@@ -123,7 +123,7 @@ acpi_ds_init_buffer_field(u16 aml_opcode,
 
 		/* Offset is in bits, count is in bits */
 
-		field_flags = AML_FIELD_ACCESS_BYTE;
+		field_flags = AML_FIELD_ACCESS_BUFFER;
 		bit_offset = offset;
 		bit_count = (u32) length_desc->integer.value;
 

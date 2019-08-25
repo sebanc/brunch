@@ -102,6 +102,7 @@ acpi_ex_read_data_from_field(struct acpi_walk_state *walk_state,
 	void *buffer;
 	u32 function;
 	u16 accessor_type;
+	u8 field_flags;
 
 	ACPI_FUNCTION_TRACE_PTR(ex_read_data_from_field, obj_desc);
 
@@ -199,11 +200,16 @@ acpi_ex_read_data_from_field(struct acpi_walk_state *walk_state,
 	 * Note: Field.length is in bits.
 	 */
 	length =
-	    (acpi_size)ACPI_ROUND_BITS_UP_TO_BYTES(obj_desc->field.bit_length);
+	    (acpi_size)ACPI_ROUND_BITS_UP_TO_BYTES(obj_desc->common_field.bit_length);
+	field_flags = obj_desc->common_field.field_flags;
 
-	if (length > acpi_gbl_integer_byte_width) {
+	if (length > acpi_gbl_integer_byte_width ||
+	    (field_flags & AML_FIELD_ACCESS_TYPE_MASK) == AML_FIELD_ACCESS_BUFFER) {
 
-		/* Field is too large for an Integer, create a Buffer instead */
+		/*
+		 * Field is either too large for an Integer, or a actually of type
+		 * buffer, so create a Buffer.
+		 */
 
 		buffer_desc = acpi_ut_create_buffer_object(length);
 		if (!buffer_desc) {
@@ -366,19 +372,7 @@ acpi_ex_write_data_to_field(union acpi_operand_object *source_desc,
 		} else if (obj_desc->field.region_obj->region.space_id ==
 			   ACPI_ADR_SPACE_GSBUS) {
 			accessor_type = obj_desc->field.attribute;
-			length =
-			    acpi_ex_get_serial_access_length(accessor_type,
-							     obj_desc->field.
-							     access_length);
-
-			/*
-			 * Add additional 2 bytes for the generic_serial_bus data buffer:
-			 *
-			 *     Status;    (Byte 0 of the data buffer)
-			 *     Length;    (Byte 1 of the data buffer)
-			 *     Data[x-1]: (Bytes 2-x of the arbitrary length data buffer)
-			 */
-			length += 2;
+			length = source_desc->buffer.length;
 			function = ACPI_WRITE | (accessor_type << 16);
 		} else {	/* IPMI */
 

@@ -38,9 +38,14 @@
  * forcibly disable it to allow proper screen updates.
  */
 
+#include <linux/surface_devices_dmi.h>
+
 #include "intel_drv.h"
 #include "i915_drv.h"
 #include "intel_frontbuffer.h"
+
+static const struct dmi_system_id devices[] = surface_all_devices;
+
 static inline bool fbc_supported(struct drm_i915_private *dev_priv)
 {
 	return HAS_FBC(dev_priv);
@@ -788,6 +793,11 @@ static bool intel_fbc_can_activate(struct intel_crtc *crtc)
 static bool intel_fbc_can_enable(struct drm_i915_private *dev_priv)
 {
 	struct intel_fbc *fbc = &dev_priv->fbc;
+
+	if (dmi_check_system(devices)) {
+		fbc->no_fbc_reason = "unsupported on Microsoft Surface devices";
+		return false;
+	}
 
 	if (intel_vgpu_active(dev_priv)) {
 		fbc->no_fbc_reason = "VGPU is active";

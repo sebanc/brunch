@@ -39,6 +39,7 @@
 #include <linux/acpi.h>
 #include <linux/of.h>
 #include <linux/regulator/consumer.h>
+#include <linux/surface_devices_dmi.h>
 
 #include <linux/platform_data/i2c-hid.h>
 
@@ -58,6 +59,8 @@
 
 #define I2C_HID_PWR_ON		0x00
 #define I2C_HID_PWR_SLEEP	0x01
+
+static const struct dmi_system_id devices[] = surface_all_devices;
 
 /* debug option */
 static bool debug;
@@ -395,6 +398,9 @@ static int i2c_hid_set_power(struct i2c_client *client, int power_state)
 	unsigned long now, delay;
 
 	i2c_hid_dbg(ihid, "%s\n", __func__);
+
+	if (dmi_check_system(devices) && !strncmp(client->name, "MSHW0030", 8))
+		return 0;
 
 	/*
 	 * Some devices require to send a command to wakeup before power on.

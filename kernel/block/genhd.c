@@ -37,6 +37,7 @@ static DEFINE_SPINLOCK(ext_devt_lock);
 static DEFINE_IDR(ext_devt_idr);
 
 static const struct device_type disk_type;
+static int fake_removable = -1;
 
 static void disk_check_events(struct disk_events *ev,
 			      unsigned int *clearing_ptr);
@@ -1099,8 +1100,26 @@ static ssize_t disk_removable_show(struct device *dev,
 {
 	struct gendisk *disk = dev_to_disk(dev);
 
+	if (fake_removable != -1)
+		return sprintf(buf, "%d\n", fake_removable);
+
 	return sprintf(buf, "%d\n",
 		       (disk->flags & GENHD_FL_REMOVABLE ? 1 : 0));
+}
+
+static ssize_t disk_removable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int value;
+
+	sscanf(buf, "%d", &value);
+
+	if (value == 0 || value == 1) {
+		fake_removable = value;
+		return count;
+	}
+
+	return -EINVAL;
 }
 
 static ssize_t disk_hidden_show(struct device *dev,
@@ -1148,7 +1167,7 @@ static ssize_t disk_discard_alignment_show(struct device *dev,
 
 static DEVICE_ATTR(range, 0444, disk_range_show, NULL);
 static DEVICE_ATTR(ext_range, 0444, disk_ext_range_show, NULL);
-static DEVICE_ATTR(removable, 0444, disk_removable_show, NULL);
+static DEVICE_ATTR(removable, 0644, disk_removable_show, disk_removable_store);
 static DEVICE_ATTR(hidden, 0444, disk_hidden_show, NULL);
 static DEVICE_ATTR(ro, 0444, disk_ro_show, NULL);
 static DEVICE_ATTR(size, 0444, part_size_show, NULL);

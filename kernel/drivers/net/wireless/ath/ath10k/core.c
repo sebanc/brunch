@@ -11,6 +11,7 @@
 #include <linux/property.h>
 #include <linux/dmi.h>
 #include <linux/ctype.h>
+#include <linux/surface_devices_dmi.h>
 #include <asm/byteorder.h>
 
 #include "core.h"
@@ -24,6 +25,8 @@
 #include "testmode.h"
 #include "wmi-ops.h"
 #include "coredump.h"
+
+static const struct dmi_system_id devices[] = surface_go_devices;
 
 unsigned int ath10k_debug_mask;
 EXPORT_SYMBOL(ath10k_debug_mask);
@@ -2019,6 +2022,9 @@ static int ath10k_init_hw_params(struct ath10k *ar)
 	}
 
 	ar->hw_params = *hw_params;
+
+	if (dmi_check_system(devices))
+		ar->hw_params.fw.board = "surface_go.bin";
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "Hardware name %s version 0x%x\n",
 		   ar->hw_params.name, ar->target_version);

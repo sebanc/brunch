@@ -614,6 +614,17 @@ static int __init dmi_smbios3_present(const u8 *buf)
 	return 1;
 }
 
+static void __init dmi_surface3_workaround(void)
+{
+	const char *surface3_product_name = "Surface 3";
+	const char *surface3_sys_vendor = "Microsoft Corporation";
+
+	if (!strncmp(dmi_ident[DMI_PRODUCT_NAME], "OEMB", 4) && !strncmp(dmi_ident[DMI_SYS_VENDOR], "OEMB", 4)) {
+		dmi_ident[DMI_PRODUCT_NAME] = surface3_product_name;
+		dmi_ident[DMI_SYS_VENDOR] = surface3_sys_vendor;
+	}
+}
+
 void __init dmi_scan_machine(void)
 {
 	char __iomem *p, *q;
@@ -642,6 +653,7 @@ void __init dmi_scan_machine(void)
 
 			if (!dmi_smbios3_present(buf)) {
 				dmi_available = 1;
+				dmi_surface3_workaround();
 				return;
 			}
 		}

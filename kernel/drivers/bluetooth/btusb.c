@@ -32,6 +32,7 @@
 #include <linux/gpio/consumer.h>
 #include <asm/unaligned.h>
 #include <linux/delay.h>
+#include <linux/surface_devices_dmi.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
@@ -41,6 +42,8 @@
 #include "btrtl.h"
 
 #define VERSION "0.8"
+
+static const struct dmi_system_id devices[] = surface_mwifiex_pcie_devices;
 
 static bool disable_scofix;
 static bool force_scofix;
@@ -3375,7 +3378,7 @@ static int btusb_probe(struct usb_interface *intf,
 	}
 #endif
 
-	if (enable_autosuspend)
+	if (enable_autosuspend && !dmi_check_system(devices))
 		usb_enable_autosuspend(data->udev);
 
 	err = hci_register_dev(hdev);

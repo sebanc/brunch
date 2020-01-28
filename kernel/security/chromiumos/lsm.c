@@ -283,7 +283,7 @@ static int chromiumos_security_inode_follow_link(struct dentry *dentry,
 	enum chromiumos_inode_security_policy policy;
 
 	/* Deny if symlinks have been disabled on this superblock. */
-	if (chromiumos_check_sb_nosymfollow_hashtable(dentry->d_sb)) {
+	if (0 && chromiumos_check_sb_nosymfollow_hashtable(dentry->d_sb)) {
 		WARN(1,
 		     "Blocked symlink traversal for path %x:%x:%s (symlinks were disabled on this FS through the 'nosymfollow' mount option)\n",
 		     MAJOR(dentry->d_sb->s_dev),

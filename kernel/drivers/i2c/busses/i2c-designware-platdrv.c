@@ -30,8 +30,11 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/suspend.h>
+#include <linux/surface_devices_dmi.h>
 
 #include "i2c-designware-core.h"
+
+static const struct dmi_system_id devices[] = surface_go_devices;
 
 static u32 i2c_dw_get_clk_rate_khz(struct dw_i2c_dev *dev)
 {
@@ -352,6 +355,9 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
 		pm_runtime_get_noresume(&pdev->dev);
 
 	pm_runtime_enable(&pdev->dev);
+
+	if (dmi_check_system(devices))
+		pm_runtime_forbid(&pdev->dev);
 
 	if (dev->mode == DW_IC_SLAVE)
 		ret = i2c_dw_probe_slave(dev);

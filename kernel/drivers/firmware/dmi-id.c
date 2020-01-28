@@ -26,7 +26,10 @@ static ssize_t sys_dmi_field_show(struct device *dev,
 {
 	int field = to_dmi_dev_attr(attr)->field;
 	ssize_t len;
-	len = scnprintf(page, PAGE_SIZE, "%s\n", dmi_get_system_info(field));
+	if (field == DMI_PRODUCT_NAME)
+		len = scnprintf(page, PAGE_SIZE, "Brunch\n");
+	else
+		len = scnprintf(page, PAGE_SIZE, "%s\n", dmi_get_system_info(field));
 	page[len-1] = '\n';
 	return len;
 }

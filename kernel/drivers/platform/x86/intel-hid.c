@@ -60,15 +60,19 @@ static const struct key_entry intel_hid_keymap[] = {
 /* 5 button array notification value. */
 static const struct key_entry intel_array_keymap[] = {
 	{ KE_KEY,    0xC2, { KEY_LEFTMETA } },                /* Press */
-	{ KE_IGNORE, 0xC3, { KEY_LEFTMETA } },                /* Release */
+	{ KE_KEY,    0xC3, { KEY_LEFTMETA } },                /* Release */
 	{ KE_KEY,    0xC4, { KEY_VOLUMEUP } },                /* Press */
-	{ KE_IGNORE, 0xC5, { KEY_VOLUMEUP } },                /* Release */
+	{ KE_KEY,    0xC5, { KEY_VOLUMEUP } },                /* Release */
 	{ KE_KEY,    0xC6, { KEY_VOLUMEDOWN } },              /* Press */
-	{ KE_IGNORE, 0xC7, { KEY_VOLUMEDOWN } },              /* Release */
+	{ KE_KEY,    0xC7, { KEY_VOLUMEDOWN } },              /* Release */
 	{ KE_KEY,    0xC8, { KEY_ROTATE_LOCK_TOGGLE } },      /* Press */
-	{ KE_IGNORE, 0xC9, { KEY_ROTATE_LOCK_TOGGLE } },      /* Release */
+	{ KE_KEY,    0xC9, { KEY_ROTATE_LOCK_TOGGLE } },      /* Release */
+	{ KE_SW,     0xCA, { .sw = { SW_DOCK, 1 } } },	      /* Docked */
+	{ KE_SW,     0xCB, { .sw = { SW_DOCK, 0 } } },	      /* Undocked */
+ 	{ KE_SW,     0xCC, { .sw = { SW_TABLET_MODE, 1 } } }, /* Tablet */
+ 	{ KE_SW,     0xCD, { .sw = { SW_TABLET_MODE, 0 } } }, /* Clamshell */
 	{ KE_KEY,    0xCE, { KEY_POWER } },                   /* Press */
-	{ KE_IGNORE, 0xCF, { KEY_POWER } },                   /* Release */
+	{ KE_KEY,    0xCF, { KEY_POWER } },                   /* Release */
 	{ KE_END },
 };
 
@@ -343,6 +347,7 @@ static void notify_handler(acpi_handle handle, u32 event, void *context)
 	struct platform_device *device = context;
 	struct intel_hid_priv *priv = dev_get_drvdata(&device->dev);
 	unsigned long long ev_index;
+	struct key_entry *key;
 
 	if (priv->wakeup_mode) {
 		/*
@@ -386,6 +391,23 @@ wakeup:
 			input_report_key(priv->input_dev, KEY_POWER, 0);
 			input_sync(priv->input_dev);
 			return;
+		}
+	}
+
+	if (priv->array) {
+		switch(event) {
+			case 0xc2: case 0xc4: case 0xc6: case 0xc8: case 0xce:
+				key = sparse_keymap_entry_from_scancode(
+					priv->array, event);
+				input_report_key(priv->array, key->keycode, 1);
+				input_sync(priv->array);
+				return;
+			case 0xc3: case 0xc5: case 0xc7: case 0xc9: case 0xcf:
+				key = sparse_keymap_entry_from_scancode(
+					priv->array, event);
+				input_report_key(priv->array, key->keycode, 0);
+				input_sync(priv->array);
+				return;
 		}
 	}
 

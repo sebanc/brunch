@@ -19,6 +19,7 @@
 #include <linux/netlink.h>
 #include <linux/nospec.h>
 #include <linux/etherdevice.h>
+#include <linux/surface_devices_dmi.h>
 #include <net/net_namespace.h>
 #include <net/genetlink.h>
 #include <net/cfg80211.h>
@@ -28,6 +29,8 @@
 #include "nl80211.h"
 #include "reg.h"
 #include "rdev-ops.h"
+
+static const struct dmi_system_id devices[] = surface_mwifiex_pcie_devices;
 
 static int nl80211_crypto_settings(struct cfg80211_registered_device *rdev,
 				   struct genl_info *info,
@@ -10187,8 +10190,11 @@ static int nl80211_set_power_save(struct sk_buff *skb, struct genl_info *info)
 
 	state = (ps_state == NL80211_PS_ENABLED) ? true : false;
 
-	if (state == wdev->ps)
+	if (state == wdev->ps && !dmi_check_system(devices))
 		return 0;
+
+	if (dmi_check_system(devices))
+		state = false;
 
 	err = rdev_set_power_mgmt(rdev, dev, state, wdev->ps_timeout);
 	if (!err)

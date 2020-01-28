@@ -17,6 +17,8 @@
  * this warranty disclaimer.
  */
 
+#include <linux/surface_devices_dmi.h>
+
 #include "decl.h"
 #include "ioctl.h"
 #include "util.h"
@@ -25,6 +27,8 @@
 #include "wmm.h"
 #include "11n.h"
 #include "11ac.h"
+
+static const struct dmi_system_id devices[] = surface_mwifiex_pcie_devices;
 
 static bool drcs;
 module_param(drcs, bool, 0644);
@@ -2395,7 +2399,7 @@ int mwifiex_sta_init_cmd(struct mwifiex_private *priv, u8 first_sta, bool init)
 	if (ret)
 		return -1;
 
-	if (!disable_auto_ds && first_sta &&
+	if (!dmi_check_system(devices) && !disable_auto_ds && first_sta &&
 	    priv->bss_type != MWIFIEX_BSS_TYPE_UAP) {
 		/* Enable auto deep sleep */
 		auto_ds.auto_ds = DEEP_SLEEP_ON;

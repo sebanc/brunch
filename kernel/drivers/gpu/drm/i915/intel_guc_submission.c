@@ -356,6 +356,11 @@ static void guc_stage_desc_init(struct intel_guc *guc,
 
 	desc->attribute = GUC_STAGE_DESC_ATTR_ACTIVE |
 			  GUC_STAGE_DESC_ATTR_KERNEL;
+#if IS_ENABLED(CONFIG_INTEL_IPTS)
+	if (client->engines == RENDER_RING)
+		desc->attribute = GUC_STAGE_DESC_ATTR_ACTIVE |
+				  GUC_STAGE_DESC_ATTR_PCH;
+#endif
 	if (is_high_priority(client))
 		desc->attribute |= GUC_STAGE_DESC_ATTR_PREEMPT;
 	desc->stage_id = client->stage_id;
@@ -1185,6 +1190,10 @@ static void guc_interrupts_capture(struct drm_i915_private *dev_priv)
 	/* route USER_INTERRUPT to Host, all others are sent to GuC. */
 	irqs = GT_RENDER_USER_INTERRUPT << GEN8_RCS_IRQ_SHIFT |
 	       GT_RENDER_USER_INTERRUPT << GEN8_BCS_IRQ_SHIFT;
+#if IS_ENABLED(CONFIG_INTEL_IPTS)
+	irqs |= GT_RENDER_PIPECTL_NOTIFY_INTERRUPT << GEN8_RCS_IRQ_SHIFT;
+#endif
+
 	/* These three registers have the same bit definitions */
 	I915_WRITE(GUC_BCS_RCS_IER, ~irqs);
 	I915_WRITE(GUC_VCS2_VCS1_IER, ~irqs);
@@ -1327,6 +1336,75 @@ void intel_guc_submission_disable(struct intel_guc *guc)
 	guc_interrupts_release(dev_priv);
 	guc_clients_doorbell_fini(guc);
 }
+
+#if IS_ENABLED(CONFIG_INTEL_IPTS)
+int intel_ipts_guc_submission_enable(void)
+{
+	struct i915_gem_context *gem_context;
+	int ret = 0;
+
+	gem_context = i915_gem_context_create_kernel(intel_ipts.to_i915, I915_PRIORITY_NORMAL);
+	if (IS_ERR(gem_context)) {
+		ret = PTR_ERR(gem_context);
+		DRM_ERROR("IPTS: Failed to create IPTS context (error %d)\n", ret);
+		return ret;
+	}
+
+	intel_ipts.ipts_context = intel_context_pin(gem_context, intel_ipts.to_i915->engine[RCS]);
+	if (ret) {
+		DRM_ERROR("IPTS: Context pin failed : %d\n", ret);
+		i915_gem_context_put(gem_context);
+		intel_ipts.ipts_context = NULL;
+		return ret;
+	}
+
+	intel_ipts.ipts_client = guc_client_alloc(intel_ipts.to_i915,
+				  		  RENDER_RING,
+				  		  GUC_CLIENT_PRIORITY_NORMAL,
+				  		  intel_ipts.ipts_context->gem_context);
+	if (IS_ERR(intel_ipts.ipts_client)) {
+		DRM_ERROR("IPTS: Failed to create IPTS GUC client!\n");
+		ret = PTR_ERR(intel_ipts.ipts_client);
+		goto err_client;
+	}
+
+	ret = create_doorbell(intel_ipts.ipts_client);
+	if (ret) {
+		DRM_ERROR("IPTS: Failed to create IPTS GUC doorbell!\n");
+		goto err_doorbell;
+	}
+
+	intel_ipts.initialized = true;
+
+	return 0;
+
+err_doorbell:
+	guc_client_free(intel_ipts.ipts_client);
+	intel_ipts.ipts_client = NULL;
+
+err_client:
+	intel_context_unpin(intel_ipts.ipts_context);
+	intel_ipts.ipts_context = NULL;
+
+	return ret;
+}
+
+void intel_ipts_guc_submission_disable(void)
+{
+	if (!intel_ipts.initialized)
+		return;
+
+	intel_ipts.initialized = false;
+
+	destroy_doorbell(intel_ipts.ipts_client);
+
+	guc_client_free(intel_ipts.ipts_client);
+	intel_ipts.ipts_client = NULL;
+
+	intel_context_unpin(intel_ipts.ipts_context);
+	intel_ipts.ipts_context = NULL;
+}
+#endif
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
 #include "selftests/intel_guc.c"

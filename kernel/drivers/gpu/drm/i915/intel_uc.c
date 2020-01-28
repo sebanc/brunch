@@ -84,6 +84,29 @@ static int __get_default_guc_log_level(struct drm_i915_private *i915)
 	return guc_log_level;
 }
 
+#if IS_ENABLED(CONFIG_INTEL_IPTS)
+int intel_ipts_detect(struct drm_i915_private *i915)
+{
+	acpi_handle handle;
+	acpi_status status;
+	struct acpi_device_info *device_info;
+
+	status = acpi_get_handle(ACPI_ROOT_OBJECT, "\\_SB.TSML", &handle);
+	if (ACPI_FAILURE(status))
+		return -ENODEV;
+
+	status = acpi_get_object_info(handle, &device_info);
+	if (ACPI_FAILURE(status))
+		return -ENODEV;
+
+	intel_ipts.to_i915 = i915;
+	i915_modparams.enable_guc = -1;
+	snprintf(intel_ipts.hardware_id, sizeof(intel_ipts.hardware_id), "%s", device_info->hardware_id.string);
+
+	return 0;
+}
+#endif
+
 /**
  * sanitize_options_early - sanitize uC related modparam options
  * @i915: device private
@@ -105,6 +128,10 @@ static void sanitize_options_early(struct drm_i915_private *i915)
 {
 	struct intel_uc_fw *guc_fw = &i915->guc.fw;
 	struct intel_uc_fw *huc_fw = &i915->huc.fw;
+
+#if IS_ENABLED(CONFIG_INTEL_IPTS)
+	intel_ipts_detect(i915);
+#endif
 
 	/* A negative value means "use platform default" */
 	if (i915_modparams.enable_guc < 0)

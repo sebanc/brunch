@@ -62,6 +62,9 @@
 #include "intel_device_info.h"
 #include "intel_display.h"
 #include "intel_dpll_mgr.h"
+#if IS_ENABLED(CONFIG_INTEL_IPTS)
+#include "intel_ipts.h"
+#endif
 #include "intel_lrc.h"
 #include "intel_opregion.h"
 #include "intel_ringbuffer.h"

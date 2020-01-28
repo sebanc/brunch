@@ -692,9 +692,7 @@ static int sensor_hub_probe(struct hid_device *hdev,
 			if (last_hsdev)
 				last_hsdev->end_collection_index = i;
 			last_hsdev = hsdev;
-			name = devm_kasprintf(&hdev->dev, GFP_KERNEL,
-					      "HID-SENSOR-%x",
-					      collection->usage);
+			name = devm_kasprintf(&hdev->dev, GFP_KERNEL, "cros-ec-compat");
 			if (name == NULL) {
 				hid_err(hdev, "Failed MFD device name\n");
 				ret = -ENOMEM;

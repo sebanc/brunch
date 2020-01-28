@@ -18,6 +18,7 @@
  */
 
 #include <linux/firmware.h>
+#include <linux/surface_devices_dmi.h>
 
 #include "decl.h"
 #include "ioctl.h"
@@ -30,6 +31,8 @@
 
 #define PCIE_VERSION	"1.0"
 #define DRV_NAME        "Marvell mwifiex PCIe"
+
+static const struct dmi_system_id devices[] = surface_mwifiex_pcie_devices;
 
 static struct mwifiex_if_ops pcie_ops;
 
@@ -139,6 +142,45 @@ static bool mwifiex_pcie_ok_to_access_hw(struct mwifiex_adapter *adapter)
 }
 
 #ifdef CONFIG_PM_SLEEP
+static int mwifiex_pcie_suspend_surface(struct device *dev)
+{
+	struct pcie_service_card *card;
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct mwifiex_adapter *adapter;
+	struct mwifiex_private *priv;
+	const struct mwifiex_pcie_card_reg *reg;
+	u32 fw_status;
+	int ret;
+
+	card = pci_get_drvdata(pdev);
+
+	wait_for_completion(&card->fw_done);
+
+	adapter = card->adapter;
+	if (!adapter || !adapter->priv_num)
+		return 0;
+
+	reg = card->pcie.reg;
+	if (reg)
+		ret = mwifiex_read_reg(adapter, reg->fw_status, &fw_status);
+	else
+		fw_status = -1;
+
+	if (fw_status == FIRMWARE_READY_PCIE && !adapter->mfg_mode) {
+		mwifiex_deauthenticate_all(adapter);
+
+		priv = mwifiex_get_priv(adapter, MWIFIEX_BSS_ROLE_ANY);
+
+		mwifiex_disable_auto_ds(priv);
+
+		mwifiex_init_shutdown_fw(priv, MWIFIEX_FUNC_SHUTDOWN);
+	}
+
+	mwifiex_remove_card(adapter);
+
+	return 0;
+}
+
 /*
  * Kernel needs to suspend all functions separately. Therefore all
  * registered functions must have drivers with suspend and resume
@@ -152,6 +194,9 @@ static int mwifiex_pcie_suspend(struct device *dev)
 	struct mwifiex_adapter *adapter;
 	struct pcie_service_card *card;
 	struct pci_dev *pdev = to_pci_dev(dev);
+
+	if (dmi_check_system(devices))
+		return mwifiex_pcie_suspend_surface(dev);
 
 	card = pci_get_drvdata(pdev);
 
@@ -184,6 +229,34 @@ static int mwifiex_pcie_suspend(struct device *dev)
 	return 0;
 }
 
+static int mwifiex_pcie_resume_surface(struct device *dev)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct pcie_service_card *card;
+	int ret;
+
+	card = pci_get_drvdata(pdev);
+
+	init_completion(&card->fw_done);
+
+	card->dev = pdev;
+
+	/* device tree node parsing and platform specific configuration*/
+	if (pdev->dev.of_node) {
+		ret = mwifiex_pcie_probe_of(&pdev->dev);
+		if (ret)
+			return ret;
+	}
+
+	if (mwifiex_add_card(card, &card->fw_done, &pcie_ops,
+			     MWIFIEX_PCIE, &pdev->dev)) {
+		pr_err("%s failed\n", __func__);
+		return -1;
+	}
+
+	return 0;
+}
+
 /*
  * Kernel needs to suspend all functions separately. Therefore all
  * registered functions must have drivers with suspend and resume
@@ -197,6 +270,9 @@ static int mwifiex_pcie_resume(struct device *dev)
 	struct mwifiex_adapter *adapter;
 	struct pcie_service_card *card;
 	struct pci_dev *pdev = to_pci_dev(dev);
+
+	if (dmi_check_system(devices))
+		return mwifiex_pcie_resume_surface(dev);
 
 	card = pci_get_drvdata(pdev);
 
@@ -270,6 +346,9 @@ static int mwifiex_pcie_probe(struct pci_dev *pdev,
 		pr_err("%s failed\n", __func__);
 		return -1;
 	}
+
+	if (dmi_check_system(devices))
+		pdev->bus->self->bridge_d3 = false;
 
 	return 0;
 }

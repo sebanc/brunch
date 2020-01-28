@@ -1,0 +1,18 @@
+--- a/chroot/usr/sbin/write_gpt.sh	2019-02-18 07:01:21.000000000 +0100
++++ b/chroot/usr/sbin/write_gpt.sh	2019-02-28 07:02:59.318167871 +0100
+@@ -68,7 +68,10 @@
+   ${GPT} add -i 6 -b $(( curr / block_size )) -s ${blocks} -t kernel     -l "KERN-C" ${target}
+-  : $(( curr += blocks * block_size ))
+-  blocks=$(( 1 / block_size ))
+-  if [ $(( 1 % block_size )) -gt 0 ]; then
+-     : $(( blocks += 1 ))
+-  fi
++  : $(( curr += blocks * block_size ))
++  if [ $(( curr % 4096 )) -gt 0 ]; then
++    : $(( curr += 4096 - curr % 4096 ))
++  fi
++  blocks=$(( 1073741824 / block_size ))
++  if [ $(( 1073741824 % block_size )) -gt 0 ]; then
++     : $(( blocks += 1 ))
++  fi
+   ${GPT} add -i 7 -b $(( curr / block_size )) -s ${blocks} -t rootfs     -l "ROOT-C" ${target}

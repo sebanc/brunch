@@ -1,0 +1,229 @@
+#!/bin/bash
+# Script to merge all configs and run 'make oldconfig' on it to wade out bad juju.
+# Then split the configs into distro-commmon and flavour-specific parts
+#
+# See this page for more details:
+# http://dev.chromium.org/chromium-os/how-tos-and-troubleshooting/kernel-configuration
+
+error() {
+	printf 'error: %b\n' "$*" >&2
+}
+
+die() {
+	error "$@"
+	exit 1
+}
+
+usage() {
+	cat <<-EOF
+	Usage: ${0##*/} [options] <oldconfig|olddefconfig|editconfig|genconfig>
+
+	Options:
+	  -f filter   Only attempt to edit configs which match filter.
+	  -h          This screen.
+	  -y          Edit all configs which match unconditionally.
+	EOF
+
+	if [[ $# -gt 0 ]]; then
+		echo
+		die "$@"
+	else
+		exit 0
+	fi
+}
+
+build_one() {
+	local arch=$1
+	local kernarch
+	local binutils_patch
+	local prefix
+	local compiler
+	local mid
+
+	# Map debian archs to kernel archs.
+	case "${arch}" in
+	armel) kernarch="arm" ;;
+	*)     kernarch="${arch}" ;;
+	esac
+
+	echo ""
+	echo "***************************************"
+	echo "* Processing ${arch} (${kernarch}) ... "
+
+	if [[ "${arch}" == "arm64" ]]; then
+		prefix=aarch64
+		compiler=clang
+		cross="${prefix}-cros-linux-gnu"
+	elif [[ "${arch}" == "x86_64" ]]; then
+		prefix=x86_64
+		compiler=clang
+		cross="${prefix}-cros-linux-gnu"
+	elif [[ "${arch}" == "armel" ]]; then
+		prefix=armv7a
+		compiler=gcc
+		cross="${prefix}-cros-linux-gnueabihf"
+	fi
+
+	set -- \
+		LD="${cross}-ld" \
+		CC="${cross}-${compiler}" \
+		CXX="${cross}-g++"
+
+	local O="$(pwd)/build/${arch}"
+	mkdir -p "${O}"
+
+	local config
+	local archconfdir="${confdir}/${arch}"
+	local flavourconfigs=( $(cd "${archconfdir}" && echo *.flavour.config) )
+
+	# Merge configs
+	# We merge base.config + common.config + <flavour>.flavour.config
+
+	for config in "${flavourconfigs[@]}"; do
+		cat \
+			"${base_conf}" \
+			"${archconfdir}/common.config" \
+			"${archconfdir}/${config}" \
+			> "${O}/.config"
+		# Call oldconfig or menuconfig
+		case ${mode} in
+		oldconfig|olddefconfig)
+			# Weed out incorrect config parameters
+			echo "* Run ${mode} on ${arch}/${config} ..."
+			make -j O="${O}" ARCH=${kernarch} "$@" "${mode}"
+			;;
+		editconfig)
+			# Interactively edit config parameters
+			if [[ -z "${filter}" || \
+			      "${arch}/${config}" == *"${filter}"* ]]; then
+				if [[ ${prompt} == "true" ]]; then
+					echo "* ${arch}/${config}: press <Enter> to edit, S to skip"
+					read -s -n 1
+				else
+					REPLY=""
+				fi
+			else
+				REPLY=s
+			fi
+
+			case ${REPLY} in
+			s|S)
+				echo "* Skip: running olddefconfig"
+				make -j O="${O}" ARCH=${kernarch} "$@" olddefconfig
+				;;
+			*)
+				echo "* Running menuconfig"
+				make -j O="${O}" ARCH=${kernarch} "$@" menuconfig
+				;;
+			esac
+			;;
+		*)	# Bad!
+			die "invalid mode ${mode}"
+			;;
+		esac
+
+		make -j O="${O}" ARCH=${kernarch} "$@" savedefconfig
+		mv "${O}/defconfig" "${archconfdir}/${config}"
+		if [[ "${keep}" == "1" ]]; then
+			mv "${O}"/.config "CONFIGS/${arch}-${config}"
+			cp "${archconfdir}/${config}" \
+				"CONFIGS/${arch}-${config}.def"
+		fi
+	done
+
+	echo "Running splitconfig for ${arch}"
+	echo
+
+	# Can we make this more robust by avoiding $tmpdir completely?
+	# This approach was used for now because I didn't want to change
+	# splitconfig
+	pushd "${archconfdir}" >/dev/null
+	rm common.config
+	"${bindir}/splitconfig"
+	mv common.config "${tmpdir}/${arch}.config"
+	popd >/dev/null
+}
+
+cleanup() {
+	rm -rf "${tmpdir}"
+}
+
+cd_kerneldir() {
+	# We have to be in the top level kernel source directory.
+	if [[ ! -f MAINTAINERS || ! -f Makefile ]]; then
+		# See if we can find it automatically first.
+		local d=$(realpath "${0%/*}/../..")
+		cd "${d}"
+		if [[ ! -f MAINTAINERS || ! -f Makefile ]]; then
+			die "This does not appear to be the kernel source directory."
+		else
+			echo "Using top kernel dir: ${d}"
+		fi
+	fi
+}
+
+main() {
+	# Process use flags first (so -h works nicely).
+	local opt
+	local filter
+	local prompt="true"
+	while getopts "f:hy" opt; do
+		case ${opt} in
+		f) filter=${OPTARG} ;;
+		h) usage ;;
+		y) prompt="false" ;;
+		*) usage "Invalid option ${opt}" ;;
+		esac
+	done
+	shift $(( OPTIND - 1 ))
+
+	if [[ ! -e /etc/cros_chroot_version ]]; then
+		die "You must run this command inside the chroot"
+	fi
+
+	# Process the remaining args.
+	local mode=$1
+	case ${mode} in
+	oldconfig|olddefconfig)  ;; # All is good
+	editconfig) ;; # All is good
+	genconfig)  ;; # All is good
+	*) usage "invalid/missing mode: ${mode}" ;;
+	esac
+
+	# Then make sure we're in the right directory.
+	cd_kerneldir
+
+	# Set up variables the build func expects.
+	local kerneldir=$(pwd)
+	local confdir="${kerneldir}/chromeos/config"
+	local archs=( x86_64 armel arm64 )
+	local bindir="${kerneldir}/chromeos/scripts"
+	local base_conf="${confdir}/base.config"
+
+	export tmpdir=$(mktemp -d)
+	trap cleanup EXIT
+
+	local keep=0
+	if [[ "${mode}" == "genconfig" ]]; then
+		keep=1
+		mode="olddefconfig"
+		mkdir -p CONFIGS
+	fi
+
+	mkdir -p build
+
+	echo "running ${mode} for ${archs[*]}"
+	echo ""
+	for arch in "${archs[@]}"; do
+		build_one "${arch}"
+	done
+
+	# Now run splitconfig on all the <arch>.common.config copied to $tmpdir.
+	pushd "${tmpdir}" >/dev/null
+	"${bindir}/splitconfig"
+	mv "common.config" "${base_conf}"
+	for arch in "${archs[@]}"; do
+		mv "${arch}.config" "${confdir}/${arch}/common.config"
+	done
+}
+main "$@"

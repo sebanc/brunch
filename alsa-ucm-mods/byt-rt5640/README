@@ -1,0 +1,7 @@
+To enable UCM on RT5640 platforms with older driver 
+(added for backwards compatibility)
+
+1. copy directory to UCM location
+sudo cp -rf ../byt-rt5640 /usr/share/alsa/ucm
+
+UCM files should be detected and use with Pulseaudio 4.0 and above

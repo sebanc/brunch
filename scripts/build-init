@@ -1,0 +1,157 @@
+#!/bin/bash
+export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+export LD_LIBRARY_PATH=/lib64:/lib:/usr/lib64:/usr/lib:/usr/local/lib64:/usr/local/lib
+export LD_RUN_PATH=/lib64:/lib:/usr/lib64:/usr/lib
+export C_INCLUDE_PATH=/home/chronos/swtpm-pkg/usr/include
+export LIBRARY_PATH=/home/chronos/swtpm-pkg/usr/lib64
+export PKG_CONFIG_PATH=/home/chronos/swtpm-pkg/usr/lib64/pkgconfig
+export LANGUAGE=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+cd /home/chronos/
+mkdir ./source
+
+version="$(/opt/google/chrome/chrome --version)"
+version=r"${version:14:2}"
+echo "Entered chroot with recovery version $version"
+
+curl -Ls https://raw.github.com/skycocker/chromebrew/master/install.sh | bash
+yes | crew install cpio expect python3 socat
+
+git clone --depth=1 -b OpenSSL_1_1_0-stable https://github.com/openssl/openssl.git
+cp -r ./openssl ./source/
+cd ./openssl
+./config
+make build_generated libcrypto.a
+mkdir -p /home/chronos/swtpm-pkg/usr/lib64
+cp libcrypto.a /home/chronos/swtpm-pkg/usr/lib64/libcrypto.a
+cd ..
+rm -rf ./openssl
+
+git clone --depth=1 -b master https://github.com/stefanberger/libtpms.git
+cp -r ./libtpms ./source/
+cd ./libtpms
+./autogen.sh --with-openssl --with-tpm2 --prefix=/home/chronos/swtpm-pkg/usr --libdir=/home/chronos/swtpm-pkg/usr/lib64 enable_hardening=no
+make
+make install
+cd ..
+rm -rf ./libtpms
+
+git clone --depth=1 -b master https://github.com/stefanberger/swtpm.git
+cp -r ./swtpm ./source/
+cd ./swtpm
+./autogen.sh with_seccomp=no with_swtpm_setup=no with_gnutls=no --prefix=/home/chronos/swtpm-pkg/usr --libdir=/home/chronos/swtpm-pkg/usr/lib64 enable_hardening=no LDFLAGS="-ldl -lpthread"
+make
+make install
+cd ..
+rm -rf ./swtpm
+
+cd ./swtpm-pkg/usr/lib64
+mv ./swtpm/* ./
+rm -r `ls | grep -v '.so'`
+cd ../bin
+rm -r `ls swtpm_* | grep -v 'swtpm_ioctl'`
+cd ..
+rm -r `ls | grep -v 'bin\|lib64'`
+cd ..
+mkdir -p ./etc/init
+cat >./etc/init/swtpm.conf <<SWTPM
+start on starting boot-services
+
+script
+   modprobe tpm_vtpm_proxy
+   mkdir -p /var/lib/swtpm
+   if [ -f "/etc/init/trunksd.conf" ]; then
+   	swtpm chardev --vtpm-proxy --tpm2 --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001
+   else
+   	swtpm chardev --vtpm-proxy --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001
+   fi
+   swtpm_ioctl --tcp :10001 -i
+end script
+SWTPM
+tar zcvf ../rootc/swtpm.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./swtpm-pkg
+
+git clone --depth=1 -b master git://git.busybox.net/busybox
+cp -r busybox ./source/
+cd busybox
+make defconfig
+sed -i 's/# CONFIG_INSTALL_NO_USR is not set/CONFIG_INSTALL_NO_USR=y/g' .config
+sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/g' .config
+make
+cd ..
+
+cd ./source
+tar zcf /out/sources_"$version".tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./source
+
+sudo chown -R chronos:chronos ./initramfs
+cd initramfs
+mkdir bin etc lib lib64 proc sbin sys tmp usr
+cp ../busybox/busybox ./bin/busybox
+for i in $(ldd /sbin/blkid | cut -d' ' -f3); do cp "$i" ./lib64; done
+cp /sbin/blkid ./sbin/
+for i in $(ldd /usr/bin/cgpt | cut -d' ' -f3); do cp "$i" ./lib64; done
+cp /usr/bin/cgpt ./sbin/
+for i in $(ldd /sbin/e2fsck | cut -d' ' -f3); do cp "$i" ./lib64; done
+cp /sbin/e2fsck ./sbin/
+for i in $(ldd /sbin/losetup | cut -d' ' -f3); do cp "$i" ./lib64; done
+cp /sbin/losetup ./sbin/
+for i in $(ldd /usr/bin/ntfs-3g | cut -d' ' -f3); do cp "$i" ./lib64; done
+cp /usr/bin/ntfs-3g ./sbin/
+find . | cpio -o -H newc | gzip > ../rootc/initramfs.img
+cd ..
+rm -rf ./busybox
+
+git clone --depth=1 -b master git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
+cp -r ./firmware-mods/* ./linux-firmware/
+cp -r ./linux-firmware ./rootc/lib/firmware
+rm -rf ./linux-firmware
+
+cd ./image
+. "/usr/sbin/write_gpt.sh"
+size=12
+locate_gpt() {
+    GPT=cgpt
+}
+blocksize() {
+    echo 512
+}
+numsectors() {
+  echo $(( $size * 1024 * 1024 * 1024 / $(blocksize) ))
+}
+dd if=/dev/zero of=./chromeos.img bs=1M count=$(( $size * 1024 )) status=progress
+write_base_table ./chromeos.img ./gptmbr.bin
+
+sudo dd if=./chromeos.img of=../brunch/maingpt.img bs=$(blocksize) count=34
+
+loopdev=`sudo losetup --show -fP ./chromeos.img`
+sudo mkdir ./tmp
+yes | sudo mkfs.ext4 -F -b 4096 -L "ROOT-C" "$loopdev"p7
+sudo mount "$loopdev"p7 ./tmp
+sudo cp -r ../rootc/* ./tmp/
+sudo umount ./tmp
+sudo dd if="$loopdev"p7 of=../brunch/rootc.img bs=1M status=progress
+sudo dd if=efi.img of="$loopdev"p12 bs=1M
+sudo mount "$loopdev"p12 ./tmp
+sudo cp ./efi-mods/efi/boot/grub.cfg ./tmp/efi/boot/
+sudo umount ./tmp
+sudo dd if="$loopdev"p12 of=../brunch/efi_legacy.img bs=1M status=progress
+sudo mount "$loopdev"p12 ./tmp
+sudo rm -r ./tmp/*
+sudo cp -r ./efi-mods/* ./tmp/
+sudo umount ./tmp
+sudo dd if="$loopdev"p12 of=../brunch/efi_secure.img bs=1M status=progress
+sudo rm -r ./tmp
+sudo losetup -d "$loopdev"
+rm ./chromeos.img
+cd ..
+
+cd ./brunch
+tar zcf /out/brunch_"$version".tar.gz * --owner=0 --group=0
+cd ..
+
+echo "End of chroot"

@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2019 Bitland Information Technology Co.LTD
+ */
+
+/dts-v1/;
+#include "mt8183-kukui-kodama.dtsi"
+
+/ {
+	model = "MediaTek kodama sku16 board";
+	compatible = "google,kodama-sku16", "google,kodama", "mediatek,mt8183";
+
+};
+
+&panel {
+	status = "okay";
+	compatible = "auo,b101uan08.3";
+	reg = <0>;
+	enable-gpios = <&pio 45 0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&panel_pins_default>;
+	avdd-supply = <&ppvarn_lcd>;
+	avee-supply = <&ppvarp_lcd>;
+	pp1800-supply = <&pp1800_lcd>;
+	rotation = <270>;
+};

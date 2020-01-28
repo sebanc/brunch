@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/spi/spi.h>
 #include <linux/acpi.h>
+#include <linux/surface_devices_dmi.h>
 
 #include <asm/unaligned.h>
 
@@ -28,6 +29,8 @@
 
 #define SURFACE3_REPORT_TOUCH	0xd2
 #define SURFACE3_REPORT_PEN	0x16
+
+static const struct dmi_system_id devices[] = surface_3_devices;
 
 struct surface3_ts_data {
 	struct spi_device *spi;
@@ -371,6 +374,9 @@ static int surface3_spi_probe(struct spi_device *spi)
 					  "Surface3-irq", data);
 	if (error)
 		return error;
+
+	if (dmi_check_system(devices))
+		spi->controller->can_dma = false;
 
 	return 0;
 }

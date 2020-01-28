@@ -191,6 +191,7 @@ static void mt_post_parse(struct mt_device *td, struct mt_application *app);
 #define MT_CLS_WIN_8				0x0012
 #define MT_CLS_EXPORT_ALL_INPUTS		0x0013
 #define MT_CLS_WIN_8_DUAL			0x0014
+#define MT_CLS_WIN_8_FORCE_GET_FEATURE		0x0015
 
 /* vendor specific classes */
 #define MT_CLS_3M				0x0101
@@ -279,6 +280,14 @@ static const struct mt_class mt_classes[] = {
 			MT_QUIRK_CONTACT_CNT_ACCURATE |
 			MT_QUIRK_WIN8_PTP_BUTTONS,
 		.export_all_inputs = true },
+	{ .name = MT_CLS_WIN_8_FORCE_GET_FEATURE,
+		.quirks = MT_QUIRK_ALWAYS_VALID |
+			MT_QUIRK_IGNORE_DUPLICATES |
+			MT_QUIRK_HOVERING |
+			MT_QUIRK_CONTACT_CNT_ACCURATE |
+			MT_QUIRK_STICKY_FINGERS |
+			MT_QUIRK_WIN8_PTP_BUTTONS |
+			MT_QUIRK_FORCE_GET_FEATURE },
 
 	/*
 	 * vendor specific classes
@@ -1972,6 +1981,10 @@ static const struct hid_device_id mt_devices[] = {
 	{ .driver_data = MT_CLS_LG,
 		HID_USB_DEVICE(USB_VENDOR_ID_LG,
 			USB_DEVICE_ID_LG_MELFAS_MT) },
+
+	/* Microsoft Surface Go type cover */
+	{ .driver_data = MT_CLS_WIN_8_FORCE_GET_FEATURE,
+		HID_DEVICE(BUS_USB, HID_GROUP_MULTITOUCH_WIN_8, 0x045e, 0x096f) },
 
 	/* MosArt panels */
 	{ .driver_data = MT_CLS_CONFIDENCE_MINUS_ONE,

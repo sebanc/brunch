@@ -44,7 +44,7 @@ You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an 
 ### Requirements
 
 - root access.
-- `tar` and `cgpt` packages/binaries.
+- `pv`, `tar` and `cgpt` packages/binaries.
 
 ### Install ChromeOS on a USB flash drive / SD card
 
@@ -89,14 +89,18 @@ The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after 
 
 ## Install ChromeOS from Windows
 
+### Requirements
+
+- Administrator access.
+
 ### Install ChromeOS on a USB flash drive / SD card
 
 1. Download a recovery image (octopus recommended) and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery version you have downloaded (from the GitHub release section).
 3. Install the Ubuntu WSL from the Microsoft store (refer to online resources).
-4. Launch Ubuntu WSL and install tar and cgpt packages:
+4. Launch Ubuntu WSL and install pv, tar and cgpt packages:
 ```
-sudo apt update && sudo apt install tar cgpt
+sudo apt update && sudo apt install pv tar cgpt
 ```
 5. Browse to your Downloads folder using `cd`:
 ```
@@ -139,15 +143,32 @@ sudo bash chromeos-install -dst < path of the ChromeOS image on the NTFS partiti
 
 The GRUB menu should appear, select "ChromeOS (boot from disk image)" and you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
 
+## Install ChromeOS on HDD from ChromeOS
+
+1. Boot your ChromeOS USB flash drive / SD card.
+2. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
+3. Identify your HDD device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive)
+4. Install ChromeOS to HDD:
+```
+sudo bash chromeos-install -dst < your HDD device. e.g. /dev/sdX >
+```
+5. Shutdown your computer and remove your ChromeOS USB flash drive / SD card.
+
+Note: Even if you boot from GRUB on your HDD, if you have a ChromeOS USB flash drive / SD card inserted, the initramfs will boot from it in priority.
+
+The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS.
+
 # Optional steps
 
 ## Framework options
 
 Some options can be passed through the kernel command lines to activate specific features which might be dangerous or not work from everyone:
 - advanced_als: default ChromeOS auto-brightness is very basic (https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md). This option activates more auto-brightness levels (based on the Google Pixel Slate implementation),
-- disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it.
-- disable_touchpad_fix: disable the patch which aims at improving touchpad sensitivity and fixing tap to click (if you encounter touchpad issues).
+- broadcom_sta: enable this option if you need the broadcom_sta module from https://github.com/antoineco/broadcom-wl,
+- disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
+- disable_touchpad_fix: disable the patch which aims at improving touchpad sensitivity and fixing tap to click (if you encounter touchpad issues),
 - enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
+- selinux_permissive: change selinux mode to permissive (try it if you have issues with android apps).
 
 Add "options=option1,option2,..." (without spaces) to the kernel command line to activate them.
 
@@ -225,11 +246,15 @@ Unfortunately, the Brunch framework has to rebuild itself by copying the origina
 
 This can in theory be due to a lot of things. However, the most likely reason is that your USB flash drive / SD card is too slow. You may try with one that has better write speed or use the dual boot method to install it on your HDD.
 
-5) Some apps do not appear on the playstore (Netflix...)
+5) Android apps are not working
+
+Android apps compatibility depends mosly on your cpu and gpu and is not guaranteed. However, you can try using the "selinux_permissive" option which appears to work in some cases (see "Framework options" section)
+
+6) Some apps do not appear on the playstore (Netflix...)
 
 In order to have access to the ChromeOS shell, ChromeOS is started in developer mode by default. If you have a stable enough system, you can remove "cros_debug" from the GRUB kernel command line (see "Modify the GRUB bootloader" section) and then do a Powerwash (ChromeOS mechanism which will wipe all your data partition) to disable developer mode.
 
-6) Some apps on the Playstore show as incompatible with my device.
+7) Some apps on the Playstore show as incompatible with my device.
 
 Some Playstore apps are not compatible with genuine Chromebooks so it is probably normal.
 

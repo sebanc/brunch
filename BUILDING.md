@@ -76,7 +76,7 @@ If you do not need Secure Boot, you can skip this step.
 
 To build the release package, you need to have:
 - root access,
-- the `cgpt` package/binary installed,
+- the `pv` and `cgpt` packages/binaries installed,
 - 16 GB free disk space available,
 - an internet connection.
 

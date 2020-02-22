@@ -55,14 +55,14 @@ fi
 
 if [[ ! -z \$framework ]]; then
 	tar zxvf "\$framework" -C /tmp rootc.img
-	dd if=/tmp/rootc.img ibs=1M status=none | pv | dd of="\$partition"7 obs=1M oflag=direct status=none
+	pv /tmp/rootc.img > "\$partition"7
 	rm /tmp/rootc.img
 	echo "Brunch updated."
 fi
 
 if [[ ! -z \$recovery ]]; then
 	loopdevice=\$(losetup --show -fP "\$recovery")
-	dd if="\$loopdevice"p3 ibs=1M status=none | pv | dd of="\$partition"5 obs=1M oflag=direct status=none
+	pv "\$loopdevice"p3 > "\$partition"5
 	losetup -d "\$loopdevice"
 	cgpt add -i 2 -S 0 -T 15 -P 0 "\$destination"
 	cgpt add -i 4 -S 0 -T 15 -P 15 "\$destination"

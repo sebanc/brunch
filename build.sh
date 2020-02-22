@@ -42,7 +42,12 @@ chown -R 1000:1000 ./chroot/home/chronos/initramfs
 mkdir ./chroot/home/chronos/rootc
 cd ./kernel
 cp ./out/arch/x86/boot/bzImage ../chroot/home/chronos/rootc/kernel
-make O=out INSTALL_MOD_PATH=../../chroot/home/chronos/rootc modules_install
+make O=out INSTALL_MOD_STRIP=1 INSTALL_MOD_PATH=../../chroot/home/chronos/rootc modules_install
+cd ..
+
+cd ./broadcom-sta
+make
+cp ./wl.ko ../chroot/home/chronos/rootc/lib/modules/broadcom_sta.ko
 cd ..
 
 cp -r ./patches ./chroot/home/chronos/rootc/

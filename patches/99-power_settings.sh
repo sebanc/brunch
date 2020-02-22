@@ -17,10 +17,19 @@ if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
 echo 1 > /system/usr/share/power_manager/board_specific/suspend_to_idle
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 4))); fi
 
+echo 0 > /system/usr/share/power_manager/board_specific/set_wifi_transmit_power_for_tablet_mode
+if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 5))); fi
+
+echo 25000 > /system/usr/share/power_manager/board_specific/battery_stabilized_after_startup_ms
+if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 6))); fi
+
+echo 0 > /system/usr/share/power_manager/board_specific/use_cras
+if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 7))); fi
+
 for i in $(echo "$1" | sed 's#,# #g')
 do
 	if [ "$i" == "advanced_als" ]; then
-	cat >/system/usr/share/power_manager/board_specific/internal_backlight_als_steps <<ALS
+		cat >/system/usr/share/power_manager/board_specific/internal_backlight_als_steps <<ALS
 19.88 19.88 -1 15
 29.48 29.48 8 40
 37.59 37.59 25 100
@@ -31,7 +40,7 @@ do
 93.27 93.27 1100 6750
 100.0 100.0 5250 -1
 ALS
-if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 5))); fi
-fi
+		if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 8))); fi
+	fi
 done
 exit $ret

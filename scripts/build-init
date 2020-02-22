@@ -63,9 +63,9 @@ script
    modprobe tpm_vtpm_proxy
    mkdir -p /var/lib/swtpm
    if [ -f "/etc/init/trunksd.conf" ]; then
-   	swtpm chardev --vtpm-proxy --tpm2 --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001
+   	swtpm chardev --vtpm-proxy --tpm2 --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001 --flags startup-clear
    else
-   	swtpm chardev --vtpm-proxy --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001
+   	swtpm chardev --vtpm-proxy --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001 --flags startup-clear
    fi
    swtpm_ioctl --tcp :10001 -i
 end script
@@ -102,6 +102,9 @@ for i in $(ldd /sbin/losetup | cut -d' ' -f3); do cp "$i" ./lib64; done
 cp /sbin/losetup ./sbin/
 for i in $(ldd /usr/bin/ntfs-3g | cut -d' ' -f3); do cp "$i" ./lib64; done
 cp /usr/bin/ntfs-3g ./sbin/
+for i in $(ldd /usr/bin/pv | cut -d' ' -f3); do cp "$i" ./lib64; done
+cp /usr/bin/pv ./sbin/
+sudo chmod 0755 ./sbin/*
 find . | cpio -o -H newc | gzip > ../rootc/initramfs.img
 cd ..
 rm -rf ./busybox
@@ -123,7 +126,7 @@ blocksize() {
 numsectors() {
   echo $(( $size * 1024 * 1024 * 1024 / $(blocksize) ))
 }
-dd if=/dev/zero of=./chromeos.img bs=1M count=$(( $size * 1024 )) status=progress
+dd if=/dev/zero ibs=1M count=$(( $size * 1024 )) status=none | pv | dd of=./chromeos.img conv=notrunc status=none
 write_base_table ./chromeos.img ./gptmbr.bin
 
 sudo dd if=./chromeos.img of=../brunch/maingpt.img bs=$(blocksize) count=34
@@ -134,17 +137,17 @@ yes | sudo mkfs.ext4 -F -b 4096 -L "ROOT-C" "$loopdev"p7
 sudo mount "$loopdev"p7 ./tmp
 sudo cp -r ../rootc/* ./tmp/
 sudo umount ./tmp
-sudo dd if="$loopdev"p7 of=../brunch/rootc.img bs=1M status=progress
-sudo dd if=efi.img of="$loopdev"p12 bs=1M
+sudo bash -c "pv ""$loopdev""p7 > ../brunch/rootc.img"
+sudo bash -c "pv efi.img > ""$loopdev""p12"
 sudo mount "$loopdev"p12 ./tmp
 sudo cp ./efi-mods/efi/boot/grub.cfg ./tmp/efi/boot/
 sudo umount ./tmp
-sudo dd if="$loopdev"p12 of=../brunch/efi_legacy.img bs=1M status=progress
+sudo bash -c "pv ""$loopdev""p12 > ../brunch/efi_legacy.img"
 sudo mount "$loopdev"p12 ./tmp
 sudo rm -r ./tmp/*
 sudo cp -r ./efi-mods/* ./tmp/
 sudo umount ./tmp
-sudo dd if="$loopdev"p12 of=../brunch/efi_secure.img bs=1M status=progress
+sudo bash -c "pv ""$loopdev""p12 > ../brunch/efi_secure.img"
 sudo rm -r ./tmp
 sudo losetup -d "$loopdev"
 rm ./chromeos.img

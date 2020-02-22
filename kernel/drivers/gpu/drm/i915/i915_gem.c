@@ -5110,11 +5110,6 @@ int i915_gem_suspend(struct drm_i915_private *i915)
 
 	mutex_lock(&i915->drm.struct_mutex);
 
-#if IS_ENABLED(CONFIG_INTEL_IPTS)
-	if (i915_modparams.enable_guc & ENABLE_GUC_SUBMISSION && intel_ipts.to_i915)
-		intel_ipts_guc_submission_disable();
-#endif
-
 	/*
 	 * We have to flush all the executing contexts to main memory so
 	 * that they can saved in the hibernation image. To ensure the last
@@ -5238,11 +5233,6 @@ void i915_gem_resume(struct drm_i915_private *i915)
 	/* Always reload a context for powersaving. */
 	if (i915_gem_switch_to_kernel_context(i915))
 		goto err_wedged;
-
-#if IS_ENABLED(CONFIG_INTEL_IPTS)
-	if (i915_modparams.enable_guc & ENABLE_GUC_SUBMISSION && intel_ipts.to_i915)
-		intel_ipts_guc_submission_enable();
-#endif
 
 out_unlock:
 	intel_uncore_forcewake_put(i915, FORCEWAKE_ALL);
@@ -5640,11 +5630,6 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 		goto err_init_hw;
 	}
 
-#if IS_ENABLED(CONFIG_INTEL_IPTS)
-	if (i915_modparams.enable_guc & ENABLE_GUC_SUBMISSION && intel_ipts.to_i915)
-		intel_ipts_guc_submission_enable();
-#endif
-
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 	mutex_unlock(&dev_priv->drm.struct_mutex);
 
@@ -5723,10 +5708,6 @@ void i915_gem_fini(struct drm_i915_private *dev_priv)
 	i915_gem_drain_workqueue(dev_priv);
 
 	mutex_lock(&dev_priv->drm.struct_mutex);
-#if IS_ENABLED(CONFIG_INTEL_IPTS)
-	if (i915_modparams.enable_guc & ENABLE_GUC_SUBMISSION && intel_ipts.to_i915)
-		intel_ipts_guc_submission_disable();
-#endif
 	intel_uc_fini_hw(dev_priv);
 	intel_uc_fini(dev_priv);
 	i915_gem_cleanup_engines(dev_priv);

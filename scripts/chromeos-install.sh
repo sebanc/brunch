@@ -6,7 +6,7 @@ usage()
 {
 	echo ""
 	echo "Brunch installer: install chromeos on device or create disk image from the brunch framework."
-	echo "Usage: chromeos_install.sh [-s X] [-l] -in chromeos_recovery_image -out destination"
+	echo "Usage: chromeos_install.sh [-s X] [-l] -src chromeos_recovery_image -dst destination"
 	echo "-src (source), --source (source)			Chromeos recovery image"
 	echo "-dst (destination), --destination (destination)	Device (e.g. /dev/sda) or Disk image file (e.g. chromeos.img)"
 	echo "-s (disk image size), --size (disk image size)	Disk image output only: final image size in GB (default=14)"
@@ -113,25 +113,26 @@ if [[ $device = 1 ]]; then
 	loopdevice=$(losetup --show -fP "$source")
 	sleep 5
 	for (( i=1; i<=12; i++ )); do
+		echo "Writing partition $i"
 		case $i in
 			2)
-			dd if="$loopdevice"p4 of="$partition"2 bs=1M conv=notrunc status=progress
+			pv "$loopdevice"p4 > "$partition"2
 			;;
 			5)
-			dd if="$loopdevice"p3 of="$partition"5 bs=1M conv=notrunc status=progress
+			pv "$loopdevice"p3 > "$partition"5
 			;;
 			7)
-			dd if=rootc.img of="$partition"7 bs=1M conv=notrunc status=progress
+			pv rootc.img > "$partition"7
 			;;
 			12)
 			if [[ $legacy_boot = 1 ]]; then
-				dd if=efi_legacy.img of="$partition"12 bs=1M conv=notrunc status=progress
+				pv efi_legacy.img > "$partition"12
 			else
-				dd if=efi_secure.img of="$partition"12 bs=1M conv=notrunc status=progress
+				pv efi_secure.img > "$partition"12
 			fi
 			;;
 			*)
-			dd if="$loopdevice"p"$i" of="$partition""$i" bs=1M conv=notrunc status=progress
+			pv "$loopdevice"p"$i" > "$partition""$i"
 			;;
 		esac
 	done
@@ -143,18 +144,20 @@ else
 		source_start=$(cgpt show -i $3 -b "$1")
 		size=$(cgpt show -i $3 -s "$1")
 		destination_start=$(cgpt show -i $4 -b "$2")
-		dd if="$1" of="$2" bs=512 count="$size" skip="$source_start" seek="$destination_start" conv=notrunc status=progress
+		dd if="$1" ibs=512 count="$size" skip="$source_start" status=none | pv | dd of="$2" obs=512 seek="$destination_start" conv=notrunc status=none
 	}
 	if [ -f "$destination" ]; then rm "$destination"; fi
 	if [[ ! $destination == *"/"* ]]; then path="."; else path="${destination%/*}"; fi
 	if [ $(( ($(df -k --output=avail "$path" | sed 1d) - ( $image_size * 1024 * 1024)) )) -lt 0 ]; then echo "Not enought space to create image file"; exit 1; fi
-	dd if=/dev/zero of="$destination" bs=1M count=$(( $image_size * 1024 )) status=progress
+	echo "Creating image file"
+	dd if=/dev/zero bs=1M count=$(( $image_size * 1024 )) status=none | pv | dd of="$destination" conv=notrunc status=none
 	if [ ! "$?" -eq 0 ]; then echo "Could not write image here, try with sudo ?"; rm "$destination"; exit 1; fi
 	dd if="maingpt.img" of="$destination" conv=notrunc
 	cgpt repair "$destination"
 	adapt_gpt "$destination" "$destination"
 	cgpt show "$destination"
 	for (( i=1; i<=12; i++ )); do
+		echo "Writing partition $i"
 		case $i in
 			2)
 			copy_partition "$source" "$destination" 4 $i
@@ -164,14 +167,14 @@ else
 			;;
 			7)
 			destination_start=$(cgpt show -i $i -b "$destination")
-			dd if="rootc.img" of="$destination" bs=512 seek="$destination_start" conv=notrunc status=progress
+			dd if="rootc.img" status=none | pv | dd of="$destination" obs=512 seek="$destination_start" conv=notrunc status=none
 			;;
 			12)
 			destination_start=$(cgpt show -i $i -b "$destination")
 			if [[ $legacy_boot = 1 ]]; then
-				dd if="efi_legacy.img" of="$destination" bs=512 seek="$destination_start" conv=notrunc status=progress
+				dd if="efi_legacy.img" status=none | pv | dd of="$destination" obs=512 seek="$destination_start" conv=notrunc status=none
 			else
-				dd if="efi_secure.img" of="$destination" bs=512 seek="$destination_start" conv=notrunc status=progress
+				dd if="efi_secure.img" status=none | pv | dd of="$destination" obs=512 seek="$destination_start" conv=notrunc status=none
 			fi
 			;;
 			*)
@@ -187,7 +190,7 @@ To boot directly from this image file, add the lines between stars to either:
 ********************************************************************************
 menuentry "ChromeOS (boot from disk image)" {
 	img_part=$(df "$destination" --output=source  | sed -e /Filesystem/d)
-	img_path=$(echo "$destination" | sed "s#$(findmnt -n -o TARGET -T "$destination")##g")
+	img_path=$(echo $(realpath "$destination") | sed "s#$(findmnt -n -o TARGET -T "$destination")##g")
 	search --no-floppy --set=root --file \$img_path
 	loopback loop \$img_path
 	linux (loop,gpt7)/kernel boot=local noresume noswap loglevel=7 disablevmx=off \\

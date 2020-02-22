@@ -15,9 +15,6 @@ menuconfig SURFACE_SAM
 config SURFACE_SAM_SSH
 	tristate "Surface Serial Hub Driver"
 	depends on SURFACE_SAM
-	depends on X86_INTEL_LPSS
-	depends on SERIAL_8250_DW
-	depends on SERIAL_8250_DMA
 	depends on SERIAL_DEV_CTRL_TTYPORT
 	select CRC_CCITT
 	default m

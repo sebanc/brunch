@@ -63,6 +63,7 @@ mount -n "$partpath"7 /firmware
 
 rebuild=0
 rootb_is_valid=0
+echo "$(grep -o cros_debug /proc/cmdline)" > /firmware/debug_mode
 echo "$options" > /firmware/current_options
 cat /sys/class/dmi/id/product_sku > /firmware/product_sku
 md5sum=$(find /firmware ! -name 'md5sum' -type f -print0 | sort -z | xargs -r0 md5sum | md5sum)
@@ -109,7 +110,8 @@ fi
 
 if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
 	echo "brunch: rebuilding ChromeOS rootfs, it might take a few minutes..." > /dev/kmsg
-	dd if="$partpath"5 of="$partpath"3 bs=1M
+	#pv < "$partpath"5 > "$partpath"3
+	pv "$partpath"5 > "$partpath"3
 	printf '\000' | dd of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 2>&1 >/dev/null
 	mount -n "$partpath"3 /system
 	mount -n -o bind /system/etc /etc
@@ -117,9 +119,11 @@ if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
 	mount -n -o bind /system/usr /usr
 	export PATH=/system/sbin:/system/bin:/system/usr/sbin:/system/usr/bin:/sbin:/bin
 	resize2fs -f "$partpath"3
-	if [ $(blkid -s TYPE -o value "$partpath"1) == "ext2" ]; then
-		mkfs.ext4 -F -b 4096 -L "H-STATE" "$partpath"1
-	fi
+	rm -r /system/lib/firmware/*
+	rm -r /system/lib/modules/*
+	cp -r /firmware/lib/firmware/* /system/lib/firmware/
+	cp -r /firmware/lib/modules/* /system/lib/modules/
+	cp -r /firmware/usr/share/alsa/ucm/* /system/usr/share/alsa/ucm/
 	for patch in /firmware/patches/*.sh
 	do
 		"$patch" "$options"
@@ -130,15 +134,13 @@ if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
 			echo "brunch: $patch failed with ret=$ret" > /dev/kmsg
 		fi
 	done
+	if [ $(blkid -s TYPE -o value "$partpath"1) == "ext2" ]; then
+		mkfs.ext4 -F -b 4096 -L "H-STATE" "$partpath"1
+	fi
 	export PATH=/sbin:/bin
 	umount /usr
 	umount /lib64
 	umount /etc
-	rm -r /system/lib/firmware/*
-	rm -r /system/lib/modules/*
-	cp -r /firmware/lib/firmware/* /system/lib/firmware/
-	cp -r /firmware/lib/modules/* /system/lib/modules/
-	cp -r /firmware/usr/share/alsa/ucm/* /system/usr/share/alsa/ucm/
 	umount /system
 	cgpt add -i 2 -P 15 -T 15 -S 0 "$bootdevice"
 	cgpt add -i 4 -P 0 -T 15 -S 0 "$bootdevice"

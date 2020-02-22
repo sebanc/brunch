@@ -399,7 +399,7 @@ static int i2c_hid_set_power(struct i2c_client *client, int power_state)
 
 	i2c_hid_dbg(ihid, "%s\n", __func__);
 
-	if (dmi_check_system(devices) && !strncmp(client->name, "MSHW0030", 8))
+	if (dmi_check_system(devices) && (!strncmp(client->name, "MSHW0030", 8) || !strncmp(client->name, "MSHW0102", 8)))
 		return 0;
 
 	/*

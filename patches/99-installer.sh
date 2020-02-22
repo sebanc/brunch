@@ -7,7 +7,7 @@ usage()
 {
 	echo ""
 	echo "Brunch installer: install chromeos on device or create disk image from the running environment."
-	echo "Usage: chromeos_install.sh [-s X] -out destination"
+	echo "Usage: chromeos_install.sh [-s X] -dst destination"
 	echo "-dst (destination), --destination (destination)	Device (e.g. /dev/sda) or Disk image file (e.g. chromeos.img)"
 	echo "-s (disk image size), --size (disk image size)	Disk image output only: final image size in GB (default=14)"
 	echo "-h, --help					Display this menu"
@@ -102,12 +102,13 @@ if [[ \$device = 1 ]]; then
 		partsource="\$source"
 	fi
 	for (( i=1; i<=12; i++ )); do
+		echo "Writing partition \$i"
 		case \$i in
 			1)
 			mkfs.ext4 -F -b 4096 -L "H-STATE" "\$partdest""\$i"
 			;;
 			*)
-			dd if="\$partsource""\$i" ibs=1M status=none | pv | dd of="\$partdest""\$i" obs=1M oflag=direct status=none
+			pv "\$partsource""\$i" > "\$partdest""\$i"
 			;;
 		esac
 	done
@@ -115,7 +116,8 @@ if [[ \$device = 1 ]]; then
 else
 	if [ -f "\$destination" ]; then rm "\$destination"; fi
 	if [ \$(( (\$(df -k --output=avail "\${destination%/*}" | sed 1d) - ( \$image_size * 1024 * 1024)) )) -lt 0 ]; then echo "Not enought space to create image file"; exit 1; fi
-	dd if=/dev/zero of="\$destination" bs=1M count=\$(( \$image_size * 1024 )) status=progress
+	echo "Creating image file"
+	dd if=/dev/zero ibs=1M count=\$(( \$image_size * 1024 )) status=none | pv | dd of="\$destination" obs=1M conv=notrunc status=none
 	if [ ! "\$?" -eq 0 ]; then echo "Could not write image here, try with sudo ?"; rm "\$destination"; exit 1; fi
 	adapt_gpt "\$source" "\$destination"
 	cgpt show "\$destination"
@@ -127,12 +129,13 @@ else
 	loopdevice=\$(losetup --show -fP "\$destination")
 	sleep 5
 	for (( i=1; i<=12; i++ )); do
+		echo "Writing partition \$i"
 		case \$i in
 			1)
 			mkfs.ext4 -F -b 4096 -L "H-STATE" "\$loopdevice"p"\$i"
 			;;
 			*)
-			dd if="\$partsource""\$i" ibs=1M status=none | pv | dd of="\$loopdevice"p"\$i" obs=1M oflag=direct status=none
+			pv "\$partsource""\$i" > "\$loopdevice"p"\$i"
 			;;
 		esac
 	done

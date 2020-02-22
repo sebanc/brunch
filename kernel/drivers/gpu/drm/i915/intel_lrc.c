@@ -2384,9 +2384,6 @@ logical_ring_default_irqs(struct intel_engine_cs *engine)
 
 	engine->irq_enable_mask = GT_RENDER_USER_INTERRUPT << shift;
 	engine->irq_keep_mask = GT_CONTEXT_SWITCH_INTERRUPT << shift;
-#if IS_ENABLED(CONFIG_INTEL_IPTS)
-	engine->irq_keep_mask |= GT_RENDER_PIPECTL_NOTIFY_INTERRUPT << shift;
-#endif
 }
 
 static void

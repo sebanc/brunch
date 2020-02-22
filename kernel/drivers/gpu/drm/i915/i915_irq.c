@@ -1505,11 +1505,6 @@ gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir)
 	if (iir & GT_CONTEXT_SWITCH_INTERRUPT)
 		tasklet = true;
 
-#if IS_ENABLED(CONFIG_INTEL_IPTS)
-	if (iir & GT_RENDER_PIPECTL_NOTIFY_INTERRUPT)
-		intel_ipts_notify_handle_processed_data();
-#endif
-
 	if (iir & GT_RENDER_USER_INTERRUPT) {
 		notify_ring(engine);
 		tasklet |= USES_GUC_SUBMISSION(engine->i915);
@@ -4163,10 +4158,6 @@ static void gen8_gt_irq_postinstall(struct drm_i915_private *dev_priv)
 
 	if (HAS_L3_DPF(dev_priv))
 		gt_interrupts[0] |= GT_RENDER_L3_PARITY_ERROR_INTERRUPT;
-
-#if IS_ENABLED(CONFIG_INTEL_IPTS)
-		gt_interrupts[0] |= GT_RENDER_PIPECTL_NOTIFY_INTERRUPT << GEN8_RCS_IRQ_SHIFT;
-#endif
 
 	dev_priv->pm_ier = 0x0;
 	dev_priv->pm_imr = ~dev_priv->pm_ier;

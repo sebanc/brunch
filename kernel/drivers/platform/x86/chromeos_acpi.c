@@ -787,7 +787,7 @@ static ssize_t fakehwid_store(struct device *dev, struct device_attribute *attr,
 
         sscanf(buf, "%s", board);
 
-	snprintf(serial, sizeof(serial), "%s %s", board, "Z9ZZ9ZZ9ZZ9ZZ9ZZ");
+	snprintf(serial, sizeof(serial), "%s %s", board, "B2BB2BB2BB2BB2BB");
 
 	crc32_val = crc32(0 ^ 0xffffffff, serial, strlen(serial)) ^ 0xffffffff;
 
@@ -795,7 +795,7 @@ static ssize_t fakehwid_store(struct device *dev, struct device_attribute *attr,
 	crc[1] = base32_alphabet[crc32_val & 0x1f];
 	crc[2] = '\0';
 
-	snprintf(fakehwid, sizeof(fakehwid), "%s %s%s", board, "Z9Z-Z9Z-Z9Z-Z9Z-Z9Z-Z", crc);
+	snprintf(fakehwid, sizeof(fakehwid), "%s %s%s", board, "B2B-B2B-B2B-B2B-B2B-B", crc);
 
        return count;
 }

@@ -15,4 +15,10 @@ script
 end script
 SELINUX
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
+for i in $(cat /proc/cmdline); do
+	if [ "$i" == "cros_debug" ]; then
+		sed -i 's#SELINUX=enforcing#SELINUX=permissive#g' /system/etc/selinux/config
+		if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
+	fi
+done
 exit $ret

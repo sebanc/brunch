@@ -653,7 +653,6 @@ void __init dmi_scan_machine(void)
 
 			if (!dmi_smbios3_present(buf)) {
 				dmi_available = 1;
-				dmi_surface3_workaround();
 				return;
 			}
 		}
@@ -672,6 +671,7 @@ void __init dmi_scan_machine(void)
 
 		if (!dmi_present(buf)) {
 			dmi_available = 1;
+			dmi_surface3_workaround();
 			return;
 		}
 	} else if (IS_ENABLED(CONFIG_DMI_SCAN_MACHINE_NON_EFI_FALLBACK)) {

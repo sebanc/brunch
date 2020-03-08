@@ -8,7 +8,7 @@ The Brunch framework purpose is to create a generic x86_64 ChromeOS image from a
 
 **Warning: with this setup, ChromeOS is not running in a virtual machine and has therefore direct access to all your devices. As such, many bad things can happen with your device and mostly your data. Make sure you only use this framework on a device which does not contain any sensitive data and keep non-sensitive data synced with a cloud service. I cannot be held responsible for anything bad that would happen to your device, including data loss.**
 
-## Chromeos recovery image
+## ChromeOS recovery image
 
 2 types of ChromeOS recovery images exist and use different device configuration mechanisms:
 - non-unibuild images: configured for single device configurations like eve (Google Pixelbook) and nocturne (Google Pixel Slate) for example.

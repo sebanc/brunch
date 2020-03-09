@@ -80,9 +80,9 @@ To build the release package, you need to have:
 - 16 GB free disk space available,
 - an internet connection.
 
-1. Download the "octopus" ChromeOS recovery image from here (https://cros-updates-serving.appspot.com/).
+1. Download the "nautilus" ChromeOS recovery image from here (https://cros-updates-serving.appspot.com/).
 
-Note: This should work with any ChromeOS image compatible with your CPU. Nevertheless, as far as I know, the octopus recovery image has the largest kernel/rootfs partitions and therefore has the most compatible GPT partitions scheme regardless of the image you will use at install time.
+Note: This should work with any ChromeOS image compatible with your CPU. Nevertheless, as far as I know, the nautilus recovery image has the largest kernel/rootfs partitions and therefore has the most compatible GPT partitions scheme regardless of the image you will use at install time.
 
 2. Make sure you have 16GB of free space available for the build.
 

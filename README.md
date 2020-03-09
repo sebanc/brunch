@@ -15,7 +15,7 @@ The Brunch framework purpose is to create a generic x86_64 ChromeOS image from a
 - unibuild images: intended to manage multiple devices through the use of the CrosConfig tool.
 
 Contrarily to the Croissant framework which mostly supports non-unibuilds images (configuration and access to android apps), Brunch should work with both but will provide better hardware support for unibuild images.
-It is actually tested using the "octopus" ChromeOS recovery image (unibuild) which is therefore recommended.
+It is actually tested using the "nautilus" ChromeOS recovery image (unibuild) which is therefore recommended.
 
 Note: I don't see any reason why you would have better results using another recovery image as they are all very similar.
 
@@ -48,7 +48,7 @@ You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an 
 
 ### Install ChromeOS on a USB flash drive / SD card
 
-1. Download a ChromeOS recovery image (octopus recommended) and extract it.
+1. Download a ChromeOS recovery image (nautilus recommended) and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery image version you have downloaded (from the GitHub release section).
 3. Open a terminal, navigate to the directory containing the package.
 4. Extract it: 
@@ -95,7 +95,7 @@ The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after 
 
 ### Install ChromeOS on a USB flash drive / SD card
 
-1. Download a recovery image (octopus recommended) and extract it.
+1. Download a recovery image (nautilus recommended) and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery version you have downloaded (from the GitHub release section).
 3. Install the Ubuntu WSL from the Microsoft store (refer to online resources).
 4. Launch Ubuntu WSL and install pv, tar and cgpt packages:

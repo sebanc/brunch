@@ -26,7 +26,8 @@ ChromeOS recovery images can be downloaded from here: https://cros-updates-servi
 Hardware support is highly dependent on the general Linux kernel hardware compatibility. As such only Linux supported hardware will work and the same specific kernel command line options recommended for your device should be passed through the GRUB bootloader (see "Modify the GRUB bootloader" section).
 
 Base hardware compatibility:
-- x86_64 computers with Intel hardware (cpu and gpu),
+- x86_64 computers with UEFI boot support,
+- Intel hardware (cpu and gpu),
 - AMD support is untested and probably not working (to be confirmed),
 - Nvidia graphic cards are also not supported.
 
@@ -164,7 +165,7 @@ The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch
 
 Some options can be passed through the kernel command lines to activate specific features which might be dangerous or not work from everyone:
 - advanced_als: default ChromeOS auto-brightness is very basic (https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md). This option activates more auto-brightness levels (based on the Google Pixel Slate implementation),
-- broadcom_sta: enable this option if you need the broadcom_sta module from https://github.com/antoineco/broadcom-wl,
+- broadcom_wl: enable this option if you need the broadcom_wl module from https://github.com/antoineco/broadcom-wl,
 - disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
 - disable_touchpad_fix: disable the patch which aims at improving touchpad sensitivity and fixing tap to click (if you encounter touchpad issues),
 - enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),

@@ -88,7 +88,7 @@ Note: This should work with any ChromeOS image compatible with your CPU. Neverth
 
 3. Launch the build as root:
 ```
-sudo bash build.sh < path to the ChromeOS recovery image >
+sudo ./build.sh < path to the ChromeOS recovery image >
 ```
 4. Verify that everything worked well. You should have an "out" directory containing 2 tar.gz files:
 - brunch_< version >.tar.gz which contains the brunch package.

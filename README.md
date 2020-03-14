@@ -32,8 +32,7 @@ Base hardware compatibility:
 - Nvidia graphic cards are also not supported.
 
 Specific hardware support:
-- sensors: HID based accelerometer and light sensors are currently supported through a custom kernel module,
-- cameras: an experimental patch aims to allow uvcvideo compatible cameras support (testers needed),
+- sensors: an experimental patch aims to allow accelerometer and light sensors through a custom kernel module,
 - Microsoft Surface devices: dedicated kernel patches are included.
 
 # Install instructions
@@ -59,7 +58,7 @@ tar zxvf brunch_< version >.tar.gz
 5. Identify your USB flash drive / SD card device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive)
 6. Install ChromeOS on the USB flash drive / SD card:
 ```
-sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < your USB flash drive / SD card device. e.g. /dev/sdX >
+sudo ./chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < your USB flash drive / SD card device. e.g. /dev/sdX >
 ```
 7. Reboot your computer and boot from the USB flash drive / SD card (refer to your computer manufacturer's online resources).
 8. (Secure Boot only) A blue screen saying "Verfification failed: (15) Access Denied" will appear upon boot and you will have to enroll the secure boot key by selecting "OK->Enroll key from disk->EFI-SYSTEM->brunch.der->Continue". Reboot your computer and boot again from the USB flash drive / SD card.
@@ -75,7 +74,7 @@ Make sure you have an ext4 or NTFS partition with at least 14gb of free space av
 1. Perform the steps 1 to 4 as described in the previous section (Install ChromeOS on a USB flash drive / SD card).
 2. Create the ChromeOS image on your unencrypted ext4 or NTFS partition.
 ```
-sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < path to the ChromeOS image on the chosen partition > -s < ChromeOS image size in GB >
+sudo ./chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < path to the ChromeOS image on the chosen partition > -s < ChromeOS image size in GB >
 ```
 3. Copy the GRUB configuration which appears in the terminal at the end of the process (between lines with stars) to either:
 - your hard disk GRUB install if you have one (refer to you distro's online resources).
@@ -114,7 +113,7 @@ sudo tar zxvf brunch_< version >.tar.gz
 7. Make sure you have at least 14gb of free space available
 8. Create a ChromeOS image:
 ```
-sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img
+sudo ./chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img
 ```
 9. Use "Rufus" (https://rufus.ie/) to write the chromeos.img to the USB flash drive / SD card.
 10. Reboot your computer and boot from the USB flash drive / SD card (refer to your computer manufacturer's online resources).
@@ -125,7 +124,7 @@ At this stage, your USB flash drive / SD card is incorrectly recognized as 14GB 
 14. Login as `root`
 15. Execute the below command:
 ```
-sudo bash resize-data
+sudo resize-data
 ```
 16. Reboot your computer when requested and boot again from USB flash drive / SD card. You can now start using ChromeOS.
 
@@ -137,7 +136,7 @@ sudo bash resize-data
 4. Identify the destination NTFS partition within /media/removable/XXXXXXX folders.
 5. Create the disk image:
 ```
-sudo bash chromeos-install -dst < path of the ChromeOS image on the NTFS partition > -s < ChromeOS image size in GB >
+sudo chromeos-install -dst < path of the ChromeOS image on the NTFS partition > -s < ChromeOS image size in GB >
 ```
 6. Use vi to copy the GRUB configuration which is displayed in the terminal at the end of the process (between lines with stars) to the USB flash drive / SD card GRUB config file.
 7. Reboot your computer and boot from USB flash drive / SD card.
@@ -151,7 +150,7 @@ The GRUB menu should appear, select "ChromeOS (boot from disk image)" and you sh
 3. Identify your HDD device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive)
 4. Install ChromeOS to HDD:
 ```
-sudo bash chromeos-install -dst < your HDD device. e.g. /dev/sdX >
+sudo chromeos-install -dst < your HDD device. e.g. /dev/sdX >
 ```
 5. Shutdown your computer and remove your ChromeOS USB flash drive / SD card.
 
@@ -169,7 +168,7 @@ Some options can be passed through the kernel command lines to activate specific
 - disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
 - disable_touchpad_fix: disable the patch which aims at improving touchpad sensitivity and fixing tap to click (if you encounter touchpad issues),
 - enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
-- selinux_permissive: change selinux mode to permissive (try it if you have issues with android apps).
+- enable_sensors: enable experimental hid sensors support (accelerometer and light).
 
 Add "options=option1,option2,..." (without spaces) to the kernel command line to activate them.
 
@@ -184,7 +183,7 @@ It is currently recommended to only update ChromeOS when the matching version of
 3. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
 4. Update the framework:
 ```
-sudo bash chromeos-update -r < path to the ChromeOS recovery image > -f < path to the Brunch release archive >
+sudo chromeos-update -r < path to the ChromeOS recovery image > -f < path to the Brunch release archive >
 ```
 5. Restart ChromeOS
 
@@ -196,7 +195,7 @@ If you chose to use the "enable_updates" option and have updated to a new Chrome
 2. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
 3. Update the framework:
 ```
-sudo bash chromeos-update -f < path to the Brunch release archive >
+sudo chromeos-update -f < path to the Brunch release archive >
 ```
 4. Restart ChromeOS
 

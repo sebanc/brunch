@@ -15,7 +15,7 @@ The Brunch framework purpose is to create a generic x86_64 ChromeOS image from a
 - unibuild images: intended to manage multiple devices through the use of the CrosConfig tool.
 
 Contrarily to the Croissant framework which mostly supports non-unibuilds images (configuration and access to android apps), Brunch should work with both but will provide better hardware support for unibuild images.
-It is actually tested using the "nautilus" ChromeOS recovery image (unibuild) which is therefore recommended.
+It is actually tested using the "rammus" ChromeOS recovery image (unibuild) which is therefore recommended.
 
 Note: I don't see any reason why you would have better results using another recovery image as they are all very similar.
 
@@ -48,7 +48,7 @@ You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an 
 
 ### Install ChromeOS on a USB flash drive / SD card
 
-1. Download a ChromeOS recovery image (nautilus recommended) and extract it.
+1. Download a ChromeOS recovery image (rammus recommended) and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery image version you have downloaded (from the GitHub release section).
 3. Open a terminal, navigate to the directory containing the package.
 4. Extract it: 
@@ -58,7 +58,7 @@ tar zxvf brunch_< version >.tar.gz
 5. Identify your USB flash drive / SD card device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive)
 6. Install ChromeOS on the USB flash drive / SD card:
 ```
-sudo ./chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < your USB flash drive / SD card device. e.g. /dev/sdX >
+sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < your USB flash drive / SD card device. e.g. /dev/sdX >
 ```
 7. Reboot your computer and boot from the USB flash drive / SD card (refer to your computer manufacturer's online resources).
 8. (Secure Boot only) A blue screen saying "Verfification failed: (15) Access Denied" will appear upon boot and you will have to enroll the secure boot key by selecting "OK->Enroll key from disk->EFI-SYSTEM->brunch.der->Continue". Reboot your computer and boot again from the USB flash drive / SD card.
@@ -74,7 +74,7 @@ Make sure you have an ext4 or NTFS partition with at least 14gb of free space av
 1. Perform the steps 1 to 4 as described in the previous section (Install ChromeOS on a USB flash drive / SD card).
 2. Create the ChromeOS image on your unencrypted ext4 or NTFS partition.
 ```
-sudo ./chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < path to the ChromeOS image on the chosen partition > -s < ChromeOS image size in GB >
+sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < path to the ChromeOS image on the chosen partition > -s < ChromeOS image size in GB >
 ```
 3. Copy the GRUB configuration which appears in the terminal at the end of the process (between lines with stars) to either:
 - your hard disk GRUB install if you have one (refer to you distro's online resources).
@@ -95,7 +95,7 @@ The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after 
 
 ### Install ChromeOS on a USB flash drive / SD card
 
-1. Download a recovery image (nautilus recommended) and extract it.
+1. Download a recovery image (rammus recommended) and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery version you have downloaded (from the GitHub release section).
 3. Install the Ubuntu WSL from the Microsoft store (refer to online resources).
 4. Launch Ubuntu WSL and install pv, tar and cgpt packages:
@@ -113,7 +113,7 @@ sudo tar zxvf brunch_< version >.tar.gz
 7. Make sure you have at least 14gb of free space available
 8. Create a ChromeOS image:
 ```
-sudo ./chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img
+sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img
 ```
 9. Use "Rufus" (https://rufus.ie/) to write the chromeos.img to the USB flash drive / SD card.
 10. Reboot your computer and boot from the USB flash drive / SD card (refer to your computer manufacturer's online resources).

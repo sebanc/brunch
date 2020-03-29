@@ -8,20 +8,7 @@ The Brunch framework purpose is to create a generic x86_64 ChromeOS image from a
 
 **Warning: with this setup, ChromeOS is not running in a virtual machine and has therefore direct access to all your devices. As such, many bad things can happen with your device and mostly your data. Make sure you only use this framework on a device which does not contain any sensitive data and keep non-sensitive data synced with a cloud service. I cannot be held responsible for anything bad that would happen to your device, including data loss.**
 
-## ChromeOS recovery image
-
-2 types of ChromeOS recovery images exist and use different device configuration mechanisms:
-- non-unibuild images: configured for single device configurations like eve (Google Pixelbook) and nocturne (Google Pixel Slate) for example.
-- unibuild images: intended to manage multiple devices through the use of the CrosConfig tool.
-
-Contrarily to the Croissant framework which mostly supports non-unibuilds images (configuration and access to android apps), Brunch should work with both but will provide better hardware support for unibuild images.
-It is actually tested using the "rammus" ChromeOS recovery image (unibuild) which is therefore recommended.
-
-Note: I don't see any reason why you would have better results using another recovery image as they are all very similar.
-
-ChromeOS recovery images can be downloaded from here: https://cros-updates-serving.appspot.com/
-
-## Hardware support
+## Hardware support and added features
 
 Hardware support is highly dependent on the general Linux kernel hardware compatibility. As such only Linux supported hardware will work and the same specific kernel command line options recommended for your device should be passed through the GRUB bootloader (see "Modify the GRUB bootloader" section).
 
@@ -34,6 +21,23 @@ Base hardware compatibility:
 Specific hardware support:
 - sensors: an experimental patch aims to allow accelerometer and light sensors through a custom kernel module,
 - Microsoft Surface devices: dedicated kernel patches are included.
+
+Additional features:
+- nano text editor
+- qemu (with spice support)
+
+## ChromeOS recovery images
+
+2 types of ChromeOS recovery images exist and use different device configuration mechanisms:
+- non-unibuild images: configured for single device configurations like eve (Google Pixelbook) and nocturne (Google Pixel Slate) for example.
+- unibuild images: intended to manage multiple devices through the use of the CrosConfig tool.
+
+Contrarily to the Croissant framework which mostly supports non-unibuilds images (configuration and access to android apps), Brunch should work with both but will provide better hardware support for unibuild images.
+It is actually tested using the "rammus" ChromeOS recovery image (unibuild) which is therefore recommended.
+
+Note: I don't see any reason why you would have better results using another recovery image as they are all very similar.
+
+ChromeOS recovery images can be downloaded from here: https://cros-updates-serving.appspot.com/
 
 # Install instructions
 
@@ -72,18 +76,27 @@ ChromeOS partition scheme is very specific which makes it difficult to dual boot
 Make sure you have an ext4 or NTFS partition with at least 14gb of free space available and no encryption or create one (refer to online resources).
 
 1. Perform the steps 1 to 4 as described in the previous section (Install ChromeOS on a USB flash drive / SD card).
-2. Create the ChromeOS image on your unencrypted ext4 or NTFS partition.
+2. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
 ```
-sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < path to the ChromeOS image on the chosen partition > -s < ChromeOS image size in GB >
+mkdir -p ~/tmpmount
+sudo mount < the destination partition (ext4 or ntfs) which will contain the disk image > ~/tmpmount
 ```
-3. Copy the GRUB configuration which appears in the terminal at the end of the process (between lines with stars) to either:
+3. Create the ChromeOS disk image:
+```
+sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
+```
+4. Copy the GRUB configuration which appears in the terminal at the end of the process (between lines with stars) to either:
 - your hard disk GRUB install if you have one (refer to you distro's online resources).
 - the USB flash drive / SD card GRUB config file (then boot from USB flash drive / SD card and choose "boot from disk image" in the GRUB menu),
-4. (secure boot only) Download the secure boot key "brunch.der" in this branch (master) of the repository and enroll it by running the command:
+5. Unmout the destination partition
+```
+sudo umount ~/tmpmount
+```
+6. (secure boot only) Download the secure boot key "brunch.der" in this branch (master) of the repository and enroll it by running the command:
 ```
 sudo mokutil --import brunch.der
 ```
-5. Reboot your computer and boot to the bootloader with the modified GRUB config.
+7. Reboot your computer and boot to the bootloader with the modified GRUB config.
 
 The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
 
@@ -133,13 +146,21 @@ sudo resize-data
 1. Make sure you have a NTFS partition with at least 14gb of free space available and no BitLocker encryption or create one (refer to online resources).
 2. Create a ChromeOS USB flash drive / SD card using the above method (Install ChromeOS on a USB flash drive / SD card) and boot it.
 3. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
-4. Identify the destination NTFS partition within /media/removable/XXXXXXX folders.
-5. Create the disk image:
+4. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
 ```
-sudo chromeos-install -dst < path of the ChromeOS image on the NTFS partition > -s < ChromeOS image size in GB >
+mkdir -p ~/tmpmount
+sudo mount < the destination partition (ext4 or ntfs) which will contain the disk image > ~/tmpmount
 ```
-6. Use vi to copy the GRUB configuration which is displayed in the terminal at the end of the process (between lines with stars) to the USB flash drive / SD card GRUB config file.
-7. Reboot your computer and boot from USB flash drive / SD card.
+5. Create the ChromeOS disk image:
+```
+sudo bash chromeos-install -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
+```
+4. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C), run `sudo edit-grub-config`, move to line 2 and paste the text (CTRL+SHIFT+V). Save and exit.
+5. Unmout the destination partition
+```
+sudo umount ~/tmpmount
+```
+6. Reboot your computer and boot from USB flash drive / SD card.
 
 The GRUB menu should appear, select "ChromeOS (boot from disk image)" and you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
 
@@ -163,12 +184,14 @@ The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch
 ## Framework options
 
 Some options can be passed through the kernel command lines to activate specific features which might be dangerous or not work from everyone:
-- advanced_als: default ChromeOS auto-brightness is very basic (https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md). This option activates more auto-brightness levels (based on the Google Pixel Slate implementation),
+- enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
 - broadcom_wl: enable this option if you need the broadcom_wl module from https://github.com/antoineco/broadcom-wl,
+- iwlwifi_backport: enable this option if your intel wireless card is not supported natively in the kernel,
 - disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
 - disable_touchpad_fix: disable the patch which aims at improving touchpad sensitivity and fixing tap to click (if you encounter touchpad issues),
-- enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
-- enable_sensors: enable experimental hid sensors support (accelerometer and light).
+- sysfs_tablet_mode: allow to control tablet mode from sysfs (`echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to acivate it or use 0 to disable it),
+- force_tablet_mode: same as above except tablet mode is enabled by default on boot,
+- advanced_als: default ChromeOS auto-brightness is very basic (https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md). This option activates more auto-brightness levels (based on the Google Pixel Slate implementation).
 
 Add "options=option1,option2,..." (without spaces) to the kernel command line to activate them.
 
@@ -246,15 +269,11 @@ Unfortunately, the Brunch framework has to rebuild itself by copying the origina
 
 This can in theory be due to a lot of things. However, the most likely reason is that your USB flash drive / SD card is too slow. You may try with one that has better write speed or use the dual boot method to install it on your HDD.
 
-5) Android apps are not working
-
-Android apps compatibility depends mosly on your cpu and gpu and is not guaranteed. However, you can try using the "selinux_permissive" option which appears to work in some cases (see "Framework options" section)
-
-6) Some apps do not appear on the playstore (Netflix...)
+5) Some apps do not appear on the playstore (Netflix...)
 
 In order to have access to the ChromeOS shell, ChromeOS is started in developer mode by default. If you have a stable enough system, you can remove "cros_debug" from the GRUB kernel command line (see "Modify the GRUB bootloader" section) and then do a Powerwash (ChromeOS mechanism which will wipe all your data partition) to disable developer mode.
 
-7) Some apps on the Playstore show as incompatible with my device.
+6) Some apps on the Playstore show as incompatible with my device.
 
 Some Playstore apps are not compatible with genuine Chromebooks so it is probably normal.
 

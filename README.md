@@ -155,12 +155,12 @@ sudo mount < the destination partition (ext4 or ntfs) which will contain the dis
 ```
 sudo bash chromeos-install -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
-4. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C), run `sudo edit-grub-config`, move to line 2 and paste the text (CTRL+SHIFT+V). Save and exit.
-5. Unmout the destination partition
+6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C), run `sudo edit-grub-config`, move to line 2 and paste the text (CTRL+SHIFT+V). Save and exit.
+7. Unmout the destination partition
 ```
 sudo umount ~/tmpmount
 ```
-6. Reboot your computer and boot from USB flash drive / SD card.
+8. Reboot your computer and boot from USB flash drive / SD card.
 
 The GRUB menu should appear, select "ChromeOS (boot from disk image)" and you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
 

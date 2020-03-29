@@ -249,7 +249,7 @@ sudo umount /tmp/efi_part
 
 ### From ChromeOS
 
-Same instructions that for Linux, except that on step 3 there is no available text editor with root support other than `vi`. You will probably need to have a look at the `vi` online resources.
+Run `sudo edit-grub-config`
 
 # FAQ
 

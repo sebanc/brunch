@@ -75,7 +75,7 @@ ChromeOS partition scheme is very specific which makes it difficult to dual boot
 
 Make sure you have an ext4 or NTFS partition with at least 14gb of free space available and no encryption or create one (refer to online resources).
 
-1. Perform the steps 1 to 4 as described in the previous section (Install ChromeOS on a USB flash drive / SD card).
+1. Perform the steps 1 to 4 as described in the previous section (Install ChromeOS on a USB flash drive / SD card) and boot Chrome OS.
 2. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
 ```
 mkdir -p ~/tmpmount

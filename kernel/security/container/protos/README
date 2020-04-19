@@ -1,0 +1,16 @@
+This document provides guidance on how to change the protos used in this directory.
+
+Any change made to a proto file require to reformat it and regenerate nanopb
+sources. It also requires the proto files to be compatible to previously released versions.
+
+To reformat any proto file run: "clang-format -style=Google -i <file.proto>"
+
+To regenerate nanopb files:
+ - Clone/setup nanopb for version 0.3.9.1 (or clone the internal depot)
+   - git clone --depth=1 https://github.com/nanopb/nanopb.git
+   - cd nanopb
+   - git fetch --tags
+   - git checkout tags/0.3.9.1
+   - make -C generator/proto
+ - Run protoc with the nanopb definition
+   - protoc --plugin=<path_to_nanopb>/generator/protoc-gen-nanopb --nanopb_out=<path_to_linux>/security/container/protos/ <path_to_linux>/security/container/protos/<file.proto>

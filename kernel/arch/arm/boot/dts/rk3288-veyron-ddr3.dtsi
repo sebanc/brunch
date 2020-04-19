@@ -1,0 +1,63 @@
+/*
+ * Google Veyron (and derivatives) fragment for ddr3 ddrfreq settings
+ *
+ * Copyright 2015 Google, Inc
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+&dmc {
+	status = "okay";
+	rockchip,pd-enable-freq = <533000000>;
+	operating-points = <
+		/* KHz    uV */
+		200000 1050813
+		333000 1099593
+		533000 1154878
+		666000 1200407
+	>;
+};
+
+&cpu_thermal {
+	trips {
+		cpu_almost_alert0: cpu_almost_alert0 {
+			temperature = <68000>; /* millicelsius */
+			hysteresis = <2000>; /* millicelsius */
+			type = "passive";
+		};
+	};
+
+	cooling-maps {
+		/*
+		 * Try to use the memory controller to help cool the CPU.
+		 *
+		 * We'll go down to 533MHz when we start getting hot.
+		 *
+		 * In the future more trip points should be added with further
+		 * testing.
+		 *
+		 * We lock into certain frequencies instead of allowing the
+		 * thermal framework to work with a range for a few reasons:
+		 * 1. The thermal framework has lots of ways to cool down the
+		 *    cpu.  It has no way to known how to trade off between CPU
+		 *    and memory, so this helps keep it from trying to do both
+		 *    at the same time.
+		 * 2. Flipping DMC frequencies is expensive.  If we did it as
+		 *    much as the thermal framework wanted we'd just waste good
+		 *    processing time.
+		 * 3. Once we're really hot it's hard to flip DMC frequencies
+		 *    because the CPU isn't running fast enough to complete the
+		 *    needed work in time.
+		 *
+		 * Note that we always flip DMC freq a little before CPU freq.
+		 * Again, this is to avoid lots of expensive flipping.
+		 */
+		dmc_map1 {
+			trip = <&cpu_almost_alert0>;
+			cooling-device =
+				<&dmc 1 1>;
+		};
+	};
+};

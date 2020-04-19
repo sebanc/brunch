@@ -1,0 +1,166 @@
+menuconfig SURFACE_SAM
+    depends on ACPI
+    tristate "Microsoft Surface/System Aggregator Module and Platform Drivers"
+    ---help---
+      Drivers for the Surface/System Aggregator Module (SAM) of Microsoft
+      Surface devices.
+
+      SAM is an embedded controller that provides access to various
+      functionalities on these devices, including battery status, keyboard
+      events (on the Laptops) and many more.
+
+      Say M/Y here if you have a Microsoft Surface device with a SAM device
+      (i.e. 5th generation or later).
+
+config SURFACE_SAM_SSH
+	tristate "Surface Serial Hub Driver"
+	depends on SURFACE_SAM
+	depends on X86_INTEL_LPSS
+	depends on SERIAL_8250_DW
+	depends on SERIAL_8250_DMA
+	depends on SERIAL_DEV_CTRL_TTYPORT
+	select CRC_CCITT
+	default m
+	---help---
+	  Surface Serial Hub driver for 5th generation (or later) Microsoft
+	  Surface devices.
+
+	  This is the base driver for the embedded serial controller found on
+	  5th generation (and later) Microsoft Surface devices (e.g. Book 2,
+	  Laptop, Laptop 2, Pro 2017, Pro 6, ...). This driver itself only
+	  provides access to the embedded controller (SAM) and subsequent
+	  drivers are required for the respective functionalities.
+
+	  If you have a 5th generation (or later) Microsoft Surface device, say
+	  Y or M here.
+
+config SURFACE_SAM_SSH_DEBUG_DEVICE
+	bool "Surface Serial Hub Debug Device"
+	depends on SURFACE_SAM_SSH
+	depends on SYSFS
+	default n
+	---help---
+	  Debug device for direct communication with the embedded controller
+	  found on 5th generation (and later) Microsoft Surface devices (e.g.
+	  Book 2, Laptop, Laptop 2, Pro 2017, Pro 6, ...) via sysfs.
+
+	  If you are not sure, say N here.
+
+config SURFACE_SAM_SAN
+	tristate "Surface ACPI Notify Driver"
+	depends on SURFACE_SAM_SSH
+	default m
+	---help---
+	  Surface ACPI Notify driver for 5th generation (or later) Microsoft
+	  Surface devices.
+
+	  This driver enables basic ACPI events and requests, such as battery
+	  status requests/events, thermal events, lid status, and possibly more,
+	  which would otherwise not work on these devices.
+
+	  If you are not sure, say M here.
+
+config SURFACE_SAM_VHF
+	tristate "Surface Virtual HID Framework Driver"
+	depends on SURFACE_SAM_SSH
+	depends on HID
+	default m
+	---help---
+	  Surface Virtual HID Framework driver for 5th generation (or later)
+	  Microsoft Surface devices.
+
+	  This driver provides support for the Microsoft Virtual HID framework,
+	  which is required for keyboard support on the Surface Laptop 1 and 2.
+
+	  If you are not sure, say M here.
+
+config SURFACE_SAM_DTX
+	tristate "Surface Detachment System (DTX) Driver"
+	depends on SURFACE_SAM_SSH
+	depends on INPUT
+	default m
+	---help---
+	  Surface Detachment System (DTX) driver for the Microsoft Surface Book
+	  2. This driver provides support for proper detachment handling in
+	  user-space, status-events relating to the base and support for
+	  the safe-guard keeping the base attached when the discrete GPU
+	  contained in it is running via the special /dev/surface-dtx device.
+
+	  Also provides a standard input device to provide SW_TABLET_MODE events
+	  upon device mode change.
+
+	  If you are not sure, say M here.
+
+config SURFACE_SAM_HPS
+	tristate "Surface dGPU Hot-Plug System (dGPU-HPS) Driver"
+	depends on SURFACE_SAM_SSH
+	depends on SURFACE_SAM_SAN
+	default m
+	---help---
+	  Driver to properly handle hot-plugging and explicit power-on/power-off
+	  of the discrete GPU (dGPU) on the Surface Book 2.
+
+	  If you are not sure, say M here.
+
+config SURFACE_SAM_SID
+	tristate "Surface Platform Integration Driver"
+	depends on SURFACE_SAM_SSH
+	default m
+	---help---
+	  Surface Platform Integration Driver for the Microsoft Surface Devices.
+	  This driver loads various model-specific sub-drivers, including
+	  battery and keyboard support on 7th generation Surface devices, proper
+	  lid setup to enable device wakeup when the lid is opened on multiple
+	  models, as well as performance mode setting support on the Surface
+	  Book 2.
+
+	  If you are not sure, say M here.
+
+config SURFACE_SAM_SID_GPELID
+	tristate "Surface Lid Wakeup Driver"
+	depends on SURFACE_SAM_SID
+	default m
+	---help---
+	  Driver to set up device wake-up via lid on Intel-based Microsoft
+	  Surface devices. These devices do not wake up from sleep as their GPE
+	  interrupt is not configured automatically. This driver solves that
+	  problem.
+
+	  If you are not sure, say M here.
+
+config SURFACE_SAM_SID_PERFMODE
+	tristate "Surface Performance Mode Driver"
+	depends on SURFACE_SAM_SID
+	depends on SYSFS
+	default m
+	---help---
+	  This driver provides suport for setting performance-modes on Surface
+	  devices via the perf_mode sysfs attribute. Currently only supports the
+	  Surface Book 2. Performance-modes directly influence the fan-profile
+	  of the device, allowing to choose between higher performance or
+	  quieter operation.
+
+	  If you are not sure, say M here.
+
+config SURFACE_SAM_SID_VHF
+	tristate "Surface SAM HID Driver"
+	depends on SURFACE_SAM_SID
+	depends on HID
+	default m
+	---help---
+	  This driver provides support for HID devices connected via the Surface
+	  SAM embedded controller. It provides support for keyboard and touchpad
+	  on the Surface Laptop 3 models.
+
+	  If you are not sure, say M here.
+
+config SURFACE_SAM_SID_POWER
+	tristate "Surface SAM Battery/AC Driver"
+	depends on SURFACE_SAM_SID
+	select POWER_SUPPLY
+	default m
+	---help---
+	  This driver provides support for the battery and AC on 7th generation
+	  Surface devices.
+
+	  If you are not sure, say M here.

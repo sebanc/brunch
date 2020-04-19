@@ -1,0 +1,166 @@
+#!/bin/busybox sh
+export PATH=/sbin:/bin
+
+busybox mount -t proc none /proc
+busybox mount -t sysfs none /sys
+busybox mount -t devtmpfs none /dev
+busybox --install -s
+ln -s /proc/mounts /etc/mtab
+
+# Wait 10s for block devices to be available
+sleep 10
+
+if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
+	mkdir /mainroot
+	fstype=$(blkid -s TYPE -o value "$img_part")
+	if [ "$fstype" == "ntfs" ]; then
+		ntfs-3g "$img_part" /mainroot
+	else
+		mount -n "$img_part" /mainroot
+	fi
+	if [ -f /mainroot/"$img_path" ]; then
+		mknod -m660 /dev/loop15 b 7 480
+		losetup -P /dev/loop15 /mainroot"$img_path"
+		bootdevice=/dev/loop15
+		partpath=/dev/loop15p
+	else
+		echo "brunch: Chromeos loopfile $img_path not found on device $img_part..." > /dev/kmsg
+	fi
+else
+	for sysblock in /sys/block/*; do
+		if [ "${sysblock/\/sys\/block\/fd/}" == "$sysblock" ] && [ "${sysblock/\/sys\/block\/loop/}" == "$sysblock" ]; then
+			device=${sysblock/\/sys\/block\//\/dev\/}
+			if (expr match "$device" ".*[0-9]$" >/dev/null); then
+				devicepart="$device"p
+			else
+				devicepart="$device"
+			fi
+			echo "brunch: Scanning device $device" > /dev/kmsg
+			if [ -e "$devicepart"1 ] && [ -e "$devicepart"3 ] && [ "$(blkid -s PARTLABEL -o value "$devicepart"1)" = "STATE" ] && [ "$(blkid -s PARTLABEL -o value "$devicepart"3)" = "ROOT-A" ]; then
+				bootdevice="$device"
+				partpath="$devicepart"
+				if [ "$(cat $sysblock/removable)" -eq 1 ]; then
+					echo "brunch: Chromeos found on removable device, booting it !" > /dev/kmsg
+					echo "0" > "$sysblock"/removable
+					break
+				else
+					echo "brunch: Chromeos found on fixed device $bootdevice, keep scanning for removable devices..." > /dev/kmsg
+				fi
+			fi
+		fi
+	done
+fi
+if [ -z "$bootdevice" ] || [ -z "$partpath" ]; then echo "brunch: Chromeos was not found on any device, fallback to shell..." > /dev/kmsg; exec sh; fi
+
+if [ ! -z "$brunch_debug" ] && [ "$brunch_debug" -eq 1 ]; then
+echo 0 0 0 0 > /proc/sys/kernel/printk
+exec sh
+fi
+
+mkdir -p /firmware /system
+e2fsck -y "$partpath"7
+mount "$partpath"7 /firmware
+
+rebuild=0
+rootb_is_valid=0
+echo "$(grep -o cros_debug /proc/cmdline)" > /firmware/debug_mode
+echo "$options" > /firmware/current_options
+cat /sys/class/dmi/id/product_sku > /firmware/product_sku
+md5sum=$(find /firmware ! -name 'md5sum' -type f -print0 | sort -z | xargs -r0 md5sum | md5sum)
+if [ $(cgpt show -i 4 -P "$bootdevice") -ge $(cgpt show -i 2 -P "$bootdevice") ]; then
+	rebuild=1
+	echo "brunch: update detected" > /dev/kmsg
+else
+	if [ ! -f "/firmware/md5sum" ]; then
+		rebuild=1
+		echo "brunch: new install detected" > /dev/kmsg
+	else
+		stored_md5sum="$(cat /firmware/md5sum)"
+		if [ ! "$stored_md5sum" == "$md5sum" ]; then
+			rebuild=1
+			echo "brunch: device/framework change detected" > /dev/kmsg
+		else
+			echo "brunch: rebuilding Chromeos rootfs not necessary" > /dev/kmsg
+		fi
+	fi
+fi
+
+if [ ! -z "$brunch_debug" ] && [ "$brunch_debug" -eq 2 ]; then
+umount /firmware
+echo 0 0 0 0 > /proc/sys/kernel/printk
+exec sh
+fi
+
+if [ "$rebuild" -eq 1 ]; then
+	mkdir /tmp/testfs
+	mount -o,ro "$partpath"5 /tmp/testfs > /dev/null 2>&1
+	if [ "$?" -eq 0 ]; then
+		ls -lR /tmp/testfs > /dev/null 2>&1
+		if [ "$?" -eq 0 ]; then
+			rootb_is_valid=1
+			umount /tmp/testfs
+		else
+			echo "brunch: Partition ROOTB is currently corrupt by an unfinished update, the framework will not be rebuilt until the update is fully applied." > /dev/kmsg
+			umount /tmp/testfs
+		fi
+	else
+		echo "brunch: Partition ROOTB is currently corrupt by an unfinished update, the framework will not be rebuilt until the update is fully applied." > /dev/kmsg
+	fi
+fi
+
+if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
+	echo "brunch: rebuilding ChromeOS rootfs, it might take a few minutes..." > /dev/kmsg
+	pv "$partpath"5 > "$partpath"3
+	#printf '\000' | dd of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 2>&1 >/dev/null
+	#dd if=/dev/zero of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 2>&1 >/dev/null
+	printf '\000' | dd of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 status=none
+	mount "$partpath"3 /system
+	mount -o bind /system/etc /etc
+	mount -o bind /system/lib64 /lib64
+	mount -o bind /system/usr /usr
+	export PATH=/system/sbin:/system/bin:/system/usr/sbin:/system/usr/bin:/sbin:/bin
+	resize2fs -f "$partpath"3
+	rm -r /system/lib/firmware/*
+	rm -r /system/lib/modules/*
+	cp -r /firmware/lib/firmware/* /system/lib/firmware/
+	cp -r /firmware/lib/headers /system/usr/src/linux-headers-$(cat /proc/version |  cut -d' ' -f3)
+	cp -r /firmware/lib/modules/* /system/lib/modules/
+	cp -r /firmware/usr/share/alsa/ucm/* /system/usr/share/alsa/ucm/
+	for patch in /firmware/patches/*.sh
+	do
+		"$patch" "$options"
+		ret="$?"
+		if [ "$ret" -eq 0 ]; then
+			echo "brunch: $patch success" > /dev/kmsg
+		else
+			echo "brunch: $patch failed with ret=$ret" > /dev/kmsg
+		fi
+	done
+	if [ $(blkid -s TYPE -o value "$partpath"1) == "ext2" ]; then
+		mkfs.ext4 -F -b 4096 -L "H-STATE" "$partpath"1
+	fi
+	export PATH=/sbin:/bin
+	umount /usr
+	umount /lib64
+	umount /etc
+	umount /system
+	cgpt add -i 2 -P 15 -T 15 -S 0 "$bootdevice"
+	cgpt add -i 4 -P 0 -T 15 -S 0 "$bootdevice"
+	echo "$md5sum" > /firmware/md5sum
+fi
+
+umount /firmware
+e2fsck -y "$partpath"3
+mount "$partpath"3 /system
+mount --move /dev /system/dev
+umount /sys
+umount /proc
+
+sync
+
+if [ ! -z "$brunch_debug" ] && [ "$brunch_debug" -eq 3 ]; then
+echo 0 0 0 0 > /proc/sys/kernel/printk
+exec sh
+fi
+
+exec switch_root /system /sbin/init restart "$@"

@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package schema;
+
+// Collect information about running containers
+message ContainerCollectorConfig {
+  bool enabled = 1;
+}
+
+message ExecuteCollectorConfig {
+  bool enabled = 1;
+
+  // truncate argv/envp if cumulative length exceeds limit
+  uint32 argv_limit = 2;
+  uint32 envp_limit = 3;
+
+  // If specified, only report the named environment variables.  An
+  // empty envp_allowlist indicates that all environment variables
+  // should be reported up to a cumulative total of envp_limit bytes.
+  repeated string envp_allowlist = 4;
+}
+
+// Convey configuration information to Guest LSM
+message ConfigurationRequest {
+  ContainerCollectorConfig container_config = 1;
+  ExecuteCollectorConfig execute_config = 2;
+
+  // Additional configuration messages will be added as new collectors
+  // are implemented
+}
+
+// Report success or failure of previous ConfigurationRequest
+message ConfigurationResponse {
+  enum ErrorCode {
+    // Keep values in sync with
+    // https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
+    NO_ERROR = 0;
+    UNKNOWN = 2;
+  }
+
+  ErrorCode error = 1;
+  string msg = 2;
+  uint64 version = 3;         // Version of the LSM
+  uint32 kernel_version = 4;  // LINUX_VERSION_CODE
+}

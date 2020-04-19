@@ -1,0 +1,473 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright (c) 2018 Google LLC
+ */
+
+/dts-v1/;
+#include "mt8183-kukui.dtsi"
+
+/ {
+	model = "MediaTek kukui rev2 board";
+	compatible = "google,kukui-rev2", "google,kukui", "mediatek,mt8183";
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pen_eject>;
+
+		pen-insert {
+			label = "Pen Insert";
+			/* Insert = low, eject = high */
+			gpios = <&pio 6 GPIO_ACTIVE_LOW>;
+			linux,code = <SW_PEN_INSERTED>;
+			linux,input-type = <EV_SW>;
+			wakeup-source;
+		};
+	};
+};
+
+&i2c0 {
+	digitizer: digitizer@9 {
+		compatible = "wacom,w9013", "hid-over-i2c";
+		reg = <0x9>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pen_default>;
+
+		interrupt-parent = <&pio>;
+		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
+
+		hid-descr-addr = <0x1>;
+	};
+
+	touchscreen: touchscreen@10 {
+		compatible = "elan,ekth3500";
+		reg = <0x10>;
+		interrupt-parent = <&pio>;
+		interrupts = <155 IRQ_TYPE_LEVEL_LOW>;
+		int-gpio = <&pio 155 0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&touch_default>;
+
+		reset-gpios = <&pio 156 1>;
+	};
+};
+
+&i2c2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2_pins>;
+	status = "okay";
+	clock-frequency = <400000>;
+
+	sensor_main: sensor_main {
+		compatible = "ovti,ov5695";
+		reg = <0x36>;
+
+		clocks = <&topckgen CLK_TOP_MUX_CAMTG>,
+			 <&topckgen CLK_TOP_UNIVP_192M_D8>;
+		clock-names = "xvclk", "freq_mux";
+
+		assigned-clocks = <&topckgen CLK_TOP_MUX_CAMTG>,
+				  <&topckgen CLK_TOP_UNIVP_192M_D8>;
+		assigned-clock-parents = <&topckgen CLK_TOP_UNIVP_192M_D8>;
+		assigned-clock-rates = <0>, <24000000>;
+
+		reset-gpios = <&pio 111 1>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&camera_pins_cam0>;
+
+		avdd-supply = <&mt6358_vcama2_reg>;
+		dvdd-supply = <&mt6358_vcamd_reg>;
+		dovdd-supply = <&mt6358_vcamio_reg>;
+
+		port {
+			ov5695_endpoint: endpoint {
+				data-lanes = <1 3>;
+				remote-endpoint = <&seninf_port1_endpoint>;
+			};
+		};
+	};
+};
+
+&i2c4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c4_pins>;
+	status = "okay";
+	clock-frequency = <400000>;
+
+	sensor_sub: sensor_sub {
+		compatible = "ovti,ov2685";
+		reg = <0x3c>;
+
+		clocks = <&topckgen CLK_TOP_MUX_CAMTG2>,
+			 <&topckgen CLK_TOP_UNIVP_192M_D8>;
+		clock-names = "xvclk", "freq_mux";
+
+		assigned-clocks = <&topckgen CLK_TOP_MUX_CAMTG2>,
+				  <&topckgen CLK_TOP_UNIVP_192M_D8>;
+		assigned-clock-parents = <&topckgen CLK_TOP_UNIVP_192M_D8>;
+		assigned-clock-rates = <0>, <24000000>;
+
+		reset-gpios = <&pio 107 1>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&camera_pins_cam1>;
+
+		avdd-supply = <&mt6358_vcama1_reg>;
+		dvdd-supply = <&mt6358_vcn18_reg>;
+		dovdd-supply = <&mt6358_vcamio_reg>;
+
+		port {
+			ov2685_endpoint: endpoint {
+				data-lanes = <1 3>;
+				remote-endpoint = <&seninf_port0_endpoint>;
+			};
+		};
+	};
+};
+
+&it6505dptx {
+	/delete-property/ no-laneswap;
+};
+
+&pio {
+	/* 192 lines */
+	gpio-line-names =
+		"SPI_AP_EC_CS_L",
+		"SPI_AP_EC_MOSI",
+		"SPI_AP_EC_CLK",
+		"I2S3_DO",
+		"USB_PD_INT_ODL",
+		"",
+		"",
+		"",
+		"",
+		"IT6505_HPD_L",
+		"I2S3_TDM_D3",
+		"SOC_I2C6_1V8_SCL",
+		"SOC_I2C6_1V8_SDA",
+		"DPI_D0",
+		"DPI_D1",
+		"DPI_D2",
+		"DPI_D3",
+		"DPI_D4",
+		"DPI_D5",
+		"DPI_D6",
+		"DPI_D7",
+		"DPI_D8",
+		"DPI_D9",
+		"DPI_D10",
+		"DPI_D11",
+		"DPI_HSYNC",
+		"DPI_VSYNC",
+		"DPI_DE",
+		"DPI_CK",
+		"AP_MSDC1_CLK",
+		"AP_MSDC1_DAT3",
+		"AP_MSDC1_CMD",
+		"AP_MSDC1_DAT0",
+		"AP_MSDC1_DAT2",
+		"AP_MSDC1_DAT1",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"OTG_EN",
+		"DRVBUS",
+		"DISP_PWM",
+		"DSI_TE",
+		"LCM_RST_1V8",
+		"AP_CTS_WIFI_RTS",
+		"AP_RTS_WIFI_CTS",
+		"SOC_I2C5_1V8_SCL",
+		"SOC_I2C5_1V8_SDA",
+		"SOC_I2C3_1V8_SCL",
+		"SOC_I2C3_1V8_SDA",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"SOC_I2C1_1V8_SDA",
+		"SOC_I2C0_1V8_SDA",
+		"SOC_I2C0_1V8_SCL",
+		"SOC_I2C1_1V8_SCL",
+		"AP_SPI_H1_MISO",
+		"AP_SPI_H1_CS_L",
+		"AP_SPI_H1_MOSI",
+		"AP_SPI_H1_CLK",
+		"I2S5_BCK",
+		"I2S5_LRCK",
+		"I2S5_DO",
+		"BOOTBLOCK_EN_L",
+		"MT8183_KPCOL0",
+		"SPI_AP_EC_MISO",
+		"UART_DBG_TX_AP_RX",
+		"UART_AP_TX_DBG_RX",
+		"I2S2_MCK",
+		"I2S2_BCK",
+		"CLK_5M_WCAM",
+		"CLK_2M_UCAM",
+		"I2S2_LRCK",
+		"I2S2_DI",
+		"SOC_I2C2_1V8_SCL",
+		"SOC_I2C2_1V8_SDA",
+		"SOC_I2C4_1V8_SCL",
+		"SOC_I2C4_1V8_SDA",
+		"",
+		"SCL8",
+		"SDA8",
+		"FCAM_PWDN_L",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"I2S_PMIC",
+		"I2S_PMIC",
+		"I2S_PMIC",
+		"I2S_PMIC",
+		"I2S_PMIC",
+		"I2S_PMIC",
+		"I2S_PMIC",
+		"I2S_PMIC",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		/*
+		 * AP_FLASH_WP_L is crossystem ABI. Rev1 schematics
+		 * call it BIOS_FLASH_WP_R_L.
+		 */
+		"AP_FLASH_WP_L",
+		"EC_AP_INT_ODL",
+		"IT6505_INT_ODL",
+		"H1_INT_OD_L",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"AP_SPI_FLASH_MISO",
+		"AP_SPI_FLASH_CS_L",
+		"AP_SPI_FLASH_MOSI",
+		"AP_SPI_FLASH_CLK",
+		"DA7219_IRQ",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"";
+
+	pen_default: pendefault {
+		pen_int_odl {
+			pinmux = <PINMUX_GPIO5__FUNC_GPIO5>;
+			input-enable;
+			bias-pull-up;
+		};
+
+		pen_reset_odl {
+			pinmux = <PINMUX_GPIO53__FUNC_GPIO53>;
+
+			/*
+			 * The pen driver doesn't currently support  driving
+			 * this reset line.  By specifying output-high here
+			 * we're relying on the fact that this pin has a default
+			 * pulldown at boot (which makes sure the pen was in
+			 * reset if it was powered) and then we set it high here
+			 * to take it out of reset.  Better would be if the pen
+			 * driver could control this and we could remove
+			 * "output-high" here.
+			 */
+			output-high;
+		};
+	};
+
+	pen_eject: peneject {
+		pen_eject {
+			pinmux = <PINMUX_GPIO6__FUNC_GPIO6>;
+			input-enable;
+			/* External pull-up. */
+			bias-disable;
+		};
+	};
+
+	touch_default: touchdefault {
+		pin_irq {
+			pinmux = <PINMUX_GPIO155__FUNC_GPIO155>;
+			input-enable;
+			bias-pull-up;
+		};
+
+		touch_pin_reset: pin_reset {
+			pinmux = <PINMUX_GPIO156__FUNC_GPIO156>;
+			output-low;
+		};
+	};
+};
+
+&scp_pins {
+	/* EINT pins are used for other purpose on rev2. */
+	/delete-node/ pins_eint;
+};
+
+&seninf {
+	status = "okay";
+
+	ports {
+		port@0 {
+			reg = <0>;
+
+			seninf_port0_endpoint: endpoint {
+				data-lanes = <1 3>;
+				remote-endpoint = <&ov2685_endpoint>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			seninf_port1_endpoint: endpoint {
+				data-lanes = <1 3>;
+				remote-endpoint = <&ov5695_endpoint>;
+			};
+		};
+	};
+};
+
+&sound {
+	mediatek,headset-codec = <&ts3a227e>;
+};
+
+&tboard_thermistor1 {
+	temperature-lookup-table = <	(-5000) 2690
+					0 2348
+					5000 2021
+					10000 1718
+					15000 1447
+					20000 1207
+					25000 1002
+					30000 830
+					35000 685
+					40000 565
+					45000 467
+					50000 385
+					55000 319
+					60000 265
+					65000 221
+					70000 183
+					75000 153
+					80000 128
+					85000 109
+					90000 93
+					95000 79
+					100000 68
+					105000 57
+					110000 49
+					115000 41
+					120000 35
+					125000 33>;
+};
+
+&tboard_thermistor2 {
+	temperature-lookup-table = <	(-5000) 2690
+					0 2348
+					5000 2021
+					10000 1718
+					15000 1447
+					20000 1207
+					25000 1002
+					30000 830
+					35000 685
+					40000 565
+					45000 467
+					50000 385
+					55000 319
+					60000 265
+					65000 221
+					70000 183
+					75000 153
+					80000 128
+					85000 109
+					90000 93
+					95000 79
+					100000 68
+					105000 57
+					110000 49
+					115000 41
+					120000 35
+					125000 33>;
+};
+
+&ts3a227e {
+	status = "okay";
+};

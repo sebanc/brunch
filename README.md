@@ -35,9 +35,9 @@ Additional features:
 Contrarily to the Croissant framework which mostly supports non-unibuilds images (configuration and access to android apps), Brunch should work with both but will provide better hardware support for unibuild images.
 
 Currently:
-- "rammus" is the recommended image for devices with Intel CPU for 4th generation and newer.
-- "samus" is the recommended image for devices with Intel CPU for 3rd generation and older.
-- "grunt" would be the image to use if you have an AMD CPU but the chances that it will work are currently low.
+- "rammus" is the recommended image for devices with 4th generation Intel CPU and newer.
+- "samus" is the recommended image for devices with 3rd generation Intel CPU and older.
+- "grunt" would be the image to use if you have an AMD CPU but the chances that it will work are low.
 
 ChromeOS recovery images can be downloaded from here: https://cros-updates-serving.appspot.com/
 
@@ -162,7 +162,8 @@ sudo bash chromeos-install -dst ~/tmpmount/chromeos.img -s < size you want to gi
 ```
 sudo umount ~/tmpmount
 ```
-8. Reboot your computer and boot from USB flash drive / SD card.
+8. Disable "Fast startup" in Windows (refer to online resources).
+9. Reboot your computer and boot from USB flash drive / SD card.
 
 The GRUB menu should appear, select "ChromeOS (boot from disk image)" and you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
 

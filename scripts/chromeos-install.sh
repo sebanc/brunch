@@ -234,6 +234,7 @@ if [[ $device = 1 ]]; then
 	read -rp "All data on device $destination will be lost, are you sure ? (type yes to continue) " confirm; if [ -z $confirm ] || [ ! $confirm == "yes" ]; then exit 0; fi
 	umount "$destination"*
 	write_base_table "$destination"
+	sync
 	partx -u "$destination"
 	if (expr match "$destination" ".*[0-9]$" >/dev/null); then
 		partition="$destination"p
@@ -241,6 +242,8 @@ if [[ $device = 1 ]]; then
 		partition="$destination"
 	fi
 	loopdevice=$(losetup --show -fP "$source")
+	sleep 5
+	partprobe "$loopdevice"
 	sleep 5
 	for (( i=1; i<=12; i++ )); do
 		echo "Writing partition $i"
@@ -283,6 +286,7 @@ else
 	dd if=/dev/zero of="$destination" bs=1G seek=$image_size count=0
 	if [ ! "$?" -eq 0 ]; then echo "Could not write image here, try with sudo ?"; rm "$destination"; exit 1; fi
 	write_base_table "$destination"
+	sync
 	for (( i=1; i<=12; i++ )); do
 		echo "Writing partition $i"
 		case $i in

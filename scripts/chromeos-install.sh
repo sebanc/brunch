@@ -243,6 +243,8 @@ if [[ $device = 1 ]]; then
 	fi
 	loopdevice=$(losetup --show -fP "$source")
 	sleep 5
+	partx -u "$loopdevice"
+	sleep 5
 	for (( i=1; i<=12; i++ )); do
 		echo "Writing partition $i"
 		case $i in

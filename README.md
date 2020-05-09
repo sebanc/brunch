@@ -190,10 +190,13 @@ Some options can be passed through the kernel command lines to activate specific
 - enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
 - broadcom_wl: enable this option if you need the broadcom_wl module from https://github.com/antoineco/broadcom-wl,
 - iwlwifi_backport: enable this option if your intel wireless card is not supported natively in the kernel,
+- rtl8821ce: enable this option if you have a rtl8821ce wireless card,
 - disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
-- disable_touchpad_fix: disable the patch which aims at improving touchpad sensitivity and fixing tap to click (if you encounter touchpad issues),
+- asus_c302: applies asus c302 specific firmwares and fixes,
+- baytrail_chromebook: applies baytrail chromebooks specific audio fixes,
 - sysfs_tablet_mode: allow to control tablet mode from sysfs (`echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to acivate it or use 0 to disable it),
 - force_tablet_mode: same as above except tablet mode is enabled by default on boot,
+- suspend_s3: disable suspend to idle (S0ix) and use S3 suspend instead,
 - advanced_als: default ChromeOS auto-brightness is very basic (https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md). This option activates more auto-brightness levels (based on the Google Pixel Slate implementation).
 
 Add "options=option1,option2,..." (without spaces) to the kernel command line to activate them.

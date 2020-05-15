@@ -14,7 +14,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 
 Base hardware compatibility:
 - x86_64 computers with UEFI boot support,
-- Intel hardware (cpu and gpu),
+- Intel hardware (cpu and gpu) starting from 1st generation (refer to https://en.wikipedia.org/wiki/Intel_Core),
 - AMD support is untested and probably not working (to be confirmed),
 - Nvidia graphic cards are also not supported.
 

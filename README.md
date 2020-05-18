@@ -18,8 +18,10 @@ Base hardware compatibility:
 - AMD support is untested and probably not working (to be confirmed),
 - Nvidia graphic cards are also not supported.
 
+An alternative procedure exist for bios/mbr devices (however note that the dual boot method is not supported). Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the mbr_suport.tar.gz package that you will find in this branch (master).
+
 Specific hardware support:
-- sensors: an experimental patch aims to allow accelerometer and light sensors through a custom kernel module,
+- sensors: an experimental patch aims to allow intel ISH accelerometer and light sensors through a custom kernel module,
 - Microsoft Surface devices: dedicated kernel patches are included.
 
 Additional features:

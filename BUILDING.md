@@ -94,3 +94,4 @@ sudo bash build.sh < path to the ChromeOS recovery image >
 - brunch_< version >.tar.gz which contains the brunch package.
 - sources_< version >.tar.gz which contains the sources that were used for building binaries inside the chroot (only for backup/history purpose).
 
+**Moved to it's own page**

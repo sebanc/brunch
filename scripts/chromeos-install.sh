@@ -1,11 +1,14 @@
 #!/bin/bash
 if ( ! test -z {,} ); then echo "Must be ran with \"bash\""; exit 1; fi
 if [ -z $(which cgpt) ]; then echo "cgpt needs to be installed first"; exit 1; fi
+if [ -z $(which pv) ]; then echo "pv needs to be installed first"; exit 1; fi
 
 usage()
 {
 	echo ""
-	echo "Brunch installer: install chromeos on device or create disk image from the brunch framework."
+	echo "Brunch Installer v4"
+	echo "By The Brunch Project"
+	echo "Brunch Installer: install Chrome OS on device or create disk image from the Brunch framework."
 	echo "Usage: chromeos_install.sh [-s X] [-l] -src chromeos_recovery_image -dst destination"
 	echo "-src (source), --source (source)			Chromeos recovery image"
 	echo "-dst (destination), --destination (destination)	Device (e.g. /dev/sda) or Disk image file (e.g. chromeos.img)"
@@ -270,7 +273,8 @@ if [[ $device = 1 ]]; then
 		esac
 	done
 	losetup -d "$loopdevice"
-	echo "ChromeOS installed."
+	echo "Chrome OS installed."
+	echo "Restart your PC and profit" 
 else
 	copy_partition()
 	{

@@ -24,7 +24,7 @@ if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 		bootdevice=/dev/loop15
 		partpath=/dev/loop15p
 	else
-		echo "brunch: Chromeos loopfile $img_path not found on device $img_part..." > /dev/kmsg
+		echo "brunch: Chrome OS loopfile $img_path not found on device $img_part..." > /dev/kmsg
 	fi
 else
 	for sysblock in /sys/block/*; do
@@ -40,17 +40,17 @@ else
 				bootdevice="$device"
 				partpath="$devicepart"
 				if [ "$(cat $sysblock/removable)" -eq 1 ]; then
-					echo "brunch: Chromeos found on removable device, booting it !" > /dev/kmsg
+					echo "brunch: Chrome OS found on removable device, booting it !" > /dev/kmsg
 					echo "0" > "$sysblock"/removable
 					break
 				else
-					echo "brunch: Chromeos found on fixed device $bootdevice, keep scanning for removable devices..." > /dev/kmsg
+					echo "brunch: Chrome OS found on fixed device $bootdevice, keep scanning for removable devices..." > /dev/kmsg
 				fi
 			fi
 		fi
 	done
 fi
-if [ -z "$bootdevice" ] || [ -z "$partpath" ]; then echo "brunch: Chromeos was not found on any device, fallback to shell..." > /dev/kmsg; exec sh; fi
+if [ -z "$bootdevice" ] || [ -z "$partpath" ]; then echo "brunch: Chrome OS was not found on any device, falling back to shell..." > /dev/kmsg; exec sh; fi
 
 if [ ! -z "$brunch_debug" ] && [ "$brunch_debug" -eq 1 ]; then
 echo 0 0 0 0 > /proc/sys/kernel/printk
@@ -80,7 +80,7 @@ else
 			rebuild=1
 			echo "brunch: device/framework change detected" > /dev/kmsg
 		else
-			echo "brunch: rebuilding Chromeos rootfs not necessary" > /dev/kmsg
+			echo "brunch: rebuilding Chrome OS rootfs not necessary" > /dev/kmsg
 		fi
 	fi
 fi
@@ -100,16 +100,16 @@ if [ "$rebuild" -eq 1 ]; then
 			rootb_is_valid=1
 			umount /tmp/testfs
 		else
-			echo "brunch: Partition ROOTB is currently corrupt by an unfinished update, the framework will not be rebuilt until the update is fully applied." > /dev/kmsg
+			echo "brunch: Partition ROOT-B is currently corrupt by an unfinished update, the framework will not be rebuilt until the update is fully applied." > /dev/kmsg
 			umount /tmp/testfs
 		fi
 	else
-		echo "brunch: Partition ROOTB is currently corrupt by an unfinished update, the framework will not be rebuilt until the update is fully applied." > /dev/kmsg
+		echo "brunch: Partition ROOT-B is currently corrupt by an unfinished update, the framework will not be rebuilt until the update is fully applied." > /dev/kmsg
 	fi
 fi
 
 if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
-	echo "brunch: rebuilding ChromeOS rootfs, it might take a few minutes..." > /dev/kmsg
+	echo "brunch: rebuilding Chrome OS rootfs, it might take a few minutes..." > /dev/kmsg
 	pv "$partpath"5 > "$partpath"3
 	#printf '\000' | dd of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 2>&1 >/dev/null
 	#dd if=/dev/zero of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 2>&1 >/dev/null

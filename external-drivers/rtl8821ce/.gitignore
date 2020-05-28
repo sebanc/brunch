@@ -1,0 +1,9 @@
+/linux
+*.o
+*.cmd
+*.o.d
+
+src/
+pkg/
+rtl8821ce/
+*.pkg.tar

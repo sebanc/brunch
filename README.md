@@ -14,11 +14,11 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 
 Base hardware compatibility:
 - x86_64 computers with UEFI boot support,
-- Intel hardware (cpu and gpu) starting from 1st generation (refer to https://en.wikipedia.org/wiki/Intel_Core),
-- AMD support is untested and probably not working (to be confirmed),
+- Intel hardware (CPU and GPU) starting from 1st generation "Nehalem" (refer to https://en.wikipedia.org/wiki/Intel_Core),
+- AMD A4/5/6 hardware (CPU and GPU), only with "grunt" recovery image (older AMD CPU and Ryzen models are not supported),
 - Nvidia graphic cards are also not supported.
 
-An alternative procedure exist for bios/mbr devices (however note that the dual boot method is not supported). Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the mbr_suport.tar.gz package that you will find in this branch (master).
+An alternative procedure exist for bios/mbr devices (however note that the dual boot method is not supported). Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the "mbr_suport.tar.gz" package that you will find in this branch (master).
 
 Specific hardware support:
 - sensors: an experimental patch aims to allow intel ISH accelerometer and light sensors through a custom kernel module,
@@ -39,7 +39,7 @@ Contrarily to the Croissant framework which mostly supports non-unibuilds images
 Currently:
 - "rammus" is the recommended image for devices with 4th generation Intel CPU and newer.
 - "samus" is the recommended image for devices with 3rd generation Intel CPU and older.
-- "grunt" would be the image to use if you have an AMD CPU but the chances that it will work are low.
+- "grunt" is the image to use if you have supported AMD harware.
 
 ChromeOS recovery images can be downloaded from here: https://cros-updates-serving.appspot.com/
 
@@ -190,9 +190,14 @@ The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch
 
 Some options can be passed through the kernel command lines to activate specific features which might be dangerous or not work from everyone:
 - enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
-- broadcom_wl: enable this option if you need the broadcom_wl module from https://github.com/antoineco/broadcom-wl,
+- no_ui_delay: allows a (slightly) faster boot but might prevent android apps or some hardware to function correctly,
+- broadcom_wl: enable this option if you need the broadcom_wl module,
 - iwlwifi_backport: enable this option if your intel wireless card is not supported natively in the kernel,
+- rtl8188eu: enable this option if you have a rtl8188eu wireless card,
+- rtl8723de: enable this option if you have a rtl8723de wireless card,
 - rtl8821ce: enable this option if you have a rtl8821ce wireless card,
+- acpi_power_button: try this option if long pressing the power button does not display the power menu,
+- alt_touchpad_config: try this option if you have touchpad issues,
 - disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
 - asus_c302: applies asus c302 specific firmwares and fixes,
 - baytrail_chromebook: applies baytrail chromebooks specific audio fixes,

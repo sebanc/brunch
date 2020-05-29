@@ -4,9 +4,10 @@ if [ -z $(which cgpt) ]; then echo "cgpt needs to be installed first"; exit 1; f
 if [ -z $(which pv) ]; then echo "pv needs to be installed first"; exit 1; fi
 
 usage()
-{
-	echo ""
-	echo "Brunch installer: install ChromeOS on device or create disk image from the brunch framework."
+{       
+        echo ""
+	echo "Brunch Installer v5 "
+	echo "Brunch installer : install ChromeOS on device or create disk image from the brunch framework."
 	echo "Usage: chromeos_install.sh [-s X] [-l] -src chromeos_recovery_image_path -dst destination"
 	echo "-src (source), --source (source)			ChromeOS recovery image"
 	echo "-dst (destination), --destination (destination)	Device (e.g. /dev/sda) or Disk image file (e.g. chromeos.img)"

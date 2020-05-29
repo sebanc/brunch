@@ -1,7 +1,7 @@
 #!/bin/bash
 if ( ! test -z {,} ); then echo "Must be ran with \"sudo bash\""; exit 1; fi
-if [ $(whoami) != "root" ]; then echo "Please run with sudo"; exit 1; fi
-if [ -z $(which cgpt) ]; then echo "The cgpt package/binary has to be installed first"; exit 1; fi
+if [ $(whoami) != "root" ]; then echo "Please run me with sudo"; exit 1; fi
+if [ -z $(which cgpt) ]; then echo "The cgpt package/binary needs to be installed first"; exit 1; fi
 if [ ! -f "./kernel/out/arch/x86/boot/bzImage" ]; then echo "The kernel has to be built first"; exit 1; fi
 if [ ! -f "$1" ]; then echo "ChromeOS recovery image $1 not found"; exit 1; fi
 if [ ! $(dd if="$1" bs=1 count=4 status=none | od -A n -t x1 | sed 's/ //g') == '33c0fa8e' ] || [ $(cgpt show -i 12 -b "$1") -eq 0 ] || [ $(cgpt show -i 13 -b "$1") -gt 0 ] || [ ! $(cgpt show -i 3 -l "$1") == 'ROOT-A' ]; then echo "$1 is not a valid ChromeOS recovery image"; fi

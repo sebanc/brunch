@@ -11,6 +11,12 @@ do
 	if [ "$i" == "acpi_power_button" ]; then acpi_power_button=1; fi
 done
 
+leagcy_power_button=0
+for i in $(echo "$1" | sed 's#,# #g')
+do
+	if [ "$i" == "legacy_power_button" ]; then legacy_power_button=1; fi
+done
+
 ret=0
 
 if [ ! -f "/system/etc/chrome_dev.conf" ]; then ret=$((ret + (2 ** 0))); fi
@@ -32,5 +38,17 @@ else
 	echo '--force-tablet-power-button' >> /system/etc/chrome_dev.conf
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 7))); fi
 fi
+
+if [ "$legacy_power_button" -eq 1 ]; then
+	echo 'legacy-power-button' >> /system/etc/ui_use_flags.txt
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 8))); fi
+	echo 1 > /system/usr/share/power_manager/board_specific/legacy_power_button
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 9))); fi
+else
+	echo 'legacy_power_button' >> /system/etc/ui_use_flags.txt
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 10))); fi
+fi
+
+
 
 exit $ret

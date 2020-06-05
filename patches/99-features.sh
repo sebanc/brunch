@@ -11,7 +11,7 @@ do
 	if [ "$i" == "acpi_power_button" ]; then acpi_power_button=1; fi
 done
 
-leagcy_power_button=0
+legacy_power_button=0
 for i in $(echo "$1" | sed 's#,# #g')
 do
 	if [ "$i" == "legacy_power_button" ]; then legacy_power_button=1; fi

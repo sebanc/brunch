@@ -196,6 +196,7 @@ Some options can be passed through the kernel command lines to activate specific
 - rtl8188eu: enable this option if you have a rtl8188eu wireless card,
 - rtl8723de: enable this option if you have a rtl8723de wireless card,
 - rtl8821ce: enable this option if you have a rtl8821ce wireless card,
+- rtbth: enable this option if you have a RT3290/RT3298LE bluetooth device,
 - acpi_power_button: try this option if long pressing the power button does not display the power menu,
 - alt_touchpad_config: try this option if you have touchpad issues,
 - disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
@@ -209,6 +210,8 @@ Some options can be passed through the kernel command lines to activate specific
 Add "options=option1,option2,..." (without spaces) to the kernel command line to activate them.
 
 For example: booting with "options=enable_updates,advanced_als" will activate both options.
+
+This is not really a framework option but you can improve performance by disabling a ChromeOS security feature and forcing hyperthreading everywhere (even in crositini) by adding "enforce_hyperthreading=1" to the kernel command line (this is just a kernel command line argument, add it after "cros_debug" and before "options=...." if any.
 
 ## Update both ChromeOS and the Brunch framework
 

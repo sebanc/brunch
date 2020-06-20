@@ -15,7 +15,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 Base hardware compatibility:
 - x86_64 computers with UEFI boot support,
 - Intel hardware (CPU and GPU) starting from 1st generation "Nehalem" (refer to https://en.wikipedia.org/wiki/Intel_Core),
-- AMD A4/5/6 hardware (CPU and GPU), only with "grunt" recovery image (older AMD CPU and Ryzen models are not supported),
+- AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU and Ryzen models are not supported),
 - Nvidia graphic cards are also not supported.
 
 An alternative procedure exist for bios/mbr devices (however note that the dual boot method is not supported). Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the "mbr_suport.tar.gz" package that you will find in this branch (master).

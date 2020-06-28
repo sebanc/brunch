@@ -8,7 +8,7 @@ ret=0
 if [ "$nouveau" -eq 1 ]; then
         echo "brunch: $0 nouveau enabled" > /dev/kmsg
         cat >/system/etc/init/nouveau.conf <<MODPROBE
-start on stopped udev-trigger
+start on startup
  
 script
         modprobe nouveau

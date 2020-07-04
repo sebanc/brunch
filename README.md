@@ -190,12 +190,10 @@ The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch
 
 Some options can be passed through the kernel command lines to activate specific features which might be dangerous or not work from everyone:
 - enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
-- no_ui_delay: allows a (slightly) faster boot but might prevent android apps or some hardware to function correctly,
-- mount_internal_drives: Allows automatic mounting of HDD partitions in ChromeOS (android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data),
+- mount_internal_drives: allows automatic mounting of HDD partitions in ChromeOS (android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data),
 - broadcom_wl: enable this option if you need the broadcom_wl module,
 - iwlwifi_backport: enable this option if your intel wireless card is not supported natively in the kernel,
 - rtl8188eu: enable this option if you have a rtl8188eu wireless card,
-- rtl8723de: enable this option if you have a rtl8723de wireless card,
 - rtl8821ce: enable this option if you have a rtl8821ce wireless card,
 - rtbth: enable this option if you have a RT3290/RT3298LE bluetooth device,
 - acpi_power_button: try this option if long pressing the power button does not display the power menu,

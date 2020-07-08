@@ -190,6 +190,7 @@ The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch
 
 Some options can be passed through the kernel command lines to activate specific features which might be dangerous or not work from everyone:
 - enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
+- android_init_fix: alternative init to support devices on which the android container fails to start with the standard init.
 - mount_internal_drives: allows automatic mounting of HDD partitions in ChromeOS (android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data),
 - broadcom_wl: enable this option if you need the broadcom_wl module,
 - iwlwifi_backport: enable this option if your intel wireless card is not supported natively in the kernel,
@@ -198,6 +199,7 @@ Some options can be passed through the kernel command lines to activate specific
 - rtbth: enable this option if you have a RT3290/RT3298LE bluetooth device,
 - acpi_power_button: try this option if long pressing the power button does not display the power menu,
 - alt_touchpad_config: try this option if you have touchpad issues,
+- alt_touchpad_config2: another option to try if you have touchpad issues,
 - disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
 - asus_c302: applies asus c302 specific firmwares and fixes,
 - baytrail_chromebook: applies baytrail chromebooks specific audio fixes,

@@ -232,7 +232,11 @@ fi
 if [[ $device = 1 ]]; then
 	if [ ! -b $destination ]; then echo "Device $destination does not exist"; exit 1; fi
 	if [ $(blockdev --getsz "$destination") -lt 29360128 ]; then echo "Not enought space on device $destination"; exit 1; fi
-	read -rp "All data on device $destination will be lost, are you sure ? (type yes to continue) " confirm; if [ -z $confirm ] || [ ! $confirm == "yes" ]; then exit 0; fi
+	read -rp "All data on device $destination will be lost, are you sure ? (type yes to continue) " confirm
+	if [ -z $confirm ] || [ ! $confirm == "yes" ]; then 
+		printf '\nFAILED: Invalid response, expected "yes"\nExit\n'
+		exit 0
+	fi
 	umount "$destination"*
 	write_base_table "$destination"
 	partx -u "$destination"

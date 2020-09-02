@@ -39,7 +39,7 @@ Contrarily to the Croissant framework which mostly supports non-unibuilds images
 Currently:
 - "rammus" is the recommended image for devices with 4th generation Intel CPU and newer.
 - "samus" is the recommended image for devices with 3rd generation Intel CPU and older.
-- "grunt" is the image to use if you have supported AMD harware.
+- "grunt" is the image to use if you have supported AMD hardware.
 
 ChromeOS recovery images can be downloaded from here: https://cros-updates-serving.appspot.com/
 

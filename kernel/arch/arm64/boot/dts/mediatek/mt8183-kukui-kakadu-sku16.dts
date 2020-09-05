@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2020 Bitland Information Technology Co.LTD
+ */
+
+/dts-v1/;
+#include "mt8183-kukui-kakadu.dtsi"
+#include "mt8183-kukui-audio-ts3a227e.dtsi"
+
+/ {
+	model = "MediaTek kakadu sku16 board";
+	compatible = "google,kakadu-sku16", "google,kakadu", "mediatek,mt8183";
+
+};
+
+&panel {
+	status = "okay";
+	compatible = "boe,tv105wum-nw0";
+	reg = <0>;
+	enable-gpios = <&pio 45 0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&panel_pins_default>;
+	avdd-supply = <&ppvarn_lcd>;
+	avee-supply = <&ppvarp_lcd>;
+	pp1800-supply = <&pp1800_lcd>;
+	rotation = <270>;
+};

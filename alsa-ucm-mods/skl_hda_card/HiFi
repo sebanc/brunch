@@ -1,0 +1,68 @@
+# Use case Configuration for skl-hda-card
+# alsaucm -c skl-hda-card set _verb HiFi set _enadev Playback
+
+SectionVerb {
+
+	EnableSequence [
+		cdev "hw:sklhdacard"
+
+		cset "name='codec0_out mo media2_in mi Switch' on"
+		cset "name='media0_out mo codec0_in mi Switch' on"
+		cset "name='Master Playback Switch' on"
+		cset "name='Capture Switch' on"
+		
+	]
+
+	DisableSequence [
+	]
+
+	# ALSA PCM
+	Value {
+		# ALSA PCM device for HiFi
+		PlaybackPCM "hw:sklhdacard"
+		CapturePCM "hw:sklhdacard"
+	}
+}
+
+SectionDevice."Playback" {
+	Comment "playback"
+	
+	Value {
+	      PlaybackPCM "hw:sklhdacard,5"
+	}
+	
+	EnableSequence [
+		cdev "hw:sklhdacard"
+	]
+
+	DisableSequence [
+		cdev "hw:sklhdacard"
+
+	]
+
+	Value {
+		PlaybackChannels "2"
+	}
+}
+
+SectionDevice."Capture" {
+	Comment "Capture"
+	
+	Value {
+	      CapturePCM "hw:sklhdacard,5"
+	}
+	
+	EnableSequence [
+		cdev "hw:sklhdacard"
+	]
+
+	DisableSequence [
+		cdev "hw:sklhdacard"
+
+	]
+
+	Value {
+		CaptureChannels "2"
+	}
+}
+

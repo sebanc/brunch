@@ -1,0 +1,185 @@
+# Use case Configuration for sofbytchtda7213
+# alsaucm -c sof-bytcht-da7213 set _verb HiFi set _enadev Headphones
+# alsaucm -c sof-bytcht-da7213 set _verb HiFi set _enadev MIC1
+# alsaucm -c sof-bytcht-da7213 set _verb HiFi set _enadev MIC2
+# alsaucm -c sof-bytcht-da7213 set _verb HiFi set _enadev AUX
+
+SectionVerb {
+
+	EnableSequence [
+		cdev "hw:sofbytchtda7213"
+
+
+		# DA7213 default output routing
+
+		# Ensure stream only goes to DAI
+		cset "name='Mixout Left Mixin Left Switch' off"
+		cset "name='Mixout Right Mixin Right Switch' off"
+		cset "name='Mixout Left Aux Left Switch' off"
+		cset "name='Mixout Right Aux Right Switch' off"
+
+	]
+
+	DisableSequence [
+	]
+
+	# ALSA PCM
+	Value {
+		# ALSA PCM device for HiFi
+		PlaybackPCM "hw:sofbytchtda7213"
+		CapturePCM "hw:sofbytchtda7213"
+	}
+}
+
+SectionDevice."MIC1" {
+	Comment "MIC1 capture - headset"
+
+	ConflictingDevice [
+		"MIC2"
+		"AUX"
+	]
+
+	EnableSequence [
+		cdev "hw:sofbytchtda7213"
+
+#		cset "name='Mic 1 Amp Source MUX' Differential"
+#		cset "name='Mic 1 Amp Source MUX' MIC_N"
+
+		cset "name='Mic 1 Amp Source MUX' MIC_P"
+		cset "name='Mic 1 Volume' 6"
+		cset "name='Mixin PGA Volume' 47%"
+		cset "name='ADC Volume' 112"
+
+		cset "name='Mixin Left Mic 1 Switch' on"
+		cset "name='Mixin Right Mic 1 Switch' on"
+		cset "name='Mixin PGA Switch' on"
+		cset "name='Mic 1 Switch' on"
+		cset "name='ADC Switch' on"
+		cset "name='Headset Mic Switch' on"
+	]
+
+	DisableSequence [
+		cdev "hw:sofbytchtda7213"
+
+		cset "name='Headset Mic Switch' off"
+		cset "name='ADC Switch' off"
+		cset "name='Mic 1 Switch' off"
+		cset "name='Mixin PGA Switch' off"
+		cset "name='Mixin Left Mic 1 Switch' off"
+		cset "name='Mixin Right Mic 1 Switch' off"
+	]
+
+	Value {
+		CaptureChannels 2
+	}
+}
+
+SectionDevice."MIC2" {
+	Comment "MIC2 capture"
+
+	ConflictingDevice [
+		"MIC1"
+		"AUX"
+	]
+
+	EnableSequence [
+		cdev "hw:sofbytchtda7213"
+
+#		cset "name='Mic 2 Amp Source MUX' Differential"
+#		cset "name='Mic 2 Amp Source MUX' MIC_N"
+
+		cset "name='Mic 2 Amp Source MUX' MIC_P"
+		cset "name='Mic 2 Volume' 6"
+		cset "name='Mixin PGA Volume' 47%"
+		cset "name='ADC Volume' 112"
+
+		cset "name='Mixin Left Mic 2 Switch' on"
+		cset "name='Mixin Right Mic 2 Switch' on"
+		cset "name='Mixin PGA Switch' on"
+		cset "name='Mic 2 Switch' on"
+		cset "name='ADC Switch' on"
+		cset "name='Mic Switch' on"
+
+	]
+
+	DisableSequence [
+		cdev "hw:sofbytchtda7213"
+
+		cset "name='Mic Switch' off"
+		cset "name='ADC Switch' off"
+		cset "name='Mic 1 Switch' off"
+		cset "name='Mixin PGA Switch' off"
+		cset "name='Mixin Left Mic 1 Switch' off"
+		cset "name='Mixin Right Mic 1 Switch' off"
+	]
+
+	Value {
+		CaptureChannels 2
+	}
+}
+
+SectionDevice."AUX" {
+	Comment "AUX capture"
+
+	ConflictingDevice [
+		"MIC1"
+		"MIC2"
+	]
+
+	EnableSequence [
+		cdev "hw:sofbytchtda7213"
+
+		cset "name='Aux Volume' 78%"
+		cset "name='ADC Volume' 76%"
+		cset "name='Mixin PGA Volume' 47%"
+
+		cset "name='Mixin Left Aux Left Switch' on"
+		cset "name='Mixin Right Aux Right Switch' on"
+		cset "name='Mixin PGA Switch' on"
+		cset "name='ADC Switch' on"
+		cset "name='Aux Switch' on"
+	]
+
+	DisableSequence [
+		cdev "hw:sofbytchtda7213"
+
+		cset "name='Aux Switch' off"
+		cset "name='ADC Switch' off"
+		cset "name='Mixin PGA Switch' off"
+		cset "name='Mixin Left Aux Left Switch' off"
+		cset "name='Mixin Right Aux Right Switch' off"
+	]
+
+	Value {
+		CaptureChannels 2
+	}
+}
+
+SectionDevice."Headphones" {
+	Comment "Headphones playback"
+
+	EnableSequence [
+		cdev "hw:sofbytchtda7213"
+
+		cset "name='Headphone Volume' 50%"
+		cset "name='Mixout Left DAC Left Switch' on"
+		cset "name='Mixout Right DAC Right Switch' on"
+		cset "name='Headphone Switch' on"
+		cset "name='Headphone Jack Switch' on"
+
+	]
+
+	DisableSequence [
+		cdev "hw:sofbytchtda7213"
+
+		cset "name='Headphone Jack Switch' off"
+		cset "name='Headphone Switch' off"
+		cset "name='Mixout Left DAC Left Switch' off"
+		cset "name='Mixout Right DAC Right Switch' off"
+	]
+
+	Value {
+		PlaybackChannels "2"
+	}
+}
+

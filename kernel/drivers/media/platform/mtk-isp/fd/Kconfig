@@ -1,0 +1,19 @@
+config VIDEO_MEDIATEK_FD
+	tristate "Mediatek face detection processing function"
+	depends on VIDEO_V4L2
+	depends on ARCH_MEDIATEK
+	select VIDEOBUF2_DMA_CONTIG
+	select VIDEOBUF2_CORE
+	select VIDEOBUF2_V4L2
+	select VIDEOBUF2_MEMOPS
+	select MEDIA_CONTROLLER
+	select MTK_SCP
+
+	default n
+	help
+		Support the Face Detection (FD) feature in the Mediatek
+		mt8183 Soc.
+
+		FD driver is a V4L2 memory-to-memory device driver which
+		provides hardware accelerated face detection function,
+		it can detect different sizes of faces in a raw image.

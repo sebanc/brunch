@@ -1,0 +1,249 @@
+# command-line sequence to switch playback/capture
+# alsaucm -c sof-cht-bsw-rt5672 set _verb HiFi set _enadev Headphones
+# alsaucm -c sof-cht-bsw-rt5672 set _verb HiFi set _enadev Speaker
+# alsaucm -c sof-cht-bsw-rt5672 set _verb HiFi set _enadev MonoSpeaker
+# alsaucm -c sof-cht-bsw-rt5672 set _verb HiFi set _enadev HeadsetMic
+# alsaucm -c sof-cht-bsw-rt5672 set _verb HiFi set _enadev DMIC1
+# alsaucm -c sof-cht-bsw-rt5672 set _verb HiFi set _enadev DMIC2
+
+SectionVerb {
+    
+    Value {
+        TQ "HiFi"
+        PlaybackPCM "hw:sofchtbswrt5672"
+        CapturePCM "hw:sofchtbswrt5672"
+    }
+    
+    EnableSequence [
+        cdev "hw:sofchtbswrt5672"
+        
+        
+        # Playback (I2S1)
+
+        # common
+        cset "name='DAC1 L Mux' IF1 DAC"
+        cset "name='DAC1 R Mux' IF1 DAC"
+        cset "name='DAC1 MIXL DAC1 Switch' on"
+        cset "name='DAC1 MIXR DAC1 Switch' on"
+        cset "name='Stereo DAC MIXL DAC L1 Switch' on"
+        cset "name='Stereo DAC MIXR DAC R1 Switch' on"
+	cset "name='Stereo DAC MIXL DAC R1 Switch' off"
+	cset "name='Stereo DAC MIXR DAC L1 Switch' off"
+
+        # speaker
+        cset "name='PDM1 L Mux' Stereo DAC"
+        cset "name='PDM1 R Mux' Stereo DAC"
+
+        # headphone
+        cset "name='HPOVOL MIXL DAC1 Switch' on"
+        cset "name='HPOVOL MIXR DAC1 Switch' on"
+        cset "name='HPO MIX HPVOL Switch' on"
+        
+        # line out
+        # cset "name='OUT MIXL DAC L1 Switch' on"
+        # cset "name='OUT MIXR DAC R1 Switch' on"
+        # cset "name='LOUT MIX OUTMIX L Switch' on"
+        # cset "name='LOUT MIX OUTMIX R Switch' on"
+    ]
+
+    DisableSequence [
+        cdev "hw:sofchtbswrt5672"
+
+        # disable audio output path
+        cset "name='codec_out1 mix 0 pcm0_in Switch' off"
+        cset "name='media0_out mix 0 media1_in Switch' off"
+
+        cset "name='media1_in Gain 0 Switch' off"
+        cset "name='pcm0_in Gain 0 Switch' off"
+        cset "name='codec_out1 Gain 0 Switch' off"
+
+        # disable audio input path
+        cset "name='pcm1_out mix 0 media_loop2_in Switch' off"
+        cset "name='media_loop2_out mix 0 codec_in0 Switch' off"
+
+        cset "name='media_loop2_out Gain 0 Switch' off"
+        cset "name='pcm1_out Gain 0 Switch' off"
+        cset "name='codec_in0 Gain 0 Switch' off"
+    ]
+	
+}
+
+SectionDevice."Speaker" {
+    Comment "Speaker"
+
+    Value {
+        PlaybackChannels "2"
+    }
+
+    ConflictingDevice [
+        "Headphones"
+	"MonoSpeaker"
+    ]
+
+    EnableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Ext Spk Switch' on"
+    ]
+
+    DisableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Ext Spk Switch' off"
+    ]
+}
+
+SectionDevice."MonoSpeaker" {
+    Comment "MonoSpeaker"
+
+    Value {
+        PlaybackChannels "2"
+    }
+
+    ConflictingDevice [
+        "Headphones"
+	"Speaker"
+    ]
+
+    EnableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Ext Spk Switch' on"
+	cset "name='Stereo DAC MIXL DAC R1 Switch' on"
+    ]
+
+    DisableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Ext Spk Switch' off"
+	cset "name='Stereo DAC MIXL DAC R1 Switch' off"
+    ]
+}
+
+SectionDevice."Headphones" {
+    Comment "Headphones"
+
+    Value {
+        PlaybackChannels "2"
+        JackControl "Headphone Jack"
+    }
+
+    ConflictingDevice [
+        "Speaker"
+	"MonoSpeaker"
+    ]
+
+    EnableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Headphone Switch' on"
+    ]
+
+    DisableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Headphone Switch' off"
+    ]
+}
+
+SectionDevice."DMIC1" {
+    Comment "DMIC1 Internal Microphones"
+
+    Value {
+        CaptureChannels "2"
+    }
+
+    ConflictingDevice [
+        "HeadsetMic"
+        "DMIC2"
+    ]
+    
+    EnableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Int Mic Switch' on"
+        cset "name='Stereo1 DMIC Mux' DMIC1"
+        cset "name='Stereo1 ADC 2 Mux' DMIC"
+        cset "name='Sto1 ADC MIXL ADC2 Switch' on"
+        cset "name='Sto1 ADC MIXR ADC2 Switch' on"
+        cset "name='Sto1 ADC MIXL ADC1 Switch' off"
+        cset "name='Sto1 ADC MIXR ADC1 Switch' off"
+    ]
+
+    DisableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Int Mic Switch' off"
+        cset "name='Sto1 ADC MIXL ADC2 Switch' off"
+        cset "name='Sto1 ADC MIXR ADC2 Switch' off"
+    ]
+}
+
+SectionDevice."DMIC2" {
+    Comment "DMIC2 Internal Microphones"
+
+    Value {
+        CaptureChannels "2"
+    }
+
+    ConflictingDevice [
+        "HeadsetMic"
+        "DMIC1"
+    ]
+
+    EnableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Int Mic Switch' on"
+        cset "name='Stereo1 DMIC Mux' DMIC2"
+        cset "name='Stereo1 ADC 2 Mux' DMIC"
+        cset "name='Sto1 ADC MIXL ADC2 Switch' on"
+        cset "name='Sto1 ADC MIXR ADC2 Switch' on"
+        cset "name='Sto1 ADC MIXL ADC1 Switch' off"
+        cset "name='Sto1 ADC MIXR ADC1 Switch' off"
+    ]
+
+    DisableSequence [
+        cdev "hw:sofchtbswrt5672"
+        cset "name='Int Mic Switch' off"
+        cset "name='Sto1 ADC MIXL ADC2 Switch' off"
+        cset "name='Sto1 ADC MIXR ADC2 Switch' off"
+    ]
+}
+
+SectionDevice."HeadsetMic" {
+         Comment "Headset Mic"
+	 
+	 Value {
+		JackControl "Headset Mic Jack"
+		#FIXME CaptureControl "MIC2"
+	}
+
+	ConflictingDevice [
+		"DMIC1"
+		"DMIC2"
+	]
+
+	EnableSequence [
+		cdev "hw:sofchtbswrt5672"
+
+		cset "name='Headset Mic Switch' on"
+        	cset "name='RECMIXL BST1 Switch' on"
+		cset "name='RECMIXR BST1 Switch' on"
+		cset "name='Mono ADC L1 Mux' ADC1"
+		cset "name='Mono ADC R1 Mux' ADC1"
+		cset "name='Mono ADC MIXL ADC2 Switch' off"
+       		cset "name='Mono ADC MIXR ADC2 Switch' off"
+        	cset "name='Mono ADC MIXL ADC1 Switch' on"
+       		cset "name='Mono ADC MIXR ADC1 Switch' on"
+	]
+
+	DisableSequence [
+		cdev "hw:sofchtbswrt5672"
+
+		cset "name='Headset Mic Switch' off"
+        	cset "name='RECMIXL BST1 Switch' off"
+		cset "name='RECMIXR BST1 Switch' off"
+		cset "name='Mono ADC L1 Mux' ADC1"
+		cset "name='Mono ADC R1 Mux' ADC1"
+		cset "name='Mono ADC MIXL ADC2 Switch' on"
+       		cset "name='Mono ADC MIXR ADC2 Switch' on"
+        	cset "name='Mono ADC MIXL ADC1 Switch' off"
+       		cset "name='Mono ADC MIXR ADC1 Switch' off"
+	]
+
+	Value {
+		CaptureChannels 2
+	}
+}

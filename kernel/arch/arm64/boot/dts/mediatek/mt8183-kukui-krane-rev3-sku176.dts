@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2019 Google LLC
+ *
+ * Device-tree for Krane rev3/rev4 sku176.
+ *
+ * SKU is a 8-bit value (0xb0 == 176):
+ *  - Bits 7..4: Panel ID: 0xb (BOE)
+ *  - Bits 3..0: SKU ID:   0x0 (default)
+ */
+
+/dts-v1/;
+#include "mt8183-kukui-krane.dtsi"
+
+/ {
+	model = "MediaTek krane rev3/rev4 sku176 board";
+	/*
+	 * rev3 (and possible rev4) BOE panels have an incorrect strapping,
+	 * so match sku16, as well.
+	 */
+	compatible = "google,krane-rev3-sku176", "google,krane-rev4-sku176",
+		"google,krane-rev3-sku16", "google,krane-rev4-sku16",
+		"google,krane-sku176", "google,krane", "mediatek,mt8183";
+};
+
+&it6505dptx {
+	/delete-property/ no-laneswap;
+};
+
+&panel {
+	status = "okay";
+	compatible = "boe,tv101wum-nl6";
+	reg = <0>;
+	enable-gpios = <&pio 45 0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&panel_pins_default>;
+	avdd-supply = <&ppvarn_lcd>;
+	avee-supply = <&ppvarp_lcd>;
+	pp1800-supply = <&pp1800_lcd>;
+	rotation = <270>;
+};

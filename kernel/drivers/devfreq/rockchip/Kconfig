@@ -1,0 +1,8 @@
+config ARM_RK3288_DMC_DEVFREQ
+	bool "ARM RK3288 DMC DEVFREQ Driver"
+	depends on ARCH_ROCKCHIP && ARM
+	select PM_OPP
+	select DEVFREQ_GOV_SIMPLE_ONDEMAND
+	help
+	  This adds the DEVFREQ driver for the RK3288 dmc. It sets the frequency
+	  for the memory controller and reads the usage counts from hardware.

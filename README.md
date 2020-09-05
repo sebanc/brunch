@@ -6,7 +6,8 @@ First of all, thanks goes to project Croissant, the swtpm maintainer and the Chr
 
 The Brunch framework purpose is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
 
-**Warning: with this setup, ChromeOS is not running in a virtual machine and has therefore direct access to all your devices. As such, many bad things can happen with your device and mostly your data. Make sure you only use this framework on a device which does not contain any sensitive data and keep non-sensitive data synced with a cloud service. I cannot be held responsible for anything bad that would happen to your device, including data loss.**
+**Warning: As Brunch is not the intended way for ChromeOS to work, at some point a ChromeOS script could potentially behave badly with Brunch and delete data unexpectedly (even on non-ChromeOS partitions). Also, ChromeOS recovery images include device firmware updates that a close enough device might potentially accept and get flashed with the wrong firmware. By installing Brunch you agree to take those risks and I cannot be held responsible for anything bad that would happen to your device including data loss.
+It is therefore highly recommended to only use this framework on a device which does not contain any sensitive data and to keep non-sensitive data synced with a cloud service.**
 
 ## Hardware support and added features
 
@@ -195,12 +196,15 @@ Some options can be passed through the kernel command lines to activate specific
 - broadcom_wl: enable this option if you need the broadcom_wl module,
 - iwlwifi_backport: enable this option if your intel wireless card is not supported natively in the kernel,
 - rtl8188eu: enable this option if you have a rtl8188eu wireless card,
+- rtl8723bu: enable this option if you have a rtl8723bu wireless card,
+- rtl8723de: enable this option if you have a rtl8723de wireless card,
 - rtl8821ce: enable this option if you have a rtl8821ce wireless card,
 - rtbth: enable this option if you have a RT3290/RT3298LE bluetooth device,
 - acpi_power_button: try this option if long pressing the power button does not display the power menu,
 - alt_touchpad_config: try this option if you have touchpad issues,
 - alt_touchpad_config2: another option to try if you have touchpad issues,
 - disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
+- internal_mic_fix: allows to forcefully enable internal mic on some devices,
 - asus_c302: applies asus c302 specific firmwares and fixes,
 - baytrail_chromebook: applies baytrail chromebooks specific audio fixes,
 - sysfs_tablet_mode: allow to control tablet mode from sysfs (`echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to acivate it or use 0 to disable it),

@@ -22,7 +22,7 @@ The build script will copy the rootfs from a ChromeOS recovery image, chroot int
 - create 2 different efi partitions ("efi_secure.img" with secure boot support and "efi_legacy.img" for older devices).
 
 From there, to create the ChromeOS image, the install script will only have to:
-- copy the primary GPT partition to a device, adjust the disk/partitions size and create the secondary GPT,
+- create partitions,
 - copy the ChromeOS recovery image partitions to this device,
 - copy the ROOTC partition which contains the framework,
 - replace the EFI partition.
@@ -80,9 +80,7 @@ To build the release package, you need to have:
 - 16 GB free disk space available,
 - an internet connection.
 
-1. Download the "rammus" ChromeOS recovery image from here (https://cros-updates-serving.appspot.com/).
-
-Note: This should work with any ChromeOS image compatible with your CPU nevertheless "rammus" currently is the most compatible image.
+1. Download the "samus" ChromeOS recovery image from here (https://cros-updates-serving.appspot.com/).
 
 2. Make sure you have 16GB of free space available for the build.
 

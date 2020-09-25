@@ -42,7 +42,7 @@ Currently:
 - "samus" is the recommended image for devices with 3rd generation Intel CPU and older.
 - "grunt" is the image to use if you have supported AMD hardware.
 
-ChromeOS recovery images can be downloaded from here: https://cros-updates-serving.appspot.com/
+ChromeOS recovery images can be downloaded from: https://cros-updates-serving.appspot.com/ or https://cros.tech/
 
 # Install instructions
 

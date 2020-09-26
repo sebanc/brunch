@@ -190,33 +190,45 @@ The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch
 ## Framework options
 
 Some options can be passed through the kernel command lines to activate specific features which might be dangerous or not work from everyone:
-- enable_updates: allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
-- android_init_fix: alternative init to support devices on which the android container fails to start with the standard init.
-- mount_internal_drives: allows automatic mounting of HDD partitions in ChromeOS (android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data), partition label will be used if it exists,
-- broadcom_wl: enable this option if you need the broadcom_wl module,
-- iwlwifi_backport: enable this option if your intel wireless card is not supported natively in the kernel,
-- rtl8188eu: enable this option if you have a rtl8188eu wireless card,
-- rtl8723bu: enable this option if you have a rtl8723bu wireless card,
-- rtl8723de: enable this option if you have a rtl8723de wireless card,
-- rtl8821ce: enable this option if you have a rtl8821ce wireless card,
-- rtbth: enable this option if you have a RT3290/RT3298LE bluetooth device,
-- acpi_power_button: try this option if long pressing the power button does not display the power menu,
-- alt_touchpad_config: try this option if you have touchpad issues,
-- alt_touchpad_config2: another option to try if you have touchpad issues,
-- disable_intel_hda: some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
-- internal_mic_fix: allows to forcefully enable internal mic on some devices,
-- asus_c302: applies asus c302 specific firmwares and fixes,
-- baytrail_chromebook: applies baytrail chromebooks specific audio fixes,
-- sysfs_tablet_mode: allow to control tablet mode from sysfs (`echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to acivate it or use 0 to disable it),
-- force_tablet_mode: same as above except tablet mode is enabled by default on boot,
-- suspend_s3: disable suspend to idle (S0ix) and use S3 suspend instead,
-- advanced_als: default ChromeOS auto-brightness is very basic (https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md). This option activates more auto-brightness levels (based on the Google Pixel Slate implementation).
+- "enable_updates": allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
+- "android_init_fix": alternative init to support devices on which the android container fails to start with the standard init.
+- "mount_internal_drives": allows automatic mounting of HDD partitions in ChromeOS (android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data), partition label will be used if it exists,
+- "broadcom_wl": enable this option if you need the broadcom_wl module,
+- "iwlwifi_backport": enable this option if your intel wireless card is not supported natively in the kernel,
+- "rtl8188eu": enable this option if you have a rtl8188eu wireless card,
+- "rtl8723bu": enable this option if you have a rtl8723bu wireless card,
+- "rtl8723de": enable this option if you have a rtl8723de wireless card,
+- "rtl8821ce": enable this option if you have a rtl8821ce wireless card,
+- "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
+- "acpi_power_button": try this option if long pressing the power button does not display the power menu,
+- "alt_touchpad_config": try this option if you have touchpad issues,
+- "alt_touchpad_config2": another option to try if you have touchpad issues,
+- "disable_intel_hda": some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
+- "internal_mic_fix": allows to forcefully enable internal mic on some devices,
+- "asus_c302": applies asus c302 specific firmwares and fixes,
+- "baytrail_chromebook": applies baytrail chromebooks specific audio fixes,
+- "sysfs_tablet_mode": allow to control tablet mode from sysfs (`echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to acivate it or use 0 to disable it),
+- "force_tablet_mode": same as above except tablet mode is enabled by default on boot,
+- "suspend_s3": disable suspend to idle (S0ix) and use S3 suspend instead,
+- "advanced_als": default ChromeOS auto-brightness is very basic (https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md). This option activates more auto-brightness levels (based on the Google Pixel Slate implementation).
 
 Add "options=option1,option2,..." (without spaces) to the kernel command line to activate them.
 
 For example: booting with "options=enable_updates,advanced_als" will activate both options.
 
-This is not really a framework option but you can improve performance by disabling a ChromeOS security feature and forcing hyperthreading everywhere (even in crositini) by adding "enforce_hyperthreading=1" to the kernel command line (this is just a kernel command line argument, add it after "cros_debug" and before "options=...." if any.
+## Kernel command line parameters
+
+Those are not options, just add them on the kernel command line after "cros_debug" and before "options=...." if any:
+- "enforce_hyperthreading=1": improve performance by disabling a ChromeOS security feature and forcing hyperthreading everywhere (even in crositini).
+- "console=": No text will be displayed on boot (it will not make boot faster).
+
+## Identify the installed Brunch framework version
+
+1. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
+2. Display the Brunch version:
+```
+cat /etc/brunch_version
+```
 
 ## Update both ChromeOS and the Brunch framework
 
@@ -225,19 +237,19 @@ It is currently recommended to only update ChromeOS when the matching version of
 1. Download the new ChromeOS recovery image version and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery version (from the GitHub release section).
 3. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
-4. Update the framework:
+4. Update both ChromeOS and Brunch:
 ```
 sudo chromeos-update -r < path to the ChromeOS recovery image > -f < path to the Brunch release archive >
 ```
 5. Restart ChromeOS
 
-## Update only the Brunch framework (if you have enabled native ChromeOS updates)
+## Update only the Brunch framework
 
 If you chose to use the "enable_updates" option and have updated to a new ChromeOS release, you might want to update the brunch framework to match your current ChromeOS version.
 
 1. Download the Brunch release corresponding to your ChromeOS version (from the GitHub release section).
 2. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
-3. Update the framework:
+3. Update Brunch:
 ```
 sudo chromeos-update -f < path to the Brunch release archive >
 ```

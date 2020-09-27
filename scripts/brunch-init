@@ -14,13 +14,108 @@ else
 	sleep 10
 fi
 
-if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
+part_choose()
+{
+	# In case UUID and PART were passed
+	img_part="$1"
+	img_uuid="$2"
+	img_uuid_part=$(blkid | grep -i "$img_uuid" | awk -F: '{ print $1 }')
+	echo "" > /dev/kmsg
+	echo "###### CHOOSE YOUR PARTITION #######################"  > /dev/kmsg
+	echo "It appears you've passed both img_part and img_uuid."  > /dev/kmsg
+	echo "You'll be asked to select the partition to use." > /dev/kmsg
+	echo "####################################################" > /dev/kmsg
+	echo "" > /dev/kmsg
+	echo "Which partition you want to use?" > /dev/kmsg
+	echo "A) img_part which points to $img_part" > /dev/kmsg
+	echo "B) img_uuid which points to $img_uuid_part" > /dev/kmsg
+	echo "" > /dev/kmsg
+	echo "Please type A or B: "
+	while true; do
+		read ab
+		case $ab in
+			a|A ) mainroot="$img_part"; return;;
+			b|B ) mainroot="$img_uuid_part"; return;;
+			* ) echo "Please answer with A or B.";;
+		esac
+	done
+}
+
+if [ ! -z "$img_path" ]; then
+	echo "IMG PATH Found, looking for IMG UUID/PART" > /dev/kmsg
 	mkdir /mainroot
-	fstype=$(blkid -s TYPE -o value "$img_part")
+	mainroot=""
+	if [ -e "$img_part" ] && [ -z "$img_uuid" ]; then
+		selection_mode=1
+		echo "Using device block path from img_part." > /dev/kmsg
+	elif [ ! -e "$img_part" ] && [ -n "$img_uuid" ]; then
+		selection_mode=2
+		echo "Using UUID/PARTUUID to get device block." > /dev/kmsg
+	elif [ -e "$img_part" ] && [ -n "$img_uuid" ]; then
+		selection_mode=3
+		echo "BOTH PART and UUID passed, a selection is required." > /dev/kmsg
+	elif [ ! -e "$img_part" ] && [ -z "$img_uuid" ]; then
+		selection_mode=0
+		echo "" 
+		echo "######## ERROR ########" > /dev/kmsg
+		echo "No source partition passed, please pass img_uuid or img_part in your kernel arguments." > /dev/kmsg
+		echo "Please recheck your Grub2 configuration." > /dev/kmsg
+		echo "#######################" > /dev/kmsg
+		echo ""
+		echo "Sleeping for 10 seconds" > /dev/kmsg
+		sleep 10 
+		exit 1 
+	fi
+	case "$selection_mode" in
+		"1")
+		echo "Using PART Mode" > /dev/kmsg
+		echo "Checking $img_part" > /dev/kmsg
+		mainroot="$img_part"
+		echo "MainRoot is now $mainroot" > /dev/kmsg
+		;;
+		"2")
+		echo "Using UUID Mode" > /dev/kmsg
+		echo "Checking $img_uuid" > /dev/kmsg
+		mainroot=$(blkid | grep -i "$img_uuid" | awk -F: '{ print $1 }')
+		if [ -z "$mainroot" ]; then
+			echo ""
+			echo ""
+			echo "YOUR UUID IS INVALID, PLEASE PUT A VALID UUID"
+			echo ""
+			echo ""
+			echo "BOOT HALTED, REBOOTING IN 10 SECONDS"
+			sleep 10
+			exit 1
+		fi
+		echo "MainRoot is now $mainroot" > /dev/kmsg
+		;;
+		"3")
+		echo "Found both UUID and PART, letting user choose within 10 seconds, default choise would be PART" > /dev/kmsg
+		part_choose "$img_part" "$img_uuid"
+		echo "" > /dev/kmsg
+		echo "#############################################################" > /dev/kmsg
+		echo "# PLEASE SET YOUR GRUB2 CONFIG TO USE EITHER UUID OR PART   #" > /dev/kmsg
+		echo "# NOT BOTH. OTHERWISE YOU'LL BE STUCK IN A REBUILDING LOOP  #" > /dev/kmsg
+		echo "# ON EACH RESTART.                                          #" > /dev/kmsg
+		echo "#############################################################" > /dev/kmsg
+		echo "" > /dev/kmsg
+		echo "MainRoot is now $mainroot" > /dev/kmsg
+		echo "" > /dev/kmsg
+		echo "Sleeping for 10 seconds before continuing the boot process." > /dev/kmsg
+		sleep 10
+		;;
+		*)
+		echo "SOMETHING WENT WRONG. THIS SHOULDN'T HAPPEN BUT IT DID!" > /dev/kmsg
+		echo "$img_part ---- $img_uuid ---- $selection_mode" > /dev/kmsg
+		echo "Exiting now" > /dev/kmsg
+		exit 1
+		;;
+	esac	
+	fstype=$(blkid -s TYPE -o value "$mainroot")
 	if [ "$fstype" == "ntfs" ]; then
-		ntfs-3g "$img_part" /mainroot
+		ntfs-3g "$mainroot" /mainroot
 	else
-		mount -n "$img_part" /mainroot
+		mount -n "$mainroot" /mainroot
 	fi
 	if [ -f /mainroot/"$img_path" ]; then
 		mknod -m660 /dev/loop15 b 7 480
@@ -28,7 +123,7 @@ if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 		bootdevice=/dev/loop15
 		partpath=/dev/loop15p
 	else
-		echo "brunch: ChromeOS loopfile $img_path not found on device $img_part..." > /dev/kmsg
+		echo "brunch: ChromeOS loopfile $img_path not found on device $mainroot..." > /dev/kmsg
 	fi
 else
 	for sysblock in /sys/block/*; do

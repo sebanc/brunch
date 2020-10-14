@@ -1,0 +1,21 @@
+/*
+ * Google Veyron (and derivatives) fragment for lpddr ddrfreq settings
+ *
+ * Copyright 2015 Google, Inc
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
+&dmc {
+	status = "okay";
+	rockchip,odt-disable-freq = <666000000>;
+	rockchip,pd-enable-freq = <333000000>;
+	operating-points = <
+		/* KHz    uV */
+		200000 1050813
+		333000 1099593
+		533000 1154878
+	>;
+};

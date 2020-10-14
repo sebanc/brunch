@@ -1,0 +1,36 @@
+# Use case Configuration for bxt-pcm512x
+
+SectionVerb {
+	EnableSequence [
+		cdev "hw:sofbxtpcm512x"
+		exec "echo HiFi enable sequence"
+		cset "name='Digital Playback Switch' off"
+		cset "name='Digital Playback Volume' 120"
+	]
+
+	DisableSequence [
+		cdev "hw:sofbxtpcm512x"
+		exec "echo HiFi disable sequence"
+		cset "name='Digital Playback Switch' on"
+	]
+
+	Value {
+		PlaybackPCM "hw:sofbxtpcm512x"
+	}
+}
+
+SectionDevice."Ext Spk" {
+	Comment "RCA Line output"
+
+	EnableSequence [
+		cdev "hw:sofbxtpcm512x"
+	]
+
+	DisableSequence [
+		cdev "hw:sofbxtpcm512x"
+	]
+
+	Value {
+		PlaybackChannels "2"
+	}
+}

@@ -233,7 +233,7 @@ Those are not options, just add them on the kernel command line after "cros_debu
 - "console=": No text will be displayed on boot (it will not make boot faster).
 
 like this: 
-https://user-images.githubusercontent.com/69226625/97113026-9fec2880-170d-11eb-930f-972f0b38af4f.png
+![](https://user-images.githubusercontent.com/69226625/97113026-9fec2880-170d-11eb-930f-972f0b38af4f.png)
 ## Identify the installed Brunch framework version
 
 1. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)

@@ -301,6 +301,8 @@ sudo umount /tmp/efi_part
 3. Save by Ctrl+o (Press enter to confirm)
 4. Exit by Ctrl+x
 
+You can visit wiki https://github.com/sebanc/brunch/wiki
+
 
 # FAQ
 

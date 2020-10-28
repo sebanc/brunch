@@ -16,7 +16,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 Base hardware compatibility:
 - x86_64 computers with UEFI boot support,
 - Intel hardware (CPU and GPU) starting from 1st generation "Nehalem" (refer to https://en.wikipedia.org/wiki/Intel_Core),
-- AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU and Ryzen models are not supported),
+- AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU and Ryzen models are not yet supported),
 - Nvidia graphic cards are also not supported.
 
 An alternative procedure exist for bios/mbr devices (however note that the dual boot method is not supported). Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the "mbr_suport.tar.gz" package that you will find in this branch (master).
@@ -78,30 +78,36 @@ The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch
 
 ChromeOS partition scheme is very specific which makes it difficult to dual boot. One solution to circumvent that is to keep ChromeOS in a disk image on the hard drive and run it from there.
 
-Make sure you have an ext4 or NTFS partition with at least 14gb of free space available and no encryption or create one (refer to online resources).
+Make sure you have an ext4 (recommended) or NTFS partition with at least 14gb of free space available and no encryption or create one (refer to online resources).
 
-1. Perform the steps 1 to 4 as described in the previous section (Install ChromeOS on a USB flash drive / SD card), boot to Chrome OS and open crosh(Chrome OS terminal).
-2. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
+1. Download the ChromeOS recovery image and extract it.
+2. Download the Brunch release corresponding to the ChromeOS recovery image version you have downloaded (from the GitHub release section).
+3. Open a terminal, navigate to the directory containing the package.
+4. Extract it: 
+```
+tar zxvf brunch_< version >.tar.gz
+```
+5. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
 ```
 mkdir -p ~/tmpmount
 sudo mount < the destination partition (ext4 or ntfs) which will contain the disk image > ~/tmpmount
 ```
-3. Create the ChromeOS disk image:
+6. Create the ChromeOS disk image:
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
-4. Copy the GRUB configuration which appears in the terminal at the end of the process (between lines with stars) to either:
+7. Copy the GRUB configuration which appears in the terminal at the end of the process (between lines with stars) to either:
 - your hard disk GRUB install if you have one (refer to you distro's online resources).
 - the USB flash drive / SD card GRUB config file (then boot from USB flash drive / SD card and choose "boot from disk image" in the GRUB menu),
-5. Unmout the destination partition
+8. Unmout the destination partition
 ```
 sudo umount ~/tmpmount
 ```
-6. (secure boot only) Download the secure boot key "brunch.der" in this branch (master) of the repository and enroll it by running the command:
+9. (secure boot only) Download the secure boot key "brunch.der" in this branch (master) of the repository and enroll it by running the command:
 ```
 sudo mokutil --import brunch.der
 ```
-7. Reboot your computer and boot to the bootloader with the modified GRUB config.
+10. Reboot your computer and boot to the bootloader with the modified GRUB config.
 
 The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
 
@@ -160,15 +166,18 @@ sudo mount < the destination partition (ext4 or ntfs) which will contain the dis
 ```
 sudo bash chromeos-install -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
-6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C), run `sudo edit-grub-config`, move to line 2 and paste the text (CTRL+SHIFT+V). Save and exit.
+6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C), create a text file, paste the copied configuration and save it to any external storage or you can simply mail yourself.
 7. Unmout the destination partition
 ```
 sudo umount ~/tmpmount
 ```
-8. Disable "Fast startup" in Windows (refer to online resources).
-9. Reboot your computer and boot from USB flash drive / SD card.
-
-The GRUB menu should appear, select "ChromeOS (boot from disk image)" and you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
+8. Reboot your computer and boot to windows.
+9. Disable "Fast startup" in Windows (refer to online resources).
+10. Install grub 2 win (https://sourceforge.net/projects/grub2win/).
+11. Create a new entery (custom config) and paste the configuration you saved in custom code box and save text file.
+12. Click `Ok` and `apply` (It wont save your entry unless you click `ok` and `apply`)
+13. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient.You should be greeted by ChromeOS startup screen once the process completes.
+You can now start using ChromeOS from your HDD.
 
 ## Install ChromeOS on HDD from ChromeOS
 
@@ -213,6 +222,7 @@ Some options can be passed through the kernel command lines to activate specific
 - "advanced_als": default ChromeOS auto-brightness is very basic (https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md). This option activates more auto-brightness levels (based on the Google Pixel Slate implementation).
 
 Add "options=option1,option2,..." (without spaces) to the kernel command line to activate them.
+you can add it after cros_debug and before loop.max.....
 
 For example: booting with "options=enable_updates,advanced_als" will activate both options.
 
@@ -222,6 +232,8 @@ Those are not options, just add them on the kernel command line after "cros_debu
 - "enforce_hyperthreading=1": improve performance by disabling a ChromeOS security feature and forcing hyperthreading everywhere (even in crositini).
 - "console=": No text will be displayed on boot (it will not make boot faster).
 
+like this: 
+https://user-images.githubusercontent.com/69226625/97113026-9fec2880-170d-11eb-930f-972f0b38af4f.png
 ## Identify the installed Brunch framework version
 
 1. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
@@ -255,6 +267,8 @@ sudo chromeos-update -f < path to the Brunch release archive >
 ```
 4. Restart ChromeOS
 
+*WARNING*: Do not update brunch with unfinished OTA update as it may make chromeOS unbootable.
+
 ## Modify the GRUB bootloader
 
 ### From Windows
@@ -282,7 +296,11 @@ sudo umount /tmp/efi_part
 
 ### From ChromeOS
 
-Run `sudo edit-grub-config`
+1. Run `sudo edit-grub-config`
+2. modify as you want
+3. Save by Ctrl+o (Press enter to confirm)
+4. Exit by Ctrl+x
+
 
 # FAQ
 

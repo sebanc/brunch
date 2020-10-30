@@ -165,13 +165,15 @@ sudo apt update && sudo apt install pv tar cgpt
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
-6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C), create a text file (right click > New > Text document) past in it and save.
+6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C).
 7. Disable "Fast startup" in Windows (refer to online resources).
-8. Install grub 2 win (https://sourceforge.net/projects/grub2win/).
-9. Create a new entery (custom config) and paste the configuration you saved in custom code box and save text file.
-10. Click `Ok` and `apply` (It wont save your entry unless you click `ok` and `apply`)
-11.Reboot.
-12. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient.You should be greeted by ChromeOS startup screen once the process completes.
+8. Install grub 2 win (https://sourceforge.net/projects/grub2win/) and launch the application.
+9. Click on `Manage Boot Menu` button, then `Add A New Entry`.
+10. Select `isoboot` in the 'Type' section.
+11. Now, click `Edit Custom Code` this will open a text file. paste the configuration copied in step 8, save and close the text file.
+12. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
+13. Reboot.
+14. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient. You should be greeted by ChromeOS startup screen once the process completes.
 You can now start using ChromeOS from your HDD.
 
 ## Install ChromeOS on HDD from ChromeOS
@@ -291,10 +293,10 @@ sudo umount /tmp/efi_part
 
 ### From ChromeOS
 
-1. Run `sudo edit-grub-config`
-2. modify as you want
-3. Save by Ctrl+o (Press enter to confirm)
-4. Exit by Ctrl+x
+1. Run `sudo edit-grub-config`.
+2. Now you can modify your grub entry.
+3. Save by Ctrl+o (Press enter to confirm).
+4. Exit by Ctrl+x.
 
 You can visit wiki https://github.com/sebanc/brunch/wiki
 

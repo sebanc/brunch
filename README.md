@@ -168,7 +168,7 @@ sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst 
 6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C), create a text file (right click > New > Text document) past in it and save.
 7. Disable "Fast startup" in Windows (refer to online resources).
 8. Install grub 2 win (https://sourceforge.net/projects/grub2win/).
-9. Create a new entery (custom config) and paste the configuration you saved in custom code box and save text file.
+9. Create a new entry (custom config) and paste the configuration you saved in custom code box and save text file.
 10. Click `Ok` and `apply` (It wont save your entry unless you click `ok` and `apply`)
 11.Reboot.
 12. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient.You should be greeted by ChromeOS startup screen once the process completes.

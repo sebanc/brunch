@@ -155,28 +155,23 @@ sudo resize-data
 ### Dual Boot ChromeOS from your HDD
 
 1. Make sure you have a NTFS partition with at least 14gb of free space available and no BitLocker encryption or create one (refer to online resources).
-2. Create a ChromeOS USB flash drive / SD card using the above method (Install ChromeOS on a USB flash drive / SD card) and boot it.
-3. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
-4. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
+2. Extract all files from brunch archive and recovery image to desired location.
+3. Open Linux shell (Shift+right click and select `open linux shell here`
+4. install pv, tar and cgpt packages:
 ```
-mkdir -p ~/tmpmount
-sudo mount < the destination partition (ext4 or ntfs) which will contain the disk image > ~/tmpmount
+sudo apt update && sudo apt install pv tar cgpt
 ```
 5. Create the ChromeOS disk image:
 ```
-sudo bash chromeos-install -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
+sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
-6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C), create a text file, paste the copied configuration and save it to any external storage or you can simply mail yourself.
-7. Unmout the destination partition
-```
-sudo umount ~/tmpmount
-```
-8. Reboot your computer and boot to windows.
-9. Disable "Fast startup" in Windows (refer to online resources).
-10. Install grub 2 win (https://sourceforge.net/projects/grub2win/).
-11. Create a new entery (custom config) and paste the configuration you saved in custom code box and save text file.
-12. Click `Ok` and `apply` (It wont save your entry unless you click `ok` and `apply`)
-13. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient.You should be greeted by ChromeOS startup screen once the process completes.
+6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C), create a text file (right click > New > Text document) past in it and save.
+7. Disable "Fast startup" in Windows (refer to online resources).
+8. Install grub 2 win (https://sourceforge.net/projects/grub2win/).
+9. Create a new entery (custom config) and paste the configuration you saved in custom code box and save text file.
+10. Click `Ok` and `apply` (It wont save your entry unless you click `ok` and `apply`)
+11.Reboot.
+12. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient.You should be greeted by ChromeOS startup screen once the process completes.
 You can now start using ChromeOS from your HDD.
 
 ## Install ChromeOS on HDD from ChromeOS

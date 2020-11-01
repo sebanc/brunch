@@ -19,7 +19,7 @@ Base hardware compatibility:
 - AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU and Ryzen models are not yet supported),
 - Nvidia graphic cards are also not supported.
 
-An alternative procedure exist for bios/mbr devices (however note that the dual boot method is not supported). Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the "mbr_suport.tar.gz" package that you will find in this branch (master).
+Specific procedure for BIOS/MBR devices: Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the "mbr_suport.tar.gz" package that you will find in this branch (master).
 
 Specific hardware support:
 - sensors: an experimental patch aims to allow intel ISH accelerometer and light sensors through a custom kernel module,
@@ -41,6 +41,9 @@ Currently:
 - "rammus" is the recommended image for devices with 4th generation Intel CPU and newer.
 - "samus" is the recommended image for devices with 3rd generation Intel CPU and older.
 - "grunt" is the image to use if you have supported AMD hardware.
+
+If you have a doubt on the recovery image to use, the "brunch-toolkit" from WesBosch has a compatibility check feature which detects the recovery image to use:
+https://github.com/WesBosch/brunch-toolkit
 
 ChromeOS recovery images can be downloaded from: https://cros-updates-serving.appspot.com/ or https://cros.tech/
 

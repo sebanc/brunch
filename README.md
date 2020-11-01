@@ -96,9 +96,11 @@ sudo mount < the destination partition (ext4 or ntfs) which will contain the dis
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
-7. Copy the GRUB configuration which appears in the terminal at the end of the process (between lines with stars) to either:
-- your hard disk GRUB install if you have one (refer to you distro's online resources).
-- the USB flash drive / SD card GRUB config file (then boot from USB flash drive / SD card and choose "boot from disk image" in the GRUB menu),
+7. Create a GRUB configuration file for brunch in your linux install:
+- Copŷ the grub config which appeared in the terminal at the end of the process (the text between lines with stars)
+- Run `sudo cp /etc/grub.d/40_custom /etc/grub.d/99_brunch`
+- Then run `sudo nano /etc/grub.d/99_brunch`, paste the grub config at the end of the file. Save the changes and exit nano (CTRL-X).
+- Lastly, run `sudo update-grub`.
 8. Unmout the destination partition
 ```
 sudo umount ~/tmpmount

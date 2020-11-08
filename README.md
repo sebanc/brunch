@@ -176,6 +176,10 @@ sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst 
 9. Click on `Manage Boot Menu` button, then `Add A New Entry`.
 10. Select `isoboot` in the 'Type' section.
 11. Now, click `Edit Custom Code` this will open a text file. paste the configuration copied in step 8, save and close the text file.
+
+#### Note: To solve 'rmmod tpm: no such modules' error while booting, delete 'rmmod tpm' from the first line of this configuration.
+rmmod tpm is necessary to boot from ubuntu or linuxmint grub. Nevertheless you can remove it from your grunb2win configuration.
+
 12. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
 13. Reboot.
 14. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient. You should be greeted by ChromeOS startup screen once the process completes.

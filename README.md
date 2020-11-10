@@ -160,29 +160,35 @@ sudo resize-data
 ### Dual Boot ChromeOS from your HDD
 
 1. Make sure you have a NTFS partition with at least 14gb of free space available and no BitLocker encryption or create one (refer to online resources).
-2. Extract all files from brunch archive and recovery image to desired location.
-3. Open Linux shell (Shift+right click and select `open linux shell here`
-4. install pv, tar and cgpt packages:
+2. Make a ChromeOS USB flashdrive / SD card (see above) and boot it.
+3. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite).
+4. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
 ```
-sudo apt update && sudo apt install pv tar cgpt
+mkdir -p ~/tmpmount
+sudo mount < the destination partition (ext4 or ntfs) which will contain the disk image > ~/tmpmount
 ```
 5. Create the ChromeOS disk image:
 ```
-sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
+sudo bash chromeos-install -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
 6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C).
-7. Disable "Fast startup" in Windows (refer to online resources).
-8. Install grub 2 win (https://sourceforge.net/projects/grub2win/) and launch the application.
-9. Click on `Manage Boot Menu` button, then `Add A New Entry`.
-10. Select `isoboot` in the 'Type' section.
-11. Now, click `Edit Custom Code` this will open a text file. paste the configuration copied in step 8, save and close the text file.
+7. Run `sudo nano ~/tmpmount/chromeos.grub.txt` and paste the config there (CTRL°SHIFT+V to paste and then CTRL-X to exit)
+8. Unmout the destination partition
+```
+sudo umount ~/tmpmount
+```
+9. Reboot to Windows, Install grub 2 win (https://sourceforge.net/projects/grub2win/) and launch the application.
+10. Click on `Manage Boot Menu` button, then `Add A New Entry`.
+11. Select `isoboot` in the 'Type' section.
+12. Now, click `Edit Custom Code` this will open a text file. Open the chromeos.grub.txt file we saved in step 7 and copy the grub configuration in grub 2 win.
 
 #### Note: To solve 'rmmod tpm: no such modules' error while booting, delete 'rmmod tpm' from the first line of this configuration.
 rmmod tpm is necessary to boot from ubuntu or linuxmint grub. Nevertheless you can remove it from your grunb2win configuration.
 
-12. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
-13. Reboot.
-14. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient. You should be greeted by ChromeOS startup screen once the process completes.
+13. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
+14. Important: Disable "Fast startup" in Windows (refer to online resources).
+15. Reboot.
+16. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient. You should be greeted by ChromeOS startup screen once the process completes.
 You can now start using ChromeOS from your HDD.
 
 ## Install ChromeOS on HDD from ChromeOS

@@ -180,11 +180,8 @@ sudo umount ~/tmpmount
 9. Reboot to Windows, Install grub 2 win (https://sourceforge.net/projects/grub2win/) and launch the application.
 10. Click on `Manage Boot Menu` button, then `Add A New Entry`.
 11. Select `isoboot` in the 'Type' section.
-12. Now, click `Edit Custom Code` this will open a text file. Open the chromeos.grub.txt file we saved in step 7 and copy the grub configuration in grub 2 win.
-
-#### Note: To solve 'rmmod tpm: no such modules' error while booting, delete 'rmmod tpm' from the first line of this configuration.
-rmmod tpm is necessary to boot from ubuntu or linuxmint grub. Nevertheless you can remove it from your grunb2win configuration.
-
+12. Now, click `Edit Custom Code` this will open a text file. Open the chromeos.grub.txt file we saved in step 7 and copy the grub configuration in grub2win.
+#### Then remove the first line of the config ("menuentry ChromeOS ... {"), the "rmmod tpm" line and the last line ("}").
 13. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
 14. Important: Disable "Fast startup" in Windows (refer to online resources).
 15. Reboot.

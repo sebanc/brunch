@@ -179,9 +179,9 @@ sudo umount ~/tmpmount
 ```
 9. Reboot to Windows, Install grub 2 win (https://sourceforge.net/projects/grub2win/) and launch the application.
 10. Click on `Manage Boot Menu` button, then `Add A New Entry`.
-11. Select `isoboot` in the 'Type' section.
+11. Select `submenu` in the 'Type' section and input "Chrome OS" as title.
 12. Now, click `Edit Custom Code` this will open a text file. Open the chromeos.grub.txt file we saved in step 7 and copy the grub configuration in grub2win.
-#### Then remove the first line of the config ("menuentry ChromeOS ... {"), the "rmmod tpm" line and the last line ("}").
+#### Then remove the "rmmod tpm" line.
 13. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
 14. Important: Disable "Fast startup" in Windows (refer to online resources).
 15. Reboot.

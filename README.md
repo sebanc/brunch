@@ -58,7 +58,7 @@ You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an 
 - root access.
 - `pv`, `tar` and `cgpt` packages/binaries.
 
-### Install ChromeOS on a USB flash drive / SD card
+### Install ChromeOS on a USB flash drive / SD card / HDD (full disk install / single boot)
 
 1. Download the ChromeOS recovery image and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery image version you have downloaded (from the GitHub release section).
@@ -67,12 +67,12 @@ You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an 
 ```
 tar zxvf brunch_< version >.tar.gz
 ```
-5. Identify your USB flash drive / SD card device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive)
-6. Install ChromeOS on the USB flash drive / SD card:
+5. Identify your USB flash drive / SD card / HDD device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive)
+6. Install ChromeOS on the USB flash drive / SD card / HDD:
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < your USB flash drive / SD card device. e.g. /dev/sdX >
 ```
-7. Reboot your computer and boot from the USB flash drive / SD card (refer to your computer manufacturer's online resources).
+7. Reboot your computer and boot from the USB flash drive / SD card / HDD (refer to your computer manufacturer's online resources).
 8. (Secure Boot only) A blue screen saying "Verfification failed: (15) Access Denied" will appear upon boot and you will have to enroll the secure boot key by selecting "OK->Enroll key from disk->EFI-SYSTEM->brunch.der->Continue". Reboot your computer and boot again from the USB flash drive / SD card.
 
 The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS.

@@ -239,6 +239,8 @@ For example: booting with "options=enable_updates,advanced_als" will activate bo
 
 Those are not options, just add them on the kernel command line after "cros_debug" and before "options=...." if any:
 - "enforce_hyperthreading=1": improve performance by disabling a ChromeOS security feature and forcing hyperthreading everywhere (even in crositini).
+- "i915.enable_fbc=0 i915.enable_psr=0": if you want to use crouton (needed with kernel 5.4).
+- "psmouse.synaptics_intertouch=1": enables gestures with more than 2 fingers on some touchpad models.
 - "console=": No text will be displayed on boot (it will not make boot faster).
 
 like this: 

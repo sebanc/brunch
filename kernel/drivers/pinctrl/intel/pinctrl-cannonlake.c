@@ -7,10 +7,10 @@
  *          Mika Westerberg <mika.westerberg@linux.intel.com>
  */
 
-#include <linux/acpi.h>
+#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/pm.h>
+
 #include <linux/pinctrl/pinctrl.h>
 
 #include "pinctrl-intel.h"
@@ -19,6 +19,7 @@
 #define CNL_PADCFGLOCK		0x080
 #define CNL_LP_HOSTSW_OWN	0x0b0
 #define CNL_H_HOSTSW_OWN	0x0c0
+#define CNL_GPI_IS		0x100
 #define CNL_GPI_IE		0x120
 
 #define CNL_GPP(r, s, e, g)				\
@@ -37,6 +38,7 @@
 		.padown_offset = CNL_PAD_OWN,		\
 		.padcfglock_offset = CNL_PADCFGLOCK,	\
 		.hostown_offset = (o),			\
+		.is_offset = CNL_GPI_IS,		\
 		.ie_offset = CNL_GPI_IE,		\
 		.pin_base = (s),			\
 		.npins = ((e) - (s) + 1),		\
@@ -829,30 +831,14 @@ static const struct intel_pinctrl_soc_data cnllp_soc_data = {
 static const struct acpi_device_id cnl_pinctrl_acpi_match[] = {
 	{ "INT3450", (kernel_ulong_t)&cnlh_soc_data },
 	{ "INT34BB", (kernel_ulong_t)&cnllp_soc_data },
-	{ },
+	{ }
 };
 MODULE_DEVICE_TABLE(acpi, cnl_pinctrl_acpi_match);
 
-static int cnl_pinctrl_probe(struct platform_device *pdev)
-{
-	const struct intel_pinctrl_soc_data *soc_data;
-	const struct acpi_device_id *id;
-
-	id = acpi_match_device(cnl_pinctrl_acpi_match, &pdev->dev);
-	if (!id || !id->driver_data)
-		return -ENODEV;
-
-	soc_data = (const struct intel_pinctrl_soc_data *)id->driver_data;
-	return intel_pinctrl_probe(pdev, soc_data);
-}
-
-static const struct dev_pm_ops cnl_pinctrl_pm_ops = {
-	SET_LATE_SYSTEM_SLEEP_PM_OPS(intel_pinctrl_suspend,
-				     intel_pinctrl_resume)
-};
+static INTEL_PINCTRL_PM_OPS(cnl_pinctrl_pm_ops);
 
 static struct platform_driver cnl_pinctrl_driver = {
-	.probe = cnl_pinctrl_probe,
+	.probe = intel_pinctrl_probe_by_hid,
 	.driver = {
 		.name = "cannonlake-pinctrl",
 		.acpi_match_table = cnl_pinctrl_acpi_match,

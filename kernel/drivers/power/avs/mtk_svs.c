@@ -549,7 +549,7 @@ static int svs_set_volts(struct svs_bank *svsb, bool force_update)
 
 		opp_volt = min(opp_volt, svsb->opp_volts[i]);
 		ret = dev_pm_opp_adjust_voltage(svsb->dev, svsb->opp_freqs[i],
-						opp_volt);
+						opp_volt, opp_volt, opp_volt);
 		if (ret) {
 			pr_err("%s: set voltage failed: %d\n", svsb->name, ret);
 			mutex_unlock(&svsb->lock);
@@ -972,6 +972,8 @@ static int svs_init01(struct mtk_svs *svs)
 			if (!search_done && svsb->opp_volts[i] <= opp_vboot) {
 				ret = dev_pm_opp_adjust_voltage(svsb->dev,
 								opp_freqs,
+								opp_vboot,
+								opp_vboot,
 								opp_vboot);
 				if (ret) {
 					pr_err("%s: set voltage failed: %d\n",

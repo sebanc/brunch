@@ -13,9 +13,10 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __LINUX_PLATFORM_DATA_CROS_EC_SENSORHUB_H
-#define __LINUX_PLATFORM_DATA_CROS_EC_SENSORHUB_H
+#ifndef __CROS_EC_PD_UPDATE_H
+#define __CROS_EC_PD_UPDATE_H
 
+#include <linux/types.h>
 #include <linux/platform_data/cros_ec_commands.h>
 #include <linux/platform_data/cros_ec_proto.h>
 
@@ -117,4 +118,4 @@ extern const struct cros_ec_pd_firmware_image cros_ec_pd_firmware_images[];
 
 
 
-#endif  /* __LINUX_PLATFORM_DATA_CROS_EC_SENSORHUB_H */
+#endif  /* __CROS_EC_PD_UPDATE_H */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2004 IBM Corporation
  * Authors:
@@ -10,12 +11,6 @@
  * Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
  *
  * sysfs filesystem inspection interface to the TPM
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, version 2 of the
- * License.
- *
  */
 #include <linux/device.h>
 #include "tpm.h"
@@ -54,9 +49,8 @@ static ssize_t pubek_show(struct device *dev, struct device_attribute *attr,
 
 	tpm_buf_append(&tpm_buf, anti_replay, sizeof(anti_replay));
 
-	if (tpm_transmit_cmd(chip, NULL, tpm_buf.data, PAGE_SIZE,
-			      READ_PUBEK_RESULT_MIN_BODY_SIZE, 0,
-			      "attempting to read the PUBEK"))
+	if (tpm_transmit_cmd(chip, &tpm_buf, READ_PUBEK_RESULT_MIN_BODY_SIZE,
+			     "attempting to read the PUBEK"))
 		goto out_buf;
 
 	out = (struct tpm_readpubek_out *)&tpm_buf.data[10];
@@ -101,26 +95,26 @@ static ssize_t pcrs_show(struct device *dev, struct device_attribute *attr,
 {
 	cap_t cap;
 	u8 digest[TPM_DIGEST_SIZE];
-	ssize_t rc;
-	int i, j, num_pcrs;
+	u32 i, j, num_pcrs;
 	char *str = buf;
 	struct tpm_chip *chip = to_tpm_chip(dev);
 
 	if (tpm_try_get_ops(chip))
 		return 0;
 
-	if (tpm_getcap(chip, TPM_CAP_PROP_PCR, &cap,
-		       "attempting to determine the number of PCRS",
-		       sizeof(cap.num_pcrs))) {
+	if (tpm1_getcap(chip, TPM_CAP_PROP_PCR, &cap,
+			"attempting to determine the number of PCRS",
+			sizeof(cap.num_pcrs))) {
 		tpm_put_ops(chip);
 		return 0;
 	}
 
 	num_pcrs = be32_to_cpu(cap.num_pcrs);
 	for (i = 0; i < num_pcrs; i++) {
-		rc = tpm_pcr_read_dev(chip, i, digest);
-		if (rc)
+		if (tpm1_pcr_read(chip, i, digest)) {
+			str = buf;
 			break;
+		}
 		str += sprintf(str, "PCR-%02d: ", i);
 		for (j = 0; j < TPM_DIGEST_SIZE; j++)
 			str += sprintf(str, "%02X ", digest[j]);
@@ -141,9 +135,9 @@ static ssize_t enabled_show(struct device *dev, struct device_attribute *attr,
 	if (tpm_try_get_ops(chip))
 		return 0;
 
-	if (tpm_getcap(chip, TPM_CAP_FLAG_PERM, &cap,
-		       "attempting to determine the permanent enabled state",
-		       sizeof(cap.perm_flags)))
+	if (tpm1_getcap(chip, TPM_CAP_FLAG_PERM, &cap,
+			"attempting to determine the permanent enabled state",
+			sizeof(cap.perm_flags)))
 		goto out_ops;
 
 	rc = sprintf(buf, "%d\n", !cap.perm_flags.disable);
@@ -163,9 +157,9 @@ static ssize_t active_show(struct device *dev, struct device_attribute *attr,
 	if (tpm_try_get_ops(chip))
 		return 0;
 
-	if (tpm_getcap(chip, TPM_CAP_FLAG_PERM, &cap,
-		       "attempting to determine the permanent active state",
-		       sizeof(cap.perm_flags)))
+	if (tpm1_getcap(chip, TPM_CAP_FLAG_PERM, &cap,
+			"attempting to determine the permanent active state",
+			sizeof(cap.perm_flags)))
 		goto out_ops;
 
 	rc = sprintf(buf, "%d\n", !cap.perm_flags.deactivated);
@@ -185,9 +179,9 @@ static ssize_t owned_show(struct device *dev, struct device_attribute *attr,
 	if (tpm_try_get_ops(chip))
 		return 0;
 
-	if (tpm_getcap(to_tpm_chip(dev), TPM_CAP_PROP_OWNER, &cap,
-		       "attempting to determine the owner state",
-		       sizeof(cap.owned)))
+	if (tpm1_getcap(to_tpm_chip(dev), TPM_CAP_PROP_OWNER, &cap,
+			"attempting to determine the owner state",
+			sizeof(cap.owned)))
 		goto out_ops;
 
 	rc = sprintf(buf, "%d\n", cap.owned);
@@ -207,9 +201,9 @@ static ssize_t temp_deactivated_show(struct device *dev,
 	if (tpm_try_get_ops(chip))
 		return 0;
 
-	if (tpm_getcap(to_tpm_chip(dev), TPM_CAP_FLAG_VOL, &cap,
-		       "attempting to determine the temporary state",
-		       sizeof(cap.stclear_flags)))
+	if (tpm1_getcap(to_tpm_chip(dev), TPM_CAP_FLAG_VOL, &cap,
+			"attempting to determine the temporary state",
+			sizeof(cap.stclear_flags)))
 		goto out_ops;
 
 	rc = sprintf(buf, "%d\n", cap.stclear_flags.deactivated);
@@ -230,18 +224,18 @@ static ssize_t caps_show(struct device *dev, struct device_attribute *attr,
 	if (tpm_try_get_ops(chip))
 		return 0;
 
-	if (tpm_getcap(chip, TPM_CAP_PROP_MANUFACTURER, &cap,
-		       "attempting to determine the manufacturer",
-		       sizeof(cap.manufacturer_id)))
+	if (tpm1_getcap(chip, TPM_CAP_PROP_MANUFACTURER, &cap,
+			"attempting to determine the manufacturer",
+			sizeof(cap.manufacturer_id)))
 		goto out_ops;
 
 	str += sprintf(str, "Manufacturer: 0x%x\n",
 		       be32_to_cpu(cap.manufacturer_id));
 
 	/* Try to get a TPM version 1.2 TPM_CAP_VERSION_INFO */
-	rc = tpm_getcap(chip, TPM_CAP_VERSION_1_2, &cap,
-			"attempting to determine the 1.2 version",
-			sizeof(cap.tpm_version_1_2));
+	rc = tpm1_getcap(chip, TPM_CAP_VERSION_1_2, &cap,
+			 "attempting to determine the 1.2 version",
+			 sizeof(cap.tpm_version_1_2));
 	if (!rc) {
 		str += sprintf(str,
 			       "TCG version: %d.%d\nFirmware version: %d.%d\n",
@@ -251,18 +245,17 @@ static ssize_t caps_show(struct device *dev, struct device_attribute *attr,
 			       cap.tpm_version_1_2.revMinor);
 	} else {
 		/* Otherwise just use TPM_STRUCT_VER */
-		if (tpm_getcap(chip, TPM_CAP_VERSION_1_1, &cap,
-			       "attempting to determine the 1.1 version",
-			       sizeof(cap.tpm_version)))
+		if (tpm1_getcap(chip, TPM_CAP_VERSION_1_1, &cap,
+				"attempting to determine the 1.1 version",
+				sizeof(cap.tpm_version)))
 			goto out_ops;
-
 		str += sprintf(str,
 			       "TCG version: %d.%d\nFirmware version: %d.%d\n",
 			       cap.tpm_version.Major,
 			       cap.tpm_version.Minor,
 			       cap.tpm_version.revMajor,
 			       cap.tpm_version.revMinor);
-}
+	}
 	rc = str - buf;
 out_ops:
 	tpm_put_ops(chip);
@@ -474,6 +467,12 @@ static const struct attribute_group tpm2_dev_group = {
 
 void tpm_sysfs_add_device(struct tpm_chip *chip)
 {
+	/* The sysfs routines rely on an implicit tpm_try_get_ops, device_del
+	 * is called before ops is null'd and the sysfs core synchronizes this
+	 * removal so that no callbacks are running or can run again
+	 */
+	/* FIXME: update tpm_sysfs to explicitly lock chip->ops for TPM 2.0
+	 */
 	WARN_ON(chip->groups_cnt != 0);
 	chip->groups[chip->groups_cnt++] =
 		(chip->flags & TPM_CHIP_FLAG_TPM2) ?

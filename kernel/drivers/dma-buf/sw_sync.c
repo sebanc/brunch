@@ -1,17 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Sync File validation framework
  *
  * Copyright (C) 2012 Google, Inc.
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
  */
 
 #include <linux/file.h>
@@ -139,16 +130,7 @@ static const char *timeline_fence_get_timeline_name(struct dma_fence *fence)
 
 static void timeline_fence_release(struct dma_fence *fence)
 {
-	struct sync_pt *pt = dma_fence_to_sync_pt(fence);
 	struct sync_timeline *parent = dma_fence_parent(fence);
-	unsigned long flags;
-
-	spin_lock_irqsave(fence->lock, flags);
-	if (!list_empty(&pt->link)) {
-		list_del(&pt->link);
-		rb_erase(&pt->node, &parent->pt_tree);
-	}
-	spin_unlock_irqrestore(fence->lock, flags);
 
 	sync_timeline_put(parent);
 	dma_fence_free(fence);
@@ -158,7 +140,7 @@ static bool timeline_fence_signaled(struct dma_fence *fence)
 {
 	struct sync_timeline *parent = dma_fence_parent(fence);
 
-	return !__dma_fence_is_later(fence->seqno, parent->value);
+	return !__dma_fence_is_later(fence->seqno, parent->value, fence->ops);
 }
 
 static bool timeline_fence_enable_signaling(struct dma_fence *fence)
@@ -212,18 +194,11 @@ static void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc)
 		if (!timeline_fence_signaled(&pt->base))
 			break;
 
-		list_del_init(&pt->link);
+		list_del(&pt->link);
 		rb_erase(&pt->node, &obj->pt_tree);
 
-		/*
-		 * A signal callback may release the last reference to this
-		 * fence, causing it to be freed. That operation has to be
-		 * last to avoid a use after free inside this loop, and must
-		 * be after we remove the fence from the timeline in order to
-		 * prevent deadlocking on timeline->lock inside
-		 * timeline_fence_release().
-		 */
 		dma_fence_signal_locked(&pt->base);
+		dma_fence_put(&pt->base);
 	}
 
 	spin_unlock_irq(&obj->lock);
@@ -270,13 +245,9 @@ static struct sync_pt *sync_pt_create(struct sync_timeline *obj,
 			} else if (cmp < 0) {
 				p = &parent->rb_left;
 			} else {
-				if (dma_fence_get_rcu(&other->base)) {
-					sync_timeline_put(obj);
-					kfree(pt);
-					pt = other;
-					goto unlock;
-				}
-				p = &parent->rb_left;
+				dma_fence_put(&pt->base);
+				pt = other;
+				goto unlock;
 			}
 		}
 		rb_link_node(&pt->node, parent, p);
@@ -287,6 +258,7 @@ static struct sync_pt *sync_pt_create(struct sync_timeline *obj,
 			      parent ? &rb_entry(parent, typeof(*pt), node)->link : &obj->pt_list);
 	}
 unlock:
+	dma_fence_get(&pt->base); /* keep a ref for the timeline */
 	spin_unlock_irq(&obj->lock);
 
 	return pt;
@@ -325,6 +297,7 @@ static int sw_sync_debugfs_release(struct inode *inode, struct file *file)
 	list_for_each_entry_safe(pt, next, &obj->pt_list, link) {
 		dma_fence_set_error(&pt->base, -ENOENT);
 		dma_fence_signal_locked(&pt->base);
+		dma_fence_put(&pt->base);
 	}
 
 	spin_unlock_irq(&obj->lock);

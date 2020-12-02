@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Persistent Storage - pstore.h
  *
@@ -5,19 +6,6 @@
  *
  * This code is the generic layer to export data records from platform
  * level persistent storage via a file system.
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 as
- *  published by the Free Software Foundation.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #ifndef _LINUX_PSTORE_H
 #define _LINUX_PSTORE_H
@@ -32,20 +20,31 @@
 
 struct module;
 
-/* pstore record types (see fs/pstore/inode.c for filename templates) */
+/*
+ * pstore record types (see fs/pstore/platform.c for pstore_type_names[])
+ * These values may be written to storage (see EFI vars backend), so
+ * they are kind of an ABI. Be careful changing the mappings.
+ */
 enum pstore_type_id {
+	/* Frontend storage types */
 	PSTORE_TYPE_DMESG	= 0,
 	PSTORE_TYPE_MCE		= 1,
 	PSTORE_TYPE_CONSOLE	= 2,
 	PSTORE_TYPE_FTRACE	= 3,
-	/* PPC64 partition types */
+
+	/* PPC64-specific partition types */
 	PSTORE_TYPE_PPC_RTAS	= 4,
 	PSTORE_TYPE_PPC_OF	= 5,
 	PSTORE_TYPE_PPC_COMMON	= 6,
 	PSTORE_TYPE_PMSG	= 7,
 	PSTORE_TYPE_PPC_OPAL	= 8,
-	PSTORE_TYPE_UNKNOWN	= 255
+
+	/* End of the list */
+	PSTORE_TYPE_MAX
 };
+
+const char *pstore_type_to_name(enum pstore_type_id type);
+enum pstore_type_id pstore_name_to_type(const char *name);
 
 struct pstore_info;
 /**
@@ -85,7 +84,7 @@ struct pstore_record {
 /**
  * struct pstore_info - backend pstore driver structure
  *
- * @owner:	module which is repsonsible for this backend driver
+ * @owner:	module which is responsible for this backend driver
  * @name:	name of the backend driver
  *
  * @buf_lock:	semaphore to serialize access to @buf
@@ -192,10 +191,10 @@ struct pstore_info {
 };
 
 /* Supported frontends */
-#define PSTORE_FLAGS_DMESG	(1 << 0)
-#define PSTORE_FLAGS_CONSOLE	(1 << 1)
-#define PSTORE_FLAGS_FTRACE	(1 << 2)
-#define PSTORE_FLAGS_PMSG	(1 << 3)
+#define PSTORE_FLAGS_DMESG	BIT(0)
+#define PSTORE_FLAGS_CONSOLE	BIT(1)
+#define PSTORE_FLAGS_FTRACE	BIT(2)
+#define PSTORE_FLAGS_PMSG	BIT(3)
 
 extern int pstore_register(struct pstore_info *);
 extern void pstore_unregister(struct pstore_info *);

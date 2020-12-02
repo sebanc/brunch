@@ -11,6 +11,7 @@
 #include "free-space-cache.h"
 #include "inode-map.h"
 #include "transaction.h"
+#include "delalloc-space.h"
 
 static void fail_caching_thread(struct btrfs_root *root)
 {
@@ -175,6 +176,7 @@ static void start_caching(struct btrfs_root *root)
 	if (!ret && objectid <= BTRFS_LAST_FREE_OBJECTID) {
 		__btrfs_add_free_space(fs_info, ctl, objectid,
 				       BTRFS_LAST_FREE_OBJECTID - objectid + 1);
+		wake_up(&root->ino_cache_wait);
 	}
 
 	tsk = kthread_run(caching_kthread, root, "btrfs-ino-cache-%llu",
@@ -434,7 +436,7 @@ int btrfs_save_ino_cache(struct btrfs_root *root,
 	 * 1 item for free space object
 	 * 3 items for pre-allocation
 	 */
-	trans->bytes_reserved = btrfs_calc_trans_metadata_size(fs_info, 10);
+	trans->bytes_reserved = btrfs_calc_insert_metadata_size(fs_info, 10);
 	ret = btrfs_block_rsv_add(root, trans->block_rsv,
 				  trans->bytes_reserved,
 				  BTRFS_RESERVE_NO_FLUSH);

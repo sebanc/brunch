@@ -29,9 +29,13 @@
 #define AMDGPU_PREAMBLE_IB_PRESENT_FIRST    (1 << 1)
 /* bit set means context switch occured */
 #define AMDGPU_HAVE_CTX_SWITCH              (1 << 2)
+/* bit set means IB is preempted */
+#define AMDGPU_IB_PREEMPTED                 (1 << 3)
 
 #define to_amdgpu_job(sched_job)		\
 		container_of((sched_job), struct amdgpu_job, base)
+
+#define AMDGPU_JOB_GET_VMID(job) ((job) ? (job)->vmid : 0)
 
 struct amdgpu_fence;
 
@@ -43,6 +47,7 @@ struct amdgpu_job {
 	struct amdgpu_ib	*ibs;
 	struct dma_fence	*fence; /* the hw fence */
 	uint32_t		preamble_status;
+	uint32_t                preemption_status;
 	uint32_t		num_ibs;
 	void			*owner;
 	bool                    vm_needs_flush;

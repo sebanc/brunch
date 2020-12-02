@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * PS/2 mouse driver
  *
@@ -5,11 +6,6 @@
  * Copyright (c) 2003-2004 Dmitry Torokhov
  */
 
-/*
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
- */
 
 #define pr_fmt(fmt)		KBUILD_MODNAME ": " fmt
 #define psmouse_fmt(fmt)	fmt
@@ -996,6 +992,8 @@ static void psmouse_apply_defaults(struct psmouse *psmouse)
 	psmouse->cleanup = NULL;
 	psmouse->pt_activate = NULL;
 	psmouse->pt_deactivate = NULL;
+	psmouse->inhibit = NULL;
+	psmouse->uninhibit = NULL;
 }
 
 static bool psmouse_do_detect(int (*detect)(struct psmouse *, bool),
@@ -1523,6 +1521,26 @@ static void psmouse_disconnect(struct serio *serio)
 	mutex_unlock(&psmouse_mutex);
 }
 
+static int psmouse_inhibit(struct input_dev *input_dev)
+{
+	struct psmouse *psmouse = input_get_drvdata(input_dev);
+
+	if (!psmouse->inhibit)
+		return 0;
+
+	return psmouse->inhibit(psmouse);
+}
+
+static int psmouse_uninhibit(struct input_dev *input_dev)
+{
+	struct psmouse *psmouse = input_get_drvdata(input_dev);
+
+	if (!psmouse->uninhibit)
+		return 0;
+
+	return psmouse->uninhibit(psmouse);
+}
+
 static int psmouse_switch_protocol(struct psmouse *psmouse,
 				   const struct psmouse_protocol *proto)
 {
@@ -1634,6 +1652,10 @@ static int psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	psmouse->smartscroll = psmouse_smartscroll;
 
 	psmouse_switch_protocol(psmouse, NULL);
+
+	input_set_drvdata(input_dev, psmouse);
+	input_dev->inhibit = psmouse_inhibit;
+	input_dev->uninhibit = psmouse_uninhibit;
 
 	if (!psmouse->protocol->smbus_companion) {
 		psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);

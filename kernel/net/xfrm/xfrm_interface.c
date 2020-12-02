@@ -185,7 +185,7 @@ static void xfrmi_scrub_packet(struct sk_buff *skb, bool xnet)
 	skb->skb_iif = 0;
 	skb->ignore_df = 0;
 	skb_dst_drop(skb);
-	nf_reset(skb);
+	nf_reset_ct(skb);
 	nf_reset_trace(skb);
 
 	if (!xnet)
@@ -199,14 +199,14 @@ static void xfrmi_scrub_packet(struct sk_buff *skb, bool xnet)
 
 static int xfrmi_rcv_cb(struct sk_buff *skb, int err)
 {
+	const struct xfrm_mode *inner_mode;
 	struct pcpu_sw_netstats *tstats;
-	struct xfrm_mode *inner_mode;
 	struct net_device *dev;
 	struct xfrm_state *x;
 	struct xfrm_if *xi;
 	bool xnet;
 
-	if (err && !skb->sp)
+	if (err && !secpath_exists(skb))
 		return 0;
 
 	x = xfrm_input_state(skb);
@@ -228,7 +228,7 @@ static int xfrmi_rcv_cb(struct sk_buff *skb, int err)
 	xnet = !net_eq(xi->net, dev_net(skb->dev));
 
 	if (xnet) {
-		inner_mode = x->inner_mode;
+		inner_mode = &x->inner_mode;
 
 		if (x->sel.family == AF_UNSPEC) {
 			inner_mode = xfrm_ip2inner_mode(x, XFRM_MODE_SKB_CB(skb)->protocol);
@@ -240,7 +240,7 @@ static int xfrmi_rcv_cb(struct sk_buff *skb, int err)
 		}
 
 		if (!xfrm_policy_check(NULL, XFRM_POLICY_IN, skb,
-				       inner_mode->afinfo->family))
+				       inner_mode->family))
 			return -EPERM;
 	}
 
@@ -293,7 +293,7 @@ xfrmi_xmit2(struct sk_buff *skb, struct net_device *dev, struct flowi *fl)
 	}
 
 	mtu = dst_mtu(dst);
-	if (!skb->ignore_df && skb->len > mtu) {
+	if (skb->len > mtu) {
 		skb_dst_update_pmtu_no_confirm(skb, mtu);
 
 		if (skb->protocol == htons(ETH_P_IPV6)) {
@@ -448,9 +448,9 @@ static int xfrmi4_err(struct sk_buff *skb, u32 info)
 	}
 
 	if (icmp_hdr(skb)->type == ICMP_DEST_UNREACH)
-		ipv4_update_pmtu(skb, net, info, 0, 0, protocol, 0);
+		ipv4_update_pmtu(skb, net, info, 0, protocol);
 	else
-		ipv4_redirect(skb, net, 0, 0, protocol, 0);
+		ipv4_redirect(skb, net, 0, protocol);
 	xfrm_state_put(x);
 
 	return 0;
@@ -539,9 +539,6 @@ static void xfrmi_get_stats64(struct net_device *dev,
 			       struct rtnl_link_stats64 *s)
 {
 	int cpu;
-
-	if (!dev->tstats)
-		return;
 
 	for_each_possible_cpu(cpu) {
 		struct pcpu_sw_netstats *stats;
@@ -726,7 +723,7 @@ nla_put_failure:
 	return -EMSGSIZE;
 }
 
-struct net *xfrmi_get_link_net(const struct net_device *dev)
+static struct net *xfrmi_get_link_net(const struct net_device *dev)
 {
 	struct xfrm_if *xi = netdev_priv(dev);
 
@@ -766,11 +763,6 @@ static void __net_exit xfrmi_destroy_interfaces(struct xfrmi_net *xfrmn)
 	unregister_netdevice_many(&list);
 }
 
-static int __net_init xfrmi_init_net(struct net *net)
-{
-	return 0;
-}
-
 static void __net_exit xfrmi_exit_net(struct net *net)
 {
 	struct xfrmi_net *xfrmn = net_generic(net, xfrmi_net_id);
@@ -802,7 +794,6 @@ static void __net_exit xfrmi_exit_batch_net(struct list_head *net_exit_list)
 
 static struct pernet_operations xfrmi_net_ops = {
 	.exit_batch = xfrmi_exit_batch_net,
-	.init = xfrmi_init_net,
 	.exit = xfrmi_exit_net,
 	.id   = &xfrmi_net_id,
 	.size = sizeof(struct xfrmi_net),

@@ -73,14 +73,14 @@ struct ib_mad_private_header {
 	struct ib_mad_recv_wc recv_wc;
 	struct ib_wc wc;
 	u64 mapping;
-} __attribute__ ((packed));
+} __packed;
 
 struct ib_mad_private {
 	struct ib_mad_private_header header;
 	size_t mad_size;
 	struct ib_grh grh;
 	u8 mad[0];
-} __attribute__ ((packed));
+} __packed;
 
 struct ib_rmpp_segment {
 	struct list_head list;
@@ -221,6 +221,6 @@ void ib_mad_complete_send_wr(struct ib_mad_send_wr_private *mad_send_wr,
 void ib_mark_mad_done(struct ib_mad_send_wr_private *mad_send_wr);
 
 void ib_reset_mad_timeout(struct ib_mad_send_wr_private *mad_send_wr,
-			  int timeout_ms);
+			  unsigned long timeout_ms);
 
 #endif	/* __IB_MAD_PRIV_H__ */

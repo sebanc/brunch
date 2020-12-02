@@ -74,8 +74,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "lists.h"
 #include "dllist.h"
-#include "syscommon.h"
-#include "sysvalidation.h"
+#include "system/syscommon.h"
+#include "system/sysvalidation.h"
 
 #include "physmem_lma.h"
 #include "physmem_osmem.h"
@@ -123,7 +123,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "oskm_apphint.h"
 #include "pvrsrv_apphint.h"
 
-#include "rgx_bvnc_defs_km.h"
+#include "km/rgx_bvnc_defs_km.h"
 
 #include "pvrsrv_tlstreams.h"
 #include "tlstream.h"

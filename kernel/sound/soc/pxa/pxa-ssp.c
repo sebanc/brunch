@@ -1,14 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * pxa-ssp.c  --  ALSA Soc Audio Layer
  *
  * Copyright 2005,2008 Wolfson Microelectronics PLC.
  * Author: Liam Girdwood
  *         Mark Brown <broonie@opensource.wolfsonmicro.com>
- *
- *  This program is free software; you can redistribute  it and/or modify it
- *  under  the terms of  the GNU General  Public License as published by the
- *  Free Software Foundation;  either version 2 of the  License, or (at your
- *  option) any later version.
  *
  * TODO:
  *  o Test network mode for > 16bit sample size
@@ -98,10 +94,13 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
 	struct snd_dmaengine_dai_dma_data *dma;
 	int ret = 0;
 
-	if (!cpu_dai->active) {
+	if (!snd_soc_dai_active(cpu_dai)) {
 		clk_prepare_enable(ssp->clk);
 		pxa_ssp_disable(ssp);
 	}
+
+	if (priv->extclk)
+		clk_prepare_enable(priv->extclk);
 
 	dma = kzalloc(sizeof(struct snd_dmaengine_dai_dma_data), GFP_KERNEL);
 	if (!dma)
@@ -120,10 +119,13 @@ static void pxa_ssp_shutdown(struct snd_pcm_substream *substream,
 	struct ssp_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
 	struct ssp_device *ssp = priv->ssp;
 
-	if (!cpu_dai->active) {
+	if (!snd_soc_dai_active(cpu_dai)) {
 		pxa_ssp_disable(ssp);
 		clk_disable_unprepare(ssp->clk);
 	}
+
+	if (priv->extclk)
+		clk_disable_unprepare(priv->extclk);
 
 	kfree(snd_soc_dai_get_dma_data(cpu_dai, substream));
 	snd_soc_dai_set_dma_data(cpu_dai, substream, NULL);
@@ -131,12 +133,12 @@ static void pxa_ssp_shutdown(struct snd_pcm_substream *substream,
 
 #ifdef CONFIG_PM
 
-static int pxa_ssp_suspend(struct snd_soc_dai *cpu_dai)
+static int pxa_ssp_suspend(struct snd_soc_component *component)
 {
-	struct ssp_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
+	struct ssp_priv *priv = snd_soc_component_get_drvdata(component);
 	struct ssp_device *ssp = priv->ssp;
 
-	if (!cpu_dai->active)
+	if (!snd_soc_component_active(component))
 		clk_prepare_enable(ssp->clk);
 
 	priv->cr0 = __raw_readl(ssp->mmio_base + SSCR0);
@@ -149,9 +151,9 @@ static int pxa_ssp_suspend(struct snd_soc_dai *cpu_dai)
 	return 0;
 }
 
-static int pxa_ssp_resume(struct snd_soc_dai *cpu_dai)
+static int pxa_ssp_resume(struct snd_soc_component *component)
 {
-	struct ssp_priv *priv = snd_soc_dai_get_drvdata(cpu_dai);
+	struct ssp_priv *priv = snd_soc_component_get_drvdata(component);
 	struct ssp_device *ssp = priv->ssp;
 	uint32_t sssr = SSSR_ROR | SSSR_TUR | SSSR_BCE;
 
@@ -163,7 +165,7 @@ static int pxa_ssp_resume(struct snd_soc_dai *cpu_dai)
 	__raw_writel(priv->to,  ssp->mmio_base + SSTO);
 	__raw_writel(priv->psp, ssp->mmio_base + SSPSP);
 
-	if (cpu_dai->active)
+	if (snd_soc_component_active(component))
 		pxa_ssp_enable(ssp);
 	else
 		clk_disable_unprepare(ssp->clk);
@@ -848,8 +850,6 @@ static const struct snd_soc_dai_ops pxa_ssp_dai_ops = {
 static struct snd_soc_dai_driver pxa_ssp_dai = {
 		.probe = pxa_ssp_probe,
 		.remove = pxa_ssp_remove,
-		.suspend = pxa_ssp_suspend,
-		.resume = pxa_ssp_resume,
 		.playback = {
 			.channels_min = 1,
 			.channels_max = 8,
@@ -867,9 +867,18 @@ static struct snd_soc_dai_driver pxa_ssp_dai = {
 
 static const struct snd_soc_component_driver pxa_ssp_component = {
 	.name		= "pxa-ssp",
-	.ops		= &pxa2xx_pcm_ops,
-	.pcm_new	= pxa2xx_soc_pcm_new,
-	.pcm_free	= pxa2xx_pcm_free_dma_buffers,
+	.pcm_construct	= pxa2xx_soc_pcm_new,
+	.pcm_destruct	= pxa2xx_soc_pcm_free,
+	.open		= pxa2xx_soc_pcm_open,
+	.close		= pxa2xx_soc_pcm_close,
+	.hw_params	= pxa2xx_soc_pcm_hw_params,
+	.hw_free	= pxa2xx_soc_pcm_hw_free,
+	.prepare	= pxa2xx_soc_pcm_prepare,
+	.trigger	= pxa2xx_soc_pcm_trigger,
+	.pointer	= pxa2xx_soc_pcm_pointer,
+	.mmap		= pxa2xx_soc_pcm_mmap,
+	.suspend	= pxa_ssp_suspend,
+	.resume		= pxa_ssp_resume,
 };
 
 #ifdef CONFIG_OF

@@ -1,17 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2014 NVIDIA CORPORATION.  All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/io.h>
@@ -27,6 +16,7 @@
 #include <dt-bindings/clock/tegra210-car.h>
 #include <dt-bindings/reset/tegra210-car.h>
 #include <linux/iopoll.h>
+#include <linux/sizes.h>
 #include <soc/tegra/pmc.h>
 
 #include "clk.h"
@@ -994,8 +984,6 @@ static void tegra210_pllre_set_defaults(struct tegra_clk_pll *pllre)
 	pllre->params->defaults_set = true;
 
 	if (val & PLL_ENABLE) {
-		pr_warn("PLL_RE already enabled. Postponing set full defaults\n");
-
 		/*
 		 * PLL is ON: check if defaults already set, then set those
 		 * that can be updated in flight.
@@ -1015,12 +1003,19 @@ static void tegra210_pllre_set_defaults(struct tegra_clk_pll *pllre)
 		_pll_misc_chk_default(clk_base, pllre->params, 0, val,
 				~mask & PLLRE_MISC0_WRITE_MASK);
 
-		/* Enable lock detect */
+		/* The PLL doesn't work if it's in IDDQ. */
 		val = readl_relaxed(clk_base + pllre->params->ext_misc_reg[0]);
+		if (val & PLLRE_MISC0_IDDQ)
+			pr_warn("unexpected IDDQ bit set for enabled clock\n");
+
+		/* Enable lock detect */
 		val &= ~mask;
 		val |= PLLRE_MISC0_DEFAULT_VALUE & mask;
 		writel_relaxed(val, clk_base + pllre->params->ext_misc_reg[0]);
 		udelay(1);
+
+		if (!pllre->params->defaults_set)
+			pr_warn("PLL_RE already enabled. Postponing set full defaults\n");
 
 		return;
 	}
@@ -3342,7 +3337,6 @@ static struct tegra_clk_init_table init_table[] __initdata = {
 	{ TEGRA210_CLK_DFLL_SOC, TEGRA210_CLK_PLL_P, 51000000, 1 },
 	{ TEGRA210_CLK_DFLL_REF, TEGRA210_CLK_PLL_P, 51000000, 1 },
 	{ TEGRA210_CLK_SBC4, TEGRA210_CLK_PLL_P, 12000000, 1 },
-	{ TEGRA210_CLK_PLL_RE_VCO, TEGRA210_CLK_CLK_MAX, 672000000, 1 },
 	{ TEGRA210_CLK_PLL_U_OUT1, TEGRA210_CLK_CLK_MAX, 48000000, 1 },
 	{ TEGRA210_CLK_XUSB_GATE, TEGRA210_CLK_CLK_MAX, 0, 1 },
 	{ TEGRA210_CLK_XUSB_SS_SRC, TEGRA210_CLK_PLL_U_480M, 120000000, 0 },
@@ -3558,7 +3552,7 @@ static void __init tegra210_clock_init(struct device_node *np)
 	if (!clks)
 		return;
 
-	value = clk_readl(clk_base + SPARE_REG0) >> CLK_M_DIVISOR_SHIFT;
+	value = readl(clk_base + SPARE_REG0) >> CLK_M_DIVISOR_SHIFT;
 	clk_m_div = (value & CLK_M_DIVISOR_MASK) + 1;
 
 	if (tegra_osc_clk_init(clk_base, tegra210_clks, tegra210_input_freq,
@@ -3575,9 +3569,9 @@ static void __init tegra210_clock_init(struct device_node *np)
 	tegra_pmc_clk_init(pmc_base, tegra210_clks);
 
 	/* For Tegra210, PLLD is the only source for DSIA & DSIB */
-	value = clk_readl(clk_base + PLLD_BASE);
+	value = readl(clk_base + PLLD_BASE);
 	value &= ~BIT(25);
-	clk_writel(value, clk_base + PLLD_BASE);
+	writel(value, clk_base + PLLD_BASE);
 
 	tegra_clk_apply_init_table = tegra210_clock_apply_init_table;
 

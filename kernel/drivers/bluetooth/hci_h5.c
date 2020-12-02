@@ -1,24 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *
  *  Bluetooth HCI Three-wire UART driver
  *
  *  Copyright (C) 2012  Intel Corporation
- *
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
  */
 
 #include <linux/acpi.h>
@@ -26,6 +11,7 @@
 #include <linux/gpio/consumer.h>
 #include <linux/kernel.h>
 #include <linux/mod_devicetable.h>
+#include <linux/of_device.h>
 #include <linux/serdev.h>
 #include <linux/skbuff.h>
 
@@ -111,11 +97,23 @@ struct h5 {
 	struct gpio_desc *device_wake_gpio;
 };
 
+enum h5_capabilities {
+	H5_CAP_WIDEBAND_SPEECH = BIT(0),
+	H5_CAP_VALID_LE_STATES = BIT(1),
+};
+
 struct h5_vnd {
 	int (*setup)(struct h5 *h5);
 	void (*open)(struct h5 *h5);
 	void (*close)(struct h5 *h5);
+	int (*suspend)(struct h5 *h5);
+	int (*resume)(struct h5 *h5);
 	const struct acpi_gpio_mapping *acpi_gpio_map;
+};
+
+struct h5_device_data {
+	uint32_t capabilities;
+	struct h5_vnd *vnd;
 };
 
 static void h5_reset_rx(struct h5 *h5);
@@ -534,7 +532,7 @@ static void h5_unslip_one_byte(struct h5 *h5, unsigned char c)
 	skb_put_data(h5->rx_skb, byte, 1);
 	h5->rx_pending--;
 
-	BT_DBG("unsliped 0x%02hhx, rx_pending %zu", *byte, h5->rx_pending);
+	BT_DBG("unslipped 0x%02hhx, rx_pending %zu", *byte, h5->rx_pending);
 }
 
 static void h5_reset_rx(struct h5 *h5)
@@ -797,7 +795,10 @@ static int h5_serdev_probe(struct serdev_device *serdev)
 {
 	const struct acpi_device_id *match;
 	struct device *dev = &serdev->dev;
+	struct hci_dev *hdev;
 	struct h5 *h5;
+	const struct h5_device_data *data;
+	int err;
 
 	h5 = devm_kzalloc(dev, sizeof(*h5), GFP_KERNEL);
 	if (!h5)
@@ -814,12 +815,19 @@ static int h5_serdev_probe(struct serdev_device *serdev)
 		if (!match)
 			return -ENODEV;
 
-		h5->vnd = (const struct h5_vnd *)match->driver_data;
+		data = (const struct h5_device_data *)match->driver_data;
+		h5->vnd = data->vnd;
 		h5->id  = (char *)match->id;
 
 		if (h5->vnd->acpi_gpio_map)
 			devm_acpi_dev_add_driver_gpios(dev,
 						       h5->vnd->acpi_gpio_map);
+	} else {
+		data = of_device_get_match_data(dev);
+		if (!data)
+			return -ENODEV;
+
+		h5->vnd = data->vnd;
 	}
 
 	h5->enable_gpio = devm_gpiod_get_optional(dev, "enable", GPIOD_OUT_LOW);
@@ -831,7 +839,20 @@ static int h5_serdev_probe(struct serdev_device *serdev)
 	if (IS_ERR(h5->device_wake_gpio))
 		return PTR_ERR(h5->device_wake_gpio);
 
-	return hci_uart_register_device(&h5->serdev_hu, &h5p);
+	err = hci_uart_register_device(&h5->serdev_hu, &h5p);
+	if (err)
+		return err;
+
+	hdev = h5->serdev_hu.hdev;
+
+	/* Set match specific quirks */
+	if (data->capabilities & H5_CAP_WIDEBAND_SPEECH)
+		set_bit(HCI_QUIRK_WIDEBAND_SPEECH_SUPPORTED, &hdev->quirks);
+
+	if (data->capabilities & H5_CAP_VALID_LE_STATES)
+		set_bit(HCI_QUIRK_VALID_LE_STATES, &hdev->quirks);
+
+	return 0;
 }
 
 static void h5_serdev_remove(struct serdev_device *serdev)
@@ -839,6 +860,28 @@ static void h5_serdev_remove(struct serdev_device *serdev)
 	struct h5 *h5 = serdev_device_get_drvdata(serdev);
 
 	hci_uart_unregister_device(&h5->serdev_hu);
+}
+
+static int __maybe_unused h5_serdev_suspend(struct device *dev)
+{
+	struct h5 *h5 = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (h5->vnd && h5->vnd->suspend)
+		ret = h5->vnd->suspend(h5);
+
+	return ret;
+}
+
+static int __maybe_unused h5_serdev_resume(struct device *dev)
+{
+	struct h5 *h5 = dev_get_drvdata(dev);
+	int ret = 0;
+
+	if (h5->vnd && h5->vnd->resume)
+		ret = h5->vnd->resume(h5);
+
+	return ret;
 }
 
 #ifdef CONFIG_BT_HCIUART_RTL
@@ -907,6 +950,56 @@ static void h5_btrtl_close(struct h5 *h5)
 	gpiod_set_value_cansleep(h5->enable_gpio, 0);
 }
 
+/* Suspend/resume support. On many devices the RTL BT device loses power during
+ * suspend/resume, causing it to lose its firmware and all state. So we simply
+ * turn it off on suspend and reprobe on resume.  This mirrors how RTL devices
+ * are handled in the USB driver, where the USB_QUIRK_RESET_RESUME is used which
+ * also causes a reprobe on resume.
+ */
+static int h5_btrtl_suspend(struct h5 *h5)
+{
+	serdev_device_set_flow_control(h5->hu->serdev, false);
+	gpiod_set_value_cansleep(h5->device_wake_gpio, 0);
+	gpiod_set_value_cansleep(h5->enable_gpio, 0);
+	return 0;
+}
+
+struct h5_btrtl_reprobe {
+	struct device *dev;
+	struct work_struct work;
+};
+
+static void h5_btrtl_reprobe_worker(struct work_struct *work)
+{
+	struct h5_btrtl_reprobe *reprobe =
+		container_of(work, struct h5_btrtl_reprobe, work);
+	int ret;
+
+	ret = device_reprobe(reprobe->dev);
+	if (ret && ret != -EPROBE_DEFER)
+		dev_err(reprobe->dev, "Reprobe error %d\n", ret);
+
+	put_device(reprobe->dev);
+	kfree(reprobe);
+	module_put(THIS_MODULE);
+}
+
+static int h5_btrtl_resume(struct h5 *h5)
+{
+	struct h5_btrtl_reprobe *reprobe;
+
+	reprobe = kzalloc(sizeof(*reprobe), GFP_KERNEL);
+	if (!reprobe)
+		return -ENOMEM;
+
+	__module_get(THIS_MODULE);
+
+	INIT_WORK(&reprobe->work, h5_btrtl_reprobe_worker);
+	reprobe->dev = get_device(&h5->hu->serdev->dev);
+	queue_work(system_long_wq, &reprobe->work);
+	return 0;
+}
+
 static const struct acpi_gpio_params btrtl_device_wake_gpios = { 0, 0, false };
 static const struct acpi_gpio_params btrtl_enable_gpios = { 1, 0, false };
 static const struct acpi_gpio_params btrtl_host_wake_gpios = { 2, 0, false };
@@ -921,19 +1014,44 @@ static struct h5_vnd rtl_vnd = {
 	.setup		= h5_btrtl_setup,
 	.open		= h5_btrtl_open,
 	.close		= h5_btrtl_close,
+	.suspend	= h5_btrtl_suspend,
+	.resume		= h5_btrtl_resume,
 	.acpi_gpio_map	= acpi_btrtl_gpios,
+};
+
+static const struct h5_device_data h5_data_rtl8822cs = {
+	.capabilities = H5_CAP_WIDEBAND_SPEECH | H5_CAP_VALID_LE_STATES,
+	.vnd = &rtl_vnd,
+};
+
+static const struct h5_device_data h5_data_rtl8723bs = {
+	.vnd = &rtl_vnd,
 };
 #endif
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id h5_acpi_match[] = {
 #ifdef CONFIG_BT_HCIUART_RTL
-	{ "OBDA8723", (kernel_ulong_t)&rtl_vnd },
+	{ "OBDA8723", (kernel_ulong_t)&h5_data_rtl8723bs},
 #endif
 	{ },
 };
 MODULE_DEVICE_TABLE(acpi, h5_acpi_match);
 #endif
+
+static const struct dev_pm_ops h5_serdev_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(h5_serdev_suspend, h5_serdev_resume)
+};
+
+static const struct of_device_id rtl_bluetooth_of_match[] = {
+#ifdef CONFIG_BT_HCIUART_RTL
+	{ .compatible = "realtek,rtl8822cs-bt",
+	  .data = &h5_data_rtl8822cs,
+	},
+#endif
+	{ },
+};
+MODULE_DEVICE_TABLE(of, rtl_bluetooth_of_match);
 
 static struct serdev_device_driver h5_serdev_driver = {
 	.probe = h5_serdev_probe,
@@ -941,6 +1059,8 @@ static struct serdev_device_driver h5_serdev_driver = {
 	.driver = {
 		.name = "hci_uart_h5",
 		.acpi_match_table = ACPI_PTR(h5_acpi_match),
+		.pm = &h5_serdev_pm_ops,
+		.of_match_table = rtl_bluetooth_of_match,
 	},
 };
 

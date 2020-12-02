@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * TI VPE mem2mem driver, based on the virtual v4l2-mem2mem example driver
  *
@@ -11,10 +12,6 @@
  * Marek Szyprowski, <m.szyprowski@samsung.com>
  *
  * Based on the virtual v4l2-mem2mem example device
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation
  */
 
 #include <linux/delay.h>
@@ -227,7 +224,6 @@ static const struct vpe_port_data port_data[11] = {
 
 /* driver info for each of the supported video formats */
 struct vpe_fmt {
-	char	*name;			/* human-readable name */
 	u32	fourcc;			/* standard format identifier */
 	u8	types;			/* CAPTURE and/or OUTPUT */
 	u8	coplanar;		/* set for unpacked Luma and Chroma */
@@ -237,7 +233,6 @@ struct vpe_fmt {
 
 static struct vpe_fmt vpe_formats[] = {
 	{
-		.name		= "NV16 YUV 422 co-planar",
 		.fourcc		= V4L2_PIX_FMT_NV16,
 		.types		= VPE_FMT_TYPE_CAPTURE | VPE_FMT_TYPE_OUTPUT,
 		.coplanar	= 1,
@@ -246,7 +241,6 @@ static struct vpe_fmt vpe_formats[] = {
 				  },
 	},
 	{
-		.name		= "NV12 YUV 420 co-planar",
 		.fourcc		= V4L2_PIX_FMT_NV12,
 		.types		= VPE_FMT_TYPE_CAPTURE | VPE_FMT_TYPE_OUTPUT,
 		.coplanar	= 1,
@@ -255,7 +249,6 @@ static struct vpe_fmt vpe_formats[] = {
 				  },
 	},
 	{
-		.name		= "YUYV 422 packed",
 		.fourcc		= V4L2_PIX_FMT_YUYV,
 		.types		= VPE_FMT_TYPE_CAPTURE | VPE_FMT_TYPE_OUTPUT,
 		.coplanar	= 0,
@@ -263,7 +256,6 @@ static struct vpe_fmt vpe_formats[] = {
 				  },
 	},
 	{
-		.name		= "UYVY 422 packed",
 		.fourcc		= V4L2_PIX_FMT_UYVY,
 		.types		= VPE_FMT_TYPE_CAPTURE | VPE_FMT_TYPE_OUTPUT,
 		.coplanar	= 0,
@@ -271,7 +263,6 @@ static struct vpe_fmt vpe_formats[] = {
 				  },
 	},
 	{
-		.name		= "RGB888 packed",
 		.fourcc		= V4L2_PIX_FMT_RGB24,
 		.types		= VPE_FMT_TYPE_CAPTURE,
 		.coplanar	= 0,
@@ -279,7 +270,6 @@ static struct vpe_fmt vpe_formats[] = {
 				  },
 	},
 	{
-		.name		= "ARGB32",
 		.fourcc		= V4L2_PIX_FMT_RGB32,
 		.types		= VPE_FMT_TYPE_CAPTURE,
 		.coplanar	= 0,
@@ -287,7 +277,6 @@ static struct vpe_fmt vpe_formats[] = {
 				  },
 	},
 	{
-		.name		= "BGR888 packed",
 		.fourcc		= V4L2_PIX_FMT_BGR24,
 		.types		= VPE_FMT_TYPE_CAPTURE,
 		.coplanar	= 0,
@@ -295,7 +284,6 @@ static struct vpe_fmt vpe_formats[] = {
 				  },
 	},
 	{
-		.name		= "ABGR32",
 		.fourcc		= V4L2_PIX_FMT_BGR32,
 		.types		= VPE_FMT_TYPE_CAPTURE,
 		.coplanar	= 0,
@@ -303,7 +291,6 @@ static struct vpe_fmt vpe_formats[] = {
 				  },
 	},
 	{
-		.name		= "RGB565",
 		.fourcc		= V4L2_PIX_FMT_RGB565,
 		.types		= VPE_FMT_TYPE_CAPTURE,
 		.coplanar	= 0,
@@ -311,7 +298,6 @@ static struct vpe_fmt vpe_formats[] = {
 				  },
 	},
 	{
-		.name		= "RGB5551",
 		.fourcc		= V4L2_PIX_FMT_RGB555,
 		.types		= VPE_FMT_TYPE_CAPTURE,
 		.coplanar	= 0,
@@ -1505,8 +1491,8 @@ handled:
 static int vpe_querycap(struct file *file, void *priv,
 			struct v4l2_capability *cap)
 {
-	strncpy(cap->driver, VPE_MODULE_NAME, sizeof(cap->driver) - 1);
-	strncpy(cap->card, VPE_MODULE_NAME, sizeof(cap->card) - 1);
+	strscpy(cap->driver, VPE_MODULE_NAME, sizeof(cap->driver));
+	strscpy(cap->card, VPE_MODULE_NAME, sizeof(cap->card));
 	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
 		VPE_MODULE_NAME);
 	return 0;
@@ -1531,7 +1517,6 @@ static int __enum_fmt(struct v4l2_fmtdesc *f, u32 type)
 	if (!fmt)
 		return -EINVAL;
 
-	strncpy(f->description, fmt->name, sizeof(f->description) - 1);
 	f->pixelformat = fmt->fourcc;
 	return 0;
 }
@@ -2450,6 +2435,8 @@ static int vpe_runtime_get(struct platform_device *pdev)
 
 	r = pm_runtime_get_sync(&pdev->dev);
 	WARN_ON(r < 0);
+	if (r)
+		pm_runtime_put_noidle(&pdev->dev);
 	return r < 0 ? r : 0;
 }
 

@@ -1,14 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * da7219.h - DA7219 ALSA SoC Codec Driver
  *
  * Copyright (c) 2015 Dialog Semiconductor
  *
  * Author: Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
  */
 
 #ifndef __DA7219_H
@@ -812,7 +808,6 @@ struct da7219_priv {
 	struct snd_soc_component *component;
 	struct da7219_aad_priv *aad;
 	struct da7219_pdata *pdata;
-	struct work_struct srm_work;
 
 	bool wakeup_source;
 	struct regulator_bulk_data supplies[DA7219_NUM_SUPPLIES];
@@ -836,8 +831,6 @@ struct da7219_priv {
 	bool micbias_on_event;
 	unsigned int mic_pga_delay;
 	u8 gain_ramp_ctrl;
-
-	unsigned int *reg_state;
 };
 
 int da7219_set_pll(struct snd_soc_component *component, int source, unsigned int fout);

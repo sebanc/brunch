@@ -48,7 +48,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxutils.h"
 #include "rgxfwutils.h"
 #include "rgxcompute.h"
-#include "rgx_bvnc_defs_km.h"
+#include "km/rgx_bvnc_defs_km.h"
 #include "rgxmem.h"
 #include "allocmem.h"
 #include "devicemem.h"

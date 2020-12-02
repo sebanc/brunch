@@ -56,7 +56,7 @@ static int compat_evdi_connect(struct file *file,
 		return -EFAULT;
 
 	request = compat_alloc_user_space(sizeof(*request));
-	if (!access_ok(VERIFY_WRITE, request, sizeof(*request))
+	if (!access_ok(request, sizeof(*request))
 	    || __put_user(req32.connected, &request->connected)
 	    || __put_user(req32.dev_index, &request->dev_index)
 	    || __put_user((void __user *)(unsigned long)req32.edid_ptr32,
@@ -80,7 +80,7 @@ static int compat_evdi_grabpix(struct file *file,
 		return -EFAULT;
 
 	request = compat_alloc_user_space(sizeof(*request));
-	if (!access_ok(VERIFY_WRITE, request, sizeof(*request))
+	if (!access_ok(request, sizeof(*request))
 	    || __put_user(req32.mode, &request->mode)
 	    || __put_user(req32.buf_width, &request->buf_width)
 	    || __put_user(req32.buf_height, &request->buf_height)

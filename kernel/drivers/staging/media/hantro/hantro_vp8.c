@@ -3,7 +3,6 @@
  * Hantro VPU codec driver
  *
  * Copyright (C) 2018 Rockchip Electronics Co., Ltd.
- * Copyright 2019 Google LLC
  */
 
 #include "hantro.h"

@@ -1,15 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2012 Red Hat
- *
- * This file is subject to the terms and conditions of the GNU General Public
- * License v2. See the file COPYING in the main directory of this archive for
- * more details.
  */
 
-#include <drm/drmP.h>
-#include "udl_drv.h"
-#include <linux/shmem_fs.h>
 #include <linux/dma-buf.h>
+#include <linux/vmalloc.h>
+
+#include <drm/drm_mode.h>
+#include <drm/drm_prime.h>
+
+#include "udl_drv.h"
 
 struct udl_gem_object *udl_gem_alloc_object(struct drm_device *dev,
 					    size_t size)
@@ -52,7 +52,7 @@ udl_gem_create(struct drm_file *file,
 		return ret;
 	}
 
-	drm_gem_object_put_unlocked(&obj->base);
+	drm_gem_object_put(&obj->base);
 	*handle_p = handle;
 	return 0;
 }
@@ -227,7 +227,7 @@ int udl_gem_mmap(struct drm_file *file, struct drm_device *dev,
 	*offset = drm_vma_node_offset_addr(&gobj->base.vma_node);
 
 out:
-	drm_gem_object_put_unlocked(&gobj->base);
+	drm_gem_object_put(&gobj->base);
 unlock:
 	mutex_unlock(&udl->gem_lock);
 	return ret;

@@ -1,17 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2009, Microsoft Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, see <http://www.gnu.org/licenses/>.
  *
  * Authors:
  *   Haiyang Zhang <haiyangz@microsoft.com>
@@ -146,7 +135,7 @@ static int netvsc_open(struct net_device *net)
 		 * slave as up. If open fails, then slave will be
 		 * still be offline (and not used).
 		 */
-		ret = dev_open(vf_netdev);
+		ret = dev_open(vf_netdev, NULL);
 		if (ret)
 			netdev_warn(net,
 				    "unable to open slave: %s: %d\n",
@@ -246,6 +235,7 @@ static inline void *init_ppi_data(struct rndis_message *msg,
 
 	ppi->size = ppi_size;
 	ppi->type = pkt_type;
+	ppi->internal = 0;
 	ppi->ppi_offset = sizeof(struct rndis_per_packet_info);
 
 	rndis_pkt->per_pkt_info_len += ppi_size;
@@ -327,7 +317,7 @@ static inline int netvsc_get_tx_queue(struct net_device *ndev,
  * If a valid queue has already been assigned, then use that.
  * Otherwise compute tx queue based on hash and the send table.
  *
- * This is basically similar to default (__netdev_pick_tx) with the added step
+ * This is basically similar to default (netdev_pick_tx) with the added step
  * of using the host send_table when no other queue has been assigned.
  *
  * TODO support XPS - but get_xps_queue not exported
@@ -350,8 +340,7 @@ static u16 netvsc_pick_tx(struct net_device *ndev, struct sk_buff *skb)
 }
 
 static u16 netvsc_select_queue(struct net_device *ndev, struct sk_buff *skb,
-			       struct net_device *sb_dev,
-			       select_queue_fallback_t fallback)
+			       struct net_device *sb_dev)
 {
 	struct net_device_context *ndc = netdev_priv(ndev);
 	struct net_device *vf_netdev;
@@ -363,10 +352,9 @@ static u16 netvsc_select_queue(struct net_device *ndev, struct sk_buff *skb,
 		const struct net_device_ops *vf_ops = vf_netdev->netdev_ops;
 
 		if (vf_ops->ndo_select_queue)
-			txq = vf_ops->ndo_select_queue(vf_netdev, skb,
-						       sb_dev, fallback);
+			txq = vf_ops->ndo_select_queue(vf_netdev, skb, sb_dev);
 		else
-			txq = fallback(vf_netdev, skb, NULL);
+			txq = netdev_pick_tx(vf_netdev, skb, NULL);
 
 		/* Record the queue selected by VF so that it can be
 		 * used for common case where VF has more queues than
@@ -389,7 +377,7 @@ static u32 fill_pg_buf(struct page *page, u32 offset, u32 len,
 {
 	int j = 0;
 
-	/* Deal with compund pages by ignoring unused part
+	/* Deal with compound pages by ignoring unused part
 	 * of the page.
 	 */
 	page += (offset >> PAGE_SHIFT);
@@ -447,7 +435,7 @@ static u32 init_page_array(void *hdr, u32 len, struct sk_buff *skb,
 		skb_frag_t *frag = skb_shinfo(skb)->frags + i;
 
 		slots_used += fill_pg_buf(skb_frag_page(frag),
-					frag->page_offset,
+					skb_frag_off(frag),
 					skb_frag_size(frag), &pb[slots_used]);
 	}
 	return slots_used;
@@ -461,7 +449,7 @@ static int count_skb_frag_slots(struct sk_buff *skb)
 	for (i = 0; i < frags; i++) {
 		skb_frag_t *frag = skb_shinfo(skb)->frags + i;
 		unsigned long size = skb_frag_size(frag);
-		unsigned long offset = frag->page_offset;
+		unsigned long offset = skb_frag_off(frag);
 
 		/* Skip unused frames from start of page */
 		offset &= ~PAGE_MASK;
@@ -625,9 +613,9 @@ static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
 				     IEEE_8021Q_INFO);
 
 		vlan->value = 0;
-		vlan->vlanid = skb->vlan_tci & VLAN_VID_MASK;
-		vlan->pri = (skb->vlan_tci & VLAN_PRIO_MASK) >>
-				VLAN_PRIO_SHIFT;
+		vlan->vlanid = skb_vlan_tag_get_id(skb);
+		vlan->cfi = skb_vlan_tag_get_cfi(skb);
+		vlan->pri = skb_vlan_tag_get_prio(skb);
 	}
 
 	if (skb_is_gso(skb)) {
@@ -773,14 +761,16 @@ static void netvsc_comp_ipcsum(struct sk_buff *skb)
 }
 
 static struct sk_buff *netvsc_alloc_recv_skb(struct net_device *net,
-					     struct napi_struct *napi,
-					     const struct ndis_tcp_ip_checksum_info *csum_info,
-					     const struct ndis_pkt_8021q_info *vlan,
-					     void *data, u32 buflen)
+					     struct netvsc_channel *nvchan)
 {
+	struct napi_struct *napi = &nvchan->napi;
+	const struct ndis_pkt_8021q_info *vlan = nvchan->rsc.vlan;
+	const struct ndis_tcp_ip_checksum_info *csum_info =
+						nvchan->rsc.csum_info;
 	struct sk_buff *skb;
+	int i;
 
-	skb = napi_alloc_skb(napi, buflen);
+	skb = napi_alloc_skb(napi, nvchan->rsc.pktlen);
 	if (!skb)
 		return skb;
 
@@ -788,7 +778,8 @@ static struct sk_buff *netvsc_alloc_recv_skb(struct net_device *net,
 	 * Copy to skb. This copy is needed here since the memory pointed by
 	 * hv_netvsc_packet cannot be deallocated
 	 */
-	skb_put_data(skb, data, buflen);
+	for (i = 0; i < nvchan->rsc.cnt; i++)
+		skb_put_data(skb, nvchan->rsc.data[i], nvchan->rsc.len[i]);
 
 	skb->protocol = eth_type_trans(skb, net);
 
@@ -813,7 +804,8 @@ static struct sk_buff *netvsc_alloc_recv_skb(struct net_device *net,
 	}
 
 	if (vlan) {
-		u16 vlan_tci = vlan->vlanid | (vlan->pri << VLAN_PRIO_SHIFT);
+		u16 vlan_tci = vlan->vlanid | (vlan->pri << VLAN_PRIO_SHIFT) |
+			(vlan->cfi ? VLAN_CFI_MASK : 0);
 
 		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q),
 				       vlan_tci);
@@ -828,14 +820,11 @@ static struct sk_buff *netvsc_alloc_recv_skb(struct net_device *net,
  */
 int netvsc_recv_callback(struct net_device *net,
 			 struct netvsc_device *net_device,
-			 struct vmbus_channel *channel,
-			 void  *data, u32 len,
-			 const struct ndis_tcp_ip_checksum_info *csum_info,
-			 const struct ndis_pkt_8021q_info *vlan)
+			 struct netvsc_channel *nvchan)
 {
 	struct net_device_context *net_device_ctx = netdev_priv(net);
+	struct vmbus_channel *channel = nvchan->channel;
 	u16 q_idx = channel->offermsg.offer.sub_channel_index;
-	struct netvsc_channel *nvchan = &net_device->chan_table[q_idx];
 	struct sk_buff *skb;
 	struct netvsc_stats *rx_stats;
 
@@ -843,8 +832,8 @@ int netvsc_recv_callback(struct net_device *net,
 		return NVSP_STAT_FAIL;
 
 	/* Allocate a skb - TODO direct I/O to pages? */
-	skb = netvsc_alloc_recv_skb(net, &nvchan->napi,
-				    csum_info, vlan, data, len);
+	skb = netvsc_alloc_recv_skb(net, nvchan);
+
 	if (unlikely(!skb)) {
 		++net_device_ctx->eth_stats.rx_no_memory;
 		return NVSP_STAT_FAIL;
@@ -860,7 +849,7 @@ int netvsc_recv_callback(struct net_device *net,
 	rx_stats = &nvchan->rx_stats;
 	u64_stats_update_begin(&rx_stats->syncp);
 	rx_stats->packets++;
-	rx_stats->bytes += len;
+	rx_stats->bytes += nvchan->rsc.pktlen;
 
 	if (skb->pkt_type == PACKET_BROADCAST)
 		++rx_stats->broadcast;
@@ -1084,6 +1073,8 @@ static void netvsc_init_settings(struct net_device *dev)
 
 	ndc->speed = SPEED_UNKNOWN;
 	ndc->duplex = DUPLEX_FULL;
+
+	dev->features = NETIF_F_LRO;
 }
 
 static int netvsc_get_link_ksettings(struct net_device *dev,
@@ -1323,7 +1314,7 @@ static int netvsc_set_mac_addr(struct net_device *ndev, void *p)
 		return -ENODEV;
 
 	if (vf_netdev) {
-		err = dev_set_mac_address(vf_netdev, addr);
+		err = dev_set_mac_address(vf_netdev, addr, NULL);
 		if (err)
 			return err;
 	}
@@ -1334,7 +1325,7 @@ static int netvsc_set_mac_addr(struct net_device *ndev, void *p)
 	} else if (vf_netdev) {
 		/* rollback change on VF */
 		memcpy(addr->sa_data, ndev->dev_addr, ETH_ALEN);
-		dev_set_mac_address(vf_netdev, addr);
+		dev_set_mac_address(vf_netdev, addr, NULL);
 	}
 
 	return err;
@@ -1642,26 +1633,6 @@ netvsc_set_rxnfc(struct net_device *ndev, struct ethtool_rxnfc *info)
 	return -EOPNOTSUPP;
 }
 
-#ifdef CONFIG_NET_POLL_CONTROLLER
-static void netvsc_poll_controller(struct net_device *dev)
-{
-	struct net_device_context *ndc = netdev_priv(dev);
-	struct netvsc_device *ndev;
-	int i;
-
-	rcu_read_lock();
-	ndev = rcu_dereference(ndc->nvdev);
-	if (ndev) {
-		for (i = 0; i < ndev->num_chn; i++) {
-			struct netvsc_channel *nvchan = &ndev->chan_table[i];
-
-			napi_schedule(&nvchan->napi);
-		}
-	}
-	rcu_read_unlock();
-}
-#endif
-
 static u32 netvsc_get_rxfh_key_size(struct net_device *dev)
 {
 	return NETVSC_HASH_KEYLEN;
@@ -1816,6 +1787,49 @@ out:
 	return ret;
 }
 
+static int netvsc_set_features(struct net_device *ndev,
+			       netdev_features_t features)
+{
+	netdev_features_t change = features ^ ndev->features;
+	struct net_device_context *ndevctx = netdev_priv(ndev);
+	struct netvsc_device *nvdev = rtnl_dereference(ndevctx->nvdev);
+	struct net_device *vf_netdev = rtnl_dereference(ndevctx->vf_netdev);
+	struct ndis_offload_params offloads;
+	int ret = 0;
+
+	if (!nvdev || nvdev->destroy)
+		return -ENODEV;
+
+	if (!(change & NETIF_F_LRO))
+		goto syncvf;
+
+	memset(&offloads, 0, sizeof(struct ndis_offload_params));
+
+	if (features & NETIF_F_LRO) {
+		offloads.rsc_ip_v4 = NDIS_OFFLOAD_PARAMETERS_RSC_ENABLED;
+		offloads.rsc_ip_v6 = NDIS_OFFLOAD_PARAMETERS_RSC_ENABLED;
+	} else {
+		offloads.rsc_ip_v4 = NDIS_OFFLOAD_PARAMETERS_RSC_DISABLED;
+		offloads.rsc_ip_v6 = NDIS_OFFLOAD_PARAMETERS_RSC_DISABLED;
+	}
+
+	ret = rndis_filter_set_offload_params(ndev, nvdev, &offloads);
+
+	if (ret) {
+		features ^= NETIF_F_LRO;
+		ndev->features = features;
+	}
+
+syncvf:
+	if (!vf_netdev)
+		return ret;
+
+	vf_netdev->wanted_features = features;
+	netdev_update_features(vf_netdev);
+
+	return ret;
+}
+
 static u32 netvsc_get_msglevel(struct net_device *ndev)
 {
 	struct net_device_context *ndev_ctx = netdev_priv(ndev);
@@ -1859,14 +1873,12 @@ static const struct net_device_ops device_ops = {
 	.ndo_start_xmit =		netvsc_start_xmit,
 	.ndo_change_rx_flags =		netvsc_change_rx_flags,
 	.ndo_set_rx_mode =		netvsc_set_rx_mode,
+	.ndo_set_features =		netvsc_set_features,
 	.ndo_change_mtu =		netvsc_change_mtu,
 	.ndo_validate_addr =		eth_validate_addr,
 	.ndo_set_mac_address =		netvsc_set_mac_addr,
 	.ndo_select_queue =		netvsc_select_queue,
 	.ndo_get_stats64 =		netvsc_get_stats64,
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller =		netvsc_poll_controller,
-#endif
 };
 
 /*
@@ -2073,7 +2085,7 @@ static void __netvsc_vf_setup(struct net_device *ndev,
 			    "unable to change mtu to %u\n", ndev->mtu);
 
 	/* set multicast etc flags on VF */
-	dev_change_flags(vf_netdev, ndev->flags | IFF_SLAVE);
+	dev_change_flags(vf_netdev, ndev->flags | IFF_SLAVE, NULL);
 
 	/* sync address list from ndev to VF */
 	netif_addr_lock_bh(ndev);
@@ -2082,7 +2094,7 @@ static void __netvsc_vf_setup(struct net_device *ndev,
 	netif_addr_unlock_bh(ndev);
 
 	if (netif_running(ndev)) {
-		ret = dev_open(vf_netdev);
+		ret = dev_open(vf_netdev, NULL);
 		if (ret)
 			netdev_warn(vf_netdev,
 				    "unable to open: %d\n", ret);
@@ -2168,7 +2180,7 @@ static int netvsc_register_vf(struct net_device *vf_netdev)
 	if (!netvsc_dev || rtnl_dereference(net_device_ctx->vf_netdev))
 		return NOTIFY_DONE;
 
-	/* if syntihetic interface is a different namespace,
+	/* if synthetic interface is a different namespace,
 	 * then move the VF to that namespace; join will be
 	 * done again in that context.
 	 */
@@ -2193,6 +2205,10 @@ static int netvsc_register_vf(struct net_device *vf_netdev)
 
 	dev_hold(vf_netdev);
 	rcu_assign_pointer(net_device_ctx->vf_netdev, vf_netdev);
+
+	vf_netdev->wanted_features = ndev->features;
+	netdev_update_features(vf_netdev);
+
 	return NOTIFY_OK;
 }
 
@@ -2316,7 +2332,7 @@ static int netvsc_probe(struct hv_device *dev,
 	 * netvsc_probe() can't get rtnl lock and as a result vmbus_onoffer()
 	 * -> ... -> device_add() -> ... -> __device_attach() can't get
 	 * the device lock, so all the subchannels can't be processed --
-	 * finally netvsc_subchan_work() hangs for ever.
+	 * finally netvsc_subchan_work() hangs forever.
 	 */
 	rtnl_lock();
 
@@ -2325,11 +2341,9 @@ static int netvsc_probe(struct hv_device *dev,
 
 	/* hw_features computed in rndis_netdev_set_hwcaps() */
 	net->features = net->hw_features |
-		NETIF_F_HIGHDMA | NETIF_F_SG |
-		NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
+		NETIF_F_HIGHDMA | NETIF_F_HW_VLAN_CTAG_TX |
+		NETIF_F_HW_VLAN_CTAG_RX;
 	net->vlan_features = net->features;
-
-	netdev_lockdep_set_classes(net);
 
 	/* MTU range: 68 - 1500 or 65521 */
 	net->min_mtu = NETVSC_MTU_MIN;

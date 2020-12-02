@@ -1,23 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /**
  * eCryptfs: Linux filesystem encryption layer
  *
  * Copyright (C) 2008 International Business Machines Corp.
  *   Author(s): Michael A. Halcrow <mahalcro@us.ibm.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
- * 02111-1307, USA.
  */
 
 #include <linux/kthread.h>
@@ -25,7 +11,6 @@
 #include <linux/slab.h>
 #include <linux/wait.h>
 #include <linux/mount.h>
-#include <linux/selinux.h>
 #include "ecryptfs_kernel.h"
 
 struct ecryptfs_open_req {
@@ -142,30 +127,17 @@ int ecryptfs_privileged_open(struct file **lower_file,
 	req.path.dentry = lower_dentry;
 	req.path.mnt = lower_mnt;
 
-	/*
-	 * When SELinux is enabled, force the lower file to be opened by the
-	 * kernel thread.  Otherwise, the lower file will be associated with the
-	 * SELinux context of the first process that opens it, which may prevent
-	 * a different process from using it, unless that process has permission
-	 * to use fds from the first process.
-	 *
-	 * If SELinux is enabled, then any process that needs read access to an
-	 * ecryptfs filesytem must allow fd:use on the kernel context.
-	 */
-	if (!selinux_is_enabled()) {
-		/* Corresponding dput() and mntput() are done when the lower
-		 * file is fput() when all eCryptfs files for the inode are
-		 * released. */
-		flags |= IS_RDONLY(d_inode(lower_dentry)) ? O_RDONLY : O_RDWR;
-		(*lower_file) = dentry_open(&req.path, flags, cred);
-		if (!IS_ERR(*lower_file))
-			goto out;
-		if ((flags & O_ACCMODE) == O_RDONLY) {
-			rc = PTR_ERR((*lower_file));
-			goto out;
-		}
+	/* Corresponding dput() and mntput() are done when the
+	 * lower file is fput() when all eCryptfs files for the inode are
+	 * released. */
+	flags |= IS_RDONLY(d_inode(lower_dentry)) ? O_RDONLY : O_RDWR;
+	(*lower_file) = dentry_open(&req.path, flags, cred);
+	if (!IS_ERR(*lower_file))
+		goto out;
+	if ((flags & O_ACCMODE) == O_RDONLY) {
+		rc = PTR_ERR((*lower_file));
+		goto out;
 	}
-
 	mutex_lock(&ecryptfs_kthread_ctl.mux);
 	if (ecryptfs_kthread_ctl.flags & ECRYPTFS_KTHREAD_ZOMBIE) {
 		rc = -EIO;

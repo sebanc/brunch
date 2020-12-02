@@ -29,8 +29,6 @@ Required properties:
                    Range : 0 (off), 1 (on),  Default : 0
 
   - reg : the I2C address of the device for I2C
-  - reset-gpios: reset gpio the chip is connected to. This is supported
-                 on max98927.
 
 Example:
 
@@ -40,5 +38,4 @@ codec: max98927@3a {
    imon-slot-no = <1>;
    interleave-mode = <0>;
    reg = <0x3a>;
-   reset-gpios = <&tlmm 75 GPIO_ACTIVE_LOW>;
 };

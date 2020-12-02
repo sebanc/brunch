@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 #include <net/ip.h>
 #include <net/tcp.h>
 
@@ -6,10 +7,14 @@
 
 struct nft_osf {
 	enum nft_registers	dreg:8;
+	u8			ttl;
+	u32			flags;
 };
 
 static const struct nla_policy nft_osf_policy[NFTA_OSF_MAX + 1] = {
 	[NFTA_OSF_DREG]		= { .type = NLA_U32 },
+	[NFTA_OSF_TTL]		= { .type = NLA_U8 },
+	[NFTA_OSF_FLAGS]	= { .type = NLA_U32 },
 };
 
 static void nft_osf_eval(const struct nft_expr *expr, struct nft_regs *regs,
@@ -18,9 +23,10 @@ static void nft_osf_eval(const struct nft_expr *expr, struct nft_regs *regs,
 	struct nft_osf *priv = nft_expr_priv(expr);
 	u32 *dest = &regs->data[priv->dreg];
 	struct sk_buff *skb = pkt->skb;
+	char os_match[NFT_OSF_MAXGENRELEN + 1];
 	const struct tcphdr *tcp;
+	struct nf_osf_data data;
 	struct tcphdr _tcph;
-	const char *os_name;
 
 	tcp = skb_header_pointer(skb, ip_hdrlen(skb),
 				 sizeof(struct tcphdr), &_tcph);
@@ -33,11 +39,17 @@ static void nft_osf_eval(const struct nft_expr *expr, struct nft_regs *regs,
 		return;
 	}
 
-	os_name = nf_osf_find(skb, nf_osf_fingers);
-	if (!os_name)
+	if (!nf_osf_find(skb, nf_osf_fingers, priv->ttl, &data)) {
 		strncpy((char *)dest, "unknown", NFT_OSF_MAXGENRELEN);
-	else
-		strncpy((char *)dest, os_name, NFT_OSF_MAXGENRELEN);
+	} else {
+		if (priv->flags & NFT_OSF_F_VERSION)
+			snprintf(os_match, NFT_OSF_MAXGENRELEN, "%s:%s",
+				 data.genre, data.version);
+		else
+			strlcpy(os_match, data.genre, NFT_OSF_MAXGENRELEN);
+
+		strncpy((char *)dest, os_match, NFT_OSF_MAXGENRELEN);
+	}
 }
 
 static int nft_osf_init(const struct nft_ctx *ctx,
@@ -45,10 +57,26 @@ static int nft_osf_init(const struct nft_ctx *ctx,
 			const struct nlattr * const tb[])
 {
 	struct nft_osf *priv = nft_expr_priv(expr);
+	u32 flags;
 	int err;
+	u8 ttl;
 
 	if (!tb[NFTA_OSF_DREG])
 		return -EINVAL;
+
+	if (tb[NFTA_OSF_TTL]) {
+		ttl = nla_get_u8(tb[NFTA_OSF_TTL]);
+		if (ttl > 2)
+			return -EINVAL;
+		priv->ttl = ttl;
+	}
+
+	if (tb[NFTA_OSF_FLAGS]) {
+		flags = ntohl(nla_get_be32(tb[NFTA_OSF_FLAGS]));
+		if (flags != NFT_OSF_F_VERSION)
+			return -EINVAL;
+		priv->flags = flags;
+	}
 
 	priv->dreg = nft_parse_register(tb[NFTA_OSF_DREG]);
 	err = nft_validate_register_store(ctx, priv->dreg, NULL,
@@ -62,6 +90,12 @@ static int nft_osf_init(const struct nft_ctx *ctx,
 static int nft_osf_dump(struct sk_buff *skb, const struct nft_expr *expr)
 {
 	const struct nft_osf *priv = nft_expr_priv(expr);
+
+	if (nla_put_u8(skb, NFTA_OSF_TTL, priv->ttl))
+		goto nla_put_failure;
+
+	if (nla_put_be32(skb, NFTA_OSF_FLAGS, ntohl(priv->flags)))
+		goto nla_put_failure;
 
 	if (nft_dump_register(skb, NFTA_OSF_DREG, priv->dreg))
 		goto nla_put_failure;

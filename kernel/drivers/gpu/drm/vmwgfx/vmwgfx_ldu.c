@@ -25,11 +25,13 @@
  *
  **************************************************************************/
 
-#include "vmwgfx_kms.h"
-#include <drm/drm_plane_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_fourcc.h>
+#include <drm/drm_plane_helper.h>
+#include <drm/drm_vblank.h>
 
+#include "vmwgfx_kms.h"
 
 #define vmw_crtc_to_ldu(x) \
 	container_of(x, struct vmw_legacy_display_unit, base.crtc)
@@ -232,7 +234,7 @@ static const struct drm_crtc_funcs vmw_legacy_crtc_funcs = {
 	.reset = vmw_du_crtc_reset,
 	.atomic_duplicate_state = vmw_du_crtc_duplicate_state,
 	.atomic_destroy_state = vmw_du_crtc_destroy_state,
-	.set_config = vmw_kms_set_config,
+	.set_config = drm_atomic_helper_set_config,
 };
 
 
@@ -262,13 +264,10 @@ static const struct drm_connector_funcs vmw_legacy_connector_funcs = {
 	.dpms = vmw_du_connector_dpms,
 	.detect = vmw_du_connector_detect,
 	.fill_modes = vmw_du_connector_fill_modes,
-	.set_property = vmw_du_connector_set_property,
 	.destroy = vmw_ldu_connector_destroy,
 	.reset = vmw_du_connector_reset,
 	.atomic_duplicate_state = vmw_du_connector_duplicate_state,
 	.atomic_destroy_state = vmw_du_connector_destroy_state,
-	.atomic_set_property = vmw_du_connector_atomic_set_property,
-	.atomic_get_property = vmw_du_connector_atomic_get_property,
 };
 
 static const struct
@@ -415,7 +414,6 @@ static int vmw_ldu_init(struct vmw_private *dev_priv, unsigned unit)
 
 	drm_plane_helper_add(cursor, &vmw_ldu_cursor_plane_helper_funcs);
 
-
 	vmw_du_connector_reset(connector);
 	ret = drm_connector_init(dev, connector, &vmw_legacy_connector_funcs,
 				 DRM_MODE_CONNECTOR_VIRTUAL);
@@ -426,8 +424,6 @@ static int vmw_ldu_init(struct vmw_private *dev_priv, unsigned unit)
 
 	drm_connector_helper_add(connector, &vmw_ldu_connector_helper_funcs);
 	connector->status = vmw_du_connector_detect(connector, true);
-	vmw_connector_state_to_vcs(connector->state)->is_implicit = true;
-
 
 	ret = drm_encoder_init(dev, encoder, &vmw_legacy_encoder_funcs,
 			       DRM_MODE_ENCODER_VIRTUAL, NULL);
@@ -445,7 +441,6 @@ static int vmw_ldu_init(struct vmw_private *dev_priv, unsigned unit)
 		DRM_ERROR("Failed to register connector\n");
 		goto err_free_encoder;
 	}
-
 
 	vmw_du_crtc_reset(crtc);
 	ret = drm_crtc_init_with_planes(dev, crtc, &ldu->base.primary,
@@ -512,7 +507,7 @@ int vmw_kms_ldu_init_display(struct vmw_private *dev_priv)
 	if (ret != 0)
 		goto err_free;
 
-	vmw_kms_create_implicit_placement_property(dev_priv, true);
+	vmw_kms_create_implicit_placement_property(dev_priv);
 
 	if (dev_priv->capabilities & SVGA_CAP_MULTIMON)
 		for (i = 0; i < VMWGFX_NUM_DISPLAY_UNITS; ++i)
@@ -560,11 +555,9 @@ int vmw_kms_ldu_do_bo_dirty(struct vmw_private *dev_priv,
 	} *cmd;
 
 	fifo_size = sizeof(*cmd) * num_clips;
-	cmd = vmw_fifo_reserve(dev_priv, fifo_size);
-	if (unlikely(cmd == NULL)) {
-		DRM_ERROR("Fifo reserve failed.\n");
+	cmd = VMW_FIFO_RESERVE(dev_priv, fifo_size);
+	if (unlikely(cmd == NULL))
 		return -ENOMEM;
-	}
 
 	memset(cmd, 0, fifo_size);
 	for (i = 0; i < num_clips; i++, clips += increment) {

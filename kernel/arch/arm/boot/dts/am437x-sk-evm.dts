@@ -1,9 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 /* AM437x SK EVM */
@@ -799,16 +796,24 @@
 	pinctrl-0 = <&davinci_mdio_default>;
 	pinctrl-1 = <&davinci_mdio_sleep>;
 	status = "okay";
+
+	ethphy0: ethernet-phy@4 {
+		reg = <4>;
+	};
+
+	ethphy1: ethernet-phy@5 {
+		reg = <5>;
+	};
 };
 
 &cpsw_emac0 {
-	phy_id = <&davinci_mdio>, <4>;
+	phy-handle = <&ethphy0>;
 	phy-mode = "rgmii";
 	dual_emac_res_vlan = <1>;
 };
 
 &cpsw_emac1 {
-	phy_id = <&davinci_mdio>, <5>;
+	phy-handle = <&ethphy1>;
 	phy-mode = "rgmii";
 	dual_emac_res_vlan = <2>;
 };

@@ -5,7 +5,7 @@
  *
  * GPL LICENSE SUMMARY
  *
- * Copyright(c) 2018 - 2020 Intel Corporation
+ * Copyright(c) 2018 - 2019 Intel Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU General Public License as
@@ -25,7 +25,7 @@
  *
  * BSD LICENSE
  *
- * Copyright(c) 2018 - 2020 Intel Corporation
+ * Copyright(c) 2018 - 2019 Intel Corporation
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -182,7 +182,7 @@ bool iwl_xvt_reorder(struct iwl_xvt *xvt, struct iwl_rx_packet *pkt)
 	u16 nssn, sn, min_sn;
 	int index;
 	u8 baid;
-	u8 sta_id = le32_get_bits(desc->status, IWL_RX_MPDU_STATUS_STA_ID);
+	u8 sta_id = desc->sta_id_flags & IWL_RX_MPDU_SIF_STA_ID_MASK;
 	u8 tid;
 
 	baid = (reorder & IWL_RX_MPDU_REORDER_BAID_MASK) >>

@@ -1,18 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /**
  * AMCC SoC PPC4xx Crypto Driver
  *
  * Copyright (c) 2008 Applied Micro Circuits Corporation.
  * All rights reserved. James Hsiao <jhsiao@amcc.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  *
  * This file implements the Linux crypto algorithms.
  */
@@ -278,10 +269,10 @@ crypto4xx_ctr_crypt(struct skcipher_request *req, bool encrypt)
 	 * overlow.
 	 */
 	if (counter + nblks < counter) {
-		struct skcipher_request *subreq = skcipher_request_ctx(req);
+		SYNC_SKCIPHER_REQUEST_ON_STACK(subreq, ctx->sw_cipher.cipher);
 		int ret;
 
-		skcipher_request_set_tfm(subreq, ctx->sw_cipher.cipher);
+		skcipher_request_set_sync_tfm(subreq, ctx->sw_cipher.cipher);
 		skcipher_request_set_callback(subreq, req->base.flags,
 			NULL, NULL);
 		skcipher_request_set_crypt(subreq, req->src, req->dst,
@@ -303,14 +294,14 @@ static int crypto4xx_sk_setup_fallback(struct crypto4xx_ctx *ctx,
 {
 	int rc;
 
-	crypto_skcipher_clear_flags(ctx->sw_cipher.cipher,
+	crypto_sync_skcipher_clear_flags(ctx->sw_cipher.cipher,
 				    CRYPTO_TFM_REQ_MASK);
-	crypto_skcipher_set_flags(ctx->sw_cipher.cipher,
+	crypto_sync_skcipher_set_flags(ctx->sw_cipher.cipher,
 		crypto_skcipher_get_flags(cipher) & CRYPTO_TFM_REQ_MASK);
-	rc = crypto_skcipher_setkey(ctx->sw_cipher.cipher, key, keylen);
+	rc = crypto_sync_skcipher_setkey(ctx->sw_cipher.cipher, key, keylen);
 	crypto_skcipher_clear_flags(cipher, CRYPTO_TFM_RES_MASK);
 	crypto_skcipher_set_flags(cipher,
-		crypto_skcipher_get_flags(ctx->sw_cipher.cipher) &
+		crypto_sync_skcipher_get_flags(ctx->sw_cipher.cipher) &
 			CRYPTO_TFM_RES_MASK);
 
 	return rc;
@@ -536,29 +527,20 @@ static int crypto4xx_aes_gcm_validate_keylen(unsigned int keylen)
 static int crypto4xx_compute_gcm_hash_key_sw(__le32 *hash_start, const u8 *key,
 					     unsigned int keylen)
 {
-	struct crypto_cipher *aes_tfm = NULL;
+	struct crypto_aes_ctx ctx;
 	uint8_t src[16] = { 0 };
-	int rc = 0;
+	int rc;
 
-	aes_tfm = crypto_alloc_cipher("aes", 0, CRYPTO_ALG_ASYNC |
-				      CRYPTO_ALG_NEED_FALLBACK);
-	if (IS_ERR(aes_tfm)) {
-		rc = PTR_ERR(aes_tfm);
-		pr_warn("could not load aes cipher driver: %d\n", rc);
+	rc = aes_expandkey(&ctx, key, keylen);
+	if (rc) {
+		pr_err("aes_expandkey() failed: %d\n", rc);
 		return rc;
 	}
 
-	rc = crypto_cipher_setkey(aes_tfm, key, keylen);
-	if (rc) {
-		pr_err("setkey() failed: %d\n", rc);
-		goto out;
-	}
-
-	crypto_cipher_encrypt_one(aes_tfm, src, src);
+	aes_encrypt(&ctx, src, src);
 	crypto4xx_memcpy_to_le32(hash_start, src, 16);
-out:
-	crypto_free_cipher(aes_tfm);
-	return rc;
+	memzero_explicit(&ctx, sizeof(ctx));
+	return 0;
 }
 
 int crypto4xx_setkey_aes_gcm(struct crypto_aead *cipher,

@@ -12,6 +12,12 @@
 #include "bmi.h"
 #include "debug.h"
 
+/* Types of fw logging mode */
+enum ath_dbg_mode {
+	ATH10K_ENABLE_FW_LOG_DIAG,
+	ATH10K_ENABLE_FW_LOG_CE,
+};
+
 struct ath10k_hif_sg_item {
 	u16 transfer_id;
 	void *transfer_context; /* NULL = tx completion callback not called */
@@ -48,9 +54,7 @@ struct ath10k_hif_ops {
 	 */
 	void (*stop)(struct ath10k *ar);
 
-	int (*start_post)(struct ath10k *ar);
-
-	int (*get_htt_tx_complete)(struct ath10k *ar);
+	int (*swap_mailbox)(struct ath10k *ar);
 
 	int (*map_service_to_pipe)(struct ath10k *ar, u16 service_id,
 				   u8 *ul_pipe, u8 *dl_pipe);
@@ -74,7 +78,7 @@ struct ath10k_hif_ops {
 	void (*write32)(struct ath10k *ar, u32 address, u32 value);
 
 	/* Power up the device and enter BMI transfer mode for FW download */
-	int (*power_up)(struct ath10k *ar);
+	int (*power_up)(struct ath10k *ar, enum ath10k_firmware_mode fw_mode);
 
 	/* Power down the device and free up resources. stop() must be called
 	 * before this if start() was called earlier
@@ -90,6 +94,7 @@ struct ath10k_hif_ops {
 
 	int (*get_target_info)(struct ath10k *ar,
 			       struct bmi_target_info *target_info);
+	int (*set_target_log_mode)(struct ath10k *ar, u8 fw_log_mode);
 };
 
 static inline int ath10k_hif_tx_sg(struct ath10k *ar, u8 pipe_id,
@@ -132,17 +137,10 @@ static inline void ath10k_hif_stop(struct ath10k *ar)
 	return ar->hif.ops->stop(ar);
 }
 
-static inline int ath10k_hif_start_post(struct ath10k *ar)
+static inline int ath10k_hif_swap_mailbox(struct ath10k *ar)
 {
-	if (ar->hif.ops->start_post)
-		return ar->hif.ops->start_post(ar);
-	return 0;
-}
-
-static inline int ath10k_hif_get_htt_tx_complete(struct ath10k *ar)
-{
-	if (ar->hif.ops->get_htt_tx_complete)
-		return ar->hif.ops->get_htt_tx_complete(ar);
+	if (ar->hif.ops->swap_mailbox)
+		return ar->hif.ops->swap_mailbox(ar);
 	return 0;
 }
 
@@ -172,9 +170,10 @@ static inline u16 ath10k_hif_get_free_queue_number(struct ath10k *ar,
 	return ar->hif.ops->get_free_queue_number(ar, pipe_id);
 }
 
-static inline int ath10k_hif_power_up(struct ath10k *ar)
+static inline int ath10k_hif_power_up(struct ath10k *ar,
+				      enum ath10k_firmware_mode fw_mode)
 {
-	return ar->hif.ops->power_up(ar);
+	return ar->hif.ops->power_up(ar, fw_mode);
 }
 
 static inline void ath10k_hif_power_down(struct ath10k *ar)
@@ -238,4 +237,12 @@ static inline int ath10k_hif_get_target_info(struct ath10k *ar,
 	return ar->hif.ops->get_target_info(ar, tgt_info);
 }
 
+static inline int ath10k_hif_set_target_log_mode(struct ath10k *ar,
+						 u8 fw_log_mode)
+{
+	if (!ar->hif.ops->set_target_log_mode)
+		return -EOPNOTSUPP;
+
+	return ar->hif.ops->set_target_log_mode(ar, fw_log_mode);
+}
 #endif /* _HIF_H_ */

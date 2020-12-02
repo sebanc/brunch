@@ -95,6 +95,8 @@ enum dpu_hw_blk_type {
 	DPU_HW_BLK_PINGPONG,
 	DPU_HW_BLK_INTF,
 	DPU_HW_BLK_WB,
+	DPU_HW_BLK_DSPP,
+	DPU_HW_BLK_MERGE_3D,
 	DPU_HW_BLK_MAX,
 };
 
@@ -170,6 +172,7 @@ enum dpu_ctl {
 	CTL_2,
 	CTL_3,
 	CTL_4,
+	CTL_5,
 	CTL_MAX
 };
 
@@ -179,8 +182,16 @@ enum dpu_pingpong {
 	PINGPONG_2,
 	PINGPONG_3,
 	PINGPONG_4,
+	PINGPONG_5,
 	PINGPONG_S0,
 	PINGPONG_MAX
+};
+
+enum dpu_merge_3d {
+	MERGE_3D_0 = 1,
+	MERGE_3D_1,
+	MERGE_3D_2,
+	MERGE_3D_MAX
 };
 
 enum dpu_intf {
@@ -248,12 +259,6 @@ enum dpu_vbif {
 	VBIF_MAX,
 	VBIF_RT = VBIF_0,
 	VBIF_NRT = VBIF_1
-};
-
-enum dpu_iommu_domain {
-	DPU_IOMMU_DOMAIN_UNSECURE,
-	DPU_IOMMU_DOMAIN_SECURE,
-	DPU_IOMMU_DOMAIN_MAX
 };
 
 /**
@@ -350,7 +355,6 @@ enum dpu_3d_blend_mode {
  * @alpha_enable: whether the format has an alpha channel
  * @num_planes: number of planes (including meta data planes)
  * @fetch_mode: linear, tiled, or ubwc hw fetch behavior
- * @is_yuv: is format a yuv variant
  * @flag: usage bit flags
  * @tile_width: format tile width
  * @tile_height: format tile height
@@ -432,5 +436,6 @@ struct dpu_mdss_color {
 #define DPU_DBG_MASK_TOP      (1 << 7)
 #define DPU_DBG_MASK_VBIF     (1 << 8)
 #define DPU_DBG_MASK_ROT      (1 << 9)
+#define DPU_DBG_MASK_DSPP     (1 << 10)
 
 #endif  /* _DPU_HW_MDSS_H */

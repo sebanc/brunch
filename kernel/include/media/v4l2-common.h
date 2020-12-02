@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
     v4l2 common internal API header
 
@@ -8,19 +9,6 @@
 
     Copyright (C) 2005  Hans Verkuil <hverkuil@xs4all.nl>
 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #ifndef V4L2_COMMON_H_
@@ -108,71 +96,12 @@ int v4l2_ctrl_query_fill(struct v4l2_queryctrl *qctrl,
 
 /* ------------------------------------------------------------------------- */
 
-/* I2C Helper functions */
-
-struct i2c_driver;
-struct i2c_adapter;
-struct i2c_client;
-struct i2c_device_id;
 struct v4l2_device;
 struct v4l2_subdev;
 struct v4l2_subdev_ops;
 
-/**
- * v4l2_i2c_new_subdev - Load an i2c module and return an initialized
- *	&struct v4l2_subdev.
- *
- * @v4l2_dev: pointer to &struct v4l2_device
- * @adapter: pointer to struct i2c_adapter
- * @client_type:  name of the chip that's on the adapter.
- * @addr: I2C address. If zero, it will use @probe_addrs
- * @probe_addrs: array with a list of address. The last entry at such
- *	array should be %I2C_CLIENT_END.
- *
- * returns a &struct v4l2_subdev pointer.
- */
-struct v4l2_subdev *v4l2_i2c_new_subdev(struct v4l2_device *v4l2_dev,
-		struct i2c_adapter *adapter, const char *client_type,
-		u8 addr, const unsigned short *probe_addrs);
-
-struct i2c_board_info;
-
-/**
- * v4l2_i2c_new_subdev_board - Load an i2c module and return an initialized
- *	&struct v4l2_subdev.
- *
- * @v4l2_dev: pointer to &struct v4l2_device
- * @adapter: pointer to struct i2c_adapter
- * @info: pointer to struct i2c_board_info used to replace the irq,
- *	 platform_data and addr arguments.
- * @probe_addrs: array with a list of address. The last entry at such
- *	array should be %I2C_CLIENT_END.
- *
- * returns a &struct v4l2_subdev pointer.
- */
-struct v4l2_subdev *v4l2_i2c_new_subdev_board(struct v4l2_device *v4l2_dev,
-		struct i2c_adapter *adapter, struct i2c_board_info *info,
-		const unsigned short *probe_addrs);
-
-/**
- * v4l2_i2c_subdev_init - Initializes a &struct v4l2_subdev with data from
- *	an i2c_client struct.
- *
- * @sd: pointer to &struct v4l2_subdev
- * @client: pointer to struct i2c_client
- * @ops: pointer to &struct v4l2_subdev_ops
- */
-void v4l2_i2c_subdev_init(struct v4l2_subdev *sd, struct i2c_client *client,
-		const struct v4l2_subdev_ops *ops);
-
-/**
- * v4l2_i2c_subdev_addr - returns i2c client address of &struct v4l2_subdev.
- *
- * @sd: pointer to &struct v4l2_subdev
- *
- * Returns the address of an I2C sub-device
- */
-unsigned short v4l2_i2c_subdev_addr(struct v4l2_subdev *sd);
+/* I2C Helper functions */
+#include <linux/i2c.h>
 
 /**
  * enum v4l2_i2c_tuner_type - specifies the range of tuner address that
@@ -203,6 +132,75 @@ enum v4l2_i2c_tuner_type {
 	ADDRS_TV,
 	ADDRS_TV_WITH_DEMOD,
 };
+
+#if defined(CONFIG_VIDEO_V4L2_I2C)
+
+/**
+ * v4l2_i2c_new_subdev - Load an i2c module and return an initialized
+ *	&struct v4l2_subdev.
+ *
+ * @v4l2_dev: pointer to &struct v4l2_device
+ * @adapter: pointer to struct i2c_adapter
+ * @client_type:  name of the chip that's on the adapter.
+ * @addr: I2C address. If zero, it will use @probe_addrs
+ * @probe_addrs: array with a list of address. The last entry at such
+ *	array should be %I2C_CLIENT_END.
+ *
+ * returns a &struct v4l2_subdev pointer.
+ */
+struct v4l2_subdev *v4l2_i2c_new_subdev(struct v4l2_device *v4l2_dev,
+		struct i2c_adapter *adapter, const char *client_type,
+		u8 addr, const unsigned short *probe_addrs);
+
+/**
+ * v4l2_i2c_new_subdev_board - Load an i2c module and return an initialized
+ *	&struct v4l2_subdev.
+ *
+ * @v4l2_dev: pointer to &struct v4l2_device
+ * @adapter: pointer to struct i2c_adapter
+ * @info: pointer to struct i2c_board_info used to replace the irq,
+ *	 platform_data and addr arguments.
+ * @probe_addrs: array with a list of address. The last entry at such
+ *	array should be %I2C_CLIENT_END.
+ *
+ * returns a &struct v4l2_subdev pointer.
+ */
+struct v4l2_subdev *v4l2_i2c_new_subdev_board(struct v4l2_device *v4l2_dev,
+		struct i2c_adapter *adapter, struct i2c_board_info *info,
+		const unsigned short *probe_addrs);
+
+/**
+ * v4l2_i2c_subdev_set_name - Set name for an I²C sub-device
+ *
+ * @sd: pointer to &struct v4l2_subdev
+ * @client: pointer to struct i2c_client
+ * @devname: the name of the device; if NULL, the I²C device's name will be used
+ * @postfix: sub-device specific string to put right after the I²C device name;
+ *	     may be NULL
+ */
+void v4l2_i2c_subdev_set_name(struct v4l2_subdev *sd, struct i2c_client *client,
+			      const char *devname, const char *postfix);
+
+/**
+ * v4l2_i2c_subdev_init - Initializes a &struct v4l2_subdev with data from
+ *	an i2c_client struct.
+ *
+ * @sd: pointer to &struct v4l2_subdev
+ * @client: pointer to struct i2c_client
+ * @ops: pointer to &struct v4l2_subdev_ops
+ */
+void v4l2_i2c_subdev_init(struct v4l2_subdev *sd, struct i2c_client *client,
+		const struct v4l2_subdev_ops *ops);
+
+/**
+ * v4l2_i2c_subdev_addr - returns i2c client address of &struct v4l2_subdev.
+ *
+ * @sd: pointer to &struct v4l2_subdev
+ *
+ * Returns the address of an I2C sub-device
+ */
+unsigned short v4l2_i2c_subdev_addr(struct v4l2_subdev *sd);
+
 /**
  * v4l2_i2c_tuner_addrs - Return a list of I2C tuner addresses to probe.
  *
@@ -213,14 +211,64 @@ enum v4l2_i2c_tuner_type {
  */
 const unsigned short *v4l2_i2c_tuner_addrs(enum v4l2_i2c_tuner_type type);
 
+/**
+ * v4l2_i2c_subdev_unregister - Unregister a v4l2_subdev
+ *
+ * @sd: pointer to &struct v4l2_subdev
+ */
+void v4l2_i2c_subdev_unregister(struct v4l2_subdev *sd);
+
+#else
+
+static inline struct v4l2_subdev *
+v4l2_i2c_new_subdev(struct v4l2_device *v4l2_dev,
+		    struct i2c_adapter *adapter, const char *client_type,
+		    u8 addr, const unsigned short *probe_addrs)
+{
+	return NULL;
+}
+
+static inline struct v4l2_subdev *
+v4l2_i2c_new_subdev_board(struct v4l2_device *v4l2_dev,
+			  struct i2c_adapter *adapter, struct i2c_board_info *info,
+			  const unsigned short *probe_addrs)
+{
+	return NULL;
+}
+
+static inline void
+v4l2_i2c_subdev_set_name(struct v4l2_subdev *sd, struct i2c_client *client,
+			 const char *devname, const char *postfix)
+{}
+
+static inline void
+v4l2_i2c_subdev_init(struct v4l2_subdev *sd, struct i2c_client *client,
+		     const struct v4l2_subdev_ops *ops)
+{}
+
+static inline unsigned short v4l2_i2c_subdev_addr(struct v4l2_subdev *sd)
+{
+	return I2C_CLIENT_END;
+}
+
+static inline const unsigned short *
+v4l2_i2c_tuner_addrs(enum v4l2_i2c_tuner_type type)
+{
+	return NULL;
+}
+
+static inline void v4l2_i2c_subdev_unregister(struct v4l2_subdev *sd)
+{}
+
+#endif
+
 /* ------------------------------------------------------------------------- */
 
 /* SPI Helper functions */
-#if defined(CONFIG_SPI)
 
 #include <linux/spi/spi.h>
 
-struct spi_device;
+#if defined(CONFIG_SPI)
 
 /**
  *  v4l2_spi_new_subdev - Load an spi module and return an initialized
@@ -246,6 +294,30 @@ struct v4l2_subdev *v4l2_spi_new_subdev(struct v4l2_device *v4l2_dev,
  */
 void v4l2_spi_subdev_init(struct v4l2_subdev *sd, struct spi_device *spi,
 		const struct v4l2_subdev_ops *ops);
+
+/**
+ * v4l2_spi_subdev_unregister - Unregister a v4l2_subdev
+ *
+ * @sd: pointer to &struct v4l2_subdev
+ */
+void v4l2_spi_subdev_unregister(struct v4l2_subdev *sd);
+
+#else
+
+static inline struct v4l2_subdev *
+v4l2_spi_new_subdev(struct v4l2_device *v4l2_dev,
+		    struct spi_master *master, struct spi_board_info *info)
+{
+	return NULL;
+}
+
+static inline void
+v4l2_spi_subdev_init(struct v4l2_subdev *sd, struct spi_device *spi,
+		     const struct v4l2_subdev_ops *ops)
+{}
+
+static inline void v4l2_spi_subdev_unregister(struct v4l2_subdev *sd)
+{}
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -283,7 +355,7 @@ struct v4l2_priv_tun_config {
  * @height:	pointer to height that will be adjusted if needed.
  * @hmin:	minimum height.
  * @hmax:	maximum height.
- * @halign:	least significant bit on width.
+ * @halign:	least significant bit on height.
  * @salign:	least significant bit for the image size (e. g.
  *		:math:`width * height`).
  *

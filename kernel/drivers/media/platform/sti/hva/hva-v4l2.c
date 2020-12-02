@@ -566,6 +566,7 @@ static int hva_qbuf(struct file *file, void *priv, struct v4l2_buffer *buf)
 		 */
 		struct vb2_queue *vq;
 		struct hva_stream *stream;
+		struct vb2_buffer *vb2_buf;
 
 		vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, buf->type);
 
@@ -575,7 +576,8 @@ static int hva_qbuf(struct file *file, void *priv, struct v4l2_buffer *buf)
 			return -EINVAL;
 		}
 
-		stream = (struct hva_stream *)vq->bufs[buf->index];
+		vb2_buf = vb2_get_buffer(vq, buf->index);
+		stream = to_hva_stream(to_vb2_v4l2_buffer(vb2_buf));
 		stream->bytesused = buf->bytesused;
 	}
 
@@ -1085,7 +1087,7 @@ static void hva_stop_streaming(struct vb2_queue *vq)
 
 	if ((V4L2_TYPE_IS_OUTPUT(vq->type) &&
 	     vb2_is_streaming(&ctx->fh.m2m_ctx->cap_q_ctx.q)) ||
-	    (!V4L2_TYPE_IS_OUTPUT(vq->type) &&
+	    (V4L2_TYPE_IS_CAPTURE(vq->type) &&
 	     vb2_is_streaming(&ctx->fh.m2m_ctx->out_q_ctx.q))) {
 		dev_dbg(dev, "%s %s out=%d cap=%d\n",
 			ctx->name, to_type_str(vq->type),

@@ -21,11 +21,15 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
+#include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/pinctrl/consumer.h>
+#include <linux/pm_runtime.h>
+#include <linux/regmap.h>
 #include <linux/reset.h>
 #include <linux/slab.h>
 
@@ -162,6 +166,8 @@
 #define STM32F7_SCLH_MAX			BIT(8)
 #define STM32F7_SCLL_MAX			BIT(8)
 
+#define STM32F7_AUTOSUSPEND_DELAY		(HZ / 100)
+
 /**
  * struct stm32f7_i2c_spec - private i2c specification timing
  * @rate: I2C bus speed (Hz)
@@ -275,6 +281,7 @@ struct stm32f7_i2c_msg {
  * slave)
  * @dma: dma data
  * @use_dma: boolean to know if dma is used in the current transfer
+ * @regmap: holds SYSCFG phandle for Fast Mode Plus bits
  */
 struct stm32f7_i2c_dev {
 	struct i2c_adapter adap;
@@ -295,6 +302,7 @@ struct stm32f7_i2c_dev {
 	bool master_mode;
 	struct stm32_i2c_dma *dma;
 	bool use_dma;
+	struct regmap *regmap;
 };
 
 /*
@@ -467,8 +475,12 @@ static int stm32f7_i2c_compute_timing(struct stm32f7_i2c_dev *i2c_dev,
 
 					list_add_tail(&v->node,
 						      &solutions);
+					break;
 				}
 			}
+
+			if (p_prev == p)
+				break;
 		}
 	}
 
@@ -940,6 +952,9 @@ static int stm32f7_i2c_smbus_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
 		cr2 &= ~STM32F7_I2C_CR2_RD_WRN;
 		f7_msg->read_write = I2C_SMBUS_READ;
 		break;
+	case I2C_SMBUS_I2C_BLOCK_DATA:
+		/* Rely on emulated i2c transfer (through master_xfer) */
+		return -EOPNOTSUPP;
 	default:
 		dev_err(dev, "Unsupported smbus protocol %d\n", f7_msg->size);
 		return -EOPNOTSUPP;
@@ -1549,15 +1564,13 @@ static int stm32f7_i2c_xfer(struct i2c_adapter *i2c_adap,
 	i2c_dev->msg_id = 0;
 	f7_msg->smbus = false;
 
-	ret = clk_enable(i2c_dev->clk);
-	if (ret) {
-		dev_err(i2c_dev->dev, "Failed to enable clock\n");
+	ret = pm_runtime_get_sync(i2c_dev->dev);
+	if (ret < 0)
 		return ret;
-	}
 
 	ret = stm32f7_i2c_wait_free_bus(i2c_dev);
 	if (ret)
-		goto clk_free;
+		goto pm_free;
 
 	stm32f7_i2c_xfer_msg(i2c_dev, msgs);
 
@@ -1573,8 +1586,9 @@ static int stm32f7_i2c_xfer(struct i2c_adapter *i2c_adap,
 		ret = -ETIMEDOUT;
 	}
 
-clk_free:
-	clk_disable(i2c_dev->clk);
+pm_free:
+	pm_runtime_mark_last_busy(i2c_dev->dev);
+	pm_runtime_put_autosuspend(i2c_dev->dev);
 
 	return (ret < 0) ? ret : num;
 }
@@ -1596,39 +1610,37 @@ static int stm32f7_i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
 	f7_msg->read_write = read_write;
 	f7_msg->smbus = true;
 
-	ret = clk_enable(i2c_dev->clk);
-	if (ret) {
-		dev_err(i2c_dev->dev, "Failed to enable clock\n");
+	ret = pm_runtime_get_sync(dev);
+	if (ret < 0)
 		return ret;
-	}
 
 	ret = stm32f7_i2c_wait_free_bus(i2c_dev);
 	if (ret)
-		goto clk_free;
+		goto pm_free;
 
 	ret = stm32f7_i2c_smbus_xfer_msg(i2c_dev, flags, command, data);
 	if (ret)
-		goto clk_free;
+		goto pm_free;
 
 	timeout = wait_for_completion_timeout(&i2c_dev->complete,
 					      i2c_dev->adap.timeout);
 	ret = f7_msg->result;
 	if (ret)
-		goto clk_free;
+		goto pm_free;
 
 	if (!timeout) {
 		dev_dbg(dev, "Access to slave 0x%x timed out\n", f7_msg->addr);
 		if (i2c_dev->use_dma)
 			dmaengine_terminate_all(dma->chan_using);
 		ret = -ETIMEDOUT;
-		goto clk_free;
+		goto pm_free;
 	}
 
 	/* Check PEC */
 	if ((flags & I2C_CLIENT_PEC) && size != I2C_SMBUS_QUICK && read_write) {
 		ret = stm32f7_i2c_smbus_check_pec(i2c_dev);
 		if (ret)
-			goto clk_free;
+			goto pm_free;
 	}
 
 	if (read_write && size != I2C_SMBUS_QUICK) {
@@ -1653,8 +1665,9 @@ static int stm32f7_i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
 		}
 	}
 
-clk_free:
-	clk_disable(i2c_dev->clk);
+pm_free:
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_autosuspend(dev);
 	return ret;
 }
 
@@ -1680,13 +1693,9 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
 	if (ret)
 		return ret;
 
-	if (!(stm32f7_i2c_is_slave_registered(i2c_dev))) {
-		ret = clk_enable(i2c_dev->clk);
-		if (ret) {
-			dev_err(dev, "Failed to enable clock\n");
-			return ret;
-		}
-	}
+	ret = pm_runtime_get_sync(dev);
+	if (ret < 0)
+		return ret;
 
 	if (id == 0) {
 		/* Configure Own Address 1 */
@@ -1707,7 +1716,7 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
 		oar2 &= ~STM32F7_I2C_OAR2_MASK;
 		if (slave->flags & I2C_CLIENT_TEN) {
 			ret = -EOPNOTSUPP;
-			goto exit;
+			goto pm_free;
 		}
 
 		oar2 |= STM32F7_I2C_OAR2_OA2_7(slave->addr);
@@ -1716,7 +1725,7 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
 		writel_relaxed(oar2, i2c_dev->base + STM32F7_I2C_OAR2);
 	} else {
 		ret = -ENODEV;
-		goto exit;
+		goto pm_free;
 	}
 
 	/* Enable ACK */
@@ -1727,11 +1736,10 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
 		STM32F7_I2C_CR1_PE;
 	stm32f7_i2c_set_bits(base + STM32F7_I2C_CR1, mask);
 
-	return 0;
-
-exit:
-	if (!(stm32f7_i2c_is_slave_registered(i2c_dev)))
-		clk_disable(i2c_dev->clk);
+	ret = 0;
+pm_free:
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_autosuspend(dev);
 
 	return ret;
 }
@@ -1749,6 +1757,10 @@ static int stm32f7_i2c_unreg_slave(struct i2c_client *slave)
 
 	WARN_ON(!i2c_dev->slave[id]);
 
+	ret = pm_runtime_get_sync(i2c_dev->dev);
+	if (ret < 0)
+		return ret;
+
 	if (id == 0) {
 		mask = STM32F7_I2C_OAR1_OA1EN;
 		stm32f7_i2c_clr_bits(base + STM32F7_I2C_OAR1, mask);
@@ -1759,12 +1771,37 @@ static int stm32f7_i2c_unreg_slave(struct i2c_client *slave)
 
 	i2c_dev->slave[id] = NULL;
 
-	if (!(stm32f7_i2c_is_slave_registered(i2c_dev))) {
+	if (!(stm32f7_i2c_is_slave_registered(i2c_dev)))
 		stm32f7_i2c_disable_irq(i2c_dev, STM32F7_I2C_ALL_IRQ_MASK);
-		clk_disable(i2c_dev->clk);
-	}
+
+	pm_runtime_mark_last_busy(i2c_dev->dev);
+	pm_runtime_put_autosuspend(i2c_dev->dev);
 
 	return 0;
+}
+
+static int stm32f7_i2c_setup_fm_plus_bits(struct platform_device *pdev,
+					  struct stm32f7_i2c_dev *i2c_dev)
+{
+	struct device_node *np = pdev->dev.of_node;
+	int ret;
+	u32 reg, mask;
+
+	i2c_dev->regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg-fmp");
+	if (IS_ERR(i2c_dev->regmap)) {
+		/* Optional */
+		return 0;
+	}
+
+	ret = of_property_read_u32_index(np, "st,syscfg-fmp", 1, &reg);
+	if (ret)
+		return ret;
+
+	ret = of_property_read_u32_index(np, "st,syscfg-fmp", 2, &mask);
+	if (ret)
+		return ret;
+
+	return regmap_update_bits(i2c_dev->regmap, reg, mask, mask);
 }
 
 static u32 stm32f7_i2c_func(struct i2c_adapter *adap)
@@ -1773,10 +1810,11 @@ static u32 stm32f7_i2c_func(struct i2c_adapter *adap)
 		I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE |
 		I2C_FUNC_SMBUS_BYTE_DATA | I2C_FUNC_SMBUS_WORD_DATA |
 		I2C_FUNC_SMBUS_BLOCK_DATA | I2C_FUNC_SMBUS_BLOCK_PROC_CALL |
-		I2C_FUNC_SMBUS_PROC_CALL | I2C_FUNC_SMBUS_PEC;
+		I2C_FUNC_SMBUS_PROC_CALL | I2C_FUNC_SMBUS_PEC |
+		I2C_FUNC_SMBUS_I2C_BLOCK;
 }
 
-static struct i2c_algorithm stm32f7_i2c_algo = {
+static const struct i2c_algorithm stm32f7_i2c_algo = {
 	.master_xfer = stm32f7_i2c_xfer,
 	.smbus_xfer = stm32f7_i2c_smbus_xfer,
 	.functionality = stm32f7_i2c_func,
@@ -1826,6 +1864,7 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Error: Missing controller clock\n");
 		return PTR_ERR(i2c_dev->clk);
 	}
+
 	ret = clk_prepare_enable(i2c_dev->clk);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to prepare_enable clock\n");
@@ -1835,12 +1874,16 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
 	i2c_dev->speed = STM32_I2C_SPEED_STANDARD;
 	ret = device_property_read_u32(&pdev->dev, "clock-frequency",
 				       &clk_rate);
-	if (!ret && clk_rate >= 1000000)
+	if (!ret && clk_rate >= 1000000) {
 		i2c_dev->speed = STM32_I2C_SPEED_FAST_PLUS;
-	else if (!ret && clk_rate >= 400000)
+		ret = stm32f7_i2c_setup_fm_plus_bits(pdev, i2c_dev);
+		if (ret)
+			goto clk_free;
+	} else if (!ret && clk_rate >= 400000) {
 		i2c_dev->speed = STM32_I2C_SPEED_FAST;
-	else if (!ret && clk_rate >= 100000)
+	} else if (!ret && clk_rate >= 100000) {
 		i2c_dev->speed = STM32_I2C_SPEED_STANDARD;
+	}
 
 	rst = devm_reset_control_get(&pdev->dev, NULL);
 	if (IS_ERR(rst)) {
@@ -1895,8 +1938,6 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
 	if (ret)
 		goto clk_free;
 
-	stm32f7_i2c_hw_config(i2c_dev);
-
 	adap = &i2c_dev->adap;
 	i2c_set_adapdata(adap, i2c_dev);
 	snprintf(adap->name, sizeof(adap->name), "STM32F7 I2C(%pa)",
@@ -1924,17 +1965,39 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
 		goto clk_free;
 	}
 
-	ret = i2c_add_adapter(adap);
-	if (ret)
-		goto clk_free;
-
 	platform_set_drvdata(pdev, i2c_dev);
 
-	clk_disable(i2c_dev->clk);
+	pm_runtime_set_autosuspend_delay(i2c_dev->dev,
+					 STM32F7_AUTOSUSPEND_DELAY);
+	pm_runtime_use_autosuspend(i2c_dev->dev);
+	pm_runtime_set_active(i2c_dev->dev);
+	pm_runtime_enable(i2c_dev->dev);
+
+	pm_runtime_get_noresume(&pdev->dev);
+
+	stm32f7_i2c_hw_config(i2c_dev);
+
+	ret = i2c_add_adapter(adap);
+	if (ret)
+		goto pm_disable;
 
 	dev_info(i2c_dev->dev, "STM32F7 I2C-%d bus adapter\n", adap->nr);
 
+	pm_runtime_mark_last_busy(i2c_dev->dev);
+	pm_runtime_put_autosuspend(i2c_dev->dev);
+
 	return 0;
+
+pm_disable:
+	pm_runtime_put_noidle(i2c_dev->dev);
+	pm_runtime_disable(i2c_dev->dev);
+	pm_runtime_set_suspended(i2c_dev->dev);
+	pm_runtime_dont_use_autosuspend(i2c_dev->dev);
+
+	if (i2c_dev->dma) {
+		stm32_i2c_dma_free(i2c_dev->dma);
+		i2c_dev->dma = NULL;
+	}
 
 clk_free:
 	clk_disable_unprepare(i2c_dev->clk);
@@ -1946,17 +2009,56 @@ static int stm32f7_i2c_remove(struct platform_device *pdev)
 {
 	struct stm32f7_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
 
+	i2c_del_adapter(&i2c_dev->adap);
+	pm_runtime_get_sync(i2c_dev->dev);
+
+	pm_runtime_put_noidle(i2c_dev->dev);
+	pm_runtime_disable(i2c_dev->dev);
+	pm_runtime_set_suspended(i2c_dev->dev);
+	pm_runtime_dont_use_autosuspend(i2c_dev->dev);
+
 	if (i2c_dev->dma) {
 		stm32_i2c_dma_free(i2c_dev->dma);
 		i2c_dev->dma = NULL;
 	}
 
-	i2c_del_adapter(&i2c_dev->adap);
-
-	clk_unprepare(i2c_dev->clk);
+	clk_disable_unprepare(i2c_dev->clk);
 
 	return 0;
 }
+
+#ifdef CONFIG_PM
+static int stm32f7_i2c_runtime_suspend(struct device *dev)
+{
+	struct stm32f7_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+
+	if (!stm32f7_i2c_is_slave_registered(i2c_dev))
+		clk_disable_unprepare(i2c_dev->clk);
+
+	return 0;
+}
+
+static int stm32f7_i2c_runtime_resume(struct device *dev)
+{
+	struct stm32f7_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+	int ret;
+
+	if (!stm32f7_i2c_is_slave_registered(i2c_dev)) {
+		ret = clk_prepare_enable(i2c_dev->clk);
+		if (ret) {
+			dev_err(dev, "failed to prepare_enable clock\n");
+			return ret;
+		}
+	}
+
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops stm32f7_i2c_pm_ops = {
+	SET_RUNTIME_PM_OPS(stm32f7_i2c_runtime_suspend,
+			   stm32f7_i2c_runtime_resume, NULL)
+};
 
 static const struct of_device_id stm32f7_i2c_match[] = {
 	{ .compatible = "st,stm32f7-i2c", .data = &stm32f7_setup},
@@ -1968,6 +2070,7 @@ static struct platform_driver stm32f7_i2c_driver = {
 	.driver = {
 		.name = "stm32f7-i2c",
 		.of_match_table = stm32f7_i2c_match,
+		.pm = &stm32f7_i2c_pm_ops,
 	},
 	.probe = stm32f7_i2c_probe,
 	.remove = stm32f7_i2c_remove,

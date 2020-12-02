@@ -1551,7 +1551,16 @@ static int ceu_parse_dt(struct ceu_device *ceudev)
 		return ret;
 
 	for (i = 0; i < num_ep; i++) {
-		struct v4l2_fwnode_endpoint fw_ep = { .bus_type = 0 };
+		struct v4l2_fwnode_endpoint fw_ep = {
+			.bus_type = V4L2_MBUS_PARALLEL,
+			.bus = {
+				.parallel = {
+					.flags = V4L2_MBUS_HSYNC_ACTIVE_HIGH |
+						 V4L2_MBUS_VSYNC_ACTIVE_HIGH,
+					.bus_width = 8,
+				},
+			},
+		};
 
 		ep = of_graph_get_endpoint_by_regs(of, 0, i);
 		if (!ep) {
@@ -1564,14 +1573,7 @@ static int ceu_parse_dt(struct ceu_device *ceudev)
 		ret = v4l2_fwnode_endpoint_parse(of_fwnode_handle(ep), &fw_ep);
 		if (ret) {
 			dev_err(ceudev->dev,
-				"Unable to parse endpoint #%u.\n", i);
-			goto error_cleanup;
-		}
-
-		if (fw_ep.bus_type != V4L2_MBUS_PARALLEL) {
-			dev_err(ceudev->dev,
-				"Only parallel input supported.\n");
-			ret = -EINVAL;
+				"Unable to parse endpoint #%u: %d.\n", i, ret);
 			goto error_cleanup;
 		}
 
@@ -1657,10 +1659,8 @@ static int ceu_probe(struct platform_device *pdev)
 	}
 
 	ret = platform_get_irq(pdev, 0);
-	if (ret < 0) {
-		dev_err(dev, "Failed to get irq: %d\n", ret);
+	if (ret < 0)
 		goto error_free_ceudev;
-	}
 	irq = ret;
 
 	ret = devm_request_irq(dev, irq, ceu_irq,

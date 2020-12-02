@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Universal Interface for Intel High Definition Audio Codec
  *
@@ -5,20 +6,6 @@
  *
  *  (C) 2006-2009 VIA Technology, Inc.
  *  (C) 2006-2008 Takashi Iwai <tiwai@suse.de>
- *
- *  This driver is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This driver is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
 /* * * * * * * * * * * * * * Release History * * * * * * * * * * * * * * * * */
@@ -409,7 +396,7 @@ static int via_resume(struct hda_codec *codec)
 	/* some delay here to make jack detection working (bko#98921) */
 	msleep(10);
 	codec->patch_ops.init(codec);
-	regcache_sync(codec->core.regmap);
+	snd_hda_regmap_sync(codec);
 	return 0;
 }
 #endif
@@ -1051,8 +1038,8 @@ static const struct snd_pci_quirk vt2002p_fixups[] = {
  */
 static void fix_vt1802_connections(struct hda_codec *codec)
 {
-	static hda_nid_t conn_24[] = { 0x14, 0x1c };
-	static hda_nid_t conn_33[] = { 0x1c };
+	static const hda_nid_t conn_24[] = { 0x14, 0x1c };
+	static const hda_nid_t conn_33[] = { 0x1c };
 
 	snd_hda_override_conn_list(codec, 0x24, ARRAY_SIZE(conn_24), conn_24);
 	snd_hda_override_conn_list(codec, 0x33, ARRAY_SIZE(conn_33), conn_33);

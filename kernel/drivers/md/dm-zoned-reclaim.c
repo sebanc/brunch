@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2017 Western Digital Corporation or its affiliates.
  *
@@ -438,7 +439,7 @@ static bool dmz_should_reclaim(struct dmz_reclaim *zrc)
 		return false;
 
 	/*
-	 * If the percentage of unmappped random zones is low,
+	 * If the percentage of unmapped random zones is low,
 	 * reclaim even if the target is busy.
 	 */
 	return p_unmap_rnd <= DMZ_RECLAIM_LOW_UNMAP_RND;

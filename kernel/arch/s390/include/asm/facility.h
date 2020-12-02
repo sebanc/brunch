@@ -76,11 +76,10 @@ static inline unsigned long __stfle_asm(u64 *stfle_fac_list, int size)
  * @stfle_fac_list: array where facility list can be stored
  * @size: size of passed in array in double words
  */
-static inline void stfle(u64 *stfle_fac_list, int size)
+static inline void __stfle(u64 *stfle_fac_list, int size)
 {
 	unsigned long nr;
 
-	preempt_disable();
 	asm volatile(
 		"	stfl	0(0)\n"
 		: "=m" (S390_lowcore.stfl_fac_list));
@@ -92,6 +91,12 @@ static inline void stfle(u64 *stfle_fac_list, int size)
 		nr = min_t(unsigned long, (nr + 1) * 8, size * 8);
 	}
 	memset((char *) stfle_fac_list + nr, 0, size * 8 - nr);
+}
+
+static inline void stfle(u64 *stfle_fac_list, int size)
+{
+	preempt_disable();
+	__stfle(stfle_fac_list, size);
 	preempt_enable();
 }
 

@@ -9,9 +9,9 @@
 #include "venc_ipi_msg.h"
 #include "venc_vpu_if.h"
 
-static void handle_enc_init_msg(struct venc_vpu_inst *vpu, void *data)
+static void handle_enc_init_msg(struct venc_vpu_inst *vpu, const void *data)
 {
-	struct venc_vpu_ipi_msg_init *msg = data;
+	const struct venc_vpu_ipi_msg_init *msg = data;
 
 	vpu->inst_addr = msg->vpu_inst_addr;
 	vpu->vsi = mtk_vcodec_fw_map_dm_addr(vpu->ctx->dev->fw_handler,
@@ -35,9 +35,9 @@ static void handle_enc_init_msg(struct venc_vpu_inst *vpu, void *data)
 	}
 }
 
-static void handle_enc_encode_msg(struct venc_vpu_inst *vpu, void *data)
+static void handle_enc_encode_msg(struct venc_vpu_inst *vpu, const void *data)
 {
-	struct venc_vpu_ipi_msg_enc *msg = data;
+	const struct venc_vpu_ipi_msg_enc *msg = data;
 
 	vpu->state = msg->state;
 	vpu->bs_size = msg->bs_size;
@@ -46,7 +46,7 @@ static void handle_enc_encode_msg(struct venc_vpu_inst *vpu, void *data)
 
 static void vpu_enc_ipi_handler(void *data, unsigned int len, void *priv)
 {
-	struct venc_vpu_ipi_msg_common *msg = data;
+	const struct venc_vpu_ipi_msg_common *msg = data;
 	struct venc_vpu_inst *vpu =
 		(struct venc_vpu_inst *)(unsigned long)msg->venc_inst;
 
@@ -117,7 +117,7 @@ int vpu_enc_init(struct venc_vpu_inst *vpu)
 	vpu->failure = 0;
 
 	status = mtk_vcodec_fw_ipi_register(vpu->ctx->dev->fw_handler, vpu->id,
-		vpu_enc_ipi_handler, "venc", NULL);
+					    vpu_enc_ipi_handler, "venc", NULL);
 
 	if (status) {
 		mtk_vcodec_err(vpu, "vpu_ipi_register fail %d", status);
@@ -160,7 +160,7 @@ int vpu_enc_set_param(struct venc_vpu_inst *vpu,
 		      enum venc_set_param_type id,
 		      struct venc_enc_param *enc_param)
 {
-	const bool is_ext = vpu->ctx->dev->venc_pdata->uses_ext;
+	const bool is_ext = MTK_ENC_CTX_IS_EXT(vpu->ctx);
 	size_t msg_size = is_ext ?
 		sizeof(struct venc_ap_ipi_msg_set_param_ext) :
 		sizeof(struct venc_ap_ipi_msg_set_param);
@@ -175,37 +175,37 @@ int vpu_enc_set_param(struct venc_vpu_inst *vpu,
 	switch (id) {
 	case VENC_SET_PARAM_ENC:
 		if (is_ext) {
-			out.base.num_data = 3;
+			out.base.data_item = 3;
 			out.base.data[0] =
 				venc_enc_param_crop_right(vpu, enc_param);
 			out.base.data[1] =
 				venc_enc_param_crop_bottom(enc_param);
 			out.base.data[2] = venc_enc_param_num_mb(enc_param);
 		} else {
-			out.base.num_data = 0;
+			out.base.data_item = 0;
 		}
 		break;
 	case VENC_SET_PARAM_FORCE_INTRA:
-		out.base.num_data = 0;
+		out.base.data_item = 0;
 		break;
 	case VENC_SET_PARAM_ADJUST_BITRATE:
-		out.base.num_data = 1;
+		out.base.data_item = 1;
 		out.base.data[0] = enc_param->bitrate;
 		break;
 	case VENC_SET_PARAM_ADJUST_FRAMERATE:
-		out.base.num_data = 1;
+		out.base.data_item = 1;
 		out.base.data[0] = enc_param->frm_rate;
 		break;
 	case VENC_SET_PARAM_GOP_SIZE:
-		out.base.num_data = 1;
+		out.base.data_item = 1;
 		out.base.data[0] = enc_param->gop_size;
 		break;
 	case VENC_SET_PARAM_INTRA_PERIOD:
-		out.base.num_data = 1;
+		out.base.data_item = 1;
 		out.base.data[0] = enc_param->intra_period;
 		break;
 	case VENC_SET_PARAM_SKIP_FRAME:
-		out.base.num_data = 0;
+		out.base.data_item = 0;
 		break;
 	default:
 		mtk_vcodec_err(vpu, "id %d not supported", id);
@@ -228,7 +228,7 @@ int vpu_enc_encode(struct venc_vpu_inst *vpu, unsigned int bs_mode,
 		   unsigned int *bs_size,
 		   struct venc_frame_info *frame_info)
 {
-	const bool is_ext = vpu->ctx->dev->venc_pdata->uses_ext;
+	const bool is_ext = MTK_ENC_CTX_IS_EXT(vpu->ctx);
 	size_t msg_size = is_ext ?
 		sizeof(struct venc_ap_ipi_msg_enc_ext) :
 		sizeof(struct venc_ap_ipi_msg_enc);
@@ -256,11 +256,10 @@ int vpu_enc_encode(struct venc_vpu_inst *vpu, unsigned int bs_mode,
 		out.base.bs_addr = bs_buf->dma_addr;
 		out.base.bs_size = bs_buf->size;
 	}
-	if (is_ext && frame_info)
-	{
+	if (is_ext && frame_info) {
 		out.data_item = 3;
-		out.data[0] = frame_info->frm_cnt;
-		out.data[1] = frame_info->skip_frm_cnt;
+		out.data[0] = frame_info->frm_count;
+		out.data[1] = frame_info->skip_frm_count;
 		out.data[2] = frame_info->frm_type;
 	}
 	if (vpu_enc_send_msg(vpu, &out, msg_size)) {

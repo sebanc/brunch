@@ -1,9 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2016 Pablo Neira Ayuso <pablo@netfilter.org>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
  */
 
 #include <linux/init.h>
@@ -38,7 +35,8 @@ static int nft_objref_init(const struct nft_ctx *ctx,
 		return -EINVAL;
 
 	objtype = ntohl(nla_get_be32(tb[NFTA_OBJREF_IMM_TYPE]));
-	obj = nft_obj_lookup(ctx->table, tb[NFTA_OBJREF_IMM_NAME], objtype,
+	obj = nft_obj_lookup(ctx->net, ctx->table,
+			     tb[NFTA_OBJREF_IMM_NAME], objtype,
 			     genmask);
 	if (IS_ERR(obj))
 		return -ENOENT;
@@ -53,7 +51,7 @@ static int nft_objref_dump(struct sk_buff *skb, const struct nft_expr *expr)
 {
 	const struct nft_object *obj = nft_objref_priv(expr);
 
-	if (nla_put_string(skb, NFTA_OBJREF_IMM_NAME, obj->name) ||
+	if (nla_put_string(skb, NFTA_OBJREF_IMM_NAME, obj->key.name) ||
 	    nla_put_be32(skb, NFTA_OBJREF_IMM_TYPE,
 			 htonl(obj->ops->type->type)))
 		goto nla_put_failure;

@@ -97,6 +97,7 @@ static struct syscall_whitelist_entry complete_whitelist[] = {
 	SYSCALL_ENTRY(getrandom),
 	SYSCALL_ENTRY(getresgid),
 	SYSCALL_ENTRY(getresuid),
+	SYSCALL_ENTRY(getrlimit),
 	SYSCALL_ENTRY(get_robust_list),
 	SYSCALL_ENTRY(getrusage),
 	SYSCALL_ENTRY(getsid),
@@ -292,6 +293,7 @@ static struct syscall_whitelist_entry complete_whitelist[] = {
 	/* Exist for x86_64 and ARM32 but not ARM64. */
 #ifndef CONFIG_ARM64
 	SYSCALL_ENTRY(access),
+	SYSCALL_ENTRY(alarm),
 	SYSCALL_ENTRY(chmod),
 	SYSCALL_ENTRY(chown),
 	SYSCALL_ENTRY(creat),
@@ -315,57 +317,30 @@ static struct syscall_whitelist_entry complete_whitelist[] = {
 	SYSCALL_ENTRY(readlink),
 	SYSCALL_ENTRY(rename),
 	SYSCALL_ENTRY(rmdir),
+	SYSCALL_ENTRY(select),
 	SYSCALL_ENTRY(signalfd),
 	SYSCALL_ENTRY(symlink),
 	SYSCALL_ENTRY(sysfs),
+	SYSCALL_ENTRY(time),
 	SYSCALL_ENTRY(unlink),
 	SYSCALL_ENTRY(ustat),
+	SYSCALL_ENTRY(utime),
 	SYSCALL_ENTRY(utimes),
 	SYSCALL_ENTRY(vfork),
 #endif
 
-	/* Exist for x86_64 and ARM64 but not ARM32 */
-#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
+	/* Exist for x86_64 and ARM64 */
 	SYSCALL_ENTRY(fadvise64),
 	SYSCALL_ENTRY(fstat),
-	SYSCALL_ENTRY(getrlimit),
 	SYSCALL_ENTRY(migrate_pages),
 	SYSCALL_ENTRY(mmap),
 	SYSCALL_ENTRY(rt_sigreturn),
 	SYSCALL_ENTRY(sync_file_range),
 	SYSCALL_ENTRY(umount2),
 	SYSCALL_ENTRY(uname),
-#endif
-
-	/* Unique to ARM32. */
-#ifdef CONFIG_ARM
-	SYSCALL_ENTRY(arm_fadvise64_64),
-	SYSCALL_ENTRY(bdflush),
-	SYSCALL_ENTRY(fcntl64),
-	SYSCALL_ENTRY(fstat64),
-	SYSCALL_ENTRY(fstatat64),
-	SYSCALL_ENTRY(ftruncate64),
-	SYSCALL_ENTRY(lstat64),
-	SYSCALL_ENTRY(mmap2),
-	SYSCALL_ENTRY(nice),
-	SYSCALL_ENTRY(pciconfig_iobase),
-	SYSCALL_ENTRY(pciconfig_read),
-	SYSCALL_ENTRY(pciconfig_write),
-	SYSCALL_ENTRY(recv),
-	SYSCALL_ENTRY(send),
-	SYSCALL_ENTRY(sendfile64),
-	SYSCALL_ENTRY(sigaction),
-	SYSCALL_ENTRY(sigpending),
-	SYSCALL_ENTRY(sigprocmask),
-	SYSCALL_ENTRY(sigsuspend),
-	SYSCALL_ENTRY(stat64),
-	SYSCALL_ENTRY(truncate64),
-	SYSCALL_ENTRY(uselib),
-#endif
 
 	/* Unique to x86_64. */
 #ifdef CONFIG_X86_64
-	SYSCALL_ENTRY(alarm),
 	SYSCALL_ENTRY(arch_prctl),
 	SYSCALL_ENTRY(ioperm),
 	SYSCALL_ENTRY(iopl),
@@ -373,11 +348,8 @@ static struct syscall_whitelist_entry complete_whitelist[] = {
 	SYSCALL_ENTRY(lstat),
 	SYSCALL_ENTRY(modify_ldt),
 	SYSCALL_ENTRY(newfstatat),
-	SYSCALL_ENTRY(select),
 	SYSCALL_ENTRY(stat),
-	SYSCALL_ENTRY(time),
 	SYSCALL_ENTRY(_sysctl),
-	SYSCALL_ENTRY(utime),
 #endif
 
 	/* Unique to ARM64. */

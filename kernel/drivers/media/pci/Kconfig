@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
 if PCI && MEDIA_SUPPORT
 
 menuconfig MEDIA_PCI_SUPPORT
@@ -53,7 +54,7 @@ source "drivers/media/pci/smipcie/Kconfig"
 source "drivers/media/pci/netup_unidvb/Kconfig"
 endif
 
-source "drivers/media/pci/intel/ipu3/Kconfig"
+source "drivers/media/pci/intel/Kconfig"
 
 endif #MEDIA_PCI_SUPPORT
 endif #PCI

@@ -44,7 +44,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #undef PVR_DPF_FUNCTION_TRACE_ON
 
 #include "img_defs.h"
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 #include "rgxdevice.h"
 #include "rgxmem.h"
 #include "allocmem.h"
@@ -82,7 +82,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if defined(SUPPORT_PAGE_FAULT_DEBUG)
 #include "devicemem_history_server.h"
 #endif
-#include "rgx_bvnc_defs_km.h"
+#include "km/rgx_bvnc_defs_km.h"
 #define PVR_DUMP_DRIVER_INFO(x, y)														\
 	PVR_DUMPDEBUG_LOG("%s info: %d.%d @ %8d (%s) build options: 0x%08x ",				\
 					   (x),																\
@@ -655,7 +655,7 @@ static void _DPXDecodeBIFReqTags(RGXDBG_BIF_ID	eBankID,
  @Return   void
 
 ******************************************************************************/
-#include "rgxmhdefs_km.h"
+#include "km/rgxmhdefs_km.h"
 
 static void _RGXDecodeBIFReqTagsXE(PVRSRV_RGXDEV_INFO	*psDevInfo,
 								   IMG_UINT32	ui32TagID,

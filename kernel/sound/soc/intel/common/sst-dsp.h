@@ -1,17 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Intel Smart Sound Technology (SST) Core
  *
  * Copyright (C) 2013, Intel Corporation. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License version
- * 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
  */
 
 #ifndef __SOUND_SOC_SST_DSP_H
@@ -277,15 +268,14 @@ void sst_dsp_ipc_msg_tx(struct sst_dsp *dsp, u32 msg);
 u32 sst_dsp_ipc_msg_rx(struct sst_dsp *dsp);
 
 /* Mailbox management */
-int sst_dsp_mailbox_init(struct sst_dsp *dsp, u32 inbox_offset,
+int sst_dsp_mailbox_init(struct sst_dsp *sst, u32 inbox_offset,
 	size_t inbox_size, u32 outbox_offset, size_t outbox_size);
-void sst_dsp_inbox_write(struct sst_dsp *dsp, void *message, size_t bytes);
-void sst_dsp_inbox_read(struct sst_dsp *dsp, void *message, size_t bytes);
-void sst_dsp_outbox_write(struct sst_dsp *dsp, void *message, size_t bytes);
-void sst_dsp_outbox_read(struct sst_dsp *dsp, void *message, size_t bytes);
-void sst_dsp_mailbox_dump(struct sst_dsp *dsp, size_t bytes);
-int sst_dsp_register_poll(struct sst_dsp  *dsp, u32 offset, u32 mask,
-		 u32 expected_value, u32 timeout, char *operation);
+void sst_dsp_inbox_write(struct sst_dsp *sst, void *message, size_t bytes);
+void sst_dsp_inbox_read(struct sst_dsp *sst, void *message, size_t bytes);
+void sst_dsp_outbox_write(struct sst_dsp *sst, void *message, size_t bytes);
+void sst_dsp_outbox_read(struct sst_dsp *sst, void *message, size_t bytes);
+int sst_dsp_register_poll(struct sst_dsp  *ctx, u32 offset, u32 mask,
+		 u32 target, u32 time, char *operation);
 
 /* Debug */
 void sst_dsp_dump(struct sst_dsp *sst);

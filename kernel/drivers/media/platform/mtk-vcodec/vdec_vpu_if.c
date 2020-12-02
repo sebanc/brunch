@@ -10,7 +10,7 @@
 #include "vdec_vpu_if.h"
 #include "mtk_vcodec_fw.h"
 
-static void handle_init_ack_msg(struct vdec_vpu_ipi_init_ack *msg)
+static void handle_init_ack_msg(const struct vdec_vpu_ipi_init_ack *msg)
 {
 	struct vdec_vpu_inst *vpu = (struct vdec_vpu_inst *)
 					(unsigned long)msg->ap_inst_addr;
@@ -24,34 +24,6 @@ static void handle_init_ack_msg(struct vdec_vpu_ipi_init_ack *msg)
 	vpu->inst_addr = msg->vpu_inst_addr;
 
 	mtk_vcodec_debug(vpu, "- vpu_inst_addr = 0x%x", vpu->inst_addr);
-
-	/* Set default ABI version if dealing with unversioned firmware. */
-	vpu->fw_abi_version = 0;
-	/*
-	 * Instance ID is only used if ABI version >= 2. Initialize it with
-	 * garbage by default.
-	 */
-	vpu->inst_id = 0xdeadbeef;
-
-	/* Firmware version field does not exist on MT8173. */
-	if (vpu->ctx->dev->vdec_pdata->chip == MTK_MT8173)
-		return;
-
-	/* Check firmware version. */
-	vpu->fw_abi_version = msg->vdec_abi_version;
-	mtk_vcodec_debug(vpu, "firmware version 0x%x\n", vpu->fw_abi_version);
-	switch (vpu->fw_abi_version) {
-	case 1:
-		break;
-	case 2:
-		vpu->inst_id = msg->inst_id;
-		break;
-	default:
-		mtk_vcodec_err(vpu, "unhandled firmware version 0x%x\n",
-			       vpu->fw_abi_version);
-		vpu->failure = 1;
-		break;
-	}
 }
 
 /*
@@ -66,14 +38,11 @@ static void handle_init_ack_msg(struct vdec_vpu_ipi_init_ack *msg)
  */
 static void vpu_dec_ipi_handler(void *data, unsigned int len, void *priv)
 {
-	struct vdec_vpu_ipi_ack *msg = data;
+	const struct vdec_vpu_ipi_ack *msg = data;
 	struct vdec_vpu_inst *vpu = (struct vdec_vpu_inst *)
 					(unsigned long)msg->ap_inst_addr;
 
 	mtk_vcodec_debug(vpu, "+ id=%X", msg->msg_id);
-
-	vpu->failure = msg->status;
-	vpu->signaled = 1;
 
 	if (msg->status == 0) {
 		switch (msg->msg_id) {
@@ -94,6 +63,8 @@ static void vpu_dec_ipi_handler(void *data, unsigned int len, void *priv)
 	}
 
 	mtk_vcodec_debug(vpu, "- id=%X", msg->msg_id);
+	vpu->failure = msg->status;
+	vpu->signaled = 1;
 }
 
 static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
@@ -125,10 +96,7 @@ static int vcodec_send_ap_ipi(struct vdec_vpu_inst *vpu, unsigned int msg_id)
 
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_id = msg_id;
-	if (vpu->fw_abi_version < 2)
-		msg.vpu_inst_addr = vpu->inst_addr;
-	else
-		msg.inst_id = vpu->inst_id;
+	msg.vpu_inst_addr = vpu->inst_addr;
 
 	err = vcodec_vpu_send_msg(vpu, &msg, sizeof(msg));
 	mtk_vcodec_debug(vpu, "- id=%X ret=%d", msg_id, err);
@@ -178,10 +146,7 @@ int vpu_dec_start(struct vdec_vpu_inst *vpu, uint32_t *data, unsigned int len)
 
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_id = AP_IPIMSG_DEC_START;
-	if (vpu->fw_abi_version < 2)
-		msg.vpu_inst_addr = vpu->inst_addr;
-	else
-		msg.inst_id = vpu->inst_id;
+	msg.vpu_inst_addr = vpu->inst_addr;
 
 	for (i = 0; i < len; i++)
 		msg.data[i] = data[i];

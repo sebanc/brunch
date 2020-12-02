@@ -23,6 +23,7 @@
  *
  */
 
+#include <linux/clocksource.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -179,7 +180,6 @@ void __init via_init(void)
 
 	/*
 	 * SE/30: disable video IRQ
-	 * XXX: testing for SE/30 VBL
 	 */
 
 	if (macintosh_config->ident == MAC_MODEL_SE30) {
@@ -187,13 +187,18 @@ void __init via_init(void)
 		via1[vBufB] |= 0x40;
 	}
 
-	/*
-	 * Set the RTC bits to a known state: all lines to outputs and
-	 * RTC disabled (yes that's 0 to enable and 1 to disable).
-	 */
-
-	via1[vDirB] |= (VIA1B_vRTCEnb | VIA1B_vRTCClk | VIA1B_vRTCData);
-	via1[vBufB] |= (VIA1B_vRTCEnb | VIA1B_vRTCClk);
+	switch (macintosh_config->adb_type) {
+	case MAC_ADB_IOP:
+	case MAC_ADB_II:
+	case MAC_ADB_PB1:
+		/*
+		 * Set the RTC bits to a known state: all lines to outputs and
+		 * RTC disabled (yes that's 0 to enable and 1 to disable).
+		 */
+		via1[vDirB] |= VIA1B_vRTCEnb | VIA1B_vRTCClk | VIA1B_vRTCData;
+		via1[vBufB] |= VIA1B_vRTCEnb | VIA1B_vRTCClk;
+		break;
+	}
 
 	/* Everything below this point is VIA2/RBV only... */
 
@@ -577,16 +582,39 @@ EXPORT_SYMBOL(via2_scsi_drq_pending);
 /* timer and clock source */
 
 #define VIA_CLOCK_FREQ     783360                /* VIA "phase 2" clock in Hz */
-#define VIA_TIMER_INTERVAL (1000000 / HZ)        /* microseconds per jiffy */
 #define VIA_TIMER_CYCLES   (VIA_CLOCK_FREQ / HZ) /* clock cycles per jiffy */
 
 #define VIA_TC             (VIA_TIMER_CYCLES - 2) /* including 0 and -1 */
 #define VIA_TC_LOW         (VIA_TC & 0xFF)
 #define VIA_TC_HIGH        (VIA_TC >> 8)
 
+static u64 mac_read_clk(struct clocksource *cs);
+
+static struct clocksource mac_clk = {
+	.name   = "via1",
+	.rating = 250,
+	.read   = mac_read_clk,
+	.mask   = CLOCKSOURCE_MASK(32),
+	.flags  = CLOCK_SOURCE_IS_CONTINUOUS,
+};
+
+static u32 clk_total, clk_offset;
+
+static irqreturn_t via_timer_handler(int irq, void *dev_id)
+{
+	irq_handler_t timer_routine = dev_id;
+
+	clk_total += VIA_TIMER_CYCLES;
+	clk_offset = 0;
+	timer_routine(0, NULL);
+
+	return IRQ_HANDLED;
+}
+
 void __init via_init_clock(irq_handler_t timer_routine)
 {
-	if (request_irq(IRQ_MAC_TIMER_1, timer_routine, 0, "timer", NULL)) {
+	if (request_irq(IRQ_MAC_TIMER_1, via_timer_handler, IRQF_TIMER, "timer",
+			timer_routine)) {
 		pr_err("Couldn't register %s interrupt\n", "timer");
 		return;
 	}
@@ -596,13 +624,16 @@ void __init via_init_clock(irq_handler_t timer_routine)
 	via1[vT1CL] = VIA_TC_LOW;
 	via1[vT1CH] = VIA_TC_HIGH;
 	via1[vACR] |= 0x40;
+
+	clocksource_register_hz(&mac_clk, VIA_CLOCK_FREQ);
 }
 
-u32 mac_gettimeoffset(void)
+static u64 mac_read_clk(struct clocksource *cs)
 {
 	unsigned long flags;
 	u8 count_high;
-	u16 count, offset = 0;
+	u16 count;
+	u32 ticks;
 
 	/*
 	 * Timer counter wrap-around is detected with the timer interrupt flag
@@ -618,11 +649,11 @@ u32 mac_gettimeoffset(void)
 	if (count_high == 0xFF)
 		count_high = 0;
 	if (count_high > 0 && (via1[vIFR] & VIA_TIMER_1_INT))
-		offset = VIA_TIMER_CYCLES;
+		clk_offset = VIA_TIMER_CYCLES;
+	count = count_high << 8;
+	ticks = VIA_TIMER_CYCLES - count;
+	ticks += clk_offset + clk_total;
 	local_irq_restore(flags);
 
-	count = count_high << 8;
-	count = VIA_TIMER_CYCLES - count + offset;
-
-	return ((count * VIA_TIMER_INTERVAL) / VIA_TIMER_CYCLES) * 1000;
+	return ticks;
 }

@@ -1,7 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /* include/net/xdp.h
  *
  * Copyright (c) 2017 Jesper Dangaard Brouer, Red Hat Inc.
- * Released under terms in GPL version 2.  See COPYING.
  */
 #ifndef __LINUX_NET_XDP_H__
 #define __LINUX_NET_XDP_H__
@@ -91,6 +91,8 @@ static inline void xdp_scrub_frame(struct xdp_frame *frame)
 	frame->dev_rx = NULL;
 }
 
+struct xdp_frame *xdp_convert_zc_to_xdp_frame(struct xdp_buff *xdp);
+
 /* Convert xdp_buff to xdp_frame */
 static inline
 struct xdp_frame *convert_to_xdp_frame(struct xdp_buff *xdp)
@@ -99,9 +101,8 @@ struct xdp_frame *convert_to_xdp_frame(struct xdp_buff *xdp)
 	int metasize;
 	int headroom;
 
-	/* TODO: implement clone, copy, use "native" MEM_TYPE */
 	if (xdp->rxq->mem.type == MEM_TYPE_ZERO_COPY)
-		return NULL;
+		return xdp_convert_zc_to_xdp_frame(xdp);
 
 	/* Assure headroom is available for storing info */
 	headroom = xdp->data - xdp->data_hard_start;
@@ -128,6 +129,21 @@ void xdp_return_frame(struct xdp_frame *xdpf);
 void xdp_return_frame_rx_napi(struct xdp_frame *xdpf);
 void xdp_return_buff(struct xdp_buff *xdp);
 
+/* When sending xdp_frame into the network stack, then there is no
+ * return point callback, which is needed to release e.g. DMA-mapping
+ * resources with page_pool.  Thus, have explicit function to release
+ * frame resources.
+ */
+void __xdp_release_frame(void *data, struct xdp_mem_info *mem);
+static inline void xdp_release_frame(struct xdp_frame *xdpf)
+{
+	struct xdp_mem_info *mem = &xdpf->mem;
+
+	/* Curr only page_pool needs this */
+	if (mem->type == MEM_TYPE_PAGE_POOL)
+		__xdp_release_frame(xdpf->data, mem);
+}
+
 int xdp_rxq_info_reg(struct xdp_rxq_info *xdp_rxq,
 		     struct net_device *dev, u32 queue_index);
 void xdp_rxq_info_unreg(struct xdp_rxq_info *xdp_rxq);
@@ -135,6 +151,7 @@ void xdp_rxq_info_unused(struct xdp_rxq_info *xdp_rxq);
 bool xdp_rxq_info_is_reg(struct xdp_rxq_info *xdp_rxq);
 int xdp_rxq_info_reg_mem_model(struct xdp_rxq_info *xdp_rxq,
 			       enum xdp_mem_type type, void *allocator);
+void xdp_rxq_info_unreg_mem_model(struct xdp_rxq_info *xdp_rxq);
 
 /* Drivers not supporting XDP metadata can use this helper, which
  * rejects any room expansion for metadata as a result.

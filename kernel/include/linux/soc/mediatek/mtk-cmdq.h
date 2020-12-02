@@ -28,7 +28,6 @@ struct cmdq_client {
 	struct mbox_chan *chan;
 	struct timer_list timer;
 	u32 timeout_ms; /* in unit of microsecond */
-	struct mutex mutex;
 };
 
 /**

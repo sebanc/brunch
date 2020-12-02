@@ -76,12 +76,12 @@ out:
 }
 
 void ath10k_sta_update_rx_tid_stats(struct ath10k *ar, u8 *first_hdr,
-				    unsigned long int num_msdus,
+				    unsigned long num_msdus,
 				    enum ath10k_pkt_rx_err err,
-				    unsigned long int unchain_cnt,
-				    unsigned long int drop_cnt,
-				    unsigned long int drop_cnt_filter,
-				    unsigned long int queued_msdus)
+				    unsigned long unchain_cnt,
+				    unsigned long drop_cnt,
+				    unsigned long drop_cnt_filter,
+				    unsigned long queued_msdus)
 {
 	struct ieee80211_sta *sta;
 	struct ath10k_sta *arsta;
@@ -430,7 +430,7 @@ ath10k_dbg_sta_write_peer_debug_trigger(struct file *file,
 	}
 
 	ret = ath10k_wmi_peer_set_param(ar, arsta->arvif->vdev_id, sta->addr,
-					WMI_PEER_DEBUG, peer_debug_trigger);
+					ar->wmi.peer_param->debug, peer_debug_trigger);
 	if (ret) {
 		ath10k_warn(ar, "failed to set param to trigger peer tid logs for station ret: %d\n",
 			    ret);

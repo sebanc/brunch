@@ -141,26 +141,10 @@ static ssize_t iwl_dbgfs_fw_nmi_write(struct iwl_xvt *xvt, char *buf,
 	return count;
 }
 
-static ssize_t iwl_dbgfs_set_profile_write(struct iwl_xvt *xvt, char *buf,
-					   size_t count, loff_t *ppos)
-{
-	int chain_a, chain_b;
-
-	if (sscanf(buf, "%d %d", &chain_a, &chain_b) != 2)
-		return -EINVAL;
-
-	mutex_lock(&xvt->mutex);
-	iwl_xvt_sar_select_profile(xvt, chain_a, chain_b);
-	mutex_unlock(&xvt->mutex);
-
-	return count;
-}
-
 /* Device wide debugfs entries */
 XVT_DEBUGFS_WRITE_FILE_OPS(fw_dbg_collect, 64);
 XVT_DEBUGFS_WRITE_FILE_OPS(fw_restart, 10);
 XVT_DEBUGFS_WRITE_FILE_OPS(fw_nmi, 10);
-XVT_DEBUGFS_WRITE_FILE_OPS(set_profile, 10);
 
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
 int iwl_xvt_dbgfs_register(struct iwl_xvt *xvt, struct dentry *dbgfs_dir)
@@ -170,7 +154,6 @@ int iwl_xvt_dbgfs_register(struct iwl_xvt *xvt, struct dentry *dbgfs_dir)
 	XVT_DEBUGFS_ADD_FILE(fw_dbg_collect, xvt->debugfs_dir, S_IWUSR);
 	XVT_DEBUGFS_ADD_FILE(fw_restart, xvt->debugfs_dir, S_IWUSR);
 	XVT_DEBUGFS_ADD_FILE(fw_nmi, xvt->debugfs_dir, S_IWUSR);
-	XVT_DEBUGFS_ADD_FILE(set_profile, xvt->debugfs_dir, S_IWUSR);
 
 	return 0;
 err:

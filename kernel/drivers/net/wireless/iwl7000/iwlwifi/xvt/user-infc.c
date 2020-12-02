@@ -164,11 +164,6 @@ void iwl_xvt_send_user_rx_notif(struct iwl_xvt *xvt,
 					IWL_TM_USER_CMD_NOTIF_IQ_CALIB,
 					data, size, GFP_ATOMIC);
 		break;
-	case WIDE_ID(XVT_GROUP, DTS_MEASUREMENT_TRIGGER_NOTIF):
-		iwl_xvt_user_send_notif(xvt,
-					IWL_TM_USER_CMD_NOTIF_DTS_MEASUREMENTS_XVT,
-					data, size, GFP_ATOMIC);
-		break;
 	case WIDE_ID(XVT_GROUP, MPAPD_EXEC_DONE_NOTIF):
 		iwl_xvt_user_send_notif(xvt,
 					IWL_TM_USER_CMD_NOTIF_MPAPD_EXEC_DONE,
@@ -448,8 +443,7 @@ static int iwl_xvt_send_phy_cfg_cmd(struct iwl_xvt *xvt, u32 ucode_type)
 		calib_cmd_cfg->calib_control.flow_trigger = 0;
 	}
 	cmd_size = iwl_fw_lookup_cmd_ver(xvt->fw, IWL_ALWAYS_LONG_GROUP,
-					 PHY_CONFIGURATION_CMD,
-					 IWL_FW_CMD_VER_UNKNOWN) == 3 ?
+					 PHY_CONFIGURATION_CMD) == 3 ?
 					    sizeof(struct iwl_phy_cfg_cmd_v3) :
 					    sizeof(struct iwl_phy_cfg_cmd_v1);
 

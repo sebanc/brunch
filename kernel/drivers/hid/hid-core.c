@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  HID support for Linux
  *
@@ -8,10 +9,6 @@
  */
 
 /*
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -173,8 +170,8 @@ static int open_collection(struct hid_parser *parser, unsigned type)
 	collection->type = type;
 	collection->usage = usage;
 	collection->level = parser->collection_stack_ptr - 1;
-	collection->parent_idx = parser->active_collection_idx;
-	parser->active_collection_idx = collection_index;
+	collection->parent_idx = (collection->level == 0) ? -1 :
+		parser->collection_stack[collection->level - 1];
 
 	if (type == HID_COLLECTION_APPLICATION)
 		parser->device->maxapplication++;
@@ -193,13 +190,6 @@ static int close_collection(struct hid_parser *parser)
 		return -EINVAL;
 	}
 	parser->collection_stack_ptr--;
-	if (parser->active_collection_idx != -1) {
-		struct hid_device *device = parser->device;
-		struct hid_collection *c;
-
-		c = &device->collection[parser->active_collection_idx];
-		parser->active_collection_idx = c->parent_idx;
-	}
 	return 0;
 }
 
@@ -886,7 +876,6 @@ static int hid_scan_report(struct hid_device *hid)
 		return -ENOMEM;
 
 	parser->device = hid;
-	parser->active_collection_idx = -1;
 	hid->group = HID_GROUP_GENERIC;
 
 	/*
@@ -1241,7 +1230,6 @@ int hid_open_report(struct hid_device *device)
 	}
 
 	parser->device = device;
-	parser->active_collection_idx = -1;
 
 	end = start + size;
 

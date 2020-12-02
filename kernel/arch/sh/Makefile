@@ -191,8 +191,8 @@ cpuincdir-y			+= cpu-common	# Must be last
 drivers-y			+= arch/sh/drivers/
 drivers-$(CONFIG_OPROFILE)	+= arch/sh/oprofile/
 
-cflags-y	+= $(foreach d, $(cpuincdir-y), -Iarch/sh/include/$(d)) \
-		   $(foreach d, $(machdir-y), -Iarch/sh/include/$(d))
+cflags-y	+= $(foreach d, $(cpuincdir-y), -I $(srctree)/arch/sh/include/$(d)) \
+		   $(foreach d, $(machdir-y), -I $(srctree)/arch/sh/include/$(d))
 
 KBUILD_CFLAGS		+= -pipe $(cflags-y)
 KBUILD_CPPFLAGS		+= $(cflags-y)
@@ -227,6 +227,9 @@ archprepare:
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 	$(Q)$(MAKE) $(clean)=arch/sh/kernel/vsyscall
+
+archheaders:
+	$(Q)$(MAKE) $(build)=arch/sh/kernel/syscalls all
 
 define archhelp
 	@echo '  zImage 	           - Compressed kernel image'

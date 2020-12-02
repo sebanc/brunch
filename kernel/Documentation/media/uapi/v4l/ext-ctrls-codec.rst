@@ -581,6 +581,8 @@ enum v4l2_mpeg_video_bitrate_mode -
       - Variable bitrate
     * - ``V4L2_MPEG_VIDEO_BITRATE_MODE_CBR``
       - Constant bitrate
+    * - ``V4L2_MPEG_VIDEO_BITRATE_MODE_CQ``
+      - Constant quality
 
 
 
@@ -591,6 +593,48 @@ enum v4l2_mpeg_video_bitrate_mode -
     Peak video bitrate in bits per second. Must be larger or equal to
     the average video bitrate. It is ignored if the video bitrate mode
     is set to constant bitrate.
+
+``V4L2_CID_MPEG_VIDEO_CONSTANT_QUALITY (integer)``
+    Constant quality level control. This control is applicable when
+    ``V4L2_CID_MPEG_VIDEO_BITRATE_MODE`` value is
+    ``V4L2_MPEG_VIDEO_BITRATE_MODE_CQ``. Valid range is 1 to 100
+    where 1 indicates lowest quality and 100 indicates highest quality.
+    Encoder will decide the appropriate quantization parameter and
+    bitrate to produce requested frame quality.
+
+
+``V4L2_CID_MPEG_VIDEO_FRAME_SKIP_MODE (enum)``
+
+enum v4l2_mpeg_video_frame_skip_mode -
+    Indicates in what conditions the encoder should skip frames. If
+    encoding a frame would cause the encoded stream to be larger then a
+    chosen data limit then the frame will be skipped. Possible values
+    are:
+
+
+.. tabularcolumns:: |p{9.2cm}|p{8.3cm}|
+
+.. raw:: latex
+
+    \small
+
+.. flat-table::
+    :header-rows:  0
+    :stub-columns: 0
+
+    * - ``V4L2_MPEG_FRAME_SKIP_MODE_DISABLED``
+      - Frame skip mode is disabled.
+    * - ``V4L2_MPEG_FRAME_SKIP_MODE_LEVEL_LIMIT``
+      - Frame skip mode enabled and buffer limit is set by the chosen
+        level and is defined by the standard.
+    * - ``V4L2_MPEG_FRAME_SKIP_MODE_BUF_LIMIT``
+      - Frame skip mode enabled and buffer limit is set by the
+        :ref:`VBV (MPEG1/2/4) <v4l2-mpeg-video-vbv-size>` or
+        :ref:`CPB (H264) buffer size <v4l2-mpeg-video-h264-cpb-size>` control.
+
+.. raw:: latex
+
+    \normalsize
 
 ``V4L2_CID_MPEG_VIDEO_TEMPORAL_DECIMATION (integer)``
     For every captured frame, skip this many subsequent frames (default
@@ -759,6 +803,32 @@ enum v4l2_mpeg_video_h264_level -
 
 
 
+.. _v4l2-mpeg-video-mpeg2-level:
+
+``V4L2_CID_MPEG_VIDEO_MPEG2_LEVEL``
+    (enum)
+
+enum v4l2_mpeg_video_mpeg2_level -
+    The level information for the MPEG2 elementary stream. Applicable to
+    MPEG2 codecs. Possible values are:
+
+
+
+.. flat-table::
+    :header-rows:  0
+    :stub-columns: 0
+
+    * - ``V4L2_MPEG_VIDEO_MPEG2_LEVEL_LOW``
+      - Low Level (LL)
+    * - ``V4L2_MPEG_VIDEO_MPEG2_LEVEL_MAIN``
+      - Main Level (ML)
+    * - ``V4L2_MPEG_VIDEO_MPEG2_LEVEL_HIGH_1440``
+      - High-1440 Level (H-14)
+    * - ``V4L2_MPEG_VIDEO_MPEG2_LEVEL_HIGH``
+      - High Level (HL)
+
+
+
 .. _v4l2-mpeg-video-mpeg4-level:
 
 ``V4L2_CID_MPEG_VIDEO_MPEG4_LEVEL``
@@ -842,6 +912,36 @@ enum v4l2_mpeg_video_h264_profile -
       - Stereo High profile
     * - ``V4L2_MPEG_VIDEO_H264_PROFILE_MULTIVIEW_HIGH``
       - Multiview High profile
+
+
+
+.. _v4l2-mpeg-video-mpeg2-profile:
+
+``V4L2_CID_MPEG_VIDEO_MPEG2_PROFILE``
+    (enum)
+
+enum v4l2_mpeg_video_mpeg2_profile -
+    The profile information for MPEG2. Applicable to MPEG2 codecs.
+    Possible values are:
+
+
+
+.. flat-table::
+    :header-rows:  0
+    :stub-columns: 0
+
+    * - ``V4L2_MPEG_VIDEO_MPEG2_PROFILE_SIMPLE``
+      - Simple profile (SP)
+    * - ``V4L2_MPEG_VIDEO_MPEG2_PROFILE_MAIN``
+      - Main profile (MP)
+    * - ``V4L2_MPEG_VIDEO_MPEG2_PROFILE_SNR_SCALABLE``
+      - SNR Scalable profile (SNR)
+    * - ``V4L2_MPEG_VIDEO_MPEG2_PROFILE_SPATIALLY_SCALABLE``
+      - Spatially Scalable profile (Spt)
+    * - ``V4L2_MPEG_VIDEO_MPEG2_PROFILE_HIGH``
+      - High profile (HP)
+    * - ``V4L2_MPEG_VIDEO_MPEG2_PROFILE_MULTIVIEW``
+      - Multi-view profile (MVP)
 
 
 
@@ -1097,6 +1197,8 @@ enum v4l2_mpeg_video_h264_entropy_mode -
     Quantization parameter for an B frame for MPEG4. Valid range: from 1
     to 31.
 
+.. _v4l2-mpeg-video-vbv-size:
+
 ``V4L2_CID_MPEG_VIDEO_VBV_SIZE (integer)``
     The Video Buffer Verifier size in kilobytes, it is used as a
     limitation of frame skip. The VBV is defined in the standard as a
@@ -1133,6 +1235,8 @@ enum v4l2_mpeg_video_h264_entropy_mode -
 ``V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME (button)``
     Force a key frame for the next queued buffer. Applicable to
     encoders. This is a general, codec-agnostic keyframe control.
+
+.. _v4l2-mpeg-video-h264-cpb-size:
 
 ``V4L2_CID_MPEG_VIDEO_H264_CPB_SIZE (integer)``
     The Coded Picture Buffer size in kilobytes, it is used as a
@@ -1694,12 +1798,12 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
       -
     * - __u32
       - ``start_byte_offset``
-      - Where the slice payload starts in the output buffer. Useful when
-        operating in frame-based decoding mode and decoding multi-slice
-        content. In this case, the output buffer will contain more than one
-        slice and some codecs need to know where each slice starts. Note that
-        this offsets points to the beginning of the slice which is supposed to
-        contain an ANNEX B start code
+        Offset (in bytes) from the beginning of the OUTPUT buffer to the start
+        of the slice. If the slice starts with a start code, then this is the
+        offset to such start code. When operating in slice-based decoding mode
+        (see :c:type:`v4l2_mpeg_video_h264_decode_mode`), this field should
+        be set to 0. When operating in frame-based decoding mode, this field
+        should be 0 for the first slice.
     * - __u32
       - ``header_bit_size``
       -
@@ -1885,8 +1989,8 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
       - ``num_slices``
       - Number of slices needed to decode the current frame/field. When
         operating in slice-based decoding mode (see
-        :c:type:`v4l2_mpeg_video_h264_decoding_mode`), this field
-        should always be set to one
+        :c:type:`v4l2_mpeg_video_h264_decode_mode`), this field
+        should always be set to one.
     * - __u16
       - ``nal_ref_idc``
       - NAL reference ID value coming from the NAL Unit header
@@ -1967,17 +2071,39 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
     * - ``V4L2_H264_DPB_ENTRY_FLAG_LONG_TERM``
       - 0x00000004
       - The DPB entry is a long term reference frame
+    * - ``V4L2_H264_DPB_ENTRY_FLAG_FIELD``
+      - 0x00000008
+      - The DPB entry is a field reference, which means only one of the field
+        will be used when decoding the new frame/field. When not set the DPB
+        entry is a frame reference (both fields will be used). Note that this
+        flag does not say anything about the number of fields contained in the
+        reference frame, it just describes the one used to decode the new
+        field/frame
+    * - ``V4L2_H264_DPB_ENTRY_FLAG_BOTTOM_FIELD``
+      - 0x00000010
+      - The DPB entry is a bottom field reference (only the bottom field of the
+        reference frame is needed to decode the new frame/field). Only valid if
+        V4L2_H264_DPB_ENTRY_FLAG_FIELD is set. When
+        V4L2_H264_DPB_ENTRY_FLAG_FIELD is set but
+        V4L2_H264_DPB_ENTRY_FLAG_BOTTOM_FIELD is not, that means the
+        DPB entry is a top field reference
 
-``V4L2_CID_MPEG_VIDEO_H264_DECODING_MODE (enum)``
+``V4L2_CID_MPEG_VIDEO_H264_DECODE_MODE (enum)``
     Specifies the decoding mode to use. Currently exposes slice-based and
     frame-based decoding but new modes might be added later on.
+    This control is used as a modifier for V4L2_PIX_FMT_H264_SLICE
+    pixel format. Applications that support V4L2_PIX_FMT_H264_SLICE
+    are required to set this control in order to specify the decoding mode
+    that is expected for the buffer.
+    Drivers may expose a single or multiple decoding modes, depending
+    on what they can support.
 
     .. note::
 
        This menu control is not yet part of the public kernel API and
        it is expected to change.
 
-.. c:type:: v4l2_mpeg_video_h264_decoding_mode
+.. c:type:: v4l2_mpeg_video_h264_decode_mode
 
 .. cssclass:: longtable
 
@@ -1986,21 +2112,58 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
     :stub-columns: 0
     :widths:       1 1 2
 
-    * - ``V4L2_MPEG_VIDEO_H264_SLICE_BASED_DECODING``
+    * - ``V4L2_MPEG_VIDEO_H264_DECODE_MODE_SLICE_BASED``
       - 0
-      - The decoding is done at the slice granularity.
-        v4l2_ctrl_h264_decode_params->num_slices can be set to anything between
-        1 and then number of slices that remain to fully decode the
-        frame/field.
-        The output buffer should contain
-        v4l2_ctrl_h264_decode_params->num_slices slices.
-    * - ``V4L2_MPEG_VIDEO_H264_FRAME_BASED_DECODING``
+      - Decoding is done at the slice granularity.
+        In this mode, ``num_slices`` field in struct
+        :c:type:`v4l2_ctrl_h264_decode_params` should be set to 1,
+        and ``start_byte_offset`` in struct
+        :c:type:`v4l2_ctrl_h264_slice_params` should be set to 0.
+        The OUTPUT buffer must contain a single slice.
+    * - ``V4L2_MPEG_VIDEO_H264_DECODE_MODE_FRAME_BASED``
       - 1
-      - The decoding is done at the frame granularity.
-        v4l2_ctrl_h264_decode_params->num_slices should be set to the number of
-        slices forming a frame.
-        The output buffer should contain all slices needed to decode the
-        frame/field.
+      - Decoding is done at the frame granularity.
+        In this mode, ``num_slices`` field in struct
+        :c:type:`v4l2_ctrl_h264_decode_params` should be set to the number
+        of slices in the frame, and ``start_byte_offset`` in struct
+        :c:type:`v4l2_ctrl_h264_slice_params` should be set accordingly
+        for each slice. For the first slice, ``start_byte_offset`` should
+        be zero.
+        The OUTPUT buffer must contain all slices needed to decode the
+        frame. The OUTPUT buffer must also contain both fields.
+
+``V4L2_CID_MPEG_VIDEO_H264_START_CODE (enum)``
+    Specifies the H264 slice start code expected for each slice.
+    This control is used as a modifier for V4L2_PIX_FMT_H264_SLICE
+    pixel format. Applications that support V4L2_PIX_FMT_H264_SLICE
+    are required to set this control in order to specify the start code
+    that is expected for the buffer.
+    Drivers may expose a single or multiple start codes, depending
+    on what they can support.
+
+    .. note::
+
+       This menu control is not yet part of the public kernel API and
+       it is expected to change.
+
+.. c:type:: v4l2_mpeg_video_h264_start_code
+
+.. cssclass:: longtable
+
+.. flat-table::
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - ``V4L2_MPEG_VIDEO_H264_START_CODE_NONE``
+      - 0
+      - Selecting this value specifies that H264 slices are passed
+        to the driver without any start code.
+    * - ``V4L2_MPEG_VIDEO_H264_START_CODE_ANNEX_B``
+      - 1
+      - Selecting this value specifies that H264 slices are expected
+        to be prefixed by Annex B start codes. According to :ref:`h264`
+        valid start codes can be 3-bytes 0x000001 or 4-bytes 0x00000001.
 
 .. _v4l2-mpeg-mpeg2:
 
@@ -3185,6 +3348,49 @@ enum v4l2_mpeg_video_vp9_profile -
       - Profile 2
     * - ``V4L2_MPEG_VIDEO_VP9_PROFILE_3``
       - Profile 3
+
+.. _v4l2-mpeg-video-vp9-level:
+
+``V4L2_CID_MPEG_VIDEO_VP9_LEVEL (enum)``
+
+enum v4l2_mpeg_video_vp9_level -
+    This control allows selecting the level for VP9 encoder.
+    This is also used to enumerate supported levels by VP9 encoder or decoder.
+    More information can be found at
+    `webmproject <https://www.webmproject.org/vp9/levels/>`__. Possible values are:
+
+.. flat-table::
+    :header-rows:  0
+    :stub-columns: 0
+
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_1_0``
+      - Level 1
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_1_1``
+      - Level 1.1
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_2_0``
+      - Level 2
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_2_1``
+      - Level 2.1
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_3_0``
+      - Level 3
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_3_1``
+      - Level 3.1
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_4_0``
+      - Level 4
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_4_1``
+      - Level 4.1
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_5_0``
+      - Level 5
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_5_1``
+      - Level 5.1
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_5_2``
+      - Level 5.2
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_6_0``
+      - Level 6
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_6_1``
+      - Level 6.1
+    * - ``V4L2_MPEG_VIDEO_VP9_LEVEL_6_2``
+      - Level 6.2
 
 
 High Efficiency Video Coding (HEVC/H.265) Control Reference

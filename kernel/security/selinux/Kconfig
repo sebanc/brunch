@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
 config SECURITY_SELINUX
 	bool "NSA SELinux Support"
 	depends on SECURITY_NETWORK && AUDIT && NET && INET
@@ -21,21 +22,6 @@ config SECURITY_SELINUX_BOOTPARAM
 	  necessarily enabled.
 
 	  If you are unsure how to answer this question, answer N.
-
-config SECURITY_SELINUX_BOOTPARAM_VALUE
-	int "NSA SELinux boot parameter default value"
-	depends on SECURITY_SELINUX_BOOTPARAM
-	range 0 1
-	default 1
-	help
-	  This option sets the default value for the kernel parameter
-	  'selinux', which allows SELinux to be disabled at boot.  If this
-	  option is set to 0 (zero), the SELinux kernel parameter will
-	  default to 0, disabling SELinux at bootup.  If this option is
-	  set to 1 (one), the SELinux kernel parameter will default to 1,
-	  enabling SELinux at bootup.
-
-	  If you are unsure how to answer this question, answer 1.
 
 config SECURITY_SELINUX_DISABLE
 	bool "NSA SELinux runtime disable"
@@ -70,16 +56,6 @@ config SECURITY_SELINUX_DEVELOP
 	  unless you specify enforcing=1 on the kernel command line.  You
 	  can interactively toggle the kernel between enforcing mode and
 	  permissive mode (if permitted by the policy) via /selinux/enforce.
-
-config SECURITY_SELINUX_PERMISSIVE_DONTAUDIT
-	bool "NSA SELinux don't audit permissive"
-	depends on SECURITY_SELINUX
-	default n
-	help
-	  This prevents logging when permissive=1.  If unsure, say N.  With
-	  this option enabled, any avc logs that would occur on a permissive
-	  domain won't be logged.  This can prevent a significant amount of
-	  logspam.
 
 config SECURITY_SELINUX_AVC_STATS
 	bool "NSA SELinux AVC Statistics"

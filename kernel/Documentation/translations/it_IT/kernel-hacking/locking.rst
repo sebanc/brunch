@@ -468,7 +468,7 @@ e tutti gli oggetti che contiene. Ecco il codice::
             if ((obj = kmalloc(sizeof(*obj), GFP_KERNEL)) == NULL)
                     return -ENOMEM;
 
-            strlcpy(obj->name, name, sizeof(obj->name));
+            strscpy(obj->name, name, sizeof(obj->name));
             obj->id = id;
             obj->popularity = 0;
 
@@ -593,8 +593,8 @@ l'opzione ``GFP_KERNEL`` che è permessa solo in contesto utente. Ho supposto
 che :c:func:`cache_add()` venga chiamata dal contesto utente, altrimenti
 questa opzione deve diventare un parametro di :c:func:`cache_add()`.
 
-Exposing Objects Outside This File
-----------------------------------
+Esporre gli oggetti al di fuori del file
+----------------------------------------
 
 Se i vostri oggetti contengono più informazioni, potrebbe non essere
 sufficiente copiare i dati avanti e indietro: per esempio, altre parti del
@@ -678,7 +678,7 @@ Ecco il codice::
      }
 
     @@ -63,6 +94,7 @@
-             strlcpy(obj->name, name, sizeof(obj->name));
+             strscpy(obj->name, name, sizeof(obj->name));
              obj->id = id;
              obj->popularity = 0;
     +        obj->refcnt = 1; /* The cache holds a reference */
@@ -792,7 +792,7 @@ contatore stesso.
      }
 
     @@ -94,7 +76,7 @@
-             strlcpy(obj->name, name, sizeof(obj->name));
+             strscpy(obj->name, name, sizeof(obj->name));
              obj->id = id;
              obj->popularity = 0;
     -        obj->refcnt = 1; /* The cache holds a reference */
@@ -1404,7 +1404,7 @@ Riferimento per l'API dei Futex
 Approfondimenti
 ===============
 
--  ``Documentation/locking/spinlocks.txt``: la guida di Linus Torvalds agli
+-  ``Documentation/locking/spinlocks.rst``: la guida di Linus Torvalds agli
    spinlock del kernel.
 
 -  Unix Systems for Modern Architectures: Symmetric Multiprocessing and

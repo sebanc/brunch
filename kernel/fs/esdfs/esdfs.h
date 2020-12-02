@@ -21,6 +21,7 @@
 #include <linux/aio.h>
 #include <linux/mm.h>
 #include <linux/mount.h>
+#include <uapi/linux/mount.h>
 #include <linux/namei.h>
 #include <linux/seq_file.h>
 #include <linux/statfs.h>

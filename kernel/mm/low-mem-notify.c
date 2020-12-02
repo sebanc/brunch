@@ -22,7 +22,6 @@
  */
 
 
-#include <linux/low-mem-notify.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/wait.h>
@@ -30,34 +29,26 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/ctype.h>
-#include <linux/kstaled.h>
+#include <linux/ratelimit.h>
+#include <linux/stddef.h>
+#include <linux/swap.h>
 
 #define MB (1 << 20)
 
 static DECLARE_WAIT_QUEUE_HEAD(low_mem_wait);
 static atomic_t low_mem_state = ATOMIC_INIT(0);
-atomic_t in_low_mem_check = ATOMIC_INIT(0);
+
+/* We support up to this many different thresholds. */
+#define LOW_MEM_THRESHOLD_MAX 5
 
 /* This is a list of thresholds in pages and should be in ascending order. */
-unsigned long low_mem_thresholds[LOW_MEM_THRESHOLD_MAX] = {
-	50 * MB / PAGE_SIZE };
-unsigned int low_mem_threshold_count = 1;
-
-/* last observed threshold */
-unsigned int low_mem_threshold_last = UINT_MAX;
-bool low_mem_margin_enabled = true;
-unsigned int low_mem_ram_vs_swap_weight = 4;
-
-/* Limit logging low memory to once per second. */
-DEFINE_RATELIMIT_STATE(low_mem_logging_ratelimit, 1 * HZ, 1);
-
-unsigned long low_mem_lowest_seen_anon_mem;
-const unsigned long low_mem_anon_mem_delta = 10 * MB / PAGE_SIZE;
-static struct kernfs_node *low_mem_available_dirent;
-
-struct low_mem_notify_file_info {
-	unsigned long unused;
+static unsigned long low_mem_thresholds[LOW_MEM_THRESHOLD_MAX] = {
+	50 * MB / PAGE_SIZE
 };
+static unsigned int low_mem_threshold_count = 1;
+
+static bool low_mem_margin_enabled = true;
+static unsigned int low_mem_ram_vs_swap_weight = 4;
 
 void low_mem_notify(void)
 {
@@ -65,43 +56,148 @@ void low_mem_notify(void)
 	wake_up(&low_mem_wait);
 }
 
-static int low_mem_notify_open(struct inode *inode, struct file *file)
+/*
+ * Compute available memory used by files that can be reclaimed quickly.
+ */
+static unsigned long get_available_file_mem(void)
 {
-	struct low_mem_notify_file_info *info;
-	int err = 0;
+	unsigned long file_mem =
+			global_node_page_state(NR_ACTIVE_FILE) +
+			global_node_page_state(NR_INACTIVE_FILE);
+	unsigned long dirty_mem = global_node_page_state(NR_FILE_DIRTY);
+	unsigned long min_file_mem = min_filelist_kbytes >> (PAGE_SHIFT - 10);
+	unsigned long clean_file_mem = file_mem > dirty_mem ?
+			file_mem - dirty_mem : 0;
+	/* Conservatively estimate the amount of available_file_mem */
+	unsigned long available_file_mem = clean_file_mem > min_file_mem ?
+			clean_file_mem - min_file_mem : 0;
+	return available_file_mem;
+}
 
-	info = kmalloc(sizeof(*info), GFP_KERNEL);
-	if (!info) {
-		err = -ENOMEM;
-		goto out;
+/*
+ * Available anonymous memory.
+ */
+static unsigned long get_available_anon_mem(void)
+{
+	return global_node_page_state(NR_ACTIVE_ANON) +
+		global_node_page_state(NR_INACTIVE_ANON);
+}
+
+/*
+ * Compute "available" memory, that is either free memory or memory that can be
+ * reclaimed quickly, adjusted for the presence of swap.
+ */
+static unsigned long get_available_mem_adj(void)
+{
+	/* free_mem is completely unallocated; clean file-backed memory
+	 * (file_mem - dirty_mem) is easy to reclaim, except for the last
+	 * min_filelist_kbytes. totalreserve_pages is the reserve of pages that
+	 * are not available to user space.
+	 */
+	unsigned long raw_free_mem = global_zone_page_state(NR_FREE_PAGES);
+	unsigned long free_mem = raw_free_mem > totalreserve_pages ?
+			raw_free_mem - totalreserve_pages : 0;
+	unsigned long available_mem = free_mem + get_available_file_mem();
+	unsigned long swappable_pages = min_t(unsigned long,
+			get_nr_swap_pages(), get_available_anon_mem());
+	/*
+	 * The contribution of swap is reduced by a factor of
+	 * low_mem_ram_vs_swap_weight.
+	 */
+	return available_mem + swappable_pages / low_mem_ram_vs_swap_weight;
+}
+
+#ifdef CONFIG_SYSFS
+static void low_mem_threshold_notify(void);
+#else
+static void low_mem_threshold_notify(void)
+{
+}
+#endif
+
+/*
+ * Returns TRUE if we are in a low memory state.
+ */
+bool low_mem_check(void)
+{
+	static bool was_low_mem;	/* = false, as per style guide */
+	static atomic_t in_low_mem_check = ATOMIC_INIT(0);
+	/* last observed threshold */
+	static unsigned int low_mem_threshold_last = UINT_MAX;
+	/* Limit logging low memory to once per second. */
+	static DEFINE_RATELIMIT_STATE(low_mem_logging_ratelimit, 1 * HZ, 1);
+
+	/* We declare a low-memory condition when a combination of RAM and swap
+	 * space is low.
+	 */
+	unsigned long available_mem = get_available_mem_adj();
+	/*
+	 * For backwards compatibility with the older margin interface, we will
+	 * trigger the /dev/chromeos-low_mem device when we are below the
+	 * lowest threshold
+	 */
+	bool is_low_mem = available_mem < low_mem_thresholds[0];
+	unsigned int threshold_lowest = UINT_MAX;
+	int i;
+
+	if (!low_mem_margin_enabled)
+		return false;
+
+	if (atomic_read(&in_low_mem_check) || atomic_xchg(&in_low_mem_check, 1))
+		return was_low_mem;
+
+	if (unlikely(is_low_mem && !was_low_mem) &&
+	    __ratelimit(&low_mem_logging_ratelimit)) {
+		pr_info("entering low_mem (avail RAM = %lu kB, avail swap %lu kB, avail file %lu kB, anon mem: %lu kB)\n",
+			available_mem * PAGE_SIZE / 1024,
+			get_nr_swap_pages() * PAGE_SIZE / 1024,
+			get_available_file_mem() * PAGE_SIZE / 1024,
+			get_available_anon_mem() * PAGE_SIZE / 1024);
+	}
+	was_low_mem = is_low_mem;
+
+	if (is_low_mem)
+		low_mem_notify();
+
+	for (i = 0; i < low_mem_threshold_count; i++) {
+		if (available_mem < low_mem_thresholds[i]) {
+			threshold_lowest = i;
+			break;
+		}
 	}
 
-	file->private_data = info;
-	kstaled_disable_throttle();
-out:
-	return err;
+	/* we crossed one or more thresholds */
+	if (unlikely(threshold_lowest < low_mem_threshold_last))
+		low_mem_threshold_notify();
+
+	low_mem_threshold_last = threshold_lowest;
+
+	atomic_set(&in_low_mem_check, 0);
+
+	return is_low_mem;
+}
+
+static int low_mem_notify_open(struct inode *inode, struct file *file)
+{
+	return 0;
 }
 
 static int low_mem_notify_release(struct inode *inode, struct file *file)
 {
-	kstaled_enable_throttle();
-	kfree(file->private_data);
 	return 0;
 }
 
 static __poll_t low_mem_notify_poll(struct file *file, poll_table *wait)
 {
-	unsigned int ret = 0;
-
 	/* Update state to reflect any recent freeing. */
 	atomic_set(&low_mem_state, low_mem_check());
 
 	poll_wait(file, &low_mem_wait, wait);
 
-	if (low_mem_margin_enabled && atomic_read(&low_mem_state) != 0)
-		ret = POLLIN;
+	if (low_mem_margin_enabled && atomic_read(&low_mem_state))
+		return POLLIN;
 
-	return ret;
+	return 0;
 }
 
 const struct file_operations low_mem_notify_fops = {
@@ -121,17 +217,17 @@ EXPORT_SYMBOL(low_mem_notify_fops);
 static ssize_t low_mem_margin_show(struct kobject *kobj,
 				  struct kobj_attribute *attr, char *buf)
 {
-	if (low_mem_margin_enabled && low_mem_threshold_count) {
-		int i;
-		ssize_t written = 0;
+	int i;
+	ssize_t written = 0;
 
-		for (i = 0; i < low_mem_threshold_count; i++)
-			written += sprintf(buf + written, "%lu ",
-			    low_mem_thresholds[i] * PAGE_SIZE / MB);
-		written += sprintf(buf + written, "\n");
-		return written;
-	} else
+	if (!low_mem_margin_enabled || !low_mem_threshold_count)
 		return sprintf(buf, "off\n");
+
+	for (i = 0; i < low_mem_threshold_count; i++)
+		written += sprintf(buf + written, "%lu ",
+			    low_mem_thresholds[i] * PAGE_SIZE / MB);
+	written += sprintf(buf + written, "\n");
+	return written;
 }
 
 static ssize_t low_mem_margin_store(struct kobject *kobj,
@@ -184,7 +280,7 @@ static ssize_t low_mem_margin_store(struct kobject *kobj,
 			return -EINVAL;
 		}
 
-		if (thresholds[i] * (MB / PAGE_SIZE) > totalram_pages) {
+		if (thresholds[i] * (MB / PAGE_SIZE) > totalram_pages()) {
 			pr_warn("low-mem: threshold too high\n");
 			return -EINVAL;
 		}
@@ -199,8 +295,7 @@ static ssize_t low_mem_margin_store(struct kobject *kobj,
 
 	/* Convert to pages outside the allocator fast path. */
 	for (i = 0; i < low_mem_threshold_count; i++) {
-		low_mem_thresholds[i] =
-			thresholds[i] * (MB / PAGE_SIZE);
+		low_mem_thresholds[i] = thresholds[i] * (MB / PAGE_SIZE);
 		pr_info("low_mem: threshold[%d] %lu MB\n", i,
 			low_mem_thresholds[i] * PAGE_SIZE / MB);
 	}
@@ -220,15 +315,15 @@ static ssize_t low_mem_ram_vs_swap_weight_store(struct kobject *kobj,
 						struct kobj_attribute *attr,
 						const char *buf, size_t count)
 {
-	unsigned long weight;
 	int err;
+	unsigned weight;
 
-	err = kstrtoul(buf, 10, &weight);
+	err = kstrtouint(buf, 10, &weight);
 	if (err)
 		return -EINVAL;
+
 	/* The special value 0 represents infinity. */
-	low_mem_ram_vs_swap_weight = weight == 0 ?
-		-1U : (unsigned int) weight;
+	low_mem_ram_vs_swap_weight = !weight ? -1 : weight;
 	pr_info("low_mem: setting ram weight to %u\n",
 		low_mem_ram_vs_swap_weight);
 	return count;
@@ -265,7 +360,9 @@ static struct attribute_group low_mem_attr_group = {
 	.name = "chromeos-low_mem",
 };
 
-void low_mem_threshold_notify(void)
+static struct kernfs_node *low_mem_available_dirent;
+
+static void low_mem_threshold_notify(void)
 {
 	if (low_mem_available_dirent)
 		sysfs_notify_dirent(low_mem_available_dirent);
@@ -273,10 +370,14 @@ void low_mem_threshold_notify(void)
 
 static int __init low_mem_init(void)
 {
+	int err;
 	struct kernfs_node *low_mem_node;
-	int err = sysfs_create_group(mm_kobj, &low_mem_attr_group);
-	if (err)
+
+	err = sysfs_create_group(mm_kobj, &low_mem_attr_group);
+	if (err) {
 		pr_err("low_mem: register sysfs failed\n");
+		return err;
+	}
 
 	low_mem_node = sysfs_get_dirent(mm_kobj->sd, "chromeos-low_mem");
 	if (low_mem_node) {
@@ -288,8 +389,7 @@ static int __init low_mem_init(void)
 	if (!low_mem_available_dirent)
 		pr_warn("unable to find dirent for \"available\" attribute\n");
 
-	low_mem_lowest_seen_anon_mem = totalram_pages;
-	return err;
+	return 0;
 }
 module_init(low_mem_init)
 

@@ -22,6 +22,7 @@
 #include <asm/syscall.h>
 #include <linux/cred.h>
 #include <linux/fs.h>
+#include <linux/fs_parser.h>
 #include <linux/fs_struct.h>
 #include <linux/lsm_hooks.h>
 #include <linux/module.h>
@@ -32,7 +33,7 @@
 #include <linux/sched/task_stack.h>
 #include <linux/sched.h>	/* current and other task related stuff */
 #include <linux/security.h>
-#include <uapi/linux/fs.h>
+#include <uapi/linux/mount.h>
 
 #include "inode_mark.h"
 #include "utils.h"
@@ -204,13 +205,7 @@ static int chromiumos_security_file_open(struct file *file)
 	return policy == CHROMIUMOS_INODE_POLICY_BLOCK ? -EACCES : 0;
 }
 
-/*
- * This hook inspects the string pointed to by the first parameter, looking for
- * the "nosymfollow" mount option.  Since the behavior is now implemented with
- * the MS_NOSYMFOLLOW flag, the "nosymfollow" option will be stripped from the
- * mount string if it is encountered.
- */
-int chromiumos_sb_copy_data(char *orig, char *copy)
+int chromiumos_sb_eat_lsm_opts(char *orig, void **mnt_opts)
 {
 	char *orig_copy;
 	char *orig_copy_cur;
@@ -221,7 +216,7 @@ int chromiumos_sb_copy_data(char *orig, char *copy)
 	if (!orig || *orig == 0)
 		return 0;
 
-	orig_copy = alloc_secdata();
+	orig_copy = (char *)get_zeroed_page(GFP_KERNEL);
 	if (!orig_copy)
 		return -ENOMEM;
 	strncpy(orig_copy, orig, PAGE_SIZE);
@@ -250,10 +245,11 @@ int chromiumos_sb_copy_data(char *orig, char *copy)
 		}
 	}
 
-	if (found)
+	if (found) {
 		pr_notice("nosymfollow option should be changed to MS_NOSYMFOLLOW flag.");
+	}
 
-	free_secdata(orig_copy);
+	free_page((unsigned long)orig_copy);
 	return 0;
 }
 
@@ -261,7 +257,7 @@ static struct security_hook_list chromiumos_security_hooks[] = {
 	LSM_HOOK_INIT(sb_mount, chromiumos_security_sb_mount),
 	LSM_HOOK_INIT(inode_follow_link, chromiumos_security_inode_follow_link),
 	LSM_HOOK_INIT(file_open, chromiumos_security_file_open),
-	LSM_HOOK_INIT(sb_copy_data, chromiumos_sb_copy_data)
+	LSM_HOOK_INIT(sb_eat_lsm_opts, chromiumos_sb_eat_lsm_opts),
 };
 
 static int __init chromiumos_security_init(void)
@@ -273,4 +269,7 @@ static int __init chromiumos_security_init(void)
 
 	return 0;
 }
-security_initcall(chromiumos_security_init);
+DEFINE_LSM(chromiumos) = {
+	.name = "chromiumos",
+	.init = chromiumos_security_init
+};

@@ -47,8 +47,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "connection_server.h"
 #include "device.h"
 #include "power.h"
-#include "syscommon.h"
-#include "sysinfo.h"
+#include "system/syscommon.h"
+#include "mt8173/sysinfo.h"
 #include "physheap.h"
 #include "cache_ops.h"
 #include "pvr_notifier.h"
@@ -67,9 +67,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "virt_validation_defs.h"
 #endif
 
-#include "dma_support.h"
-#include "vz_support.h"
-#include "vz_physheap.h"
+#include "system/dma_support.h"
+#include "system/vz_support.h"
+#include "system/vz_physheap.h"
 
 /*!
  * For OSThreadDestroy(), which may require a retry

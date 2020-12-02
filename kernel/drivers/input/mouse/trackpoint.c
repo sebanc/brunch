@@ -1,9 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Stephen Evanchik <evanchsa@gmail.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
  *
  * Trademarks are the property of their respective owners.
  */
@@ -285,6 +282,8 @@ static int trackpoint_start_protocol(struct psmouse *psmouse,
 	case TP_VARIANT_ALPS:
 	case TP_VARIANT_ELAN:
 	case TP_VARIANT_NXP:
+	case TP_VARIANT_JYT_SYNAPTICS:
+	case TP_VARIANT_SYNAPTICS:
 		if (variant_id)
 			*variant_id = param[0];
 		if (firmware_id)
@@ -394,6 +393,52 @@ static int trackpoint_reconnect(struct psmouse *psmouse)
 	return 0;
 }
 
+static void trackpoint_cleanup(struct psmouse *psmouse)
+{
+	struct trackpoint_data *tp = psmouse->private;
+	u8 param[3] = { TP_TOGGLE, TP_TOGGLE_BURST, TP_TOGGLE_ELAN_SLEEP };
+
+	if (tp->variant_id == TP_VARIANT_ELAN) {
+		if (ps2_command(&psmouse->ps2dev, param,
+				MAKE_PS2_CMD(3, 0, TP_COMMAND))) {
+			psmouse_err(psmouse,
+				    "failed to suspend trackpont.\n");
+		}
+	}
+}
+
+static int trackpoint_inhibit(struct psmouse *psmouse)
+{
+	struct trackpoint_data *tp = psmouse->private;
+	u8 param[1] = { TP_POWER_DOWN };
+
+	if (tp->variant_id == TP_VARIANT_ELAN) {
+		if (ps2_command(&psmouse->ps2dev, param,
+				MAKE_PS2_CMD(1, 0, TP_COMMAND))) {
+			psmouse_err(psmouse,
+				    "failed to inhibit trackpoint.\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static int trackpoint_uninhibit(struct psmouse *psmouse)
+{
+	struct trackpoint_data *tp = psmouse->private;
+	u8 param[1] = { TP_ELAN_POWER_UP };
+
+	if (tp->variant_id == TP_VARIANT_ELAN) {
+		if (ps2_command(&psmouse->ps2dev, param,
+				MAKE_PS2_CMD(1, 0, TP_COMMAND))) {
+			psmouse_err(psmouse,
+				    "failed to uninhibit trackpoint.\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
 int trackpoint_detect(struct psmouse *psmouse, bool set_properties)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
@@ -425,6 +470,10 @@ int trackpoint_detect(struct psmouse *psmouse, bool set_properties)
 
 	psmouse->reconnect = trackpoint_reconnect;
 	psmouse->disconnect = trackpoint_disconnect;
+
+	psmouse->cleanup = trackpoint_cleanup;
+	psmouse->inhibit = trackpoint_inhibit;
+	psmouse->uninhibit = trackpoint_uninhibit;
 
 	if (variant_id != TP_VARIANT_IBM) {
 		/* Newer variants do not support extended button query. */

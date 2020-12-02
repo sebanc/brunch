@@ -8,6 +8,7 @@
 #include <linux/string.h>
 #include <linux/rhashtable.h>
 #include <linux/netdevice.h>
+#include <linux/mutex.h>
 #include <net/net_namespace.h>
 #include <net/tc_act/tc_vlan.h>
 
@@ -25,6 +26,7 @@ struct mlxsw_sp_acl {
 	struct mlxsw_sp_fid *dummy_fid;
 	struct rhashtable ruleset_ht;
 	struct list_head rules;
+	struct mutex rules_lock; /* Protects rules list */
 	struct {
 		struct delayed_work dw;
 		unsigned long interval;	/* ms */
@@ -43,14 +45,6 @@ struct mlxsw_sp_acl_block_binding {
 	struct net_device *dev;
 	struct mlxsw_sp_port *mlxsw_sp_port;
 	bool ingress;
-};
-
-struct mlxsw_sp_acl_block {
-	struct list_head binding_list;
-	struct mlxsw_sp_acl_ruleset *ruleset_zero;
-	struct mlxsw_sp *mlxsw_sp;
-	unsigned int rule_count;
-	unsigned int disable_count;
 };
 
 struct mlxsw_sp_acl_ruleset_ht_key {
@@ -221,6 +215,7 @@ struct mlxsw_sp_acl_block *mlxsw_sp_acl_block_create(struct mlxsw_sp *mlxsw_sp,
 		return NULL;
 	INIT_LIST_HEAD(&block->binding_list);
 	block->mlxsw_sp = mlxsw_sp;
+	block->net = net;
 	return block;
 }
 
@@ -246,13 +241,19 @@ mlxsw_sp_acl_block_lookup(struct mlxsw_sp_acl_block *block,
 int mlxsw_sp_acl_block_bind(struct mlxsw_sp *mlxsw_sp,
 			    struct mlxsw_sp_acl_block *block,
 			    struct mlxsw_sp_port *mlxsw_sp_port,
-			    bool ingress)
+			    bool ingress,
+			    struct netlink_ext_ack *extack)
 {
 	struct mlxsw_sp_acl_block_binding *binding;
 	int err;
 
 	if (WARN_ON(mlxsw_sp_acl_block_lookup(block, mlxsw_sp_port, ingress)))
 		return -EEXIST;
+
+	if (!ingress && block->egress_blocker_rule_count) {
+		NL_SET_ERR_MSG_MOD(extack, "Block cannot be bound to egress because it contains unsupported rules");
+		return -EOPNOTSUPP;
+	}
 
 	binding = kzalloc(sizeof(*binding), GFP_KERNEL);
 	if (!binding)
@@ -435,7 +436,8 @@ u16 mlxsw_sp_acl_ruleset_group_id(struct mlxsw_sp_acl_ruleset *ruleset)
 }
 
 struct mlxsw_sp_acl_rule_info *
-mlxsw_sp_acl_rulei_create(struct mlxsw_sp_acl *acl)
+mlxsw_sp_acl_rulei_create(struct mlxsw_sp_acl *acl,
+			  struct mlxsw_afa_block *afa_block)
 {
 	struct mlxsw_sp_acl_rule_info *rulei;
 	int err;
@@ -444,11 +446,17 @@ mlxsw_sp_acl_rulei_create(struct mlxsw_sp_acl *acl)
 	if (!rulei)
 		return ERR_PTR(-ENOMEM);
 
+	if (afa_block) {
+		rulei->act_block = afa_block;
+		return rulei;
+	}
+
 	rulei->act_block = mlxsw_afa_block_create(acl->mlxsw_sp->afa);
 	if (IS_ERR(rulei->act_block)) {
 		err = PTR_ERR(rulei->act_block);
 		goto err_afa_block_create;
 	}
+	rulei->action_created = 1;
 	return rulei;
 
 err_afa_block_create:
@@ -458,7 +466,8 @@ err_afa_block_create:
 
 void mlxsw_sp_acl_rulei_destroy(struct mlxsw_sp_acl_rule_info *rulei)
 {
-	mlxsw_afa_block_destroy(rulei->act_block);
+	if (rulei->action_created)
+		mlxsw_afa_block_destroy(rulei->act_block);
 	kfree(rulei);
 }
 
@@ -470,7 +479,7 @@ int mlxsw_sp_acl_rulei_commit(struct mlxsw_sp_acl_rule_info *rulei)
 void mlxsw_sp_acl_rulei_priority(struct mlxsw_sp_acl_rule_info *rulei,
 				 unsigned int priority)
 {
-	rulei->priority = priority >> 16;
+	rulei->priority = priority;
 }
 
 void mlxsw_sp_acl_rulei_keymask_u32(struct mlxsw_sp_acl_rule_info *rulei,
@@ -580,7 +589,7 @@ int mlxsw_sp_acl_rulei_act_vlan(struct mlxsw_sp *mlxsw_sp,
 {
 	u8 ethertype;
 
-	if (action == TCA_VLAN_ACT_MODIFY) {
+	if (action == FLOW_ACTION_VLAN_MANGLE) {
 		switch (proto) {
 		case ETH_P_8021Q:
 			ethertype = 0;
@@ -624,6 +633,7 @@ struct mlxsw_sp_acl_rule *
 mlxsw_sp_acl_rule_create(struct mlxsw_sp *mlxsw_sp,
 			 struct mlxsw_sp_acl_ruleset *ruleset,
 			 unsigned long cookie,
+			 struct mlxsw_afa_block *afa_block,
 			 struct netlink_ext_ack *extack)
 {
 	const struct mlxsw_sp_acl_profile_ops *ops = ruleset->ht_key.ops;
@@ -631,7 +641,7 @@ mlxsw_sp_acl_rule_create(struct mlxsw_sp *mlxsw_sp,
 	int err;
 
 	mlxsw_sp_acl_ruleset_ref_inc(ruleset);
-	rule = kzalloc(sizeof(*rule) + ops->rule_priv_size(mlxsw_sp),
+	rule = kzalloc(sizeof(*rule) + ops->rule_priv_size,
 		       GFP_KERNEL);
 	if (!rule) {
 		err = -ENOMEM;
@@ -640,7 +650,7 @@ mlxsw_sp_acl_rule_create(struct mlxsw_sp *mlxsw_sp,
 	rule->cookie = cookie;
 	rule->ruleset = ruleset;
 
-	rule->rulei = mlxsw_sp_acl_rulei_create(mlxsw_sp->acl);
+	rule->rulei = mlxsw_sp_acl_rulei_create(mlxsw_sp->acl, afa_block);
 	if (IS_ERR(rule->rulei)) {
 		err = PTR_ERR(rule->rulei);
 		goto err_rulei_create;
@@ -670,6 +680,7 @@ int mlxsw_sp_acl_rule_add(struct mlxsw_sp *mlxsw_sp,
 {
 	struct mlxsw_sp_acl_ruleset *ruleset = rule->ruleset;
 	const struct mlxsw_sp_acl_profile_ops *ops = ruleset->ht_key.ops;
+	struct mlxsw_sp_acl_block *block = ruleset->ht_key.block;
 	int err;
 
 	err = ops->rule_add(mlxsw_sp, ruleset->priv, rule->priv, rule->rulei);
@@ -687,14 +698,16 @@ int mlxsw_sp_acl_rule_add(struct mlxsw_sp *mlxsw_sp,
 		 * one, to be directly bound to device. The rest of the
 		 * rulesets are bound by "Goto action set".
 		 */
-		err = mlxsw_sp_acl_ruleset_block_bind(mlxsw_sp, ruleset,
-						      ruleset->ht_key.block);
+		err = mlxsw_sp_acl_ruleset_block_bind(mlxsw_sp, ruleset, block);
 		if (err)
 			goto err_ruleset_block_bind;
 	}
 
+	mutex_lock(&mlxsw_sp->acl->rules_lock);
 	list_add_tail(&rule->list, &mlxsw_sp->acl->rules);
-	ruleset->ht_key.block->rule_count++;
+	mutex_unlock(&mlxsw_sp->acl->rules_lock);
+	block->rule_count++;
+	block->egress_blocker_rule_count += rule->rulei->egress_bind_blocker;
 	return 0;
 
 err_ruleset_block_bind:
@@ -710,9 +723,13 @@ void mlxsw_sp_acl_rule_del(struct mlxsw_sp *mlxsw_sp,
 {
 	struct mlxsw_sp_acl_ruleset *ruleset = rule->ruleset;
 	const struct mlxsw_sp_acl_profile_ops *ops = ruleset->ht_key.ops;
+	struct mlxsw_sp_acl_block *block = ruleset->ht_key.block;
 
+	block->egress_blocker_rule_count -= rule->rulei->egress_bind_blocker;
 	ruleset->ht_key.block->rule_count--;
+	mutex_lock(&mlxsw_sp->acl->rules_lock);
 	list_del(&rule->list);
+	mutex_unlock(&mlxsw_sp->acl->rules_lock);
 	if (!ruleset->ht_key.chain_index &&
 	    mlxsw_sp_acl_ruleset_is_singular(ruleset))
 		mlxsw_sp_acl_ruleset_block_unbind(mlxsw_sp, ruleset,
@@ -720,6 +737,20 @@ void mlxsw_sp_acl_rule_del(struct mlxsw_sp *mlxsw_sp,
 	rhashtable_remove_fast(&ruleset->rule_ht, &rule->ht_node,
 			       mlxsw_sp_acl_rule_ht_params);
 	ops->rule_del(mlxsw_sp, rule->priv);
+}
+
+int mlxsw_sp_acl_rule_action_replace(struct mlxsw_sp *mlxsw_sp,
+				     struct mlxsw_sp_acl_rule *rule,
+				     struct mlxsw_afa_block *afa_block)
+{
+	struct mlxsw_sp_acl_ruleset *ruleset = rule->ruleset;
+	const struct mlxsw_sp_acl_profile_ops *ops = ruleset->ht_key.ops;
+	struct mlxsw_sp_acl_rule_info *rulei;
+
+	rulei = mlxsw_sp_acl_rule_rulei(rule);
+	rulei->act_block = afa_block;
+
+	return ops->rule_action_replace(mlxsw_sp, rule->priv, rule->rulei);
 }
 
 struct mlxsw_sp_acl_rule *
@@ -758,19 +789,18 @@ static int mlxsw_sp_acl_rules_activity_update(struct mlxsw_sp_acl *acl)
 	struct mlxsw_sp_acl_rule *rule;
 	int err;
 
-	/* Protect internal structures from changes */
-	rtnl_lock();
+	mutex_lock(&acl->rules_lock);
 	list_for_each_entry(rule, &acl->rules, list) {
 		err = mlxsw_sp_acl_rule_activity_update(acl->mlxsw_sp,
 							rule);
 		if (err)
 			goto err_rule_update;
 	}
-	rtnl_unlock();
+	mutex_unlock(&acl->rules_lock);
 	return 0;
 
 err_rule_update:
-	rtnl_unlock();
+	mutex_unlock(&acl->rules_lock);
 	return err;
 }
 
@@ -782,7 +812,7 @@ static void mlxsw_sp_acl_rule_activity_work_schedule(struct mlxsw_sp_acl *acl)
 			       msecs_to_jiffies(interval));
 }
 
-static void mlxsw_sp_acl_rul_activity_update_work(struct work_struct *work)
+static void mlxsw_sp_acl_rule_activity_update_work(struct work_struct *work)
 {
 	struct mlxsw_sp_acl *acl = container_of(work, struct mlxsw_sp_acl,
 						rule_activity_update.dw.work);
@@ -855,18 +885,20 @@ int mlxsw_sp_acl_init(struct mlxsw_sp *mlxsw_sp)
 	acl->dummy_fid = fid;
 
 	INIT_LIST_HEAD(&acl->rules);
+	mutex_init(&acl->rules_lock);
 	err = mlxsw_sp_acl_tcam_init(mlxsw_sp, &acl->tcam);
 	if (err)
 		goto err_acl_ops_init;
 
 	/* Create the delayed work for the rule activity_update */
 	INIT_DELAYED_WORK(&acl->rule_activity_update.dw,
-			  mlxsw_sp_acl_rul_activity_update_work);
+			  mlxsw_sp_acl_rule_activity_update_work);
 	acl->rule_activity_update.interval = MLXSW_SP_ACL_RULE_ACTIVITY_UPDATE_PERIOD_MS;
 	mlxsw_core_schedule_dw(&acl->rule_activity_update.dw, 0);
 	return 0;
 
 err_acl_ops_init:
+	mutex_destroy(&acl->rules_lock);
 	mlxsw_sp_fid_put(fid);
 err_fid_get:
 	rhashtable_destroy(&acl->ruleset_ht);
@@ -883,9 +915,26 @@ void mlxsw_sp_acl_fini(struct mlxsw_sp *mlxsw_sp)
 
 	cancel_delayed_work_sync(&mlxsw_sp->acl->rule_activity_update.dw);
 	mlxsw_sp_acl_tcam_fini(mlxsw_sp, &acl->tcam);
+	mutex_destroy(&acl->rules_lock);
 	WARN_ON(!list_empty(&acl->rules));
 	mlxsw_sp_fid_put(acl->dummy_fid);
 	rhashtable_destroy(&acl->ruleset_ht);
 	mlxsw_afk_destroy(acl->afk);
 	kfree(acl);
+}
+
+u32 mlxsw_sp_acl_region_rehash_intrvl_get(struct mlxsw_sp *mlxsw_sp)
+{
+	struct mlxsw_sp_acl *acl = mlxsw_sp->acl;
+
+	return mlxsw_sp_acl_tcam_vregion_rehash_intrvl_get(mlxsw_sp,
+							   &acl->tcam);
+}
+
+int mlxsw_sp_acl_region_rehash_intrvl_set(struct mlxsw_sp *mlxsw_sp, u32 val)
+{
+	struct mlxsw_sp_acl *acl = mlxsw_sp->acl;
+
+	return mlxsw_sp_acl_tcam_vregion_rehash_intrvl_set(mlxsw_sp,
+							   &acl->tcam, val);
 }

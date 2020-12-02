@@ -1,14 +1,7 @@
-/*
- * Copyright 2011 Freescale Semiconductor, Inc.
- * Copyright 2011 Linaro Ltd.
- *
- * The code contained herein is licensed under the GNU General Public
- * License. You may obtain a copy of the GNU General Public License
- * Version 2 or later at the following locations:
- *
- * http://www.opensource.org/licenses/gpl-license.html
- * http://www.gnu.org/copyleft/gpl.html
- */
+// SPDX-License-Identifier: GPL-2.0+
+//
+// Copyright 2011 Freescale Semiconductor, Inc.
+// Copyright 2011 Linaro Ltd.
 
 #include "imx53-pinfunc.h"
 #include <dt-bindings/clock/imx5-clock.h>
@@ -38,6 +31,7 @@
 		i2c0 = &i2c1;
 		i2c1 = &i2c2;
 		i2c2 = &i2c3;
+		ipu0 = &ipu;
 		mmc0 = &esdhc1;
 		mmc1 = &esdhc2;
 		mmc2 = &esdhc3;
@@ -76,6 +70,11 @@
 	display-subsystem {
 		compatible = "fsl,imx-display-subsystem";
 		ports = <&ipu_di0>, <&ipu_di1>;
+	};
+
+	capture_subsystem {
+		compatible = "fsl,imx-capture-subsystem";
+		ports = <&ipu_csi0>, <&ipu_csi1>;
 	};
 
 	tzic: tz-interrupt-controller@fffc000 {
@@ -165,10 +164,16 @@
 
 			ipu_csi0: port@0 {
 				reg = <0>;
+
+				ipu_csi0_from_parallel_sensor: endpoint {
+				};
 			};
 
 			ipu_csi1: port@1 {
 				reg = <1>;
+
+				ipu_csi1_from_parallel_sensor: endpoint {
+				};
 			};
 
 			ipu_di0: port@2 {
@@ -205,6 +210,16 @@
 					remote-endpoint = <&tve_in>;
 				};
 			};
+		};
+
+		gpu: gpu@30000000 {
+			compatible = "amd,imageon-200.0", "amd,imageon";
+			reg = <0x30000000 0x20000>;
+			reg-names = "kgsl_3d0_reg_memory";
+			interrupts = <12>;
+			interrupt-names = "kgsl_3d0_irq";
+			clocks = <&clks IMX5_CLK_GPU3D_GATE>, <&clks IMX5_CLK_GARB_GATE>;
+			clock-names = "core_clk", "mem_iface_clk";
 		};
 
 		aips@50000000 { /* AIPS1 */
@@ -257,7 +272,7 @@
 					status = "disabled";
 				};
 
-				ecspi1: ecspi@50010000 {
+				ecspi1: spi@50010000 {
 					#address-cells = <1>;
 					#size-cells = <0>;
 					compatible = "fsl,imx53-ecspi", "fsl,imx51-ecspi";
@@ -682,7 +697,7 @@
 				status = "disabled";
 			};
 
-			ecspi2: ecspi@63fac000 {
+			ecspi2: spi@63fac000 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				compatible = "fsl,imx53-ecspi", "fsl,imx51-ecspi";
@@ -705,7 +720,7 @@
 				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
 			};
 
-			cspi: cspi@63fc0000 {
+			cspi: spi@63fc0000 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				compatible = "fsl,imx53-cspi", "fsl,imx35-cspi";

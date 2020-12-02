@@ -12,16 +12,19 @@
 #include <linux/list.h>
 #include <linux/refcount.h>
 #include <linux/workqueue.h>
+#include <linux/mutex.h>
+#include <linux/rwsem.h>
+#include <linux/atomic.h>
+#include <linux/hashtable.h>
 #include <net/gen_stats.h>
 #include <net/rtnetlink.h>
+#include <net/flow_offload.h>
 
 struct Qdisc_ops;
 struct qdisc_walker;
 struct tcf_walker;
 struct module;
-
-typedef int tc_setup_cb_t(enum tc_setup_type type,
-			  void *type_data, void *cb_priv);
+struct bpf_flow_keys;
 
 struct qdisc_rate_table {
 	struct tc_ratespec rate;
@@ -47,10 +50,7 @@ struct qdisc_size_table {
 struct qdisc_skb_head {
 	struct sk_buff	*head;
 	struct sk_buff	*tail;
-	union {
-		u32		qlen;
-		atomic_t	atomic_qlen;
-	};
+	__u32		qlen;
 	spinlock_t	lock;
 };
 
@@ -108,6 +108,10 @@ struct Qdisc {
 
 	spinlock_t		busylock ____cacheline_aligned_in_smp;
 	spinlock_t		seqlock;
+
+	/* for NOLOCK qdisc, true if there are no enqueued skbs */
+	bool			empty;
+	struct rcu_head		rcu;
 };
 
 static inline void qdisc_refcount_inc(struct Qdisc *qdisc)
@@ -117,6 +121,19 @@ static inline void qdisc_refcount_inc(struct Qdisc *qdisc)
 	refcount_inc(&qdisc->refcnt);
 }
 
+/* Intended to be used by unlocked users, when concurrent qdisc release is
+ * possible.
+ */
+
+static inline struct Qdisc *qdisc_refcount_inc_nz(struct Qdisc *qdisc)
+{
+	if (qdisc->flags & TCQ_F_BUILTIN)
+		return qdisc;
+	if (refcount_inc_not_zero(&qdisc->refcnt))
+		return qdisc;
+	return NULL;
+}
+
 static inline bool qdisc_is_running(struct Qdisc *qdisc)
 {
 	if (qdisc->flags & TCQ_F_NOLOCK)
@@ -124,11 +141,24 @@ static inline bool qdisc_is_running(struct Qdisc *qdisc)
 	return (raw_read_seqcount(&qdisc->running) & 1) ? true : false;
 }
 
+static inline bool qdisc_is_percpu_stats(const struct Qdisc *q)
+{
+	return q->flags & TCQ_F_CPUSTATS;
+}
+
+static inline bool qdisc_is_empty(const struct Qdisc *qdisc)
+{
+	if (qdisc_is_percpu_stats(qdisc))
+		return READ_ONCE(qdisc->empty);
+	return !READ_ONCE(qdisc->q.qlen);
+}
+
 static inline bool qdisc_run_begin(struct Qdisc *qdisc)
 {
 	if (qdisc->flags & TCQ_F_NOLOCK) {
 		if (!spin_trylock(&qdisc->seqlock))
 			return false;
+		WRITE_ONCE(qdisc->empty, false);
 	} else if (qdisc_is_running(qdisc)) {
 		return false;
 	}
@@ -163,6 +193,7 @@ static inline int qdisc_avail_bulklimit(const struct netdev_queue *txq)
 }
 
 struct Qdisc_class_ops {
+	unsigned int		flags;
 	/* Child qdisc manipulation */
 	struct netdev_queue *	(*select_queue)(struct Qdisc *, struct tcmsg *);
 	int			(*graft)(struct Qdisc *, unsigned long cl,
@@ -192,6 +223,13 @@ struct Qdisc_class_ops {
 					struct sk_buff *skb, struct tcmsg*);
 	int			(*dump_stats)(struct Qdisc *, unsigned long,
 					struct gnet_dump *);
+};
+
+/* Qdisc_class_ops flag values */
+
+/* Implements API that doesn't require rtnl lock */
+enum qdisc_class_ops_flags {
+	QDISC_CLASS_OPS_DOIT_UNLOCKED = 1,
 };
 
 struct Qdisc_ops {
@@ -239,7 +277,7 @@ struct tcf_result {
 		};
 		const struct tcf_proto *goto_tp;
 
-		/* used by the TC_ACT_REINSERT action */
+		/* used in the skb_tc_reinsert function */
 		struct {
 			bool		ingress;
 			struct gnet_stats_queue *qstats;
@@ -257,22 +295,29 @@ struct tcf_proto_ops {
 					    const struct tcf_proto *,
 					    struct tcf_result *);
 	int			(*init)(struct tcf_proto*);
-	void			(*destroy)(struct tcf_proto *tp,
+	void			(*destroy)(struct tcf_proto *tp, bool rtnl_held,
 					   struct netlink_ext_ack *extack);
 
 	void*			(*get)(struct tcf_proto*, u32 handle);
+	void			(*put)(struct tcf_proto *tp, void *f);
 	int			(*change)(struct net *net, struct sk_buff *,
 					struct tcf_proto*, unsigned long,
 					u32 handle, struct nlattr **,
-					void **, bool,
+					void **, bool, bool,
 					struct netlink_ext_ack *);
 	int			(*delete)(struct tcf_proto *tp, void *arg,
-					  bool *last,
+					  bool *last, bool rtnl_held,
 					  struct netlink_ext_ack *);
-	void			(*walk)(struct tcf_proto*, struct tcf_walker *arg);
+	bool			(*delete_empty)(struct tcf_proto *tp);
+	void			(*walk)(struct tcf_proto *tp,
+					struct tcf_walker *arg, bool rtnl_held);
 	int			(*reoffload)(struct tcf_proto *tp, bool add,
-					     tc_setup_cb_t *cb, void *cb_priv,
+					     flow_setup_cb_t *cb, void *cb_priv,
 					     struct netlink_ext_ack *extack);
+	void			(*hw_add)(struct tcf_proto *tp,
+					  void *type_data);
+	void			(*hw_del)(struct tcf_proto *tp,
+					  void *type_data);
 	void			(*bind_class)(void *, u32, unsigned long,
 					      void *, unsigned long);
 	void *			(*tmplt_create)(struct net *net,
@@ -283,12 +328,22 @@ struct tcf_proto_ops {
 
 	/* rtnetlink specific */
 	int			(*dump)(struct net*, struct tcf_proto*, void *,
-					struct sk_buff *skb, struct tcmsg*);
+					struct sk_buff *skb, struct tcmsg*,
+					bool);
 	int			(*tmplt_dump)(struct sk_buff *skb,
 					      struct net *net,
 					      void *tmplt_priv);
 
 	struct module		*owner;
+	int			flags;
+};
+
+/* Classifiers setting TCF_PROTO_OPS_DOIT_UNLOCKED in tcf_proto_ops->flags
+ * are expected to implement tcf_proto_ops->delete_empty(), otherwise race
+ * conditions can occur when filters are inserted/deleted simultaneously.
+ */
+enum tcf_proto_ops_flags {
+	TCF_PROTO_OPS_DOIT_UNLOCKED = 1,
 };
 
 struct tcf_proto {
@@ -307,13 +362,22 @@ struct tcf_proto {
 	void			*data;
 	const struct tcf_proto_ops	*ops;
 	struct tcf_chain	*chain;
+	/* Lock protects tcf_proto shared state and can be used by unlocked
+	 * classifiers to protect their private data.
+	 */
+	spinlock_t		lock;
+	bool			deleting;
+	refcount_t		refcnt;
 	struct rcu_head		rcu;
+	struct hlist_node	destroy_ht_node;
 };
 
 struct qdisc_skb_cb {
-	unsigned int		pkt_len;
-	u16			slave_dev_queue_mapping;
-	u16			tc_classid;
+	struct {
+		unsigned int		pkt_len;
+		u16			slave_dev_queue_mapping;
+		u16			tc_classid;
+	};
 #define QDISC_CB_PRIV_LEN 20
 	unsigned char		data[QDISC_CB_PRIV_LEN];
 };
@@ -321,6 +385,8 @@ struct qdisc_skb_cb {
 typedef void tcf_chain_head_change_t(struct tcf_proto *tp_head, void *priv);
 
 struct tcf_chain {
+	/* Protects filter_chain. */
+	struct mutex filter_chain_lock;
 	struct tcf_proto __rcu *filter_chain;
 	struct list_head list;
 	struct tcf_block *block;
@@ -328,57 +394,66 @@ struct tcf_chain {
 	unsigned int refcnt;
 	unsigned int action_refcnt;
 	bool explicitly_created;
+	bool flushing;
 	const struct tcf_proto_ops *tmplt_ops;
 	void *tmplt_priv;
+	struct rcu_head rcu;
 };
 
 struct tcf_block {
+	/* Lock protects tcf_block and lifetime-management data of chains
+	 * attached to the block (refcnt, action_refcnt, explicitly_created).
+	 */
+	struct mutex lock;
 	struct list_head chain_list;
 	u32 index; /* block index for shared blocks */
-	unsigned int refcnt;
+	u32 classid; /* which class this block belongs to */
+	refcount_t refcnt;
 	struct net *net;
 	struct Qdisc *q;
-	struct list_head cb_list;
+	struct rw_semaphore cb_lock; /* protects cb_list and offload counters */
+	struct flow_block flow_block;
 	struct list_head owner_list;
 	bool keep_dst;
-	unsigned int offloadcnt; /* Number of oddloaded filters */
+	atomic_t offloadcnt; /* Number of oddloaded filters */
 	unsigned int nooffloaddevcnt; /* Number of devs unable to do offload */
+	unsigned int lockeddevcnt; /* Number of devs that require rtnl lock. */
 	struct {
 		struct tcf_chain *chain;
 		struct list_head filter_chain_list;
 	} chain0;
+	struct rcu_head rcu;
+	DECLARE_HASHTABLE(proto_destroy_ht, 7);
+	struct mutex proto_destroy_lock; /* Lock for proto_destroy hashtable. */
 };
 
-static inline void tcf_block_offload_inc(struct tcf_block *block, u32 *flags)
+#ifdef CONFIG_PROVE_LOCKING
+static inline bool lockdep_tcf_chain_is_locked(struct tcf_chain *chain)
 {
-	if (*flags & TCA_CLS_FLAGS_IN_HW)
-		return;
-	*flags |= TCA_CLS_FLAGS_IN_HW;
-	block->offloadcnt++;
+	return lockdep_is_held(&chain->filter_chain_lock);
 }
 
-static inline void tcf_block_offload_dec(struct tcf_block *block, u32 *flags)
+static inline bool lockdep_tcf_proto_is_locked(struct tcf_proto *tp)
 {
-	if (!(*flags & TCA_CLS_FLAGS_IN_HW))
-		return;
-	*flags &= ~TCA_CLS_FLAGS_IN_HW;
-	block->offloadcnt--;
+	return lockdep_is_held(&tp->lock);
+}
+#else
+static inline bool lockdep_tcf_chain_is_locked(struct tcf_block *chain)
+{
+	return true;
 }
 
-static inline void
-tc_cls_offload_cnt_update(struct tcf_block *block, unsigned int *cnt,
-			  u32 *flags, bool add)
+static inline bool lockdep_tcf_proto_is_locked(struct tcf_proto *tp)
 {
-	if (add) {
-		if (!*cnt)
-			tcf_block_offload_inc(block, flags);
-		(*cnt)++;
-	} else {
-		(*cnt)--;
-		if (!*cnt)
-			tcf_block_offload_dec(block, flags);
-	}
+	return true;
 }
+#endif /* #ifdef CONFIG_PROVE_LOCKING */
+
+#define tcf_chain_dereference(p, chain)					\
+	rcu_dereference_protected(p, lockdep_tcf_chain_is_locked(chain))
+
+#define tcf_proto_dereference(p, tp)					\
+	rcu_dereference_protected(p, lockdep_tcf_proto_is_locked(tp))
 
 static inline void qdisc_cb_private_validate(const struct sk_buff *skb, int sz)
 {
@@ -388,19 +463,27 @@ static inline void qdisc_cb_private_validate(const struct sk_buff *skb, int sz)
 	BUILD_BUG_ON(sizeof(qcb->data) < sz);
 }
 
+static inline int qdisc_qlen_cpu(const struct Qdisc *q)
+{
+	return this_cpu_ptr(q->cpu_qstats)->qlen;
+}
+
 static inline int qdisc_qlen(const struct Qdisc *q)
 {
 	return q->q.qlen;
 }
 
-static inline u32 qdisc_qlen_sum(const struct Qdisc *q)
+static inline int qdisc_qlen_sum(const struct Qdisc *q)
 {
-	u32 qlen = q->qstats.qlen;
+	__u32 qlen = q->qstats.qlen;
+	int i;
 
-	if (q->flags & TCQ_F_NOLOCK)
-		qlen += atomic_read(&q->q.atomic_qlen);
-	else
+	if (qdisc_is_percpu_stats(q)) {
+		for_each_possible_cpu(i)
+			qlen += per_cpu_ptr(q->cpu_qstats, i)->qlen;
+	} else {
 		qlen += q->q.qlen;
+	}
 
 	return qlen;
 }
@@ -555,9 +638,33 @@ void dev_deactivate_many(struct list_head *head);
 struct Qdisc *dev_graft_qdisc(struct netdev_queue *dev_queue,
 			      struct Qdisc *qdisc);
 void qdisc_reset(struct Qdisc *qdisc);
-void qdisc_destroy(struct Qdisc *qdisc);
-void qdisc_tree_reduce_backlog(struct Qdisc *qdisc, unsigned int n,
-			       unsigned int len);
+void qdisc_put(struct Qdisc *qdisc);
+void qdisc_put_unlocked(struct Qdisc *qdisc);
+void qdisc_tree_reduce_backlog(struct Qdisc *qdisc, int n, int len);
+#ifdef CONFIG_NET_SCHED
+int qdisc_offload_dump_helper(struct Qdisc *q, enum tc_setup_type type,
+			      void *type_data);
+void qdisc_offload_graft_helper(struct net_device *dev, struct Qdisc *sch,
+				struct Qdisc *new, struct Qdisc *old,
+				enum tc_setup_type type, void *type_data,
+				struct netlink_ext_ack *extack);
+#else
+static inline int
+qdisc_offload_dump_helper(struct Qdisc *q, enum tc_setup_type type,
+			  void *type_data)
+{
+	q->flags &= ~TCQ_F_OFFLOADED;
+	return 0;
+}
+
+static inline void
+qdisc_offload_graft_helper(struct net_device *dev, struct Qdisc *sch,
+			   struct Qdisc *new, struct Qdisc *old,
+			   enum tc_setup_type type, void *type_data,
+			   struct netlink_ext_ack *extack)
+{
+}
+#endif
 struct Qdisc *qdisc_alloc(struct netdev_queue *dev_queue,
 			  const struct Qdisc_ops *ops,
 			  struct netlink_ext_ack *extack);
@@ -568,22 +675,6 @@ struct Qdisc *qdisc_create_dflt(struct netdev_queue *dev_queue,
 void __qdisc_calculate_pkt_len(struct sk_buff *skb,
 			       const struct qdisc_size_table *stab);
 int skb_do_redirect(struct sk_buff *);
-
-static inline void skb_reset_tc(struct sk_buff *skb)
-{
-#ifdef CONFIG_NET_CLS_ACT
-	skb->tc_redirected = 0;
-#endif
-}
-
-static inline bool skb_is_tc_redirected(const struct sk_buff *skb)
-{
-#ifdef CONFIG_NET_CLS_ACT
-	return skb->tc_redirected;
-#else
-	return false;
-#endif
-}
 
 static inline bool skb_at_tc_ingress(const struct sk_buff *skb)
 {
@@ -635,7 +726,7 @@ static inline bool qdisc_all_tx_empty(const struct net_device *dev)
 		struct netdev_queue *txq = netdev_get_tx_queue(dev, i);
 		const struct Qdisc *q = rcu_dereference(txq->qdisc);
 
-		if (q->q.qlen) {
+		if (!qdisc_is_empty(q)) {
 			rcu_read_unlock();
 			return false;
 		}
@@ -705,11 +796,6 @@ static inline int qdisc_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 	return sch->enqueue(skb, sch, to_free);
 }
 
-static inline bool qdisc_is_percpu_stats(const struct Qdisc *q)
-{
-	return q->flags & TCQ_F_CPUSTATS;
-}
-
 static inline void _bstats_update(struct gnet_stats_basic_packed *bstats,
 				  __u64 bytes, __u32 packets)
 {
@@ -777,14 +863,14 @@ static inline void qdisc_qstats_cpu_backlog_inc(struct Qdisc *sch,
 	this_cpu_add(sch->cpu_qstats->backlog, qdisc_pkt_len(skb));
 }
 
-static inline void qdisc_qstats_atomic_qlen_inc(struct Qdisc *sch)
+static inline void qdisc_qstats_cpu_qlen_inc(struct Qdisc *sch)
 {
-	atomic_inc(&sch->q.atomic_qlen);
+	this_cpu_inc(sch->cpu_qstats->qlen);
 }
 
-static inline void qdisc_qstats_atomic_qlen_dec(struct Qdisc *sch)
+static inline void qdisc_qstats_cpu_qlen_dec(struct Qdisc *sch)
 {
-	atomic_dec(&sch->q.atomic_qlen);
+	this_cpu_dec(sch->cpu_qstats->qlen);
 }
 
 static inline void qdisc_qstats_cpu_requeues_inc(struct Qdisc *sch)
@@ -822,6 +908,41 @@ static inline void qdisc_qstats_overlimit(struct Qdisc *sch)
 	sch->qstats.overlimits++;
 }
 
+static inline int qdisc_qstats_copy(struct gnet_dump *d, struct Qdisc *sch)
+{
+	__u32 qlen = qdisc_qlen_sum(sch);
+
+	return gnet_stats_copy_queue(d, sch->cpu_qstats, &sch->qstats, qlen);
+}
+
+static inline void qdisc_qstats_qlen_backlog(struct Qdisc *sch,  __u32 *qlen,
+					     __u32 *backlog)
+{
+	struct gnet_stats_queue qstats = { 0 };
+	__u32 len = qdisc_qlen_sum(sch);
+
+	__gnet_stats_copy_queue(&qstats, sch->cpu_qstats, &sch->qstats, len);
+	*qlen = qstats.qlen;
+	*backlog = qstats.backlog;
+}
+
+static inline void qdisc_tree_flush_backlog(struct Qdisc *sch)
+{
+	__u32 qlen, backlog;
+
+	qdisc_qstats_qlen_backlog(sch, &qlen, &backlog);
+	qdisc_tree_reduce_backlog(sch, qlen, backlog);
+}
+
+static inline void qdisc_purge_queue(struct Qdisc *sch)
+{
+	__u32 qlen, backlog;
+
+	qdisc_qstats_qlen_backlog(sch, &qlen, &backlog);
+	qdisc_reset(sch);
+	qdisc_tree_reduce_backlog(sch, qlen, backlog);
+}
+
 static inline void qdisc_skb_head_init(struct qdisc_skb_head *qh)
 {
 	qh->head = NULL;
@@ -829,8 +950,8 @@ static inline void qdisc_skb_head_init(struct qdisc_skb_head *qh)
 	qh->qlen = 0;
 }
 
-static inline int __qdisc_enqueue_tail(struct sk_buff *skb, struct Qdisc *sch,
-				       struct qdisc_skb_head *qh)
+static inline void __qdisc_enqueue_tail(struct sk_buff *skb,
+					struct qdisc_skb_head *qh)
 {
 	struct sk_buff *last = qh->tail;
 
@@ -843,14 +964,24 @@ static inline int __qdisc_enqueue_tail(struct sk_buff *skb, struct Qdisc *sch,
 		qh->head = skb;
 	}
 	qh->qlen++;
-	qdisc_qstats_backlog_inc(sch, skb);
-
-	return NET_XMIT_SUCCESS;
 }
 
 static inline int qdisc_enqueue_tail(struct sk_buff *skb, struct Qdisc *sch)
 {
-	return __qdisc_enqueue_tail(skb, sch, &sch->q);
+	__qdisc_enqueue_tail(skb, &sch->q);
+	qdisc_qstats_backlog_inc(sch, skb);
+	return NET_XMIT_SUCCESS;
+}
+
+static inline void __qdisc_enqueue_head(struct sk_buff *skb,
+					struct qdisc_skb_head *qh)
+{
+	skb->next = qh->head;
+
+	if (!qh->head)
+		qh->tail = skb;
+	qh->head = skb;
+	qh->qlen++;
 }
 
 static inline struct sk_buff *__qdisc_dequeue_head(struct qdisc_skb_head *qh)
@@ -949,6 +1080,32 @@ static inline struct sk_buff *qdisc_peek_dequeued(struct Qdisc *sch)
 	return skb;
 }
 
+static inline void qdisc_update_stats_at_dequeue(struct Qdisc *sch,
+						 struct sk_buff *skb)
+{
+	if (qdisc_is_percpu_stats(sch)) {
+		qdisc_qstats_cpu_backlog_dec(sch, skb);
+		qdisc_bstats_cpu_update(sch, skb);
+		qdisc_qstats_cpu_qlen_dec(sch);
+	} else {
+		qdisc_qstats_backlog_dec(sch, skb);
+		qdisc_bstats_update(sch, skb);
+		sch->q.qlen--;
+	}
+}
+
+static inline void qdisc_update_stats_at_enqueue(struct Qdisc *sch,
+						 unsigned int pkt_len)
+{
+	if (qdisc_is_percpu_stats(sch)) {
+		qdisc_qstats_cpu_qlen_inc(sch);
+		this_cpu_add(sch->cpu_qstats->backlog, pkt_len);
+	} else {
+		sch->qstats.backlog += pkt_len;
+		sch->q.qlen++;
+	}
+}
+
 /* use instead of qdisc->dequeue() for all qdiscs queried with ->peek() */
 static inline struct sk_buff *qdisc_dequeue_peeked(struct Qdisc *sch)
 {
@@ -956,8 +1113,13 @@ static inline struct sk_buff *qdisc_dequeue_peeked(struct Qdisc *sch)
 
 	if (skb) {
 		skb = __skb_dequeue(&sch->gso_skb);
-		qdisc_qstats_backlog_dec(sch, skb);
-		sch->q.qlen--;
+		if (qdisc_is_percpu_stats(sch)) {
+			qdisc_qstats_cpu_backlog_dec(sch, skb);
+			qdisc_qstats_cpu_qlen_dec(sch);
+		} else {
+			qdisc_qstats_backlog_dec(sch, skb);
+			sch->q.qlen--;
+		}
 	} else {
 		skb = sch->dequeue(sch);
 	}
@@ -995,13 +1157,8 @@ static inline struct Qdisc *qdisc_replace(struct Qdisc *sch, struct Qdisc *new,
 	sch_tree_lock(sch);
 	old = *pold;
 	*pold = new;
-	if (old != NULL) {
-		unsigned int qlen = old->q.qlen;
-		unsigned int backlog = old->qstats.backlog;
-
-		qdisc_reset(old);
-		qdisc_tree_reduce_backlog(old, qlen, backlog);
-	}
+	if (old != NULL)
+		qdisc_tree_flush_backlog(old);
 	sch_tree_unlock(sch);
 
 	return old;

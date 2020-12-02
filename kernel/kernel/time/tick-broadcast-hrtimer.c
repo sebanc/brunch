@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * linux/kernel/time/tick-broadcast-hrtimer.c
- * This file emulates a local clock event device
- * via a pseudo clock device.
+ * Emulate a local clock event device via a pseudo clock device.
  */
 #include <linux/cpu.h>
 #include <linux/err.h>
@@ -64,7 +62,7 @@ static int bc_set_next(ktime_t expires, struct clock_event_device *bc)
 	 * hrtimer_start() can call into tracing.
 	 */
 	RCU_NONIDLE( {
-		hrtimer_start(&bctimer, expires, HRTIMER_MODE_ABS_PINNED);
+		hrtimer_start(&bctimer, expires, HRTIMER_MODE_ABS_PINNED_HARD);
 		/*
 		 * The core tick broadcast mode expects bc->bound_on to be set
 		 * correctly to prevent a CPU which has the broadcast hrtimer
@@ -107,7 +105,7 @@ static enum hrtimer_restart bc_handler(struct hrtimer *t)
 
 void tick_setup_hrtimer_broadcast(void)
 {
-	hrtimer_init(&bctimer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+	hrtimer_init(&bctimer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_HARD);
 	bctimer.function = bc_handler;
 	clockevents_register_device(&ce_broadcast_hrtimer);
 }

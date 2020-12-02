@@ -10,6 +10,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/fs_context.h>
 
 #define FUSE_CTL_SUPER_MAGIC 0x65735543
 
@@ -35,7 +36,9 @@ static ssize_t fuse_conn_abort_write(struct file *file, const char __user *buf,
 {
 	struct fuse_conn *fc = fuse_ctl_file_conn_get(file);
 	if (fc) {
-		fuse_abort_conn(fc, true);
+		if (fc->abort_err)
+			fc->aborted = true;
+		fuse_abort_conn(fc);
 		fuse_conn_put(fc);
 	}
 	return count;
@@ -58,6 +61,27 @@ static ssize_t fuse_conn_waiting_read(struct file *file, char __user *buf,
 		fuse_conn_put(fc);
 	}
 	size = sprintf(tmp, "%ld\n", (long)file->private_data);
+	return simple_read_from_buffer(buf, len, ppos, tmp, size);
+}
+
+static ssize_t fuse_conn_file_system_read(struct file *file, char __user *buf,
+					  size_t len, loff_t *ppos)
+{
+	char tmp[32];
+	size_t size;
+
+	if (!*ppos) {
+		struct fuse_conn *fc = fuse_ctl_file_conn_get(file);
+
+		if (!fc)
+			return 0;
+		if (fc->sb && fc->sb->s_type)
+			file->private_data = (void *)fc->sb->s_type->name;
+		else
+			file->private_data = "(NULL)";
+		fuse_conn_put(fc);
+	}
+	size = sprintf(tmp, "%.30s\n", (char *)file->private_data);
 	return simple_read_from_buffer(buf, len, ppos, tmp, size);
 }
 
@@ -125,7 +149,12 @@ static ssize_t fuse_conn_max_background_write(struct file *file,
 	if (ret > 0) {
 		struct fuse_conn *fc = fuse_ctl_file_conn_get(file);
 		if (fc) {
+			spin_lock(&fc->bg_lock);
 			fc->max_background = val;
+			fc->blocked = fc->num_background >= fc->max_background;
+			if (!fc->blocked)
+				wake_up(&fc->blocked_waitq);
+			spin_unlock(&fc->bg_lock);
 			fuse_conn_put(fc);
 		}
 	}
@@ -155,18 +184,31 @@ static ssize_t fuse_conn_congestion_threshold_write(struct file *file,
 						    size_t count, loff_t *ppos)
 {
 	unsigned uninitialized_var(val);
+	struct fuse_conn *fc;
 	ssize_t ret;
 
 	ret = fuse_conn_limit_write(file, buf, count, ppos, &val,
 				    max_user_congthresh);
-	if (ret > 0) {
-		struct fuse_conn *fc = fuse_ctl_file_conn_get(file);
-		if (fc) {
-			fc->congestion_threshold = val;
-			fuse_conn_put(fc);
+	if (ret <= 0)
+		goto out;
+	fc = fuse_ctl_file_conn_get(file);
+	if (!fc)
+		goto out;
+
+	spin_lock(&fc->bg_lock);
+	fc->congestion_threshold = val;
+	if (fc->sb) {
+		if (fc->num_background < fc->congestion_threshold) {
+			clear_bdi_congested(fc->sb->s_bdi, BLK_RW_SYNC);
+			clear_bdi_congested(fc->sb->s_bdi, BLK_RW_ASYNC);
+		} else {
+			set_bdi_congested(fc->sb->s_bdi, BLK_RW_SYNC);
+			set_bdi_congested(fc->sb->s_bdi, BLK_RW_ASYNC);
 		}
 	}
-
+	spin_unlock(&fc->bg_lock);
+	fuse_conn_put(fc);
+out:
 	return ret;
 }
 
@@ -193,6 +235,12 @@ static const struct file_operations fuse_conn_congestion_threshold_ops = {
 	.open = nonseekable_open,
 	.read = fuse_conn_congestion_threshold_read,
 	.write = fuse_conn_congestion_threshold_write,
+	.llseek = no_llseek,
+};
+
+static const struct file_operations fuse_conn_file_system_ops = {
+	.open = nonseekable_open,
+	.read = fuse_conn_file_system_read,
 	.llseek = no_llseek,
 };
 
@@ -264,7 +312,9 @@ int fuse_ctl_add_conn(struct fuse_conn *fc)
 				 1, NULL, &fuse_conn_max_background_ops) ||
 	    !fuse_ctl_add_dentry(parent, fc, "congestion_threshold",
 				 S_IFREG | 0600, 1, NULL,
-				 &fuse_conn_congestion_threshold_ops))
+				 &fuse_conn_congestion_threshold_ops) ||
+	    !fuse_ctl_add_dentry(parent, fc, "filesystem", S_IFREG | 0400, 1,
+				 NULL, &fuse_conn_file_system_ops))
 		goto err;
 
 	return 0;
@@ -297,7 +347,7 @@ void fuse_ctl_remove_conn(struct fuse_conn *fc)
 	drop_nlink(d_inode(fuse_control_sb->s_root));
 }
 
-static int fuse_ctl_fill_super(struct super_block *sb, void *data, int silent)
+static int fuse_ctl_fill_super(struct super_block *sb, struct fs_context *fctx)
 {
 	static const struct tree_descr empty_descr = {""};
 	struct fuse_conn *fc;
@@ -323,10 +373,19 @@ static int fuse_ctl_fill_super(struct super_block *sb, void *data, int silent)
 	return 0;
 }
 
-static struct dentry *fuse_ctl_mount(struct file_system_type *fs_type,
-			int flags, const char *dev_name, void *raw_data)
+static int fuse_ctl_get_tree(struct fs_context *fc)
 {
-	return mount_single(fs_type, flags, raw_data, fuse_ctl_fill_super);
+	return get_tree_single(fc, fuse_ctl_fill_super);
+}
+
+static const struct fs_context_operations fuse_ctl_context_ops = {
+	.get_tree	= fuse_ctl_get_tree,
+};
+
+static int fuse_ctl_init_fs_context(struct fs_context *fc)
+{
+	fc->ops = &fuse_ctl_context_ops;
+	return 0;
 }
 
 static void fuse_ctl_kill_sb(struct super_block *sb)
@@ -345,7 +404,7 @@ static void fuse_ctl_kill_sb(struct super_block *sb)
 static struct file_system_type fuse_ctl_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "fusectl",
-	.mount		= fuse_ctl_mount,
+	.init_fs_context = fuse_ctl_init_fs_context,
 	.kill_sb	= fuse_ctl_kill_sb,
 };
 MODULE_ALIAS_FS("fusectl");

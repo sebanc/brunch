@@ -19,7 +19,7 @@
  * This is the main reason why we're doing stable VA mappings for RT
  * services.
  *
- * This flag is used in conjuction with a chicken bit called
+ * This flag is used in conjunction with a chicken bit called
  * "efi=old_map" which can be used as a fallback to the old runtime
  * services mapping method in case there's some b0rkage with a
  * particular EFI implementation (haha, it is hard to hold up the
@@ -138,6 +138,9 @@ extern void __init efi_apply_memmap_quirks(void);
 extern int __init efi_reuse_config(u64 tables, int nr_tables);
 extern void efi_delete_dummy_variable(void);
 extern void efi_switch_mm(struct mm_struct *mm);
+extern void efi_recover_from_page_fault(unsigned long phys_addr);
+extern void efi_free_boot_services(void);
+extern void efi_reserve_boot_services(void);
 
 struct efi_setup_data {
 	u64 fw_vendor;
@@ -167,7 +170,6 @@ static inline bool efi_runtime_supported(void)
 	return false;
 }
 
-extern struct console early_efi_console;
 extern void parse_efi_setup(u64 phys_addr, u32 data_len);
 
 extern void efifb_setup_from_dmi(struct screen_info *si, const char *opt);
@@ -240,10 +242,15 @@ static inline bool efi_is_64bit(void)
 		__efi_early()->runtime_services), __VA_ARGS__)
 
 extern bool efi_reboot_required(void);
+extern bool efi_is_table_address(unsigned long phys_addr);
 
 #else
 static inline void parse_efi_setup(u64 phys_addr, u32 data_len) {}
 static inline bool efi_reboot_required(void)
+{
+	return false;
+}
+static inline  bool efi_is_table_address(unsigned long phys_addr)
 {
 	return false;
 }

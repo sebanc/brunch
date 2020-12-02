@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
 **  System Bus Adapter (SBA) I/O MMU manager
 **
@@ -7,10 +8,6 @@
 **
 **	Portions (c) 1999 Dave S. Miller (from sparc64 I/O MMU code)
 **
-**	This program is free software; you can redistribute it and/or modify
-**	it under the terms of the GNU General Public License as published by
-**      the Free Software Foundation; either version 2 of the License, or
-**      (at your option) any later version.
 **
 **
 ** This module initializes the IOC (I/O Controller) found on B1000/C3000/
@@ -48,6 +45,8 @@
 #include <asm/pdc.h>		/* for PDC_MODEL_* */
 #include <asm/pdcpat.h>		/* for is_pdc_pat() */
 #include <asm/parisc-device.h>
+
+#include "iommu.h"
 
 #define MODULE_NAME "SBA"
 
@@ -92,8 +91,6 @@
 #define SBA_INLINE	__inline__
 
 #define DEFAULT_DMA_HINT_REG	0
-
-#define SBA_MAPPING_ERROR    (~(dma_addr_t)0)
 
 struct sba_device *sba_list;
 EXPORT_SYMBOL_GPL(sba_list);
@@ -572,7 +569,7 @@ sba_io_pdir_entry(u64 *pdir_ptr, space_t sid, unsigned long vba,
 	u64 pa; /* physical address */
 	register unsigned ci; /* coherent index */
 
-	pa = virt_to_phys(vba);
+	pa = lpa(vba);
 	pa &= IOVP_MASK;
 
 	asm("lci 0(%1), %0" : "=r" (ci) : "r" (vba));
@@ -586,8 +583,7 @@ sba_io_pdir_entry(u64 *pdir_ptr, space_t sid, unsigned long vba,
 	 * (bit #61, big endian), we have to flush and sync every time
 	 * IO-PDIR is changed in Ike/Astro.
 	 */
-	if (ioc_needs_fdc)
-		asm volatile("fdc %%r0(%0)" : : "r" (pdir_ptr));
+	asm_io_fdc(pdir_ptr);
 }
 
 
@@ -640,8 +636,8 @@ sba_mark_invalid(struct ioc *ioc, dma_addr_t iova, size_t byte_cnt)
 		do {
 			/* clear I/O Pdir entry "valid" bit first */
 			((u8 *) pdir_ptr)[7] = 0;
+			asm_io_fdc(pdir_ptr);
 			if (ioc_needs_fdc) {
-				asm volatile("fdc %%r0(%0)" : : "r" (pdir_ptr));
 #if 0
 				entries_per_cacheline = L1_CACHE_SHIFT - 3;
 #endif
@@ -660,8 +656,7 @@ sba_mark_invalid(struct ioc *ioc, dma_addr_t iova, size_t byte_cnt)
 	** could dump core on HPMC.
 	*/
 	((u8 *) pdir_ptr)[7] = 0;
-	if (ioc_needs_fdc)
-		asm volatile("fdc %%r0(%0)" : : "r" (pdir_ptr));
+	asm_io_fdc(pdir_ptr);
 
 	WRITE_REG( SBA_IOVA(ioc, iovp, 0, 0), ioc->ioc_hpa+IOC_PCOM);
 }
@@ -682,14 +677,6 @@ static int sba_dma_supported( struct device *dev, u64 mask)
 		BUG();
 		return(0);
 	}
-
-	/* Documentation/DMA-API-HOWTO.txt tells drivers to try 64-bit
-	 * first, then fall back to 32-bit if that fails.
-	 * We are just "encouraging" 32-bit DMA masks here since we can
-	 * never allow IOMMU bypass unless we add special support for ZX1.
-	 */
-	if (mask > ~0U)
-		return 0;
 
 	ioc = GET_IOC(dev);
 	if (!ioc)
@@ -726,7 +713,7 @@ sba_map_single(struct device *dev, void *addr, size_t size,
 
 	ioc = GET_IOC(dev);
 	if (!ioc)
-		return SBA_MAPPING_ERROR;
+		return DMA_MAPPING_ERROR;
 
 	/* save offset bits */
 	offset = ((dma_addr_t) (long) addr) & ~IOVP_MASK;
@@ -772,8 +759,7 @@ sba_map_single(struct device *dev, void *addr, size_t size,
 	}
 
 	/* force FDC ops in io_pdir_entry() to be visible to IOMMU */
-	if (ioc_needs_fdc)
-		asm volatile("sync" : : );
+	asm_io_sync();
 
 #ifdef ASSERT_PDIR_SANITY
 	sba_check_pdir(ioc,"Check after sba_map_single()");
@@ -857,8 +843,7 @@ sba_unmap_page(struct device *dev, dma_addr_t iova, size_t size,
 	sba_free_range(ioc, iova, size);
 
 	/* If fdc's were issued, force fdc's to be visible now */
-	if (ioc_needs_fdc)
-		asm volatile("sync" : : );
+	asm_io_sync();
 
 	READ_REG(ioc->ioc_hpa+IOC_PCOM);	/* flush purges */
 #endif /* DELAYED_RESOURCE_CNT == 0 */
@@ -1007,8 +992,7 @@ sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
 	filled = iommu_fill_pdir(ioc, sglist, nents, 0, sba_io_pdir_entry);
 
 	/* force FDC ops in io_pdir_entry() to be visible to IOMMU */
-	if (ioc_needs_fdc)
-		asm volatile("sync" : : );
+	asm_io_sync();
 
 #ifdef ASSERT_PDIR_SANITY
 	if (sba_check_pdir(ioc,"Check after sba_map_sg()"))
@@ -1084,11 +1068,6 @@ sba_unmap_sg(struct device *dev, struct scatterlist *sglist, int nents,
 
 }
 
-static int sba_mapping_error(struct device *dev, dma_addr_t dma_addr)
-{
-	return dma_addr == SBA_MAPPING_ERROR;
-}
-
 static const struct dma_map_ops sba_ops = {
 	.dma_supported =	sba_dma_supported,
 	.alloc =		sba_alloc,
@@ -1097,7 +1076,7 @@ static const struct dma_map_ops sba_ops = {
 	.unmap_page =		sba_unmap_page,
 	.map_sg =		sba_map_sg,
 	.unmap_sg =		sba_unmap_sg,
-	.mapping_error =	sba_mapping_error,
+	.get_sgtable =		dma_common_get_sgtable,
 };
 
 
@@ -1418,7 +1397,7 @@ sba_ioc_init(struct parisc_device *sba, struct ioc *ioc, int ioc_num)
 	** for DMA hints - ergo only 30 bits max.
 	*/
 
-	iova_space_size = (u32) (totalram_pages/global_ioc_cnt);
+	iova_space_size = (u32) (totalram_pages()/global_ioc_cnt);
 
 	/* limit IOVA space size to 1MB-1GB */
 	if (iova_space_size < (1 << (20 - PAGE_SHIFT))) {
@@ -1443,7 +1422,7 @@ sba_ioc_init(struct parisc_device *sba, struct ioc *ioc, int ioc_num)
 	DBG_INIT("%s() hpa 0x%lx mem %ldMB IOV %dMB (%d bits)\n",
 			__func__,
 			ioc->ioc_hpa,
-			(unsigned long) totalram_pages >> (20 - PAGE_SHIFT),
+			(unsigned long) totalram_pages() >> (20 - PAGE_SHIFT),
 			iova_space_size>>20,
 			iov_order + PAGE_SHIFT);
 

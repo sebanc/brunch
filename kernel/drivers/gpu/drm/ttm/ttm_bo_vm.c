@@ -61,9 +61,10 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 
 	/*
 	 * If possible, avoid waiting for GPU with mmap_sem
-	 * held.
+	 * held.  We only do this if the fault allows retry and this
+	 * is the first attempt.
 	 */
-	if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
+	if (fault_flag_allow_retry_first(vmf->flags)) {
 		ret = VM_FAULT_RETRY;
 		if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 			goto out_unlock;
@@ -71,7 +72,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 		ttm_bo_get(bo);
 		up_read(&vmf->vma->vm_mm->mmap_sem);
 		(void) dma_fence_wait(bo->moving, true);
-		ttm_bo_unreserve(bo);
+		dma_resv_unlock(bo->base.resv);
 		ttm_bo_put(bo);
 		goto out_unlock;
 	}
@@ -131,12 +132,13 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * for reserve, and if it fails, retry the fault after waiting
 	 * for the buffer to become unreserved.
 	 */
-	err = ttm_bo_reserve(bo, true, true, NULL);
-	if (unlikely(err != 0)) {
-		if (err != -EBUSY)
-			return VM_FAULT_NOPAGE;
-
-		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
+	if (unlikely(!dma_resv_trylock(bo->base.resv))) {
+		/*
+		 * If the fault allows retry and this is the first
+		 * fault attempt, we try to release the mmap_sem
+		 * before waiting
+		 */
+		if (fault_flag_allow_retry_first(vmf->flags)) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
 				up_read(&vmf->vma->vm_mm->mmap_sem);
@@ -165,6 +167,8 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	}
 
 	if (bdev->driver->fault_reserve_notify) {
+		struct dma_fence *moving = dma_fence_get(bo->moving);
+
 		err = bdev->driver->fault_reserve_notify(bo);
 		switch (err) {
 		case 0:
@@ -177,6 +181,13 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 			ret = VM_FAULT_SIGBUS;
 			goto out_unlock;
 		}
+
+		if (bo->moving != moving) {
+			spin_lock(&bdev->glob->lru_lock);
+			ttm_bo_move_to_lru_tail(bo, NULL);
+			spin_unlock(&bdev->glob->lru_lock);
+		}
+		dma_fence_put(moving);
 	}
 
 	/*
@@ -206,9 +217,9 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	}
 
 	page_offset = ((address - vma->vm_start) >> PAGE_SHIFT) +
-		vma->vm_pgoff - drm_vma_node_start(&bo->vma_node);
+		vma->vm_pgoff - drm_vma_node_start(&bo->base.vma_node);
 	page_last = vma_pages(vma) + vma->vm_pgoff -
-		drm_vma_node_start(&bo->vma_node);
+		drm_vma_node_start(&bo->base.vma_node);
 
 	if (unlikely(page_offset >= bo->num_pages)) {
 		ret = VM_FAULT_SIGBUS;
@@ -262,7 +273,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 			} else if (unlikely(!page)) {
 				break;
 			}
-			page->index = drm_vma_node_start(&bo->vma_node) +
+			page->index = drm_vma_node_start(&bo->base.vma_node) +
 				page_offset;
 			pfn = page_to_pfn(page);
 		}
@@ -289,7 +300,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 out_io_unlock:
 	ttm_mem_io_unlock(man);
 out_unlock:
-	ttm_bo_unreserve(bo);
+	dma_resv_unlock(bo->base.resv);
 	return ret;
 }
 
@@ -351,8 +362,10 @@ static int ttm_bo_vm_access_kmap(struct ttm_buffer_object *bo,
 static int ttm_bo_vm_access(struct vm_area_struct *vma, unsigned long addr,
 			    void *buf, int len, int write)
 {
-	unsigned long offset = (addr) - vma->vm_start;
 	struct ttm_buffer_object *bo = vma->vm_private_data;
+	unsigned long offset = (addr) - vma->vm_start +
+		((vma->vm_pgoff - drm_vma_node_start(&bo->base.vma_node))
+		 << PAGE_SHIFT);
 	int ret;
 
 	if (len < 1 || (offset + len) >> PAGE_SHIFT > bo->num_pages)
@@ -404,7 +417,8 @@ static struct ttm_buffer_object *ttm_bo_vm_lookup(struct ttm_bo_device *bdev,
 
 	node = drm_vma_offset_lookup_locked(&bdev->vma_manager, offset, pages);
 	if (likely(node)) {
-		bo = container_of(node, struct ttm_buffer_object, vma_node);
+		bo = container_of(node, struct ttm_buffer_object,
+				  base.vma_node);
 		bo = ttm_bo_get_unless_zero(bo);
 	}
 
@@ -422,6 +436,9 @@ int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 	struct ttm_bo_driver *driver;
 	struct ttm_buffer_object *bo;
 	int ret;
+
+	if (unlikely(vma->vm_pgoff < DRM_FILE_PAGE_OFFSET_START))
+		return -EINVAL;
 
 	bo = ttm_bo_vm_lookup(bdev, vma->vm_pgoff, vma_pages(vma));
 	if (unlikely(!bo))

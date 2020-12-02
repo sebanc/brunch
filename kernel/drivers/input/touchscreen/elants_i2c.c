@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Elan Microelectronics touch panels with I2C interface
  *
@@ -10,7 +11,6 @@
  *  Copyright (c) 2010-2012 Benjamin Tissoires <benjamin.tissoires@gmail.com>
  *  Copyright (c) 2010-2012 Ecole Nationale de l'Aviation Civile, France
  *
- *
  * This code is partly based on i2c-hid.c:
  *
  * Copyright (c) 2012 Benjamin Tissoires <benjamin.tissoires@gmail.com>
@@ -18,13 +18,7 @@
  * Copyright (c) 2012 Red Hat, Inc
  */
 
-/*
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- */
 
-#include <linux/bits.h>
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
@@ -65,10 +59,8 @@
 #define CMD_HEADER_WRITE	0x54
 #define CMD_HEADER_READ		0x53
 #define CMD_HEADER_6B_READ	0x5B
-#define CMD_HEADER_ROM_READ	0x96
 #define CMD_HEADER_RESP		0x52
 #define CMD_HEADER_6B_RESP	0x9B
-#define CMD_HEADER_ROM_RESP	0x95
 #define CMD_HEADER_HELLO	0x55
 #define CMD_HEADER_REK		0x66
 
@@ -79,7 +71,6 @@
 #define FW_POS_STATE		1
 #define FW_POS_TOTAL		2
 #define FW_POS_XY		3
-#define FW_POS_TOOL_TYPE	33
 #define FW_POS_CHECKSUM		34
 #define FW_POS_WIDTH		35
 #define FW_POS_PRESSURE		45
@@ -154,10 +145,11 @@ struct elants_data {
 
 	bool wake_irq_enabled;
 	bool keep_power_in_suspend;
-	bool unbinding;
 
 	/* Must be last to be used for DMA operations */
 	u8 buf[MAX_PACKET_SIZE] ____cacheline_aligned;
+
+	bool unbinding;
 };
 
 static int elants_i2c_send(struct i2c_client *client,
@@ -209,10 +201,6 @@ static int elants_i2c_execute_command(struct i2c_client *client,
 
 	case CMD_HEADER_6B_READ:
 		expected_response = CMD_HEADER_6B_RESP;
-		break;
-
-	case CMD_HEADER_ROM_READ:
-		expected_response = CMD_HEADER_ROM_RESP;
 		break;
 
 	default:
@@ -574,8 +562,6 @@ static int elants_i2c_initialize(struct elants_data *ts)
 
 	/* hw version is available even if device in recovery state */
 	error2 = elants_i2c_query_hw_version(ts);
-	if (!error2)
-		error2 = elants_i2c_query_bc_version(ts);
 	if (!error)
 		error = error2;
 
@@ -583,6 +569,8 @@ static int elants_i2c_initialize(struct elants_data *ts)
 		error = elants_i2c_query_fw_version(ts);
 	if (!error)
 		error = elants_i2c_query_test_version(ts);
+	if (!error)
+		error = elants_i2c_query_bc_version(ts);
 	if (!error)
 		error = elants_i2c_query_ts_info(ts);
 
@@ -631,94 +619,39 @@ static int elants_i2c_fw_write_page(struct i2c_client *client,
 	return error;
 }
 
-static int elants_i2c_validate_remark_id(struct elants_data *ts,
-					 const struct firmware *fw)
-{
-	struct i2c_client *client = ts->client;
-	int error;
-	const u8 cmd[] = { CMD_HEADER_ROM_READ, 0x80, 0x1F, 0x00, 0x00, 0x21 };
-	u8 resp[6] = { 0 };
-	u16 ts_remark_id = 0;
-	u16 fw_remark_id = 0;
-
-	/* Compare TS Remark ID and FW Remark ID */
-	error = elants_i2c_execute_command(client, cmd, sizeof(cmd),
-					resp, sizeof(resp));
-	if (error) {
-		dev_err(&client->dev, "failed to query Remark ID: %d\n", error);
-		return error;
-	}
-
-	ts_remark_id = get_unaligned_be16(&resp[3]);
-
-	fw_remark_id = get_unaligned_le16(&fw->data[fw->size - 4]);
-
-	if (fw_remark_id != ts_remark_id) {
-		dev_err(&client->dev,
-			"Remark ID Mismatched: ts_remark_id=0x%04x, fw_remark_id=0x%04x.\n",
-			ts_remark_id, fw_remark_id);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 static int elants_i2c_do_update_firmware(struct i2c_client *client,
 					 const struct firmware *fw,
 					 bool force)
 {
-	struct elants_data *ts = i2c_get_clientdata(client);
 	const u8 enter_iap[] = { 0x45, 0x49, 0x41, 0x50 };
 	const u8 enter_iap2[] = { 0x54, 0x00, 0x12, 0x34 };
 	const u8 iap_ack[] = { 0x55, 0xaa, 0x33, 0xcc };
-	const u8 close_idle[] = { 0x54, 0x2c, 0x01, 0x01 };
+	const u8 close_idle[] = {0x54, 0x2c, 0x01, 0x01};
 	u8 buf[HEADER_SIZE];
 	u16 send_id;
 	int page, n_fw_pages;
 	int error;
-	bool check_remark_id = ts->iap_version >= 0x60;
 
 	/* Recovery mode detection! */
 	if (force) {
 		dev_dbg(&client->dev, "Recovery mode procedure\n");
-
-		if (check_remark_id) {
-			error = elants_i2c_validate_remark_id(ts, fw);
-			if (error)
-				return error;
-		}
-
 		error = elants_i2c_send(client, enter_iap2, sizeof(enter_iap2));
-		if (error) {
-			dev_err(&client->dev, "failed to enter IAP mode: %d\n",
-				error);
-			return error;
-		}
 	} else {
 		/* Start IAP Procedure */
 		dev_dbg(&client->dev, "Normal IAP procedure\n");
-
 		/* Close idle mode */
 		error = elants_i2c_send(client, close_idle, sizeof(close_idle));
 		if (error)
 			dev_err(&client->dev, "Failed close idle: %d\n", error);
 		msleep(60);
-
 		elants_i2c_sw_reset(client);
 		msleep(20);
-
-		if (check_remark_id) {
-			error = elants_i2c_validate_remark_id(ts, fw);
-			if (error)
-				return error;
-		}
-
 		error = elants_i2c_send(client, enter_iap, sizeof(enter_iap));
-		if (error) {
-			dev_err(&client->dev, "failed to enter IAP mode: %d\n",
-				error);
-			return error;
-		}
+	}
+
+	if (error) {
+		dev_err(&client->dev, "failed to enter IAP mode: %d\n", error);
+		return error;
 	}
 
 	msleep(20);
@@ -854,7 +787,6 @@ static void elants_i2c_mt_event(struct elants_data *ts, u8 *buf)
 {
 	struct input_dev *input = ts->input;
 	unsigned int n_fingers;
-	unsigned int tool_type;
 	u16 finger_state;
 	int i;
 
@@ -864,10 +796,6 @@ static void elants_i2c_mt_event(struct elants_data *ts, u8 *buf)
 
 	dev_dbg(&ts->client->dev,
 		"n_fingers: %u, state: %04x\n",  n_fingers, finger_state);
-
-	/* Note: all fingers have the same tool type */
-	tool_type = buf[FW_POS_TOOL_TYPE] & BIT(0) ?
-			MT_TOOL_FINGER : MT_TOOL_PALM;
 
 	for (i = 0; i < MAX_CONTACT_NUM && n_fingers; i++) {
 		if (finger_state & 1) {
@@ -884,7 +812,7 @@ static void elants_i2c_mt_event(struct elants_data *ts, u8 *buf)
 				i, x, y, p, w);
 
 			input_mt_slot(input, i);
-			input_mt_report_slot_state(input, tool_type, true);
+			input_mt_report_slot_state(input, MT_TOOL_FINGER, true);
 			input_event(input, EV_ABS, ABS_MT_POSITION_X, x);
 			input_event(input, EV_ABS, ABS_MT_POSITION_Y, y);
 			input_event(input, EV_ABS, ABS_MT_PRESSURE, p);
@@ -1330,8 +1258,6 @@ static int elants_i2c_probe(struct i2c_client *client,
 	input_set_abs_params(ts->input, ABS_MT_POSITION_Y, 0, ts->y_max, 0, 0);
 	input_set_abs_params(ts->input, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
 	input_set_abs_params(ts->input, ABS_MT_PRESSURE, 0, 255, 0, 0);
-	input_set_abs_params(ts->input, ABS_MT_TOOL_TYPE,
-			     0, MT_TOOL_PALM, 0, 0);
 	input_abs_set_res(ts->input, ABS_MT_POSITION_X, ts->x_res);
 	input_abs_set_res(ts->input, ABS_MT_POSITION_Y, ts->y_res);
 	if (ts->major_res > 0)

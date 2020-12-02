@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/ctype.h>
@@ -22,6 +23,7 @@
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
 #include <linux/nfs_mount.h>
+#include <uapi/linux/mount.h>
 
 #include "do_mounts.h"
 
@@ -167,6 +169,24 @@ done:
 	}
 	return res;
 }
+
+/**
+ * match_dev_by_label - callback for finding a partition using its label
+ * @dev:	device passed in by the caller
+ * @data:	opaque pointer to the label to match
+ *
+ * Returns 1 if the device matches, and 0 otherwise.
+ */
+static int match_dev_by_label(struct device *dev, const void *data)
+{
+	const char *label = data;
+	struct hd_struct *part = dev_to_part(dev);
+
+	if (part->info && !strcmp(label, part->info->volname))
+		return 1;
+
+	return 0;
+}
 #endif
 
 /*
@@ -190,6 +210,8 @@ done:
  *	   a partition with a known unique id.
  *	8) <major>:<minor> major and minor number of the device separated by
  *	   a colon.
+ *	9) PARTLABEL=<name> with name being the GPT partition label.
+ *	   MSDOS partitions do not support labels!
  *
  *	If name doesn't have fall into the categories above, we return (0,0).
  *	block_class is used to check if something is a disk name. If the disk
@@ -210,6 +232,17 @@ dev_t name_to_dev_t(const char *name)
 		res = devt_from_partuuid(name);
 		if (!res)
 			goto fail;
+		goto done;
+	} else if (strncmp(name, "PARTLABEL=", 10) == 0) {
+		struct device *dev;
+
+		dev = class_find_device(&block_class, NULL, name + 10,
+					&match_dev_by_label);
+		if (!dev)
+			goto fail;
+
+		res = dev->devt;
+		put_device(dev);
 		goto done;
 	}
 #endif
@@ -558,7 +591,6 @@ void __init prepare_namespace(void)
 	async_synchronize_full();
 
 	md_run_setup();
-	dm_run_setup();
 
 	if (saved_root_name[0]) {
 		root_device_name = saved_root_name;
@@ -598,44 +630,23 @@ out:
 }
 
 static bool is_tmpfs;
-static struct dentry *rootfs_mount(struct file_system_type *fs_type,
-	int flags, const char *dev_name, void *data)
+static int rootfs_init_fs_context(struct fs_context *fc)
 {
-	static unsigned long once;
-	void *fill = ramfs_fill_super;
-
-	if (test_and_set_bit(0, &once))
-		return ERR_PTR(-ENODEV);
-
 	if (IS_ENABLED(CONFIG_TMPFS) && is_tmpfs)
-		fill = shmem_fill_super;
+		return shmem_init_fs_context(fc);
 
-	return mount_nodev(fs_type, flags, data, fill);
+	return ramfs_init_fs_context(fc);
 }
 
-static struct file_system_type rootfs_fs_type = {
+struct file_system_type rootfs_fs_type = {
 	.name		= "rootfs",
-	.mount		= rootfs_mount,
+	.init_fs_context = rootfs_init_fs_context,
 	.kill_sb	= kill_litter_super,
 };
 
-int __init init_rootfs(void)
+void __init init_rootfs(void)
 {
-	int err = register_filesystem(&rootfs_fs_type);
-
-	if (err)
-		return err;
-
 	if (IS_ENABLED(CONFIG_TMPFS) && !saved_root_name[0] &&
-		(!root_fs_names || strstr(root_fs_names, "tmpfs"))) {
-		err = shmem_init();
+		(!root_fs_names || strstr(root_fs_names, "tmpfs")))
 		is_tmpfs = true;
-	} else {
-		err = init_ramfs_fs();
-	}
-
-	if (err)
-		unregister_filesystem(&rootfs_fs_type);
-
-	return err;
 }

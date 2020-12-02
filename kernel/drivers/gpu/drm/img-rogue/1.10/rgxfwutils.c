@@ -49,7 +49,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "lists.h"
 
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 #include "rgx_fwif_km.h"
 #include "pdump_km.h"
 #include "osfunc.h"
@@ -93,7 +93,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "tlstream.h"
 #include "devicemem_server_utils.h"
 #include "htbuffer.h"
-#include "rgx_bvnc_defs_km.h"
+#include "km/rgx_bvnc_defs_km.h"
 
 #include "physmem_lma.h"
 #include "physmem_osmem.h"
@@ -118,8 +118,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxpdvfs.h"
 #endif
 
-#include "vz_support.h"
-#include "vz_physheap.h"
+#include "system/vz_support.h"
+#include "system/vz_physheap.h"
 #include "rgx_heaps.h"
 
 /* Kernel CCB length */
@@ -1156,13 +1156,13 @@ static PVRSRV_ERROR RGXSetupCCB(PVRSRV_RGXDEV_INFO	*psDevInfo,
 {
 	const IMG_UINT32	ui32MaxInputStrSize	= 13;
 	const IMG_UINT32	ui32AppendStrSize	= 7;
-	const IMG_UINT32	ui32MaxTotalStrSize	= ui32MaxInputStrSize + ui32AppendStrSize +1;
 	const IMG_CHAR		sAppend[] = "Control";
 	PVRSRV_ERROR		eError;
 	RGXFWIF_CCB_CTL		*psCCBCtl;
 	DEVMEM_FLAGS_T		uiCCBCtlMemAllocFlags;
 	IMG_UINT32		ui32CCBSize = (1U << ui32NumCmdsLog2);
-	IMG_CHAR		sCCBCtlName[ui32MaxTotalStrSize];
+	IMG_CHAR		sCCBCtlName[32];
+	int			n;
 
 	PVR_ASSERT(strlen(sAppend) == ui32AppendStrSize);
 	PVR_ASSERT(strlen(pszName) <= ui32MaxInputStrSize);
@@ -1177,8 +1177,8 @@ static PVRSRV_ERROR RGXSetupCCB(PVRSRV_RGXDEV_INFO	*psDevInfo,
 			PVRSRV_MEMALLOCFLAG_ZERO_ON_ALLOC;
 
 	/* Append "Control" to the name for the control struct. */
-	strcpy(sCCBCtlName, pszName);
-	strncat(sCCBCtlName, sAppend, ui32AppendStrSize);
+	n = snprintf(sCCBCtlName, sizeof(sCCBCtlName), "%s%s", pszName, sAppend);
+	PVR_ASSERT(n < sizeof(sCCBCtlName));
 
 	/* Allocate memory for the CCB control.*/
 	PDUMPCOMMENT("Allocate memory for %s", sCCBCtlName);

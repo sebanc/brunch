@@ -1,0 +1,12 @@
+.*
+*.o
+*.ko
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+
+!.gitignore
+!.gitattributes

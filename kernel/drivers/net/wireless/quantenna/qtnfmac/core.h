@@ -1,18 +1,5 @@
-/*
- * Copyright (c) 2015-2016 Quantenna Communications, Inc.
- * All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- */
+/* SPDX-License-Identifier: GPL-2.0+ */
+/* Copyright (c) 2015-2016 Quantenna Communications. All rights reserved. */
 
 #ifndef _QTN_FMAC_CORE_H_
 #define _QTN_FMAC_CORE_H_
@@ -64,12 +51,6 @@ struct qtnf_sta_list {
 	atomic_t size;
 };
 
-enum qtnf_sta_state {
-	QTNF_STA_DISCONNECTED,
-	QTNF_STA_CONNECTING,
-	QTNF_STA_CONNECTED
-};
-
 struct qtnf_vif {
 	struct wireless_dev wdev;
 	u8 bssid[ETH_ALEN];
@@ -77,12 +58,13 @@ struct qtnf_vif {
 	u8 vifid;
 	u8 bss_priority;
 	u8 bss_status;
-	enum qtnf_sta_state sta_state;
 	u16 mgmt_frames_bitmask;
 	struct net_device *netdev;
 	struct qtnf_wmac *mac;
 
 	struct work_struct reset_work;
+	struct work_struct high_pri_tx_work;
+	struct sk_buff_head high_pri_tx_queue;
 	struct qtnf_sta_list sta_list;
 	unsigned long cons_tx_timeout_cnt;
 	int generation;
@@ -132,6 +114,7 @@ struct qtnf_wmac {
 	struct cfg80211_scan_request *scan_req;
 	struct mutex mac_lock;	/* lock during wmac speicific ops */
 	struct delayed_work scan_timeout;
+	struct ieee80211_regdomain *rd;
 };
 
 struct qtnf_hw_info {
@@ -140,7 +123,6 @@ struct qtnf_hw_info {
 	u8 mac_bitmap;
 	u32 fw_ver;
 	u32 hw_capab;
-	struct ieee80211_regdomain *rd;
 	u8 total_tx_chain;
 	u8 total_rx_chain;
 	char fw_version[ETHTOOL_FWVERS_LEN];
@@ -152,6 +134,7 @@ struct qtnf_vif *qtnf_mac_get_free_vif(struct qtnf_wmac *mac);
 struct qtnf_vif *qtnf_mac_get_base_vif(struct qtnf_wmac *mac);
 void qtnf_mac_iface_comb_free(struct qtnf_wmac *mac);
 void qtnf_mac_ext_caps_free(struct qtnf_wmac *mac);
+bool qtnf_mac_slave_radar_get(struct wiphy *wiphy);
 struct wiphy *qtnf_wiphy_allocate(struct qtnf_bus *bus);
 int qtnf_core_net_attach(struct qtnf_wmac *mac, struct qtnf_vif *priv,
 			 const char *name, unsigned char name_assign_type);
@@ -169,6 +152,8 @@ void qtnf_virtual_intf_cleanup(struct net_device *ndev);
 
 void qtnf_netdev_updown(struct net_device *ndev, bool up);
 void qtnf_scan_done(struct qtnf_wmac *mac, bool aborted);
+void qtnf_packet_send_hi_pri(struct sk_buff *skb);
+struct dentry *qtnf_get_debugfs_dir(void);
 
 static inline struct qtnf_vif *qtnf_netdev_get_priv(struct net_device *dev)
 {

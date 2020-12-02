@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
 config 64BIT
 	bool "64-bit kernel" if "$(ARCH)" = "sparc"
 	default "$(ARCH)" = "sparc64"
@@ -16,11 +17,13 @@ config SPARC
 	select ARCH_MIGHT_HAVE_PC_SERIO
 	select OF
 	select OF_PROMTREE
+	select HAVE_ASM_MODVERSIONS
 	select HAVE_IDE
 	select HAVE_OPROFILE
 	select HAVE_ARCH_KGDB if !SMP || SPARC64
 	select HAVE_ARCH_TRACEHOOK
 	select HAVE_EXIT_THREAD
+	select HAVE_PCI
 	select SYSCTL_EXCEPTION_TRACE
 	select RTC_CLASS
 	select RTC_DRV_M48T59
@@ -38,20 +41,18 @@ config SPARC
 	select GENERIC_STRNCPY_FROM_USER
 	select GENERIC_STRNLEN_USER
 	select MODULES_USE_ELF_RELA
+	select PCI_SYSCALL if PCI
 	select ODD_RT_SIGACTION
 	select OLD_SIGSUSPEND
-	select ARCH_HAS_SG_CHAIN
 	select CPU_NO_EFFICIENT_FFS
 	select LOCKDEP_SMALL if LOCKDEP
 	select NEED_DMA_MAP_STATE
 	select NEED_SG_DMA_LENGTH
-	select HAVE_MEMBLOCK
-	select NO_BOOTMEM
 
 config SPARC32
 	def_bool !64BIT
+	select ARCH_32BIT_OFF_T
 	select ARCH_HAS_SYNC_DMA_FOR_CPU
-	select DMA_NONCOHERENT_OPS
 	select GENERIC_ATOMIC64
 	select CLZ_TAB
 	select HAVE_UID16
@@ -91,6 +92,8 @@ config SPARC64
 	select GENERIC_TIME_VSYSCALL
 	select ARCH_CLOCKSOURCE_DATA
 	select ARCH_HAS_PTE_SPECIAL
+	select PCI_DOMAINS if PCI
+	select ARCH_HAS_GIGANTIC_PAGE
 
 config ARCH_DEFCONFIG
 	string
@@ -176,7 +179,7 @@ config SMP
 	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
 	  Management" code will be disabled if you say Y here.
 
-	  See also <file:Documentation/lockup-watchdogs.txt> and the SMP-HOWTO
+	  See also <file:Documentation/admin-guide/lockup-watchdogs.rst> and the SMP-HOWTO
 	  available at <http://www.tldp.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
@@ -189,15 +192,7 @@ config NR_CPUS
 	default 32 if SPARC32
 	default 4096 if SPARC64
 
-source kernel/Kconfig.hz
-
-config RWSEM_GENERIC_SPINLOCK
-	bool
-	default y if SPARC32
-
-config RWSEM_XCHGADD_ALGORITHM
-	bool
-	default y if SPARC64
+source "kernel/Kconfig.hz"
 
 config GENERIC_HWEIGHT
 	bool
@@ -304,9 +299,6 @@ config NODES_SHIFT
 config NODES_SPAN_OTHER_NODES
 	def_bool y
 	depends on NEED_MULTIPLE_NODES
-
-config ARCH_SELECT_MEMORY_MODEL
-	def_bool y if SPARC64
 
 config ARCH_SPARSEMEM_ENABLE
 	def_bool y if SPARC64
@@ -474,24 +466,6 @@ config SUN_LDOMS
 	  Say Y here is you want to support virtual devices via
 	  Logical Domains.
 
-config PCI
-	bool "Support for PCI and PS/2 keyboard/mouse"
-	help
-	  Find out whether your system includes a PCI bus. PCI is the name of
-	  a bus system, i.e. the way the CPU talks to the other stuff inside
-	  your box.  If you say Y here, the kernel will include drivers and
-	  infrastructure code to support PCI bus devices.
-
-	  CONFIG_PCI is needed for all JavaStation's (including MrCoffee),
-	  CP-1200, JavaEngine-1, Corona, Red October, and Serengeti SGSC.
-	  All of these platforms are extremely obscure, so say N if unsure.
-
-config PCI_DOMAINS
-	def_bool PCI if SPARC64
-
-config PCI_SYSCALL
-	def_bool PCI
-
 config PCIC_PCI
 	bool
 	depends on PCI && SPARC32 && !SPARC_LEON
@@ -519,10 +493,6 @@ config SPARC_GRPCI2
 	default y
 	help
 	  Say Y here to include the GRPCI2 Host Bridge Driver.
-
-source "drivers/pci/Kconfig"
-
-source "drivers/pcmcia/Kconfig"
 
 config SUN_OPENPROMFS
 	tristate "Openprom tree appears in /proc/openprom"

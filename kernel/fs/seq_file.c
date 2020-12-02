@@ -317,6 +317,7 @@ loff_t seq_lseek(struct file *file, loff_t offset, int whence)
 	switch (whence) {
 	case SEEK_CUR:
 		offset += file->f_pos;
+		/* fall through */
 	case SEEK_SET:
 		if (offset < 0)
 			break;
@@ -382,6 +383,17 @@ void seq_escape(struct seq_file *m, const char *s, const char *esc)
 	seq_commit(m, ret < size ? ret : -1);
 }
 EXPORT_SYMBOL(seq_escape);
+
+void seq_escape_mem_ascii(struct seq_file *m, const char *src, size_t isz)
+{
+	char *buf;
+	size_t size = seq_get_buf(m, &buf);
+	int ret;
+
+	ret = string_escape_mem_ascii(src, isz, buf, size);
+	seq_commit(m, ret < size ? ret : -1);
+}
+EXPORT_SYMBOL(seq_escape_mem_ascii);
 
 void seq_vprintf(struct seq_file *m, const char *f, va_list args)
 {

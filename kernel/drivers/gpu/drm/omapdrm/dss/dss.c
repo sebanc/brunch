@@ -1,21 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2009 Nokia Corporation
  * Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
  *
  * Some code and ideas taken from drivers/video/omap/ driver
  * by Imre Deak.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #define DSS_SUBSYS_NAME "DSS"
@@ -934,7 +923,6 @@ dss_debugfs_create_file(struct dss_device *dss, const char *name,
 			void *data)
 {
 	struct dss_debugfs_entry *entry;
-	struct dentry *d;
 
 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
 	if (!entry)
@@ -942,15 +930,9 @@ dss_debugfs_create_file(struct dss_device *dss, const char *name,
 
 	entry->show_fn = show_fn;
 	entry->data = data;
+	entry->dentry = debugfs_create_file(name, 0444, dss->debugfs.root,
+					    entry, &dss_debug_fops);
 
-	d = debugfs_create_file(name, 0444, dss->debugfs.root, entry,
-				&dss_debug_fops);
-	if (IS_ERR(d)) {
-		kfree(entry);
-		return ERR_CAST(d);
-	}
-
-	entry->dentry = d;
 	return entry;
 }
 
@@ -1169,6 +1151,31 @@ static const struct dss_features dra7xx_dss_feats = {
 	.has_lcd_clk_src	=	true,
 };
 
+static void __dss_uninit_ports(struct dss_device *dss, unsigned int num_ports)
+{
+	struct platform_device *pdev = dss->pdev;
+	struct device_node *parent = pdev->dev.of_node;
+	struct device_node *port;
+	unsigned int i;
+
+	for (i = 0; i < num_ports; i++) {
+		port = of_graph_get_port_by_id(parent, i);
+		if (!port)
+			continue;
+
+		switch (dss->feat->ports[i]) {
+		case OMAP_DISPLAY_TYPE_DPI:
+			dpi_uninit_port(port);
+			break;
+		case OMAP_DISPLAY_TYPE_SDI:
+			sdi_uninit_port(port);
+			break;
+		default:
+			break;
+		}
+	}
+}
+
 static int dss_init_ports(struct dss_device *dss)
 {
 	struct platform_device *pdev = dss->pdev;
@@ -1186,13 +1193,13 @@ static int dss_init_ports(struct dss_device *dss)
 		case OMAP_DISPLAY_TYPE_DPI:
 			r = dpi_init_port(dss, pdev, port, dss->feat->model);
 			if (r)
-				return r;
+				goto error;
 			break;
 
 		case OMAP_DISPLAY_TYPE_SDI:
 			r = sdi_init_port(dss, pdev, port);
 			if (r)
-				return r;
+				goto error;
 			break;
 
 		default:
@@ -1201,31 +1208,15 @@ static int dss_init_ports(struct dss_device *dss)
 	}
 
 	return 0;
+
+error:
+	__dss_uninit_ports(dss, i);
+	return r;
 }
 
 static void dss_uninit_ports(struct dss_device *dss)
 {
-	struct platform_device *pdev = dss->pdev;
-	struct device_node *parent = pdev->dev.of_node;
-	struct device_node *port;
-	int i;
-
-	for (i = 0; i < dss->feat->num_ports; i++) {
-		port = of_graph_get_port_by_id(parent, i);
-		if (!port)
-			continue;
-
-		switch (dss->feat->ports[i]) {
-		case OMAP_DISPLAY_TYPE_DPI:
-			dpi_uninit_port(port);
-			break;
-		case OMAP_DISPLAY_TYPE_SDI:
-			sdi_uninit_port(port);
-			break;
-		default:
-			break;
-		}
-	}
+	__dss_uninit_ports(dss, dss->feat->num_ports);
 }
 
 static int dss_video_pll_probe(struct dss_device *dss)
@@ -1560,7 +1551,7 @@ static void dss_shutdown(struct platform_device *pdev)
 
 	DSSDBG("shutdown\n");
 
-	for_each_dss_display(dssdev) {
+	for_each_dss_output(dssdev) {
 		if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
 			dssdev->ops->disable(dssdev);
 	}

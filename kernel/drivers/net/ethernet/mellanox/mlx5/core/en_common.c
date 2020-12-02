@@ -160,7 +160,7 @@ int mlx5e_refresh_tirs(struct mlx5e_priv *priv, bool enable_uc_lb)
 
 	if (enable_uc_lb)
 		MLX5_SET(modify_tir_in, in, ctx.self_lb_block,
-			 MLX5_TIRC_SELF_LB_BLOCK_BLOCK_UNICAST_);
+			 MLX5_TIRC_SELF_LB_BLOCK_BLOCK_UNICAST);
 
 	MLX5_SET(modify_tir_in, in, bitmask.self_lb_en, 1);
 
@@ -179,16 +179,4 @@ out:
 	mutex_unlock(&mdev->mlx5e_res.td.list_lock);
 
 	return err;
-}
-
-u8 mlx5e_params_calculate_tx_min_inline(struct mlx5_core_dev *mdev)
-{
-	u8 min_inline_mode;
-
-	mlx5_query_min_inline(mdev, &min_inline_mode);
-	if (min_inline_mode == MLX5_INLINE_MODE_NONE &&
-	    !MLX5_CAP_ETH(mdev, wqe_vlan_insert))
-		min_inline_mode = MLX5_INLINE_MODE_L2;
-
-	return min_inline_mode;
 }

@@ -302,14 +302,9 @@ void Switch_DM_Func(struct adapter *padapter, u32 mode, u8 enable)
 		rtw_hal_set_hwreg(padapter, HW_VAR_DM_FUNC_CLR, (u8 *)(&mode));
 }
 
-static void Set_NETYPE0_MSR(struct adapter *padapter, u8 type)
-{
-	rtw_hal_set_hwreg(padapter, HW_VAR_MEDIA_STATUS, (u8 *)(&type));
-}
-
 void Set_MSR(struct adapter *padapter, u8 type)
 {
-	Set_NETYPE0_MSR(padapter, type);
+	rtw_hal_set_hwreg(padapter, HW_VAR_MEDIA_STATUS, (u8 *)(&type));
 }
 
 inline u8 rtw_get_oper_ch(struct adapter *adapter)
@@ -456,7 +451,7 @@ void set_channel_bwmode(struct adapter *padapter, unsigned char channel, unsigne
 	mutex_unlock(&(adapter_to_dvobj(padapter)->setch_mutex));
 }
 
-__inline u8 *get_my_bssid(struct wlan_bssid_ex *pnetwork)
+inline u8 *get_my_bssid(struct wlan_bssid_ex *pnetwork)
 {
 	return pnetwork->MacAddress;
 }
@@ -518,7 +513,7 @@ unsigned int decide_wait_for_beacon_timeout(unsigned int bcn_interval)
 	else if ((bcn_interval << 2) > WAIT_FOR_BCN_TO_MAX)
 		return WAIT_FOR_BCN_TO_MAX;
 	else
-		return ((bcn_interval << 2));
+		return bcn_interval << 2;
 }
 
 void invalidate_cam_all(struct adapter *padapter)
@@ -745,7 +740,7 @@ s16 rtw_camid_alloc(struct adapter *adapter, struct sta_info *sta, u8 kid)
 		i = _rtw_camid_search(adapter, addr, kid);
 		if (i >= 0) {
 			/* Fix issue that pairwise and group key have same key id. Pairwise key first, group key can overwirte group only(ex: rekey) */
-			if (sta || _rtw_camid_is_gk(adapter, i) == true)
+			if (sta || _rtw_camid_is_gk(adapter, i))
 				cam_id = i;
 			else
 				DBG_871X_LEVEL(_drv_always_, FUNC_ADPT_FMT" group key id:%u the same key id as pairwise key\n"
@@ -889,7 +884,7 @@ void WMMOnAssocRsp(struct adapter *padapter)
 		TXOP = 0x2f;
 		acParm = AIFS | (ECWMin << 8) | (ECWMax << 12) | (TXOP << 16);
 		rtw_hal_set_hwreg(padapter, HW_VAR_AC_PARAM_VO, (u8 *)(&acParm));
-	} else{
+	} else {
 		edca[0] = edca[1] = edca[2] = edca[3] = 0;
 
 		for (i = 0; i < 4; i++) {
@@ -1028,7 +1023,7 @@ static void bwmode_update_check(struct adapter *padapter, struct ndis_80211_var_
 			new_ch_offset = HAL_PRIME_CHNL_OFFSET_DONT_CARE;
 			break;
 		}
-	} else{
+	} else {
 		new_bwmode = CHANNEL_WIDTH_20;
 		new_ch_offset = HAL_PRIME_CHNL_OFFSET_DONT_CARE;
 	}
@@ -1060,7 +1055,7 @@ static void bwmode_update_check(struct adapter *padapter, struct ndis_80211_var_
 				/*  bwmode */
 				psta->bw_mode = pmlmeext->cur_bwmode;
 				phtpriv_sta->ch_offset = pmlmeext->cur_ch_offset;
-			} else{
+			} else {
 				psta->bw_mode = CHANNEL_WIDTH_20;
 				phtpriv_sta->ch_offset = HAL_PRIME_CHNL_OFFSET_DONT_CARE;
 			}
@@ -1094,7 +1089,7 @@ void HT_caps_handler(struct adapter *padapter, struct ndis_80211_var_ie *pIE)
 			/* 	Commented by Albert 2010/07/12 */
 			/* 	Got the endian issue here. */
 			pmlmeinfo->HT_caps.u.HT_cap[i] &= (pIE->data[i]);
-		} else{
+		} else {
 			/* modify from  fw by Thomas 2010/11/17 */
 			if ((pmlmeinfo->HT_caps.u.HT_cap_element.AMPDU_para & 0x3) > (pIE->data[i] & 0x3))
 				max_AMPDU_len = (pIE->data[i] & 0x3);
@@ -1191,7 +1186,7 @@ void HTOnAssocRsp(struct adapter *padapter)
 
 	if ((pmlmeinfo->HT_info_enable) && (pmlmeinfo->HT_caps_enable)) {
 		pmlmeinfo->HT_enable = 1;
-	} else{
+	} else {
 		pmlmeinfo->HT_enable = 0;
 		/* set_channel_bwmode(padapter, pmlmeext->cur_channel, pmlmeext->cur_ch_offset, pmlmeext->cur_bwmode); */
 		return;
@@ -1239,7 +1234,7 @@ void VCS_update(struct adapter *padapter, struct sta_info *psta)
 		if (pregpriv->vcs_type == 1) { /* 1:RTS/CTS 2:CTS to self */
 			psta->rtsen = 1;
 			psta->cts2self = 0;
-		} else{
+		} else {
 			psta->rtsen = 0;
 			psta->cts2self = 1;
 		}
@@ -1251,11 +1246,11 @@ void VCS_update(struct adapter *padapter, struct sta_info *psta)
 			if (pregpriv->vcs_type == 1) {
 				psta->rtsen = 1;
 				psta->cts2self = 0;
-			} else{
+			} else {
 				psta->rtsen = 0;
 				psta->cts2self = 1;
 			}
-		} else{
+		} else {
 			psta->rtsen = 0;
 			psta->cts2self = 0;
 		}
@@ -1620,16 +1615,10 @@ void Update_RA_Entry(struct adapter *padapter, struct sta_info *psta)
 	rtw_hal_update_ra_mask(psta, 0);
 }
 
-void enable_rate_adaptive(struct adapter *padapter, struct sta_info *psta);
-void enable_rate_adaptive(struct adapter *padapter, struct sta_info *psta)
-{
-	Update_RA_Entry(padapter, psta);
-}
-
 void set_sta_rate(struct adapter *padapter, struct sta_info *psta)
 {
 	/* rate adaptive */
-	enable_rate_adaptive(padapter, psta);
+	Update_RA_Entry(padapter, psta);
 }
 
 unsigned char check_assoc_AP(u8 *pframe, uint len)
@@ -1751,7 +1740,7 @@ void update_capinfo(struct adapter *Adapter, u16 updateCap)
 				pmlmeinfo->preamble_mode = PREAMBLE_SHORT;
 				rtw_hal_set_hwreg(Adapter, HW_VAR_ACK_PREAMBLE, (u8 *)&ShortPreamble);
 			}
-		} else{
+		} else {
 			/*  Long Preamble */
 			if (pmlmeinfo->preamble_mode != PREAMBLE_LONG) { /*  PREAMBLE_SHORT or PREAMBLE_AUTO */
 				ShortPreamble = false;
@@ -1804,7 +1793,7 @@ void update_wireless_mode(struct adapter *padapter)
 			network_type = WIRELESS_11_5N;
 
 		network_type |= WIRELESS_11A;
-	} else{
+	} else {
 		if (pmlmeinfo->VHT_enable)
 			network_type = WIRELESS_11AC;
 		else if (pmlmeinfo->HT_enable)
@@ -1839,7 +1828,7 @@ void update_sta_basic_rate(struct sta_info *psta, u8 wireless_mode)
 		/*  Only B, B/G, and B/G/N AP could use CCK rate */
 		memcpy(psta->bssrateset, rtw_basic_rate_cck, 4);
 		psta->bssratelen = 4;
-	} else{
+	} else {
 		memcpy(psta->bssrateset, rtw_basic_rate_ofdm, 3);
 		psta->bssratelen = 3;
 	}
@@ -1945,7 +1934,7 @@ void adaptive_early_32k(struct mlme_ext_priv *pmlmeext, u8 *pframe, uint len)
 
 	/* delay = (timestamp mod 1024*100)/1000 (unit: ms) */
 	/* delay_ms = do_div(tsf, (pmlmeinfo->bcn_interval*1024))/1000; */
-	delay_ms = rtw_modular64(tsf, (pmlmeinfo->bcn_interval*1024));
+	delay_ms = do_div(tsf, (pmlmeinfo->bcn_interval*1024));
 	delay_ms = delay_ms/1000;
 
 	if (delay_ms >= 8)
@@ -2009,11 +1998,6 @@ void adaptive_early_32k(struct mlme_ext_priv *pmlmeext, u8 *pframe, uint len)
 	}
 }
 
-void beacon_timing_control(struct adapter *padapter)
-{
-	rtw_hal_bcn_related_reg_setting(padapter);
-}
-
 void rtw_alloc_macid(struct adapter *padapter, struct sta_info *psta)
 {
 	int i;
@@ -2040,7 +2024,7 @@ void rtw_alloc_macid(struct adapter *padapter, struct sta_info *psta)
 	if (i > (NUM_STA-1)) {
 		psta->mac_id = NUM_STA;
 		DBG_871X("  no room for more MACIDs\n");
-	} else{
+	} else {
 		psta->mac_id = i;
 		DBG_871X("%s = %d\n", __func__, psta->mac_id);
 	}
@@ -2149,7 +2133,7 @@ int  rtw_set_gpio_output_value(struct net_device *netdev, int gpio_num, bool isH
 
 		DBG_871X("%s Set gpio %x[%d]=%d\n", __func__, REG_GPIO_PIN_CTRL+1, gpio_num, isHigh);
 		res = 0;
-	} else{
+	} else {
 		DBG_871X("%s The gpio is input, not be set!\n", __func__);
 		res = -1;
 	}

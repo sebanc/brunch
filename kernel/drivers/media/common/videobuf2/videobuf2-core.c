@@ -205,6 +205,7 @@ static int __vb2_buf_mem_alloc(struct vb2_buffer *vb)
 	 * NOTE: mmapped areas should be page aligned
 	 */
 	for (plane = 0; plane < vb->num_planes; ++plane) {
+		/* Memops alloc requires size to be page aligned. */
 		unsigned long size = PAGE_ALIGN(vb->planes[plane].length);
 
 		/* Did it wrap around? */
@@ -392,7 +393,7 @@ static int __vb2_queue_alloc(struct vb2_queue *q, enum vb2_memory memory,
 		}
 	}
 
-	dprintk(3, "allocated %d buffers, %d plane(s) each\n",
+	dprintk(1, "allocated %d buffers, %d plane(s) each\n",
 			buffer, num_planes);
 
 	return buffer;
@@ -668,6 +669,7 @@ int vb2_core_reqbufs(struct vb2_queue *q, enum vb2_memory memory,
 {
 	unsigned int num_buffers, allocated_buffers, num_planes = 0;
 	unsigned plane_sizes[VB2_MAX_PLANES] = { };
+	unsigned int i;
 	int ret;
 
 	if (q->streaming) {
@@ -727,6 +729,14 @@ int vb2_core_reqbufs(struct vb2_queue *q, enum vb2_memory memory,
 		       plane_sizes, q->alloc_devs);
 	if (ret)
 		return ret;
+
+	/* Check that driver has set sane values */
+	if (WARN_ON(!num_planes))
+		return -EINVAL;
+
+	for (i = 0; i < num_planes; i++)
+		if (WARN_ON(!plane_sizes[i]))
+			return -EINVAL;
 
 	/* Finally, allocate buffers and video memory */
 	allocated_buffers =
@@ -1752,7 +1762,6 @@ EXPORT_SYMBOL_GPL(vb2_wait_for_all_buffers);
 static void __vb2_dqbuf(struct vb2_buffer *vb)
 {
 	struct vb2_queue *q = vb->vb2_queue;
-	unsigned int i;
 
 	/* nothing to do if the buffer is already dequeued */
 	if (vb->state == VB2_BUF_STATE_DEQUEUED)
@@ -1761,6 +1770,8 @@ static void __vb2_dqbuf(struct vb2_buffer *vb)
 	vb->state = VB2_BUF_STATE_DEQUEUED;
 
 	if (q->memory == VB2_MEMORY_USERPTR) {
+		int i;
+
 		call_void_vb_qop(vb, buf_cleanup, vb);
 
 		for (i = 0; i < vb->num_planes; ++i) {
@@ -2183,6 +2194,13 @@ int vb2_mmap(struct vb2_queue *q, struct vm_area_struct *vma)
 		ret = -EINVAL;
 		goto unlock;
 	}
+
+	/*
+	 * vm_pgoff is treated in V4L2 API as a 'cookie' to select a buffer,
+	 * not as a in-buffer offset. We always want to mmap a whole buffer
+	 * from its beginning.
+	 */
+	vma->vm_pgoff = 0;
 
 	ret = call_memop(vb, mmap, vb->planes[plane].mem_priv, vma);
 

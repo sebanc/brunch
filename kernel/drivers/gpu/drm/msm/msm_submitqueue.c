@@ -3,12 +3,16 @@
  */
 
 #include <linux/kref.h>
+#include <linux/uaccess.h>
+
 #include "msm_gpu.h"
 
 void msm_submitqueue_destroy(struct kref *kref)
 {
 	struct msm_gpu_submitqueue *queue = container_of(kref,
 		struct msm_gpu_submitqueue, ref);
+
+	msm_file_private_put(queue->ctx);
 
 	kfree(queue);
 }
@@ -47,8 +51,10 @@ void msm_submitqueue_close(struct msm_file_private *ctx)
 	 * No lock needed in close and there won't
 	 * be any more user ioctls coming our way
 	 */
-	list_for_each_entry_safe(entry, tmp, &ctx->submitqueues, node)
+	list_for_each_entry_safe(entry, tmp, &ctx->submitqueues, node) {
+		list_del(&entry->node);
 		msm_submitqueue_put(entry);
+	}
 }
 
 int msm_submitqueue_create(struct drm_device *drm, struct msm_file_private *ctx,
@@ -79,6 +85,7 @@ int msm_submitqueue_create(struct drm_device *drm, struct msm_file_private *ctx,
 
 	write_lock(&ctx->queuelock);
 
+	queue->ctx = msm_file_private_get(ctx);
 	queue->id = ctx->queueid++;
 
 	if (id)
@@ -111,6 +118,47 @@ int msm_submitqueue_init(struct drm_device *drm, struct msm_file_private *ctx)
 	rwlock_init(&ctx->queuelock);
 
 	return msm_submitqueue_create(drm, ctx, default_prio, 0, NULL);
+}
+
+static int msm_submitqueue_query_faults(struct msm_gpu_submitqueue *queue,
+		struct drm_msm_submitqueue_query *args)
+{
+	size_t size = min_t(size_t, args->len, sizeof(queue->faults));
+	int ret;
+
+	/* If a zero length was passed in, return the data size we expect */
+	if (!args->len) {
+		args->len = sizeof(queue->faults);
+		return 0;
+	}
+
+	/* Set the length to the actual size of the data */
+	args->len = size;
+
+	ret = copy_to_user(u64_to_user_ptr(args->data), &queue->faults, size);
+
+	return ret ? -EFAULT : 0;
+}
+
+int msm_submitqueue_query(struct drm_device *drm, struct msm_file_private *ctx,
+		struct drm_msm_submitqueue_query *args)
+{
+	struct msm_gpu_submitqueue *queue;
+	int ret = -EINVAL;
+
+	if (args->pad)
+		return -EINVAL;
+
+	queue = msm_submitqueue_get(ctx, args->id);
+	if (!queue)
+		return -ENOENT;
+
+	if (args->param == MSM_SUBMITQUEUE_PARAM_FAULTS)
+		ret = msm_submitqueue_query_faults(queue, args);
+
+	msm_submitqueue_put(queue);
+
+	return ret;
 }
 
 int msm_submitqueue_remove(struct msm_file_private *ctx, u32 id)

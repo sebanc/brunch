@@ -1,12 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * rt5670.c  --  RT5670 ALSA SoC audio codec driver
  *
  * Copyright 2014 Realtek Semiconductor Corp.
  * Author: Bard Liao <bardliao@realtek.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/module.h>
@@ -456,13 +453,13 @@ static int rt5670_headset_detect(struct snd_soc_component *component, int jack_i
 		snd_soc_component_update_bits(component, RT5670_CJ_CTRL2,
 			RT5670_CBJ_MN_JD, 0);
 		msleep(300);
-		val = snd_soc_component_read32(component, RT5670_CJ_CTRL3) & 0x7;
+		val = snd_soc_component_read(component, RT5670_CJ_CTRL3) & 0x7;
 		if (val == 0x1 || val == 0x2) {
 			rt5670->jack_type = SND_JACK_HEADSET;
 			/* for push button */
 			snd_soc_component_update_bits(component, RT5670_INT_IRQ_ST, 0x8, 0x8);
 			snd_soc_component_update_bits(component, RT5670_IL_CMD, 0x40, 0x40);
-			snd_soc_component_read32(component, RT5670_IL_CMD);
+			snd_soc_component_read(component, RT5670_IL_CMD);
 		} else {
 			snd_soc_component_update_bits(component, RT5670_GEN_CTRL3, 0x4, 0x4);
 			rt5670->jack_type = SND_JACK_HEADPHONE;
@@ -502,12 +499,12 @@ static int rt5670_button_detect(struct snd_soc_component *component)
 {
 	int btn_type, val;
 
-	val = snd_soc_component_read32(component, RT5670_IL_CMD);
+	val = snd_soc_component_read(component, RT5670_IL_CMD);
 	btn_type = val & 0xff80;
 	snd_soc_component_write(component, RT5670_IL_CMD, val);
 	if (btn_type != 0) {
 		msleep(20);
-		val = snd_soc_component_read32(component, RT5670_IL_CMD);
+		val = snd_soc_component_read(component, RT5670_IL_CMD);
 		snd_soc_component_write(component, RT5670_IL_CMD, val);
 	}
 
@@ -522,9 +519,9 @@ static int rt5670_irq_detection(void *data)
 	int val, btn_type, report = jack->status;
 
 	if (rt5670->pdata.jd_mode == 1) /* 2 port */
-		val = snd_soc_component_read32(rt5670->component, RT5670_A_JD_CTRL1) & 0x0070;
+		val = snd_soc_component_read(rt5670->component, RT5670_A_JD_CTRL1) & 0x0070;
 	else
-		val = snd_soc_component_read32(rt5670->component, RT5670_A_JD_CTRL1) & 0x0020;
+		val = snd_soc_component_read(rt5670->component, RT5670_A_JD_CTRL1) & 0x0020;
 
 	switch (val) {
 	/* jack in */
@@ -537,7 +534,7 @@ static int rt5670_irq_detection(void *data)
 			break;
 		}
 		btn_type = 0;
-		if (snd_soc_component_read32(rt5670->component, RT5670_INT_IRQ_ST) & 0x4) {
+		if (snd_soc_component_read(rt5670->component, RT5670_INT_IRQ_ST) & 0x4) {
 			/* button pressed */
 			report = SND_JACK_HEADSET;
 			btn_type = rt5670_button_detect(rt5670->component);
@@ -766,7 +763,7 @@ static int is_using_asrc(struct snd_soc_dapm_widget *source,
 		return 0;
 	}
 
-	val = (snd_soc_component_read32(component, reg) >> shift) & 0xf;
+	val = (snd_soc_component_read(component, reg) >> shift) & 0xf;
 	switch (val) {
 	case 1:
 	case 2:
@@ -2654,7 +2651,7 @@ static int rt5670_probe(struct snd_soc_component *component)
 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(component);
 	struct rt5670_priv *rt5670 = snd_soc_component_get_drvdata(component);
 
-	switch (snd_soc_component_read32(component, RT5670_RESET) & RT5670_ID_MASK) {
+	switch (snd_soc_component_read(component, RT5670_RESET) & RT5670_ID_MASK) {
 	case RT5670_ID_5670:
 	case RT5670_ID_5671:
 		snd_soc_dapm_new_controls(dapm,
@@ -2906,6 +2903,18 @@ static const struct dmi_system_id dmi_platform_intel_quirks[] = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
 			DMI_MATCH(DMI_PRODUCT_NAME, "Venue 8 Pro 5855"),
+		},
+		.driver_data = (unsigned long *)(RT5670_DMIC_EN |
+						 RT5670_DMIC2_INR |
+						 RT5670_DEV_GPIO |
+						 RT5670_JD_MODE3),
+	},
+	{
+		.callback = rt5670_quirk_cb,
+		.ident = "Aegex 10 tablet (RU2)",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "AEGEX"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "RU2"),
 		},
 		.driver_data = (unsigned long *)(RT5670_DMIC_EN |
 						 RT5670_DMIC2_INR |

@@ -1,25 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* SCTP kernel implementation
  * (C) Copyright IBM Corp. 2003, 2004
  *
  * This file is part of the SCTP kernel implementation
  *
  * This file contains the code relating the chunk abstraction.
- *
- * This SCTP implementation is free software;
- * you can redistribute it and/or modify it under the terms of
- * the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This SCTP implementation is distributed in the hope that it
- * will be useful, but WITHOUT ANY WARRANTY; without even the implied
- *                 ************************
- * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU CC; see the file COPYING.  If not, see
- * <http://www.gnu.org/licenses/>.
  *
  * Please send any bug reports or fixes you make to the
  * email address(es):
@@ -86,11 +71,10 @@ void sctp_datamsg_free(struct sctp_datamsg *msg)
 /* Final destructruction of datamsg memory. */
 static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 {
+	struct sctp_association *asoc = NULL;
 	struct list_head *pos, *temp;
 	struct sctp_chunk *chunk;
-	struct sctp_sock *sp;
 	struct sctp_ulpevent *ev;
-	struct sctp_association *asoc = NULL;
 	int error = 0, notify;
 
 	/* If we failed, we may need to notify. */
@@ -108,9 +92,8 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 			else
 				error = asoc->outqueue.error;
 
-			sp = sctp_sk(asoc->base.sk);
-			notify = sctp_ulpevent_type_enabled(SCTP_SEND_FAILED,
-							    &sp->subscribe);
+			notify = sctp_ulpevent_type_enabled(asoc->subscribe,
+							    SCTP_SEND_FAILED);
 		}
 
 		/* Generate a SEND FAILED event only if enabled. */
@@ -194,7 +177,7 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	if (unlikely(!max_data)) {
 		max_data = sctp_min_frag_point(sctp_sk(asoc->base.sk),
 					       sctp_datachk_len(&asoc->stream));
-		pr_warn_ratelimited("%s: asoc:%p frag_point is zero, forcing max_data to default minimum (%Zu)",
+		pr_warn_ratelimited("%s: asoc:%p frag_point is zero, forcing max_data to default minimum (%zu)",
 				    __func__, asoc, max_data);
 	}
 

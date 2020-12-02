@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * wm8958-dsp2.c  --  WM8958 DSP2 support
  *
  * Copyright 2011 Wolfson Microelectronics plc
  *
  * Author: Mark Brown <broonie@opensource.wolfsonmicro.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/module.h>
@@ -199,7 +196,7 @@ static void wm8958_dsp_start_mbc(struct snd_soc_component *component, int path)
 	int i;
 
 	/* If the DSP is already running then noop */
-	if (snd_soc_component_read32(component, WM8958_DSP2_PROGRAM) & WM8958_DSP2_ENA)
+	if (snd_soc_component_read(component, WM8958_DSP2_PROGRAM) & WM8958_DSP2_ENA)
 		return;
 
 	/* If we have MBC firmware download it */
@@ -331,7 +328,7 @@ static void wm8958_dsp_start_enh_eq(struct snd_soc_component *component, int pat
 static void wm8958_dsp_apply(struct snd_soc_component *component, int path, int start)
 {
 	struct wm8994_priv *wm8994 = snd_soc_component_get_drvdata(component);
-	int pwr_reg = snd_soc_component_read32(component, WM8994_POWER_MANAGEMENT_5);
+	int pwr_reg = snd_soc_component_read(component, WM8994_POWER_MANAGEMENT_5);
 	int ena, reg, aif;
 
 	switch (path) {
@@ -359,7 +356,7 @@ static void wm8958_dsp_apply(struct snd_soc_component *component, int path, int 
 	if (!pwr_reg)
 		ena = 0;
 
-	reg = snd_soc_component_read32(component, WM8958_DSP2_PROGRAM);
+	reg = snd_soc_component_read(component, WM8958_DSP2_PROGRAM);
 
 	dev_dbg(component->dev, "DSP path %d %d startup: %d, power: %x, DSP: %x\n",
 		path, wm8994->dsp_active, start, pwr_reg, reg);
@@ -370,9 +367,9 @@ static void wm8958_dsp_apply(struct snd_soc_component *component, int path, int 
 			return;
 
 		/* If either AIFnCLK is not yet enabled postpone */
-		if (!(snd_soc_component_read32(component, WM8994_AIF1_CLOCKING_1)
+		if (!(snd_soc_component_read(component, WM8994_AIF1_CLOCKING_1)
 		      & WM8994_AIF1CLK_ENA_MASK) &&
-		    !(snd_soc_component_read32(component, WM8994_AIF2_CLOCKING_1)
+		    !(snd_soc_component_read(component, WM8994_AIF2_CLOCKING_1)
 		      & WM8994_AIF2CLK_ENA_MASK))
 			return;
 
@@ -467,7 +464,7 @@ static int wm8958_put_mbc_enum(struct snd_kcontrol *kcontrol,
 	int reg;
 
 	/* Don't allow on the fly reconfiguration */
-	reg = snd_soc_component_read32(component, WM8994_CLOCKING_1);
+	reg = snd_soc_component_read(component, WM8994_CLOCKING_1);
 	if (reg < 0 || reg & WM8958_DSP2CLK_ENA)
 		return -EBUSY;
 
@@ -557,7 +554,7 @@ static int wm8958_put_vss_enum(struct snd_kcontrol *kcontrol,
 	int reg;
 
 	/* Don't allow on the fly reconfiguration */
-	reg = snd_soc_component_read32(component, WM8994_CLOCKING_1);
+	reg = snd_soc_component_read(component, WM8994_CLOCKING_1);
 	if (reg < 0 || reg & WM8958_DSP2CLK_ENA)
 		return -EBUSY;
 
@@ -590,7 +587,7 @@ static int wm8958_put_vss_hpf_enum(struct snd_kcontrol *kcontrol,
 	int reg;
 
 	/* Don't allow on the fly reconfiguration */
-	reg = snd_soc_component_read32(component, WM8994_CLOCKING_1);
+	reg = snd_soc_component_read(component, WM8994_CLOCKING_1);
 	if (reg < 0 || reg & WM8958_DSP2CLK_ENA)
 		return -EBUSY;
 
@@ -757,7 +754,7 @@ static int wm8958_put_enh_eq_enum(struct snd_kcontrol *kcontrol,
 	int reg;
 
 	/* Don't allow on the fly reconfiguration */
-	reg = snd_soc_component_read32(component, WM8994_CLOCKING_1);
+	reg = snd_soc_component_read(component, WM8994_CLOCKING_1);
 	if (reg < 0 || reg & WM8958_DSP2CLK_ENA)
 		return -EBUSY;
 

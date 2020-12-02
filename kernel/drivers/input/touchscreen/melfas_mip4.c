@@ -1,24 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * MELFAS MIP4 Touchscreen
  *
  * Copyright (C) 2016 MELFAS Inc.
  *
  * Author : Sangwon Jee <jeesw@melfas.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
  */
 
 #include <linux/acpi.h>
 #include <linux/delay.h>
-#include <linux/dmi.h>
 #include <linux/firmware.h>
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
@@ -182,8 +172,6 @@ struct mip4_ts {
 	unsigned short key_code[MIP4_MAX_KEYS];
 
 	bool wake_irq_enabled;
-
-	bool poweron_delay;
 
 	u8 buf[MIP4_BUF_SIZE];
 };
@@ -382,10 +370,8 @@ static int mip4_power_on(struct mip4_ts *ts)
 
 		/* Booting delay : 200~300ms */
 		usleep_range(200 * 1000, 300 * 1000);
-	} else if (ts->poweron_delay) {
-		/* Booting delay : 200~300ms */
-		usleep_range(200 * 1000, 300 * 1000);
 	}
+
 	return 0;
 }
 
@@ -1438,18 +1424,6 @@ static const struct attribute_group mip4_attr_group = {
 	.attrs = mip4_attrs,
 };
 
-/* Some firmware needs additional delay in poweron */
-static const struct dmi_system_id mip4_poweron_delay_dmi_table[] = {
-	{
-		.ident = "Google Sarien",
-		.matches = {
-			DMI_MATCH(DMI_BOARD_VENDOR, "Dell Inc."),
-			DMI_MATCH(DMI_BOARD_NAME, "Sarien"),
-		},
-	},
-	{ }
-};
-
 static int mip4_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct mip4_ts *ts;
@@ -1469,7 +1443,6 @@ static int mip4_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	if (!input)
 		return -ENOMEM;
 
-	ts->poweron_delay = dmi_check_system(mip4_poweron_delay_dmi_table);
 	ts->client = client;
 	ts->input = input;
 

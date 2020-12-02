@@ -83,96 +83,6 @@ struct iwl_mvm_smooth_entry {
 	u64 host_time;
 };
 
-struct iwl_mvm_ftm_pasn_entry {
-	struct list_head list;
-	u8 addr[ETH_ALEN];
-	u8 hltk[HLTK_11AZ_LEN];
-	u8 tk[TK_11AZ_LEN];
-	u8 cipher;
-	u8 tx_pn[IEEE80211_CCMP_PN_LEN];
-	u8 rx_pn[IEEE80211_CCMP_PN_LEN];
-};
-
-int iwl_mvm_ftm_add_pasn_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
-			     u8 *addr, u32 cipher, u8 *tk, u32 tk_len,
-			     u8 *hltk, u32 hltk_len)
-{
-	struct iwl_mvm_ftm_pasn_entry *pasn = kzalloc(sizeof(*pasn),
-						      GFP_KERNEL);
-	u32 expected_tk_len;
-
-	lockdep_assert_held(&mvm->mutex);
-
-	if (!pasn)
-		return -ENOBUFS;
-
-	pasn->cipher = iwl_mvm_cipher_to_location_cipher(cipher);
-
-	switch (pasn->cipher) {
-	case IWL_LOCATION_CIPHER_CCMP_128:
-	case IWL_LOCATION_CIPHER_GCMP_128:
-		expected_tk_len = WLAN_KEY_LEN_CCMP;
-		break;
-	case IWL_LOCATION_CIPHER_GCMP_256:
-		expected_tk_len = WLAN_KEY_LEN_GCMP_256;
-		break;
-	default:
-		goto out;
-	}
-
-	/*
-	 * If associated to this AP and already have security context,
-	 * the TK is already configured for this station, so it
-	 * shouldn't be set again here.
-	 */
-	if (vif->bss_conf.assoc &&
-	    !memcmp(addr, vif->bss_conf.bssid, ETH_ALEN)) {
-		struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
-		struct ieee80211_sta *sta;
-
-		rcu_read_lock();
-		sta = rcu_dereference(mvm->fw_id_to_mac_id[mvmvif->ap_sta_id]);
-		if (!IS_ERR_OR_NULL(sta) && sta->mfp)
-			expected_tk_len = 0;
-		rcu_read_unlock();
-	}
-
-	if (tk_len != expected_tk_len || hltk_len != sizeof(pasn->hltk)) {
-		IWL_ERR(mvm, "Invalid key length: tk_len=%u hltk_len=%u\n",
-			tk_len, hltk_len);
-		goto out;
-	}
-
-	memcpy(pasn->addr, addr, sizeof(pasn->addr));
-	memcpy(pasn->hltk, hltk, sizeof(pasn->hltk));
-
-	if (tk && tk_len)
-		memcpy(pasn->tk, tk, sizeof(pasn->tk));
-
-	list_add_tail(&pasn->list, &mvm->ftm_initiator.pasn_list);
-	return 0;
-out:
-	kfree(pasn);
-	return -EINVAL;
-}
-
-void iwl_mvm_ftm_remove_pasn_sta(struct iwl_mvm *mvm, u8 *addr)
-{
-	struct iwl_mvm_ftm_pasn_entry *entry, *prev;
-
-	lockdep_assert_held(&mvm->mutex);
-
-	list_for_each_entry_safe(entry, prev, &mvm->ftm_initiator.pasn_list,
-				 list) {
-		if (memcmp(entry->addr, addr, sizeof(entry->addr)))
-			continue;
-
-		list_del(&entry->list);
-		kfree(entry);
-		return;
-	}
-}
-
 static void iwl_mvm_ftm_reset(struct iwl_mvm *mvm)
 {
 	struct iwl_mvm_loc_entry *e, *t;
@@ -297,7 +207,7 @@ static void iwl_mvm_ftm_cmd_v5(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 static void iwl_mvm_ftm_cmd_common(struct iwl_mvm *mvm,
 				   struct ieee80211_vif *vif,
-				   struct iwl_tof_range_req_cmd_v9 *cmd,
+				   struct iwl_tof_range_req_cmd *cmd,
 				   struct cfg80211_pmsr_request *req)
 {
 	int i;
@@ -484,7 +394,7 @@ iwl_mvm_ftm_put_target_v2(struct iwl_mvm *mvm,
 static void
 iwl_mvm_ftm_put_target_common(struct iwl_mvm *mvm,
 			      struct cfg80211_pmsr_request_peer *peer,
-			      struct iwl_tof_range_req_ap_entry_v6 *target)
+			      struct iwl_tof_range_req_ap_entry *target)
 {
 	memcpy(target->bssid, peer->addr, ETH_ALEN);
 	target->burst_period =
@@ -565,7 +475,7 @@ iwl_mvm_ftm_put_target_v4(struct iwl_mvm *mvm,
 static int
 iwl_mvm_ftm_put_target(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		       struct cfg80211_pmsr_request_peer *peer,
-		       struct iwl_tof_range_req_ap_entry_v6 *target)
+		       struct iwl_tof_range_req_ap_entry *target)
 {
 	int ret;
 
@@ -575,7 +485,7 @@ iwl_mvm_ftm_put_target(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	if (ret)
 		return ret;
 
-	iwl_mvm_ftm_put_target_common(mvm, peer, target);
+	iwl_mvm_ftm_put_target_common(mvm, peer, (void *)target);
 
 	if (vif->bss_conf.assoc &&
 	    !memcmp(peer->addr, vif->bss_conf.bssid, ETH_ALEN)) {
@@ -690,32 +600,10 @@ static int iwl_mvm_ftm_start_v8(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	return iwl_mvm_ftm_send_cmd(mvm, &hcmd);
 }
 
-#ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
-static void iwl_mvm_ftm_set_calib(struct iwl_mvm *mvm,
-				  struct iwl_tof_range_req_ap_entry_v6 *target)
-{
-	if (IWL_MVM_FTM_INITIATOR_COMMON_CALIB) {
-		int j;
-
-		/*
-		 * The driver API only supports one calibration value.
-		 * For now, use it for all bandwidths.
-		 * TODO: Add support for per bandwidth calibration
-		 * values.
-		 */
-		for (j = 0; j < IWL_TOF_BW_NUM; j++)
-			target->calib[j] =
-				cpu_to_le16(IWL_MVM_FTM_INITIATOR_COMMON_CALIB);
-
-		FTM_PUT_FLAG(USE_CALIB);
-	}
-}
-#endif
-
 static int iwl_mvm_ftm_start_v9(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 				struct cfg80211_pmsr_request *req)
 {
-	struct iwl_tof_range_req_cmd_v9 cmd;
+	struct iwl_tof_range_req_cmd cmd;
 	struct iwl_host_cmd hcmd = {
 		.id = iwl_cmd_id(TOF_RANGE_REQ_CMD, LOCATION_GROUP, 0),
 		.dataflags[0] = IWL_HCMD_DFL_DUP,
@@ -729,106 +617,29 @@ static int iwl_mvm_ftm_start_v9(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	for (i = 0; i < cmd.num_of_ap; i++) {
 		struct cfg80211_pmsr_request_peer *peer = &req->peers[i];
-		struct iwl_tof_range_req_ap_entry_v6 *target = &cmd.ap[i];
+		struct iwl_tof_range_req_ap_entry *target = &cmd.ap[i];
 
 		err = iwl_mvm_ftm_put_target(mvm, vif, peer, target);
 		if (err)
 			return err;
 
 #ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
-		iwl_mvm_ftm_set_calib(mvm, target);
+		if (IWL_MVM_FTM_INITIATOR_COMMON_CALIB) {
+			int j;
+
+			/*
+			 * The driver API only supports one calibration value.
+			 * For now, use it for all bandwidths.
+			 * TODO: Add support for per bandwidth calibration
+			 * values.
+			 */
+			for (j = 0; j < IWL_TOF_BW_NUM; j++)
+				target->calib[j] =
+					cpu_to_le16(IWL_MVM_FTM_INITIATOR_COMMON_CALIB);
+
+			FTM_PUT_FLAG(USE_CALIB);
+		}
 #endif
-	}
-
-	return iwl_mvm_ftm_send_cmd(mvm, &hcmd);
-}
-
-static void iter(struct ieee80211_hw *hw,
-		 struct ieee80211_vif *vif,
-		 struct ieee80211_sta *sta,
-		 struct ieee80211_key_conf *key,
-		 void *data)
-{
-	struct iwl_tof_range_req_ap_entry_v6 *target = data;
-
-	if (!sta || memcmp(sta->addr, target->bssid, ETH_ALEN))
-		return;
-
-	WARN_ON(!sta->mfp);
-
-	if (WARN_ON(key->keylen > sizeof(target->tk)))
-		return;
-
-	memcpy(target->tk, key->key, key->keylen);
-	target->cipher = iwl_mvm_cipher_to_location_cipher(key->cipher);
-	WARN_ON(target->cipher == IWL_LOCATION_CIPHER_INVALID);
-}
-
-static void
-iwl_mvm_ftm_set_secured_ranging(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
-				struct iwl_tof_range_req_ap_entry_v7 *target)
-{
-	struct iwl_mvm_ftm_pasn_entry *entry;
-	u32 flags = le32_to_cpu(target->initiator_ap_flags);
-
-	if (!(flags & (IWL_INITIATOR_AP_FLAGS_NON_TB |
-		       IWL_INITIATOR_AP_FLAGS_TB)))
-		return;
-
-	lockdep_assert_held(&mvm->mutex);
-
-	list_for_each_entry(entry, &mvm->ftm_initiator.pasn_list, list) {
-		if (memcmp(entry->addr, target->bssid, sizeof(entry->addr)))
-			continue;
-
-		target->cipher = entry->cipher;
-		memcpy(target->hltk, entry->hltk, sizeof(target->hltk));
-
-		if (vif->bss_conf.assoc &&
-		    !memcmp(vif->bss_conf.bssid, target->bssid,
-			    sizeof(target->bssid)))
-			ieee80211_iter_keys(mvm->hw, vif, iter, target);
-		else
-			memcpy(target->tk, entry->tk, sizeof(target->tk));
-
-		memcpy(target->rx_pn, entry->rx_pn, sizeof(target->rx_pn));
-		memcpy(target->tx_pn, entry->tx_pn, sizeof(target->tx_pn));
-
-		target->initiator_ap_flags |=
-			cpu_to_le32(IWL_INITIATOR_AP_FLAGS_SECURED);
-		return;
-	}
-}
-
-static int iwl_mvm_ftm_start_v11(struct iwl_mvm *mvm,
-				 struct ieee80211_vif *vif,
-				 struct cfg80211_pmsr_request *req)
-{
-	struct iwl_tof_range_req_cmd_v11 cmd;
-	struct iwl_host_cmd hcmd = {
-		.id = iwl_cmd_id(TOF_RANGE_REQ_CMD, LOCATION_GROUP, 0),
-		.dataflags[0] = IWL_HCMD_DFL_DUP,
-		.data[0] = &cmd,
-		.len[0] = sizeof(cmd),
-	};
-	u8 i;
-	int err;
-
-	iwl_mvm_ftm_cmd_common(mvm, vif, (void *)&cmd, req);
-
-	for (i = 0; i < cmd.num_of_ap; i++) {
-		struct cfg80211_pmsr_request_peer *peer = &req->peers[i];
-		struct iwl_tof_range_req_ap_entry_v7 *target = &cmd.ap[i];
-
-		err = iwl_mvm_ftm_put_target(mvm, vif, peer, (void *)target);
-		if (err)
-			return err;
-
-#ifdef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
-		iwl_mvm_ftm_set_calib(mvm, (void *)target);
-#endif
-
-		iwl_mvm_ftm_set_secured_ranging(mvm, vif, target);
 	}
 
 	return iwl_mvm_ftm_send_cmd(mvm, &hcmd);
@@ -848,13 +659,9 @@ int iwl_mvm_ftm_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	if (new_api) {
 		u8 cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw, LOCATION_GROUP,
-						   TOF_RANGE_REQ_CMD,
-						   IWL_FW_CMD_VER_UNKNOWN);
+						   TOF_RANGE_REQ_CMD);
 
 		switch (cmd_ver) {
-		case 11:
-			err = iwl_mvm_ftm_start_v11(mvm, vif, req);
-			break;
 		case 9:
 		case 10:
 			err = iwl_mvm_ftm_start_v9(mvm, vif, req);
@@ -1079,31 +886,12 @@ static void iwl_mvm_debug_range_resp(struct iwl_mvm *mvm, u8 index,
 	IWL_DEBUG_INFO(mvm, "\tdistance: %lld\n", rtt_avg);
 }
 
-static void
-iwl_mvm_ftm_pasn_update_pn(struct iwl_mvm *mvm,
-			   struct iwl_tof_range_rsp_ap_entry_ntfy_v6 *fw_ap)
-{
-	struct iwl_mvm_ftm_pasn_entry *entry;
-
-	lockdep_assert_held(&mvm->mutex);
-
-	list_for_each_entry(entry, &mvm->ftm_initiator.pasn_list, list) {
-		if (memcmp(fw_ap->bssid, entry->addr, sizeof(entry->addr)))
-			continue;
-
-		memcpy(entry->rx_pn, fw_ap->rx_pn, sizeof(entry->rx_pn));
-		memcpy(entry->tx_pn, fw_ap->tx_pn, sizeof(entry->tx_pn));
-		return;
-	}
-}
-
 void iwl_mvm_ftm_range_resp(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
 {
 	struct iwl_rx_packet *pkt = rxb_addr(rxb);
 	struct iwl_tof_range_rsp_ntfy_v5 *fw_resp_v5 = (void *)pkt->data;
 	struct iwl_tof_range_rsp_ntfy_v6 *fw_resp_v6 = (void *)pkt->data;
-	struct iwl_tof_range_rsp_ntfy_v7 *fw_resp_v7 = (void *)pkt->data;
-	struct iwl_tof_range_rsp_ntfy_v8 *fw_resp_v8 = (void *)pkt->data;
+	struct iwl_tof_range_rsp_ntfy *fw_resp = (void *)pkt->data;
 	int i;
 	bool new_api = fw_has_api(&mvm->fw->ucode_capa,
 				  IWL_UCODE_TLV_API_FTM_NEW_RANGE_REQ);
@@ -1116,12 +904,12 @@ void iwl_mvm_ftm_range_resp(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
 	}
 
 	if (new_api) {
-		if (iwl_mvm_ftm_range_resp_valid(mvm, fw_resp_v8->request_id,
-						 fw_resp_v8->num_of_aps))
+		if (iwl_mvm_ftm_range_resp_valid(mvm, fw_resp->request_id,
+						 fw_resp->num_of_aps))
 			return;
 
-		num_of_aps = fw_resp_v8->num_of_aps;
-		last_in_batch = fw_resp_v8->last_report;
+		num_of_aps = fw_resp->num_of_aps;
+		last_in_batch = fw_resp->last_report;
 	} else {
 		if (iwl_mvm_ftm_range_resp_valid(mvm, fw_resp_v5->request_id,
 						 fw_resp_v5->num_of_aps))
@@ -1137,21 +925,17 @@ void iwl_mvm_ftm_range_resp(struct iwl_mvm *mvm, struct iwl_rx_cmd_buffer *rxb)
 
 	for (i = 0; i < num_of_aps && i < IWL_MVM_TOF_MAX_APS; i++) {
 		struct cfg80211_pmsr_result result = {};
-		struct iwl_tof_range_rsp_ap_entry_ntfy_v6 *fw_ap;
+		struct iwl_tof_range_rsp_ap_entry_ntfy *fw_ap;
 		int peer_idx;
 
 		if (new_api) {
-			if (mvm->cmd_ver.range_resp == 8) {
-				fw_ap = &fw_resp_v8->ap[i];
-				iwl_mvm_ftm_pasn_update_pn(mvm, fw_ap);
-			} else if (fw_has_api(&mvm->fw->ucode_capa,
-					      IWL_UCODE_TLV_API_FTM_RTT_ACCURACY)) {
-				fw_ap = (void *)&fw_resp_v7->ap[i];
-			} else {
+			if (fw_has_api(&mvm->fw->ucode_capa,
+				       IWL_UCODE_TLV_API_FTM_RTT_ACCURACY))
+				fw_ap = &fw_resp->ap[i];
+			else
 				fw_ap = (void *)&fw_resp_v6->ap[i];
-			}
 
-			result.final = fw_ap->last_burst;
+			result.final = fw_resp->ap[i].last_burst;
 			result.ap_tsf = le32_to_cpu(fw_ap->start_tsf);
 			result.ap_tsf_valid = 1;
 		} else {

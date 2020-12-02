@@ -27,6 +27,23 @@
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/list.h>
+#include <linux/notifier.h>
+
+/* A hardware display blank change occurred */
+#define DRM_PANEL_EVENT_BLANK		0x01
+/* A hardware display blank early change occurred */
+#define DRM_PANEL_EARLY_EVENT_BLANK	0x02
+
+enum {
+	/* panel: power on */
+	DRM_PANEL_BLANK_UNBLANK,
+	/* panel: power off */
+	DRM_PANEL_BLANK_POWERDOWN,
+};
+
+struct drm_panel_notifier {
+	void *data;
+};
 
 struct backlight_device;
 struct device_node;
@@ -68,13 +85,6 @@ enum drm_panel_orientation;
  * functionality to enable/disable backlight.
  */
 struct drm_panel_funcs {
-	/**
-	 * @prepare_power:
-	 *
-	 * Turn on panel power.
-	 */
-	int (*prepare_power)(struct drm_panel *panel);
-
 	/**
 	 * @prepare:
 	 *
@@ -119,14 +129,8 @@ struct drm_panel_funcs {
 	 *
 	 * This function is mandatory.
 	 */
-	int (*get_modes)(struct drm_panel *panel);
-
-	/**
-	 * @unprepare_power:
-	 *
-	 * Turn off panel_power.
-	 */
-	int (*unprepare_power)(struct drm_panel *panel);
+	int (*get_modes)(struct drm_panel *panel,
+			 struct drm_connector *connector);
 
 	/**
 	 * @get_timings:
@@ -142,12 +146,6 @@ struct drm_panel_funcs {
 
 /**
  * struct drm_panel - DRM panel object
- * @drm: DRM device owning the panel
- * @connector: DRM connector that the panel is attached to
- * @dev: parent device of the panel
- * @link: link from panel device (supplier) to DRM device (consumer)
- * @funcs: operations that can be performed on the panel
- * @list: panel entry in registry
  */
 struct drm_panel {
 	/**
@@ -156,13 +154,6 @@ struct drm_panel {
 	 * DRM device owning the panel.
 	 */
 	struct drm_device *drm;
-
-	/**
-	 * @connector:
-	 *
-	 * DRM connector that the panel is attached to.
-	 */
-	struct drm_connector *connector;
 
 	/**
 	 * @dev:
@@ -189,17 +180,14 @@ struct drm_panel {
 	 */
 	const struct drm_panel_funcs *funcs;
 
-	/*
-	 * panel information to be set in the connector when the panel is
-	 * attached.
+	/**
+	 * @connector_type:
+	 *
+	 * Type of the panel as a DRM_MODE_CONNECTOR_* value. This is used to
+	 * initialise the drm_connector corresponding to the panel with the
+	 * correct connector type.
 	 */
-	unsigned int width_mm;
-	unsigned int height_mm;
-	unsigned int bpc;
-	int orientation;
-	const u32 *bus_formats;
-	unsigned int num_bus_formats;
-	u32 bus_flags;
+	int connector_type;
 
 	/**
 	 * @list:
@@ -207,18 +195,31 @@ struct drm_panel {
 	 * Panel entry in registry.
 	 */
 	struct list_head list;
+
+	/**
+	 * @nh:
+	 *
+	 * panel notifier list head
+	 */
+	struct blocking_notifier_head nh;
 };
 
-void drm_panel_init(struct drm_panel *panel);
+void drm_panel_init(struct drm_panel *panel, struct device *dev,
+		    const struct drm_panel_funcs *funcs,
+		    int connector_type);
 
 int drm_panel_add(struct drm_panel *panel);
 void drm_panel_remove(struct drm_panel *panel);
 
 int drm_panel_attach(struct drm_panel *panel, struct drm_connector *connector);
-int drm_panel_detach(struct drm_panel *panel);
+void drm_panel_detach(struct drm_panel *panel);
 
-int drm_panel_prepare_power(struct drm_panel *panel);
-int drm_panel_unprepare_power(struct drm_panel *panel);
+int drm_panel_notifier_register(struct drm_panel *panel,
+	struct notifier_block *nb);
+int drm_panel_notifier_unregister(struct drm_panel *panel,
+	struct notifier_block *nb);
+int drm_panel_notifier_call_chain(struct drm_panel *panel,
+	unsigned long val, void *v);
 
 int drm_panel_prepare(struct drm_panel *panel);
 int drm_panel_unprepare(struct drm_panel *panel);
@@ -226,7 +227,7 @@ int drm_panel_unprepare(struct drm_panel *panel);
 int drm_panel_enable(struct drm_panel *panel);
 int drm_panel_disable(struct drm_panel *panel);
 
-int drm_panel_get_modes(struct drm_panel *panel);
+int drm_panel_get_modes(struct drm_panel *panel, struct drm_connector *connector);
 
 #if defined(CONFIG_OF) && defined(CONFIG_DRM_PANEL)
 struct drm_panel *of_drm_find_panel(const struct device_node *np);
@@ -237,8 +238,9 @@ static inline struct drm_panel *of_drm_find_panel(const struct device_node *np)
 {
 	return ERR_PTR(-ENODEV);
 }
+
 static inline int of_drm_get_panel_orientation(const struct device_node *np,
-		enum drm_panel_orientation *orientation)
+					       enum drm_panel_orientation *orientation)
 {
 	return -ENODEV;
 }

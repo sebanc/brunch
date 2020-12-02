@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *   US-X2Y AUDIO
  *   Copyright (c) 2002-2004 by Karsten Wiese
@@ -13,21 +14,6 @@
  *   Many codes borrowed from audio.c by 
  *	    Alan Cox (alan@lxorguk.ukuu.org.uk)
  *	    Thomas Sailer (sailer@ife.ee.ethz.ch)
- *
- *
- *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation; either version 2 of the License, or
- *   (at your option) any later version.
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, write to the Free Software
- *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
 
@@ -931,11 +917,12 @@ static const struct snd_pcm_ops snd_usX2Y_pcm_ops =
  */
 static void usX2Y_audio_stream_free(struct snd_usX2Y_substream **usX2Y_substream)
 {
-	kfree(usX2Y_substream[SNDRV_PCM_STREAM_PLAYBACK]);
-	usX2Y_substream[SNDRV_PCM_STREAM_PLAYBACK] = NULL;
+	int stream;
 
-	kfree(usX2Y_substream[SNDRV_PCM_STREAM_CAPTURE]);
-	usX2Y_substream[SNDRV_PCM_STREAM_CAPTURE] = NULL;
+	for_each_pcm_streams(stream) {
+		kfree(usX2Y_substream[stream]);
+		usX2Y_substream[stream] = NULL;
+	}
 }
 
 static void snd_usX2Y_pcm_private_free(struct snd_pcm *pcm)

@@ -1423,6 +1423,8 @@ static inline bool ieee80211_has_nan_iftype(unsigned int iftype)
 struct cfg80211_nan_conf {
 	u8 master_pref;
 	u8 bands;
+	u8 cdw_2g;
+	u8 cdw_5g;
 };
 
 enum nl80211_nan_function_type {
@@ -1511,6 +1513,14 @@ bool ieee80211_has_nan_iftype(unsigned int iftype)
 	return iftype & BIT(NL80211_IFTYPE_NAN);
 }
 #endif /* CFG80211_VERSION < KERNEL_VERSION(4,9,0) */
+
+#if CFG80211_VERSION < KERNEL_VERSION(99,0,0)
+#define nan_conf_cdw_2g(conf) 1
+#define nan_conf_cdw_5g(conf) 1
+#else
+#define nan_conf_cdw_2g(conf) ((conf)->cdw_2g)
+#define nan_conf_cdw_5g(conf) ((conf)->cdw_5g)
+#endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(4,20,0)
 #define beacon_ftm_len(beacon, m) 0
@@ -2827,8 +2837,6 @@ static inline void cfg80211_bss_iter(struct wiphy *wiphy,
 #endif /* CFG80211_VERSION < KERNEL_VERSION(5,3,0) */
 
 #if CFG80211_VERSION < KERNEL_VERSION(5,4,0)
-#define NL80211_BAND_6GHZ 3
-
 static inline bool nl80211_is_6ghz(enum nl80211_band band)
 {
 	return false;
@@ -2855,10 +2863,6 @@ int ieee80211_get_vht_max_nss(struct ieee80211_vht_cap *cap,
 			      enum ieee80211_vht_chanwidth bw,
 			      int mcs, bool ext_nss_bw_capable,
 			      unsigned int max_vht_nss);
-#endif
-
-#if CFG80211_VERSION < KERNEL_VERSION(5,8,0)
-#define NL80211_EXT_FEATURE_BEACON_PROTECTION_CLIENT -1
 #endif
 
 #if CFG80211_VERSION < KERNEL_VERSION(99,99,0)
@@ -2892,103 +2896,3 @@ static inline size_t cfg80211_rekey_akm(struct cfg80211_gtk_rekey_data *data)
 	return data->akm;
 #endif
 }
-
-#if CFG80211_VERSION < KERNEL_VERSION(5,7,0)
-/**
- * struct cfg80211_he_bss_color - AP settings for BSS coloring
- *
- * @color: the current color.
- * @disabled: is the feature disabled.
- * @partial: define the AID equation.
- */
-struct cfg80211_he_bss_color {
-	u8 color;
-	bool disabled;
-	bool partial;
-};
-
-/**
- * struct ieee80211_he_bss_color - AP settings for BSS coloring
- *
- * @color: the current color.
- * @disabled: is the feature disabled.
- * @partial: define the AID equation.
- */
-struct ieee80211_he_bss_color {
-	u8 color;
-	bool disabled;
-	bool partial;
-};
-
-/**
- * enum nl80211_tid_config - TID config state
- * @NL80211_TID_CONFIG_ENABLE: Enable config for the TID
- * @NL80211_TID_CONFIG_DISABLE: Disable config for the TID
- */
-enum nl80211_tid_config {
-	NL80211_TID_CONFIG_ENABLE,
-	NL80211_TID_CONFIG_DISABLE,
-};
-
-/**
- * struct cfg80211_tid_cfg - TID specific configuration
- * @config_override: Flag to notify driver to reset TID configuration
- *	of the peer.
- * @tids: bitmap of TIDs to modify
- * @mask: bitmap of attributes indicating which parameter changed,
- *	similar to &nl80211_tid_config_supp.
- * @noack: noack configuration value for the TID
- * @retry_long: retry count value
- * @retry_short: retry count value
- * @ampdu: Enable/Disable aggregation
- * @rtscts: Enable/Disable RTS/CTS
- */
-struct cfg80211_tid_cfg {
-	bool config_override;
-	u8 tids;
-	u32 mask;
-	enum nl80211_tid_config noack;
-	u8 retry_long, retry_short;
-	enum nl80211_tid_config ampdu;
-	enum nl80211_tid_config rtscts;
-};
-
-/**
- * struct cfg80211_tid_config - TID configuration
- * @peer: Station's MAC address
- * @n_tid_conf: Number of TID specific configurations to be applied
- * @tid_conf: Configuration change info
- */
-struct cfg80211_tid_config {
-	const u8 *peer;
-	u32 n_tid_conf;
-	struct cfg80211_tid_cfg tid_conf[];
-};
-
-#define NL80211_EXT_FEATURE_CONTROL_PORT_NO_PREAUTH -1
-#define NL80211_EXT_FEATURE_DEL_IBSS_STA -1
-
-static inline bool
-cfg80211_crypto_control_port_no_preauth(struct cfg80211_crypto_settings *crypto)
-{
-	return false;
-}
-
-static inline unsigned long
-cfg80211_wiphy_tx_queue_len(struct wiphy *wiphy)
-{
-	return 0;
-}
-#else /* < 5.7 */
-static inline bool
-cfg80211_crypto_control_port_no_preauth(struct cfg80211_crypto_settings *crypto)
-{
-	return crypto->control_port_no_preauth;
-}
-
-static inline unsigned long
-cfg80211_wiphy_tx_queue_len(struct wiphy *wiphy)
-{
-	return wiphy->tx_queue_len;
-}
-#endif /* < 5.7 */

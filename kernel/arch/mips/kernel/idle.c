@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * MIPS idle loop and WAIT instruction support.
  *
@@ -5,11 +6,6 @@
  * Copyright (C) 1994 - 2006 Ralf Baechle
  * Copyright (C) 2003, 2004  Maciej W. Rozycki
  * Copyright (C) 2001, 2004, 2011, 2012	 MIPS Technologies, Inc.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  */
 #include <linux/cpu.h>
 #include <linux/export.h>
@@ -101,7 +97,8 @@ static void __cpuidle au1k_wait(void)
 	unsigned long c0status = read_c0_status() | 1;	/* irqs on */
 
 	__asm__(
-	"	.set	arch=r4000			\n"
+	"	.set	push			\n"
+	"	.set	arch=r4000		\n"
 	"	cache	0x14, 0(%0)		\n"
 	"	cache	0x14, 32(%0)		\n"
 	"	sync				\n"
@@ -111,7 +108,7 @@ static void __cpuidle au1k_wait(void)
 	"	nop				\n"
 	"	nop				\n"
 	"	nop				\n"
-	"	.set	mips0			\n"
+	"	.set	pop			\n"
 	: : "r" (au1k_wait), "r" (c0status));
 }
 
@@ -154,7 +151,6 @@ void __init check_wait(void)
 		cpu_wait = r39xx_wait;
 		break;
 	case CPU_R4200:
-/*	case CPU_R4300: */
 	case CPU_R4600:
 	case CPU_R4640:
 	case CPU_R4650:
@@ -176,14 +172,15 @@ void __init check_wait(void)
 	case CPU_CAVIUM_OCTEON_PLUS:
 	case CPU_CAVIUM_OCTEON2:
 	case CPU_CAVIUM_OCTEON3:
-	case CPU_JZRISC:
+	case CPU_XBURST:
 	case CPU_LOONGSON1:
 	case CPU_XLR:
 	case CPU_XLP:
 		cpu_wait = r4k_wait;
 		break;
-	case CPU_LOONGSON3:
-		if ((c->processor_id & PRID_REV_MASK) >= PRID_REV_LOONGSON3A_R2)
+	case CPU_LOONGSON64:
+		if ((c->processor_id & (PRID_IMP_MASK | PRID_REV_MASK)) >=
+				(PRID_IMP_LOONGSON_64C | PRID_REV_LOONGSON3A_R2_0))
 			cpu_wait = r4k_wait;
 		break;
 

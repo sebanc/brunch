@@ -1,17 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Driver for ITE Tech Inc. IT8712F/IT8512 CIR
  *
  * Copyright (C) 2010 Juan Jesús García de Soria <skandalfo@gmail.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
  *
  * Inspired by the original lirc_it87 and lirc_ite8709 drivers, on top of the
  * skeleton provided by the nuvoton-cir driver.
@@ -173,7 +164,7 @@ static void ite_decode_bytes(struct ite_dev *dev, const u8 * data, int
 	u32 sample_period;
 	unsigned long *ldata;
 	unsigned int next_one, next_zero, size;
-	DEFINE_IR_RAW_EVENT(ev);
+	struct ir_raw_event ev = {};
 
 	if (length == 0)
 		return;
@@ -515,7 +506,7 @@ static int ite_tx_ir(struct rc_dev *rcdev, unsigned *txbuf, unsigned n)
 	/* and set the carrier values for reception */
 	ite_set_carrier_params(dev);
 
-	/* reenable the receiver */
+	/* re-enable the receiver */
 	if (dev->in_use)
 		dev->params.enable_rx(dev);
 
@@ -1506,9 +1497,6 @@ static int ite_probe(struct pnp_dev *pdev, const struct pnp_device_id
 
 	/* initialize spinlocks */
 	spin_lock_init(&itdev->lock);
-
-	/* initialize raw event */
-	init_ir_raw_event(&itdev->rawir);
 
 	/* set driver data into the pnp device */
 	pnp_set_drvdata(pdev, itdev);

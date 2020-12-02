@@ -23,7 +23,9 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <drm/drmP.h>
+#include <drm/drm_file.h>
+#include <drm/drm_fourcc.h>
+
 #include "virtgpu_drv.h"
 
 void virtio_gpu_gem_free_object(struct drm_gem_object *gem_obj)
@@ -73,7 +75,7 @@ int virtio_gpu_gem_create(struct drm_file *file,
 	*obj_p = &obj->gem_base;
 
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(&obj->gem_base);
+	drm_gem_object_put(&obj->gem_base);
 
 	*handle_p = handle;
 	return 0;
@@ -124,8 +126,13 @@ int virtio_gpu_mode_dumb_mmap(struct drm_file *file_priv,
 	if (gobj == NULL)
 		return -ENOENT;
 	obj = gem_to_virtio_gpu_obj(gobj);
+	if (obj->blob && !obj->waited_on_map) {
+		virtio_gpu_object_wait(obj, false);
+		obj->waited_on_map = true;
+	}
+
 	*offset_p = virtio_gpu_object_mmap_offset(obj);
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return 0;
 }
 
@@ -137,8 +144,7 @@ int virtio_gpu_gem_object_open(struct drm_gem_object *obj,
 	struct virtio_gpu_object *qobj = gem_to_virtio_gpu_obj(obj);
 	int r;
 
-	if (!vgdev->has_virgl_3d || !qobj->hw_res_handle ||
-            qobj->resource_v2)
+	if (!vgdev->has_virgl_3d || !qobj->hw_res_handle)
 		return 0;
 
 	r = virtio_gpu_object_reserve(qobj, false);
@@ -159,7 +165,7 @@ void virtio_gpu_gem_object_close(struct drm_gem_object *obj,
 	struct virtio_gpu_object *qobj = gem_to_virtio_gpu_obj(obj);
 	int r;
 
-	if (!vgdev->has_virgl_3d || qobj->resource_v2)
+	if (!vgdev->has_virgl_3d)
 		return;
 
 	r = virtio_gpu_object_reserve(qobj, false);
@@ -169,4 +175,32 @@ void virtio_gpu_gem_object_close(struct drm_gem_object *obj,
 	virtio_gpu_cmd_context_detach_resource(vgdev, vfpriv->ctx_id,
 						qobj->hw_res_handle);
 	virtio_gpu_object_unreserve(qobj);
+}
+
+void virtio_gpu_gem_object_put_free_delayed(struct virtio_gpu_device *vgdev,
+					    struct virtio_gpu_vq_cb_target *t)
+{
+	spin_lock(&vgdev->obj_free_lock);
+	list_add_tail(&t->next, &vgdev->obj_free_list);
+	spin_unlock(&vgdev->obj_free_lock);
+	schedule_work(&vgdev->obj_free_work);
+}
+
+void virtio_gpu_gem_object_put_free_work(struct work_struct *work)
+{
+	struct virtio_gpu_device *vgdev =
+		container_of(work, struct virtio_gpu_device, obj_free_work);
+	struct virtio_gpu_vq_cb_target *target;
+
+	spin_lock(&vgdev->obj_free_lock);
+	while (!list_empty(&vgdev->obj_free_list)) {
+		target = list_first_entry(&vgdev->obj_free_list,
+					  struct virtio_gpu_vq_cb_target, next);
+		list_del(&target->next);
+		spin_unlock(&vgdev->obj_free_lock);
+		drm_gem_object_put(&target->obj->gem_base);
+		kfree(target);
+		spin_lock(&vgdev->obj_free_lock);
+	}
+	spin_unlock(&vgdev->obj_free_lock);
 }

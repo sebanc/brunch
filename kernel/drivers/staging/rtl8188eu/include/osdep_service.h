@@ -64,8 +64,6 @@ static inline int rtw_netif_queue_stopped(struct net_device *pnetdev)
 u8 *_rtw_malloc(u32 sz);
 #define rtw_malloc(sz)			_rtw_malloc((sz))
 
-void *rtw_malloc2d(int h, int w, int size);
-
 void _rtw_init_queue(struct __queue *pqueue);
 
 struct rtw_netdev_priv_indicator {
@@ -81,8 +79,6 @@ void rtw_free_netdev(struct net_device *netdev);
 #define FUNC_NDEV_ARG(ndev) __func__, ndev->name
 #define FUNC_ADPT_FMT "%s(%s)"
 #define FUNC_ADPT_ARG(adapter) __func__, adapter->pnetdev->name
-
-u64 rtw_modular64(u64 x, u64 y);
 
 /* Macros for handling unaligned memory accesses */
 

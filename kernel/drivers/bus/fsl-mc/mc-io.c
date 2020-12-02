@@ -129,7 +129,12 @@ error_destroy_mc_io:
  */
 void fsl_destroy_mc_io(struct fsl_mc_io *mc_io)
 {
-	struct fsl_mc_device *dpmcp_dev = mc_io->dpmcp_dev;
+	struct fsl_mc_device *dpmcp_dev;
+
+	if (!mc_io)
+		return;
+
+	dpmcp_dev = mc_io->dpmcp_dev;
 
 	if (dpmcp_dev)
 		fsl_mc_io_unset_dpmcp(mc_io);
@@ -209,9 +214,19 @@ int __must_check fsl_mc_portal_allocate(struct fsl_mc_device *mc_dev,
 	if (error < 0)
 		goto error_cleanup_resource;
 
+	dpmcp_dev->consumer_link = device_link_add(&mc_dev->dev,
+						   &dpmcp_dev->dev,
+						   DL_FLAG_AUTOREMOVE_CONSUMER);
+	if (!dpmcp_dev->consumer_link) {
+		error = -EINVAL;
+		goto error_cleanup_mc_io;
+	}
+
 	*new_mc_io = mc_io;
 	return 0;
 
+error_cleanup_mc_io:
+	fsl_destroy_mc_io(mc_io);
 error_cleanup_resource:
 	fsl_mc_resource_free(resource);
 	return error;
@@ -244,6 +259,8 @@ void fsl_mc_portal_free(struct fsl_mc_io *mc_io)
 
 	fsl_destroy_mc_io(mc_io);
 	fsl_mc_resource_free(resource);
+
+	dpmcp_dev->consumer_link = NULL;
 }
 EXPORT_SYMBOL_GPL(fsl_mc_portal_free);
 

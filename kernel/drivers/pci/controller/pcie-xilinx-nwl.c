@@ -438,11 +438,10 @@ static const struct irq_domain_ops legacy_domain_ops = {
 #ifdef CONFIG_PCI_MSI
 static struct irq_chip nwl_msi_irq_chip = {
 	.name = "nwl_pcie:msi",
-	.irq_enable = unmask_msi_irq,
-	.irq_disable = mask_msi_irq,
-	.irq_mask = mask_msi_irq,
-	.irq_unmask = unmask_msi_irq,
-
+	.irq_enable = pci_msi_unmask_irq,
+	.irq_disable = pci_msi_mask_irq,
+	.irq_mask = pci_msi_mask_irq,
+	.irq_unmask = pci_msi_unmask_irq,
 };
 
 static struct msi_domain_info nwl_msi_domain_info = {
@@ -776,16 +775,7 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
 			     struct platform_device *pdev)
 {
 	struct device *dev = pcie->dev;
-	struct device_node *node = dev->of_node;
 	struct resource *res;
-	const char *type;
-
-	/* Check for device type */
-	type = of_get_property(node, "device_type", NULL);
-	if (!type || strcmp(type, "pci")) {
-		dev_err(dev, "invalid \"device_type\" %s\n", type);
-		return -EINVAL;
-	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "breg");
 	pcie->breg_base = devm_ioremap_resource(dev, res);

@@ -187,9 +187,6 @@ struct share_obj {
  *			suppose a client is using VPU to decode VP8.
  *			If the other client wants to encode VP8,
  *			it has to wait until VP8 decode completes.
- * @enc_mutex:		protect vpu_ipi_send() and ensure only
- *			one encoder has an in-flight message to the VPU at
- *			a time.
  * @wdt_refcnt:		WDT reference count to make sure the watchdog can be
  *			disabled if no other client is using VPU service
  * @ack_wq:		The wait queue for each codec and mdp. When sleeping
@@ -206,14 +203,13 @@ struct mtk_vpu {
 	struct vpu_run run;
 	struct vpu_wdt wdt;
 	struct vpu_ipi_desc ipi_desc[IPI_MAX];
-	struct share_obj *recv_buf;
-	struct share_obj *send_buf;
+	struct share_obj __iomem *recv_buf;
+	struct share_obj __iomem *send_buf;
 	struct device *dev;
 	struct clk *clk;
 	bool fw_loaded;
 	bool enable_4GB;
 	struct mutex vpu_mutex; /* for protecting vpu data data structure */
-	struct mutex enc_mutex; /* for protecting encoder IPIs */
 	u32 wdt_refcnt;
 	wait_queue_head_t ack_wq;
 	bool ipi_id_ack[IPI_MAX];
@@ -265,39 +261,6 @@ static int vpu_clock_enable(struct mtk_vpu *vpu)
 	return ret;
 }
 
-/*
- * TODO(b/159371656): Remove this once the VPU firmware is updated to support
- * using VP8 and H264 concurrently.
- */
-static void vpu_lock_ipi(struct mtk_vpu *vpu, enum ipi_id id)
-{
-	switch (id) {
-	case IPI_VENC_H264:
-	case IPI_VENC_VP8:
-		mutex_lock(&vpu->enc_mutex);
-		break;
-	default:
-		/*
-		 * Decoders do not need to be locked because mtk-vcodec-dec
-		 * prevents multiple decoders from trying to send messages at
-		 * the same time.
-		 */
-		break;
-	}
-}
-
-static void vpu_unlock_ipi(struct mtk_vpu *vpu, enum ipi_id id)
-{
-	switch (id) {
-	case IPI_VENC_H264:
-	case IPI_VENC_VP8:
-		mutex_unlock(&vpu->enc_mutex);
-		break;
-	default:
-		break;
-	}
-}
-
 int vpu_ipi_register(struct platform_device *pdev,
 		     enum ipi_id id, ipi_handler_t handler,
 		     const char *name, void *priv)
@@ -329,7 +292,7 @@ int vpu_ipi_send(struct platform_device *pdev,
 		 unsigned int len)
 {
 	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-	struct share_obj *send_obj = vpu->send_buf;
+	struct share_obj __iomem *send_obj = vpu->send_buf;
 	unsigned long timeout;
 	int ret = 0;
 
@@ -350,7 +313,6 @@ int vpu_ipi_send(struct platform_device *pdev,
 		goto clock_disable;
 	}
 
-	vpu_lock_ipi(vpu, id);
 	mutex_lock(&vpu->vpu_mutex);
 
 	 /* Wait until VPU receives the last command */
@@ -363,9 +325,9 @@ int vpu_ipi_send(struct platform_device *pdev,
 		}
 	} while (vpu_cfg_readl(vpu, HOST_TO_VPU));
 
-	memcpy((void *)send_obj->share_buf, buf, len);
-	send_obj->len = len;
-	send_obj->id = id;
+	memcpy_toio(send_obj->share_buf, buf, len);
+	writel(len, &send_obj->len);
+	writel(id, &send_obj->id);
 
 	vpu->ipi_id_ack[id] = false;
 	/* send the command to VPU */
@@ -377,8 +339,6 @@ int vpu_ipi_send(struct platform_device *pdev,
 	timeout = msecs_to_jiffies(IPI_TIMEOUT_MS);
 	ret = wait_event_timeout(vpu->ack_wq, vpu->ipi_id_ack[id], timeout);
 	vpu->ipi_id_ack[id] = false;
-	vpu_unlock_ipi(vpu, id);
-
 	if (ret == 0) {
 		dev_err(vpu->dev, "vpu ipi %d ack time out !", id);
 		ret = -EIO;
@@ -390,7 +350,6 @@ int vpu_ipi_send(struct platform_device *pdev,
 
 mut_unlock:
 	mutex_unlock(&vpu->vpu_mutex);
-	vpu_unlock_ipi(vpu, id);
 clock_disable:
 	vpu_clock_disable(vpu);
 
@@ -501,9 +460,9 @@ struct platform_device *vpu_get_plat_device(struct platform_device *pdev)
 	}
 
 	vpu_pdev = of_find_device_by_node(vpu_node);
+	of_node_put(vpu_node);
 	if (WARN_ON(!vpu_pdev)) {
 		dev_err(dev, "vpu pdev failed\n");
-		of_node_put(vpu_node);
 		return NULL;
 	}
 
@@ -513,12 +472,12 @@ EXPORT_SYMBOL_GPL(vpu_get_plat_device);
 
 /* load vpu program/data memory */
 static int load_requested_vpu(struct mtk_vpu *vpu,
-			      const struct firmware *vpu_fw,
 			      u8 fw_type)
 {
 	size_t tcm_size = fw_type ? VPU_DTCM_SIZE : VPU_PTCM_SIZE;
 	size_t fw_size = fw_type ? VPU_D_FW_SIZE : VPU_P_FW_SIZE;
 	char *fw_name = fw_type ? VPU_D_FW : VPU_P_FW;
+	const struct firmware *vpu_fw;
 	size_t dl_size = 0;
 	size_t extra_fw_size = 0;
 	void *dest;
@@ -572,7 +531,6 @@ int vpu_load_firmware(struct platform_device *pdev)
 	struct mtk_vpu *vpu;
 	struct device *dev = &pdev->dev;
 	struct vpu_run *run;
-	const struct firmware *vpu_fw = NULL;
 	int ret;
 
 	if (!pdev) {
@@ -601,14 +559,14 @@ int vpu_load_firmware(struct platform_device *pdev)
 	run->signaled = false;
 	dev_dbg(vpu->dev, "firmware request\n");
 	/* Downloading program firmware to device*/
-	ret = load_requested_vpu(vpu, vpu_fw, P_FW);
+	ret = load_requested_vpu(vpu, P_FW);
 	if (ret < 0) {
 		dev_err(dev, "Failed to request %s, %d\n", VPU_P_FW, ret);
 		goto OUT_LOAD_FW;
 	}
 
 	/* Downloading data firmware to device */
-	ret = load_requested_vpu(vpu, vpu_fw, D_FW);
+	ret = load_requested_vpu(vpu, D_FW);
 	if (ret < 0) {
 		dev_err(dev, "Failed to request %s, %d\n", VPU_D_FW, ret);
 		goto OUT_LOAD_FW;
@@ -642,13 +600,13 @@ OUT_LOAD_FW:
 }
 EXPORT_SYMBOL_GPL(vpu_load_firmware);
 
-static void vpu_init_ipi_handler(void *data, unsigned int len, void *priv)
+static void vpu_init_ipi_handler(const void *data, unsigned int len, void *priv)
 {
-	struct mtk_vpu *vpu = (struct mtk_vpu *)priv;
-	struct vpu_run *run = (struct vpu_run *)data;
+	struct mtk_vpu *vpu = priv;
+	const struct vpu_run *run = data;
 
 	vpu->run.signaled = run->signaled;
-	strncpy(vpu->run.fw_ver, run->fw_ver, VPU_FW_VER_LEN);
+	strscpy(vpu->run.fw_ver, run->fw_ver, sizeof(vpu->run.fw_ver));
 	vpu->run.dec_capability = run->dec_capability;
 	vpu->run.enc_capability = run->enc_capability;
 	wake_up_interruptible(&vpu->run.wq);
@@ -742,19 +700,21 @@ static int vpu_alloc_ext_mem(struct mtk_vpu *vpu, u32 fw_type)
 
 static void vpu_ipi_handler(struct mtk_vpu *vpu)
 {
-	struct share_obj *rcv_obj = vpu->recv_buf;
+	struct share_obj __iomem *rcv_obj = vpu->recv_buf;
 	struct vpu_ipi_desc *ipi_desc = vpu->ipi_desc;
+	unsigned char data[SHARE_BUF_SIZE];
+	s32 id = readl(&rcv_obj->id);
 
-	if (rcv_obj->id < IPI_MAX && ipi_desc[rcv_obj->id].handler) {
-		ipi_desc[rcv_obj->id].handler(rcv_obj->share_buf,
-					      rcv_obj->len,
-					      ipi_desc[rcv_obj->id].priv);
-		if (rcv_obj->id > IPI_VPU_INIT) {
-			vpu->ipi_id_ack[rcv_obj->id] = true;
+	memcpy_fromio(data, rcv_obj->share_buf, sizeof(data));
+	if (id < IPI_MAX && ipi_desc[id].handler) {
+		ipi_desc[id].handler(data, readl(&rcv_obj->len),
+				     ipi_desc[id].priv);
+		if (id > IPI_VPU_INIT) {
+			vpu->ipi_id_ack[id] = true;
 			wake_up(&vpu->ack_wq);
 		}
 	} else {
-		dev_err(vpu->dev, "No such ipi id = %d\n", rcv_obj->id);
+		dev_err(vpu->dev, "No such ipi id = %d\n", id);
 	}
 }
 
@@ -764,11 +724,10 @@ static int vpu_ipi_init(struct mtk_vpu *vpu)
 	vpu_cfg_writel(vpu, 0x0, VPU_TO_HOST);
 
 	/* shared buffer initialization */
-	vpu->recv_buf = (__force struct share_obj *)(vpu->reg.tcm +
-						     VPU_DTCM_OFFSET);
+	vpu->recv_buf = vpu->reg.tcm + VPU_DTCM_OFFSET;
 	vpu->send_buf = vpu->recv_buf + 1;
-	memset(vpu->recv_buf, 0, sizeof(struct share_obj));
-	memset(vpu->send_buf, 0, sizeof(struct share_obj));
+	memset_io(vpu->recv_buf, 0, sizeof(struct share_obj));
+	memset_io(vpu->send_buf, 0, sizeof(struct share_obj));
 
 	return 0;
 }
@@ -855,7 +814,6 @@ static int mtk_vpu_probe(struct platform_device *pdev)
 	}
 	INIT_WORK(&vpu->wdt.ws, vpu_wdt_reset_func);
 	mutex_init(&vpu->vpu_mutex);
-	mutex_init(&vpu->enc_mutex);
 
 	ret = vpu_clock_enable(vpu);
 	if (ret) {
@@ -890,7 +848,7 @@ static int mtk_vpu_probe(struct platform_device *pdev)
 	/* Set PTCM to 96K and DTCM to 32K */
 	vpu_cfg_writel(vpu, 0x2, VPU_TCM_CFG);
 
-	vpu->enable_4GB = !!(totalram_pages > (SZ_2G >> PAGE_SHIFT));
+	vpu->enable_4GB = !!(totalram_pages() > (SZ_2G >> PAGE_SHIFT));
 	dev_info(dev, "4GB mode %u\n", vpu->enable_4GB);
 
 	if (vpu->enable_4GB) {
@@ -946,7 +904,6 @@ cleanup_ipi:
 #endif
 	memset(vpu->ipi_desc, 0, sizeof(struct vpu_ipi_desc) * IPI_MAX);
 vpu_mutex_destroy:
-	mutex_destroy(&vpu->enc_mutex);
 	mutex_destroy(&vpu->vpu_mutex);
 disable_vpu_clk:
 	vpu_clock_disable(vpu);
@@ -977,7 +934,6 @@ static int mtk_vpu_remove(struct platform_device *pdev)
 	}
 	vpu_free_ext_mem(vpu, P_FW);
 	vpu_free_ext_mem(vpu, D_FW);
-	mutex_destroy(&vpu->enc_mutex);
 	mutex_destroy(&vpu->vpu_mutex);
 	clk_unprepare(vpu->clk);
 

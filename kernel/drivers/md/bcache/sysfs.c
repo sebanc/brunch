@@ -16,7 +16,9 @@
 #include <linux/sort.h>
 #include <linux/sched/clock.h>
 
-/* Default is -1; we skip past it for struct cached_dev's cache mode */
+extern bool bcache_is_reboot;
+
+/* Default is 0 ("writethrough") */
 static const char * const bch_cache_modes[] = {
 	"writethrough",
 	"writeback",
@@ -31,7 +33,7 @@ static const char * const bch_reada_cache_policies[] = {
 	NULL
 };
 
-/* Default is -1; we skip past it for stop_when_cache_set_failed */
+/* Default is 0 ("auto") */
 static const char * const bch_stop_on_failure_modes[] = {
 	"auto",
 	"always",
@@ -73,6 +75,8 @@ read_attribute(written);
 read_attribute(btree_written);
 read_attribute(metadata_written);
 read_attribute(active_journal_entries);
+read_attribute(backing_dev_name);
+read_attribute(backing_dev_uuid);
 
 sysfs_time_stats_attribute(btree_gc,	sec, ms);
 sysfs_time_stats_attribute(btree_split, sec, us);
@@ -88,12 +92,14 @@ read_attribute(bset_tree_stats);
 read_attribute(state);
 read_attribute(cache_read_races);
 read_attribute(reclaim);
+read_attribute(reclaimed_journal_buckets);
 read_attribute(flush_write);
-read_attribute(retry_flush_write);
 read_attribute(writeback_keys_done);
 read_attribute(writeback_keys_failed);
 read_attribute(io_errors);
 read_attribute(congested);
+read_attribute(cutoff_writeback);
+read_attribute(cutoff_writeback_sync);
 rw_attribute(congested_read_threshold_us);
 rw_attribute(congested_write_threshold_us);
 
@@ -135,6 +141,7 @@ rw_attribute(expensive_debug_checks);
 rw_attribute(cache_replacement_policy);
 rw_attribute(btree_shrinker_disabled);
 rw_attribute(copy_gc_enabled);
+rw_attribute(gc_after_writeback);
 rw_attribute(size);
 
 static ssize_t bch_snprint_string_list(char *buf,
@@ -252,6 +259,19 @@ SHOW(__bch_cached_dev)
 		return strlen(buf);
 	}
 
+	if (attr == &sysfs_backing_dev_name) {
+		snprintf(buf, BDEVNAME_SIZE + 1, "%s", dc->backing_dev_name);
+		strcat(buf, "\n");
+		return strlen(buf);
+	}
+
+	if (attr == &sysfs_backing_dev_uuid) {
+		/* convert binary uuid into 36-byte string plus '\0' */
+		snprintf(buf, 36+1, "%pU", dc->sb.uuid);
+		strcat(buf, "\n");
+		return strlen(buf);
+	}
+
 #undef var
 	return 0;
 }
@@ -265,18 +285,23 @@ STORE(__cached_dev)
 	struct cache_set *c;
 	struct kobj_uevent_env *env;
 
+	/* no user space access if system is rebooting */
+	if (bcache_is_reboot)
+		return -EBUSY;
+
 #define d_strtoul(var)		sysfs_strtoul(var, dc->var)
 #define d_strtoul_nonzero(var)	sysfs_strtoul_clamp(var, dc->var, 1, INT_MAX)
 #define d_strtoi_h(var)		sysfs_hatoi(var, dc->var)
 
 	sysfs_strtoul(data_csum,	dc->disk.data_csum);
 	d_strtoul(verify);
-	d_strtoul(bypass_torture_test);
-	d_strtoul(writeback_metadata);
-	d_strtoul(writeback_running);
-	d_strtoul(writeback_delay);
+	sysfs_strtoul_bool(bypass_torture_test, dc->bypass_torture_test);
+	sysfs_strtoul_bool(writeback_metadata, dc->writeback_metadata);
+	sysfs_strtoul_bool(writeback_running, dc->writeback_running);
+	sysfs_strtoul_clamp(writeback_delay, dc->writeback_delay, 0, UINT_MAX);
 
-	sysfs_strtoul_clamp(writeback_percent, dc->writeback_percent, 0, 40);
+	sysfs_strtoul_clamp(writeback_percent, dc->writeback_percent,
+			    0, bch_cutoff_writeback);
 
 	if (attr == &sysfs_writeback_rate) {
 		ssize_t ret;
@@ -322,8 +347,11 @@ STORE(__cached_dev)
 		bch_cache_accounting_clear(&dc->accounting);
 
 	if (attr == &sysfs_running &&
-	    strtoul_or_return(buf))
-		bch_cached_dev_run(dc);
+	    strtoul_or_return(buf)) {
+		v = bch_cached_dev_run(dc);
+		if (v)
+			return v;
+	}
 
 	if (attr == &sysfs_cache_mode) {
 		v = __sysfs_match_string(bch_cache_modes, -1, buf);
@@ -410,11 +438,32 @@ STORE(bch_cached_dev)
 	struct cached_dev *dc = container_of(kobj, struct cached_dev,
 					     disk.kobj);
 
+	/* no user space access if system is rebooting */
+	if (bcache_is_reboot)
+		return -EBUSY;
+
 	mutex_lock(&bch_register_lock);
 	size = __cached_dev_store(kobj, attr, buf, size);
 
-	if (attr == &sysfs_writeback_running)
-		bch_writeback_queue(dc);
+	if (attr == &sysfs_writeback_running) {
+		/* dc->writeback_running changed in __cached_dev_store() */
+		if (IS_ERR_OR_NULL(dc->writeback_thread)) {
+			/*
+			 * reject setting it to 1 via sysfs if writeback
+			 * kthread is not created yet.
+			 */
+			if (dc->writeback_running) {
+				dc->writeback_running = false;
+				pr_err("%s: failed to run non-existent writeback thread",
+						dc->disk.disk->disk_name);
+			}
+		} else
+			/*
+			 * writeback kthread will check if dc->writeback_running
+			 * is true or false.
+			 */
+			bch_writeback_queue(dc);
+	}
 
 	/*
 	 * Only set BCACHE_DEV_WB_RUNNING when cached device attached to
@@ -466,6 +515,8 @@ static struct attribute *bch_cached_dev_files[] = {
 	&sysfs_verify,
 	&sysfs_bypass_torture_test,
 #endif
+	&sysfs_backing_dev_name,
+	&sysfs_backing_dev_uuid,
 	NULL
 };
 KTYPE(bch_cached_dev);
@@ -494,6 +545,10 @@ STORE(__bch_flash_dev)
 	struct bcache_device *d = container_of(kobj, struct bcache_device,
 					       kobj);
 	struct uuid_entry *u = &d->c->uuids[d->id];
+
+	/* no user space access if system is rebooting */
+	if (bcache_is_reboot)
+		return -EBUSY;
 
 	sysfs_strtoul(data_csum,	d->data_csum);
 
@@ -677,11 +732,11 @@ SHOW(__bch_cache_set)
 	sysfs_print(reclaim,
 		    atomic_long_read(&c->reclaim));
 
+	sysfs_print(reclaimed_journal_buckets,
+		    atomic_long_read(&c->reclaimed_journal_buckets));
+
 	sysfs_print(flush_write,
 		    atomic_long_read(&c->flush_write));
-
-	sysfs_print(retry_flush_write,
-		    atomic_long_read(&c->retry_flush_write));
 
 	sysfs_print(writeback_keys_done,
 		    atomic_long_read(&c->writeback_keys_done));
@@ -703,6 +758,9 @@ SHOW(__bch_cache_set)
 	sysfs_print(congested_write_threshold_us,
 		    c->congested_write_threshold_us);
 
+	sysfs_print(cutoff_writeback, bch_cutoff_writeback);
+	sysfs_print(cutoff_writeback_sync, bch_cutoff_writeback_sync);
+
 	sysfs_print(active_journal_entries,	fifo_used(&c->journal.pin));
 	sysfs_printf(verify,			"%i", c->verify);
 	sysfs_printf(key_merging_disabled,	"%i", c->key_merging_disabled);
@@ -711,6 +769,7 @@ SHOW(__bch_cache_set)
 	sysfs_printf(gc_always_rewrite,		"%i", c->gc_always_rewrite);
 	sysfs_printf(btree_shrinker_disabled,	"%i", c->shrinker_disabled);
 	sysfs_printf(copy_gc_enabled,		"%i", c->copy_gc_enabled);
+	sysfs_printf(gc_after_writeback,	"%i", c->gc_after_writeback);
 	sysfs_printf(io_disable,		"%i",
 		     test_bit(CACHE_SET_IO_DISABLE, &c->flags));
 
@@ -725,6 +784,10 @@ STORE(__bch_cache_set)
 {
 	struct cache_set *c = container_of(kobj, struct cache_set, kobj);
 	ssize_t v;
+
+	/* no user space access if system is rebooting */
+	if (bcache_is_reboot)
+		return -EBUSY;
 
 	if (attr == &sysfs_unregister)
 		bch_cache_set_unregister(c);
@@ -760,21 +823,8 @@ STORE(__bch_cache_set)
 		bch_cache_accounting_clear(&c->accounting);
 	}
 
-	if (attr == &sysfs_trigger_gc) {
-		/*
-		 * Garbage collection thread only works when sectors_to_gc < 0,
-		 * when users write to sysfs entry trigger_gc, most of time
-		 * they want to forcibly triger gargage collection. Here -1 is
-		 * set to c->sectors_to_gc, to make gc_should_run() give a
-		 * chance to permit gc thread to run. "give a chance" means
-		 * before going into gc_should_run(), there is still chance
-		 * that c->sectors_to_gc being set to other positive value. So
-		 * writing sysfs entry trigger_gc won't always make sure gc
-		 * thread takes effect.
-		 */
-		atomic_set(&c->sectors_to_gc, -1);
-		wake_up_gc(c);
-	}
+	if (attr == &sysfs_trigger_gc)
+		force_wake_up_gc(c);
 
 	if (attr == &sysfs_prune_cache) {
 		struct shrink_control sc;
@@ -784,10 +834,12 @@ STORE(__bch_cache_set)
 		c->shrink.scan_objects(&c->shrink, &sc);
 	}
 
-	sysfs_strtoul(congested_read_threshold_us,
-		      c->congested_read_threshold_us);
-	sysfs_strtoul(congested_write_threshold_us,
-		      c->congested_write_threshold_us);
+	sysfs_strtoul_clamp(congested_read_threshold_us,
+			    c->congested_read_threshold_us,
+			    0, UINT_MAX);
+	sysfs_strtoul_clamp(congested_write_threshold_us,
+			    c->congested_write_threshold_us,
+			    0, UINT_MAX);
 
 	if (attr == &sysfs_errors) {
 		v = __sysfs_match_string(error_actions, -1, buf);
@@ -797,8 +849,7 @@ STORE(__bch_cache_set)
 		c->on_error = v;
 	}
 
-	if (attr == &sysfs_io_error_limit)
-		c->error_limit = strtoul_or_return(buf);
+	sysfs_strtoul_clamp(io_error_limit, c->error_limit, 0, UINT_MAX);
 
 	/* See count_io_errors() for why 88 */
 	if (attr == &sysfs_io_error_halflife) {
@@ -826,13 +877,21 @@ STORE(__bch_cache_set)
 		}
 	}
 
-	sysfs_strtoul(journal_delay_ms,		c->journal_delay_ms);
-	sysfs_strtoul(verify,			c->verify);
-	sysfs_strtoul(key_merging_disabled,	c->key_merging_disabled);
+	sysfs_strtoul_clamp(journal_delay_ms,
+			    c->journal_delay_ms,
+			    0, USHRT_MAX);
+	sysfs_strtoul_bool(verify,		c->verify);
+	sysfs_strtoul_bool(key_merging_disabled, c->key_merging_disabled);
 	sysfs_strtoul(expensive_debug_checks,	c->expensive_debug_checks);
-	sysfs_strtoul(gc_always_rewrite,	c->gc_always_rewrite);
-	sysfs_strtoul(btree_shrinker_disabled,	c->shrinker_disabled);
-	sysfs_strtoul(copy_gc_enabled,		c->copy_gc_enabled);
+	sysfs_strtoul_bool(gc_always_rewrite,	c->gc_always_rewrite);
+	sysfs_strtoul_bool(btree_shrinker_disabled, c->shrinker_disabled);
+	sysfs_strtoul_bool(copy_gc_enabled,	c->copy_gc_enabled);
+	/*
+	 * write gc_after_writeback here may overwrite an already set
+	 * BCH_DO_AUTO_GC, it doesn't matter because this flag will be
+	 * set in next chance.
+	 */
+	sysfs_strtoul_clamp(gc_after_writeback, c->gc_after_writeback, 0, 1);
 
 	return size;
 }
@@ -848,6 +907,10 @@ SHOW(bch_cache_set_internal)
 STORE(bch_cache_set_internal)
 {
 	struct cache_set *c = container_of(kobj, struct cache_set, internal);
+
+	/* no user space access if system is rebooting */
+	if (bcache_is_reboot)
+		return -EBUSY;
 
 	return bch_cache_set_store(&c->kobj, attr, buf, size);
 }
@@ -898,8 +961,8 @@ static struct attribute *bch_cache_set_internal_files[] = {
 	&sysfs_bset_tree_stats,
 	&sysfs_cache_read_races,
 	&sysfs_reclaim,
+	&sysfs_reclaimed_journal_buckets,
 	&sysfs_flush_write,
-	&sysfs_retry_flush_write,
 	&sysfs_writeback_keys_done,
 	&sysfs_writeback_keys_failed,
 
@@ -913,13 +976,17 @@ static struct attribute *bch_cache_set_internal_files[] = {
 	&sysfs_gc_always_rewrite,
 	&sysfs_btree_shrinker_disabled,
 	&sysfs_copy_gc_enabled,
+	&sysfs_gc_after_writeback,
 	&sysfs_io_disable,
+	&sysfs_cutoff_writeback,
+	&sysfs_cutoff_writeback_sync,
 	NULL
 };
 KTYPE(bch_cache_set_internal);
 
 static int __bch_cache_cmp(const void *l, const void *r)
 {
+	cond_resched();
 	return *((uint16_t *)r) - *((uint16_t *)l);
 }
 
@@ -982,8 +1049,6 @@ SHOW(__bch_cache)
 		       !cached[n - 1])
 			--n;
 
-		unused = ca->sb.nbuckets - n;
-
 		while (cached < p + n &&
 		       *cached == BTREE_PRIO)
 			cached++, n--;
@@ -1032,6 +1097,10 @@ STORE(__bch_cache)
 {
 	struct cache *ca = container_of(kobj, struct cache, kobj);
 	ssize_t v;
+
+	/* no user space access if system is rebooting */
+	if (bcache_is_reboot)
+		return -EBUSY;
 
 	if (attr == &sysfs_discard) {
 		bool v = strtoul_or_return(buf);

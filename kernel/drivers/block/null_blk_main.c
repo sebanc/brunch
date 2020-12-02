@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Add configfs and memory store: Kyungchan Koh <kkc6196@fb.com> and
  * Shaohua Li <shli@fb.com>
@@ -140,8 +141,8 @@ static int g_bs = 512;
 module_param_named(bs, g_bs, int, 0444);
 MODULE_PARM_DESC(bs, "Block size (in bytes)");
 
-static int nr_devices = 1;
-module_param(nr_devices, int, 0444);
+static unsigned int nr_devices = 1;
+module_param(nr_devices, uint, 0444);
 MODULE_PARM_DESC(nr_devices, "Number of devices to register");
 
 static bool g_blocking;
@@ -187,6 +188,10 @@ MODULE_PARM_DESC(zoned, "Make device as a host-managed zoned block device. Defau
 static unsigned long g_zone_size = 256;
 module_param_named(zone_size, g_zone_size, ulong, S_IRUGO);
 MODULE_PARM_DESC(zone_size, "Zone size in MB when block device is zoned. Must be power-of-two: Default: 256");
+
+static unsigned int g_zone_nr_conv;
+module_param_named(zone_nr_conv, g_zone_nr_conv, uint, 0444);
+MODULE_PARM_DESC(zone_nr_conv, "Number of conventional zones when block device is zoned. Default: 0");
 
 static struct nullb_device *null_alloc_dev(void);
 static void null_free_dev(struct nullb_device *dev);
@@ -293,6 +298,7 @@ NULLB_DEVICE_ATTR(mbps, uint);
 NULLB_DEVICE_ATTR(cache_size, ulong);
 NULLB_DEVICE_ATTR(zoned, bool);
 NULLB_DEVICE_ATTR(zone_size, ulong);
+NULLB_DEVICE_ATTR(zone_nr_conv, uint);
 
 static ssize_t nullb_device_power_show(struct config_item *item, char *page)
 {
@@ -408,6 +414,7 @@ static struct configfs_attribute *nullb_device_attrs[] = {
 	&nullb_device_attr_badblocks,
 	&nullb_device_attr_zoned,
 	&nullb_device_attr_zone_size,
+	&nullb_device_attr_zone_nr_conv,
 	NULL,
 };
 
@@ -521,6 +528,7 @@ static struct nullb_device *null_alloc_dev(void)
 	dev->use_per_node_hctx = g_use_per_node_hctx;
 	dev->zoned = g_zoned;
 	dev->zone_size = g_zone_size;
+	dev->zone_nr_conv = g_zone_nr_conv;
 	return dev;
 }
 
@@ -608,20 +616,12 @@ static struct nullb_cmd *alloc_cmd(struct nullb_queue *nq, int can_wait)
 
 static void end_cmd(struct nullb_cmd *cmd)
 {
-	struct request_queue *q = NULL;
 	int queue_mode = cmd->nq->dev->queue_mode;
-
-	if (cmd->rq)
-		q = cmd->rq->q;
 
 	switch (queue_mode)  {
 	case NULL_Q_MQ:
 		blk_mq_end_request(cmd->rq, cmd->error);
 		return;
-	case NULL_Q_RQ:
-		INIT_LIST_HEAD(&cmd->rq->queuelist);
-		blk_end_request_all(cmd->rq, cmd->error);
-		break;
 	case NULL_Q_BIO:
 		cmd->bio->bi_status = cmd->error;
 		bio_endio(cmd->bio);
@@ -629,15 +629,6 @@ static void end_cmd(struct nullb_cmd *cmd)
 	}
 
 	free_cmd(cmd);
-
-	/* Restart queue if needed, as we are freeing a tag */
-	if (queue_mode == NULL_Q_RQ && blk_queue_stopped(q)) {
-		unsigned long flags;
-
-		spin_lock_irqsave(q->queue_lock, flags);
-		blk_start_queue_async(q);
-		spin_unlock_irqrestore(q->queue_lock, flags);
-	}
 }
 
 static enum hrtimer_restart null_cmd_timer_expired(struct hrtimer *timer)
@@ -654,14 +645,9 @@ static void null_cmd_end_timer(struct nullb_cmd *cmd)
 	hrtimer_start(&cmd->timer, kt, HRTIMER_MODE_REL);
 }
 
-static void null_softirq_done_fn(struct request *rq)
+static void null_complete_rq(struct request *rq)
 {
-	struct nullb *nullb = rq->q->queuedata;
-
-	if (nullb->dev->queue_mode == NULL_Q_MQ)
-		end_cmd(blk_mq_rq_to_pdu(rq));
-	else
-		end_cmd(rq->special);
+	end_cmd(blk_mq_rq_to_pdu(rq));
 }
 
 static struct nullb_page *null_alloc_page(gfp_t gfp_flags)
@@ -1121,7 +1107,7 @@ static int null_handle_bio(struct nullb_cmd *cmd)
 		len = bvec.bv_len;
 		err = null_transfer(nullb, bvec.bv_page, len, bvec.bv_offset,
 				     op_is_write(bio_op(bio)), sector,
-				     bio_op(bio) & REQ_FUA);
+				     bio->bi_opf & REQ_FUA);
 		if (err) {
 			spin_unlock_irq(&nullb->lock);
 			return err;
@@ -1138,150 +1124,73 @@ static void null_stop_queue(struct nullb *nullb)
 
 	if (nullb->dev->queue_mode == NULL_Q_MQ)
 		blk_mq_stop_hw_queues(q);
-	else {
-		spin_lock_irq(q->queue_lock);
-		blk_stop_queue(q);
-		spin_unlock_irq(q->queue_lock);
-	}
 }
 
 static void null_restart_queue_async(struct nullb *nullb)
 {
 	struct request_queue *q = nullb->q;
-	unsigned long flags;
 
 	if (nullb->dev->queue_mode == NULL_Q_MQ)
 		blk_mq_start_stopped_hw_queues(q, true);
-	else {
-		spin_lock_irqsave(q->queue_lock, flags);
-		blk_start_queue_async(q);
-		spin_unlock_irqrestore(q->queue_lock, flags);
-	}
 }
 
-static bool cmd_report_zone(struct nullb *nullb, struct nullb_cmd *cmd)
-{
-	struct nullb_device *dev = cmd->nq->dev;
-
-	if (dev->queue_mode == NULL_Q_BIO) {
-		if (bio_op(cmd->bio) == REQ_OP_ZONE_REPORT) {
-			cmd->error = null_zone_report(nullb, cmd->bio);
-			return true;
-		}
-	} else {
-		if (req_op(cmd->rq) == REQ_OP_ZONE_REPORT) {
-			cmd->error = null_zone_report(nullb, cmd->rq->bio);
-			return true;
-		}
-	}
-
-	return false;
-}
-
-static blk_status_t null_handle_cmd(struct nullb_cmd *cmd)
+static inline blk_status_t null_handle_throttled(struct nullb_cmd *cmd)
 {
 	struct nullb_device *dev = cmd->nq->dev;
 	struct nullb *nullb = dev->nullb;
-	int err = 0;
+	blk_status_t sts = BLK_STS_OK;
+	struct request *rq = cmd->rq;
 
-	if (cmd_report_zone(nullb, cmd))
-		goto out;
+	if (!hrtimer_active(&nullb->bw_timer))
+		hrtimer_restart(&nullb->bw_timer);
 
-	if (test_bit(NULLB_DEV_FL_THROTTLED, &dev->flags)) {
-		struct request *rq = cmd->rq;
-
-		if (!hrtimer_active(&nullb->bw_timer))
-			hrtimer_restart(&nullb->bw_timer);
-
-		if (atomic_long_sub_return(blk_rq_bytes(rq),
-				&nullb->cur_bytes) < 0) {
-			null_stop_queue(nullb);
-			/* race with timer */
-			if (atomic_long_read(&nullb->cur_bytes) > 0)
-				null_restart_queue_async(nullb);
-			if (dev->queue_mode == NULL_Q_RQ) {
-				struct request_queue *q = nullb->q;
-
-				spin_lock_irq(q->queue_lock);
-				rq->rq_flags |= RQF_DONTPREP;
-				blk_requeue_request(q, rq);
-				spin_unlock_irq(q->queue_lock);
-				return BLK_STS_OK;
-			} else
-				/* requeue request */
-				return BLK_STS_DEV_RESOURCE;
-		}
+	if (atomic_long_sub_return(blk_rq_bytes(rq), &nullb->cur_bytes) < 0) {
+		null_stop_queue(nullb);
+		/* race with timer */
+		if (atomic_long_read(&nullb->cur_bytes) > 0)
+			null_restart_queue_async(nullb);
+		/* requeue request */
+		sts = BLK_STS_DEV_RESOURCE;
 	}
+	return sts;
+}
 
-	if (nullb->dev->badblocks.shift != -1) {
-		int bad_sectors;
-		sector_t sector, size, first_bad;
-		bool is_flush = true;
+static inline blk_status_t null_handle_badblocks(struct nullb_cmd *cmd,
+						 sector_t sector,
+						 sector_t nr_sectors)
+{
+	struct badblocks *bb = &cmd->nq->dev->badblocks;
+	sector_t first_bad;
+	int bad_sectors;
 
-		if (dev->queue_mode == NULL_Q_BIO &&
-				bio_op(cmd->bio) != REQ_OP_FLUSH) {
-			is_flush = false;
-			sector = cmd->bio->bi_iter.bi_sector;
-			size = bio_sectors(cmd->bio);
-		}
-		if (dev->queue_mode != NULL_Q_BIO &&
-				req_op(cmd->rq) != REQ_OP_FLUSH) {
-			is_flush = false;
-			sector = blk_rq_pos(cmd->rq);
-			size = blk_rq_sectors(cmd->rq);
-		}
-		if (!is_flush && badblocks_check(&nullb->dev->badblocks, sector,
-				size, &first_bad, &bad_sectors)) {
-			cmd->error = BLK_STS_IOERR;
-			goto out;
-		}
-	}
+	if (badblocks_check(bb, sector, nr_sectors, &first_bad, &bad_sectors))
+		return BLK_STS_IOERR;
 
-	if (dev->memory_backed) {
-		if (dev->queue_mode == NULL_Q_BIO) {
-			if (bio_op(cmd->bio) == REQ_OP_FLUSH)
-				err = null_handle_flush(nullb);
-			else
-				err = null_handle_bio(cmd);
-		} else {
-			if (req_op(cmd->rq) == REQ_OP_FLUSH)
-				err = null_handle_flush(nullb);
-			else
-				err = null_handle_rq(cmd);
-		}
-	}
-	cmd->error = errno_to_blk_status(err);
+	return BLK_STS_OK;
+}
 
-	if (!cmd->error && dev->zoned) {
-		sector_t sector;
-		unsigned int nr_sectors;
-		int op;
+static inline blk_status_t null_handle_memory_backed(struct nullb_cmd *cmd,
+						     enum req_opf op)
+{
+	struct nullb_device *dev = cmd->nq->dev;
+	int err;
 
-		if (dev->queue_mode == NULL_Q_BIO) {
-			op = bio_op(cmd->bio);
-			sector = cmd->bio->bi_iter.bi_sector;
-			nr_sectors = cmd->bio->bi_iter.bi_size >> 9;
-		} else {
-			op = req_op(cmd->rq);
-			sector = blk_rq_pos(cmd->rq);
-			nr_sectors = blk_rq_sectors(cmd->rq);
-		}
+	if (dev->queue_mode == NULL_Q_BIO)
+		err = null_handle_bio(cmd);
+	else
+		err = null_handle_rq(cmd);
 
-		if (op == REQ_OP_WRITE)
-			null_zone_write(cmd, sector, nr_sectors);
-		else if (op == REQ_OP_ZONE_RESET)
-			null_zone_reset(cmd, sector);
-	}
-out:
+	return errno_to_blk_status(err);
+}
+
+static inline void nullb_complete_cmd(struct nullb_cmd *cmd)
+{
 	/* Complete IO by inline, softirq or timer */
-	switch (dev->irqmode) {
+	switch (cmd->nq->dev->irqmode) {
 	case NULL_IRQ_SOFTIRQ:
-		switch (dev->queue_mode)  {
+		switch (cmd->nq->dev->queue_mode) {
 		case NULL_Q_MQ:
 			blk_mq_complete_request(cmd->rq);
-			break;
-		case NULL_Q_RQ:
-			blk_complete_request(cmd->rq);
 			break;
 		case NULL_Q_BIO:
 			/*
@@ -1298,6 +1207,40 @@ out:
 		null_cmd_end_timer(cmd);
 		break;
 	}
+}
+
+static blk_status_t null_handle_cmd(struct nullb_cmd *cmd, sector_t sector,
+				    sector_t nr_sectors, enum req_opf op)
+{
+	struct nullb_device *dev = cmd->nq->dev;
+	struct nullb *nullb = dev->nullb;
+	blk_status_t sts;
+
+	if (test_bit(NULLB_DEV_FL_THROTTLED, &dev->flags)) {
+		sts = null_handle_throttled(cmd);
+		if (sts != BLK_STS_OK)
+			return sts;
+	}
+
+	if (op == REQ_OP_FLUSH) {
+		cmd->error = errno_to_blk_status(null_handle_flush(nullb));
+		goto out;
+	}
+
+	if (nullb->dev->badblocks.shift != -1) {
+		cmd->error = null_handle_badblocks(cmd, sector, nr_sectors);
+		if (cmd->error != BLK_STS_OK)
+			goto out;
+	}
+
+	if (dev->memory_backed)
+		cmd->error = null_handle_memory_backed(cmd, op);
+
+	if (!cmd->error && dev->zoned)
+		cmd->error = null_handle_zoned(cmd, op, sector, nr_sectors);
+
+out:
+	nullb_complete_cmd(cmd);
 	return BLK_STS_OK;
 }
 
@@ -1340,6 +1283,8 @@ static struct nullb_queue *nullb_to_queue(struct nullb *nullb)
 
 static blk_qc_t null_queue_bio(struct request_queue *q, struct bio *bio)
 {
+	sector_t sector = bio->bi_iter.bi_sector;
+	sector_t nr_sectors = bio_sectors(bio);
 	struct nullb *nullb = q->queuedata;
 	struct nullb_queue *nq = nullb_to_queue(nullb);
 	struct nullb_cmd *cmd;
@@ -1347,32 +1292,8 @@ static blk_qc_t null_queue_bio(struct request_queue *q, struct bio *bio)
 	cmd = alloc_cmd(nq, 1);
 	cmd->bio = bio;
 
-	null_handle_cmd(cmd);
+	null_handle_cmd(cmd, sector, nr_sectors, bio_op(bio));
 	return BLK_QC_T_NONE;
-}
-
-static enum blk_eh_timer_return null_rq_timed_out_fn(struct request *rq)
-{
-	pr_info("null: rq %p timed out\n", rq);
-	__blk_complete_request(rq);
-	return BLK_EH_DONE;
-}
-
-static int null_rq_prep_fn(struct request_queue *q, struct request *req)
-{
-	struct nullb *nullb = q->queuedata;
-	struct nullb_queue *nq = nullb_to_queue(nullb);
-	struct nullb_cmd *cmd;
-
-	cmd = alloc_cmd(nq, 0);
-	if (cmd) {
-		cmd->rq = req;
-		req->special = cmd;
-		return BLKPREP_OK;
-	}
-	blk_stop_queue(q);
-
-	return BLKPREP_DEFER;
 }
 
 static bool should_timeout_request(struct request *rq)
@@ -1393,30 +1314,9 @@ static bool should_requeue_request(struct request *rq)
 	return false;
 }
 
-static void null_request_fn(struct request_queue *q)
-{
-	struct request *rq;
-
-	while ((rq = blk_fetch_request(q)) != NULL) {
-		struct nullb_cmd *cmd = rq->special;
-
-		/* just ignore the request */
-		if (should_timeout_request(rq))
-			continue;
-		if (should_requeue_request(rq)) {
-			blk_requeue_request(q, rq);
-			continue;
-		}
-
-		spin_unlock_irq(q->queue_lock);
-		null_handle_cmd(cmd);
-		spin_lock_irq(q->queue_lock);
-	}
-}
-
 static enum blk_eh_timer_return null_timeout_rq(struct request *rq, bool res)
 {
-	pr_info("null: rq %p timed out\n", rq);
+	pr_info("rq %p timed out\n", rq);
 	blk_mq_complete_request(rq);
 	return BLK_EH_DONE;
 }
@@ -1426,6 +1326,8 @@ static blk_status_t null_queue_rq(struct blk_mq_hw_ctx *hctx,
 {
 	struct nullb_cmd *cmd = blk_mq_rq_to_pdu(bd->rq);
 	struct nullb_queue *nq = hctx->driver_data;
+	sector_t nr_sectors = blk_rq_sectors(bd->rq);
+	sector_t sector = blk_rq_pos(bd->rq);
 
 	might_sleep_if(hctx->flags & BLK_MQ_F_BLOCKING);
 
@@ -1455,12 +1357,12 @@ static blk_status_t null_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (should_timeout_request(bd->rq))
 		return BLK_STS_OK;
 
-	return null_handle_cmd(cmd);
+	return null_handle_cmd(cmd, sector, nr_sectors, req_op(bd->rq));
 }
 
 static const struct blk_mq_ops null_mq_ops = {
 	.queue_rq       = null_queue_rq,
-	.complete	= null_softirq_done_fn,
+	.complete	= null_complete_rq,
 	.timeout	= null_timeout_rq,
 };
 
@@ -1536,6 +1438,7 @@ static const struct block_device_operations null_fops = {
 	.owner =	THIS_MODULE,
 	.open =		null_open,
 	.release =	null_release,
+	.report_zones =	null_zone_report,
 };
 
 static void null_init_queue(struct nullb *nullb, struct nullb_queue *nq)
@@ -1599,7 +1502,6 @@ static int setup_queues(struct nullb *nullb)
 	if (!nullb->queues)
 		return -ENOMEM;
 
-	nullb->nr_queues = 0;
 	nullb->queue_depth = nullb->dev->hw_queue_depth;
 
 	return 0;
@@ -1641,6 +1543,13 @@ static int null_gendisk_register(struct nullb *nullb)
 	disk->private_data	= nullb;
 	disk->queue		= nullb->q;
 	strncpy(disk->disk_name, nullb->disk_name, DISK_NAME_LEN);
+
+	if (nullb->dev->zoned) {
+		int ret = blk_revalidate_disk_zones(disk);
+
+		if (ret != 0)
+			return ret;
+	}
 
 	add_disk(disk);
 	return 0;
@@ -1764,31 +1673,12 @@ static int null_add_dev(struct nullb_device *dev)
 		}
 		null_init_queues(nullb);
 	} else if (dev->queue_mode == NULL_Q_BIO) {
-		nullb->q = blk_alloc_queue_node(GFP_KERNEL, dev->home_node,
-						NULL);
+		nullb->q = blk_alloc_queue_node(GFP_KERNEL, dev->home_node);
 		if (!nullb->q) {
 			rv = -ENOMEM;
 			goto out_cleanup_queues;
 		}
 		blk_queue_make_request(nullb->q, null_queue_bio);
-		rv = init_driver_queues(nullb);
-		if (rv)
-			goto out_cleanup_blk_queue;
-	} else {
-		nullb->q = blk_init_queue_node(null_request_fn, &nullb->lock,
-						dev->home_node);
-		if (!nullb->q) {
-			rv = -ENOMEM;
-			goto out_cleanup_queues;
-		}
-
-		if (!null_setup_fault())
-			goto out_cleanup_blk_queue;
-
-		blk_queue_prep_rq(nullb->q, null_rq_prep_fn);
-		blk_queue_softirq_done(nullb->q, null_softirq_done_fn);
-		blk_queue_rq_timed_out(nullb->q, null_rq_timed_out_fn);
-		nullb->q->rq_timeout = 5 * HZ;
 		rv = init_driver_queues(nullb);
 		if (rv)
 			goto out_cleanup_blk_queue;
@@ -1802,7 +1692,6 @@ static int null_add_dev(struct nullb_device *dev)
 	if (dev->cache_size > 0) {
 		set_bit(NULLB_DEV_FL_CACHE, &nullb->dev->flags);
 		blk_queue_write_cache(nullb->q, true, true);
-		blk_queue_flush_queueable(nullb->q, true);
 	}
 
 	if (dev->zoned) {
@@ -1812,6 +1701,9 @@ static int null_add_dev(struct nullb_device *dev)
 
 		blk_queue_chunk_sectors(nullb->q, dev->zone_size_sects);
 		nullb->q->limits.zoned = BLK_ZONED_HM;
+		blk_queue_flag_set(QUEUE_FLAG_ZONE_RESETALL, nullb->q);
+		blk_queue_required_elevator_features(nullb->q,
+						ELEVATOR_F_ZBD_SEQ_WRITE);
 	}
 
 	nullb->q->queuedata = nullb;
@@ -1864,19 +1756,28 @@ static int __init null_init(void)
 	struct nullb_device *dev;
 
 	if (g_bs > PAGE_SIZE) {
-		pr_warn("null_blk: invalid block size\n");
-		pr_warn("null_blk: defaults block size to %lu\n", PAGE_SIZE);
+		pr_warn("invalid block size\n");
+		pr_warn("defaults block size to %lu\n", PAGE_SIZE);
 		g_bs = PAGE_SIZE;
 	}
 
 	if (!is_power_of_2(g_zone_size)) {
-		pr_err("null_blk: zone_size must be power-of-two\n");
+		pr_err("zone_size must be power-of-two\n");
 		return -EINVAL;
 	}
 
+	if (g_home_node != NUMA_NO_NODE && g_home_node >= nr_online_nodes) {
+		pr_err("invalid home_node value\n");
+		g_home_node = NUMA_NO_NODE;
+	}
+
+	if (g_queue_mode == NULL_Q_RQ) {
+		pr_err("legacy IO path no longer available\n");
+		return -EINVAL;
+	}
 	if (g_queue_mode == NULL_Q_MQ && g_use_per_node_hctx) {
 		if (g_submit_queues != nr_online_nodes) {
-			pr_warn("null_blk: submit_queues param is set to %u.\n",
+			pr_warn("submit_queues param is set to %u.\n",
 							nr_online_nodes);
 			g_submit_queues = nr_online_nodes;
 		}
@@ -1919,7 +1820,7 @@ static int __init null_init(void)
 		}
 	}
 
-	pr_info("null: module loaded\n");
+	pr_info("module loaded\n");
 	return 0;
 
 err_dev:

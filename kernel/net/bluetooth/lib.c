@@ -225,7 +225,6 @@ void bt_warn_ratelimited(const char *format, ...)
 
 	vaf.fmt = format;
 	vaf.va = &args;
-
 	pr_warn_ratelimited("%pV", &vaf);
 
 	va_end(args);

@@ -316,8 +316,8 @@ static int bnxt_hwrm_set_dcbx_app(struct bnxt *bp, struct dcb_app *app,
 
 	n = IEEE_8021QAZ_MAX_TCS;
 	data_len = sizeof(*data) + sizeof(*fw_app) * n;
-	data = dma_zalloc_coherent(&bp->pdev->dev, data_len, &mapping,
-				   GFP_KERNEL);
+	data = dma_alloc_coherent(&bp->pdev->dev, data_len, &mapping,
+				  GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
@@ -377,8 +377,6 @@ static int bnxt_hwrm_set_dcbx_app(struct bnxt *bp, struct dcb_app *app,
 	set.data_len = cpu_to_le16(sizeof(*data) + sizeof(*fw_app) * n);
 	set.hdr_cnt = 1;
 	rc = hwrm_send_message(bp, &set, sizeof(set), HWRM_CMD_TIMEOUT);
-	if (rc)
-		rc = -EIO;
 
 set_app_exit:
 	dma_free_coherent(&bp->pdev->dev, data_len, data, mapping);
@@ -391,6 +389,7 @@ static int bnxt_hwrm_queue_dscp_qcaps(struct bnxt *bp)
 	struct hwrm_queue_dscp_qcaps_input req = {0};
 	int rc;
 
+	bp->max_dscp_value = 0;
 	if (bp->hwrm_spec_code < 0x10800 || BNXT_VF(bp))
 		return 0;
 
@@ -433,8 +432,6 @@ static int bnxt_hwrm_queue_dscp2pri_cfg(struct bnxt *bp, struct dcb_app *app,
 	dscp2pri->pri = app->priority;
 	req.entry_cnt = cpu_to_le16(1);
 	rc = hwrm_send_message(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT);
-	if (rc)
-		rc = -EIO;
 	dma_free_coherent(&bp->pdev->dev, sizeof(*dscp2pri), dscp2pri,
 			  mapping);
 	return rc;
@@ -471,7 +468,10 @@ static int bnxt_ets_validate(struct bnxt *bp, struct ieee_ets *ets, u8 *tc)
 	if (total_ets_bw > 100)
 		return -EINVAL;
 
-	*tc = max_tc + 1;
+	if (max_tc >= bp->max_tc)
+		*tc = bp->max_tc;
+	else
+		*tc = max_tc + 1;
 	return 0;
 }
 
@@ -724,6 +724,7 @@ static const struct dcbnl_rtnl_ops dcbnl_ops = {
 
 void bnxt_dcb_init(struct bnxt *bp)
 {
+	bp->dcbx_cap = 0;
 	if (bp->hwrm_spec_code < 0x10501)
 		return;
 

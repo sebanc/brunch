@@ -68,9 +68,10 @@ static struct bin_attribute firmware_attr = {
 
 static int mmio_snapshot_handler(struct intel_gvt *gvt, u32 offset, void *data)
 {
-	struct drm_i915_private *dev_priv = gvt->dev_priv;
+	struct drm_i915_private *i915 = gvt->dev_priv;
 
-	*(u32 *)(data + offset) = I915_READ_NOTRACE(_MMIO(offset));
+	*(u32 *)(data + offset) = intel_uncore_read_notrace(&i915->uncore,
+							    _MMIO(offset));
 	return 0;
 }
 
@@ -145,7 +146,7 @@ void intel_gvt_free_firmware(struct intel_gvt *gvt)
 		clean_firmware_sysfs(gvt);
 
 	kfree(gvt->firmware.cfg_space);
-	kfree(gvt->firmware.mmio);
+	vfree(gvt->firmware.mmio);
 }
 
 static int verify_firmware(struct intel_gvt *gvt,
@@ -228,7 +229,7 @@ int intel_gvt_load_firmware(struct intel_gvt *gvt)
 
 	firmware->cfg_space = mem;
 
-	mem = kmalloc(info->mmio_size, GFP_KERNEL);
+	mem = vmalloc(info->mmio_size);
 	if (!mem) {
 		kfree(path);
 		kfree(firmware->cfg_space);

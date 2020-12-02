@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-only
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note 
  *
  * Copyright (c) 2015 - 2020 DisplayLink (UK) Ltd.
  *
@@ -9,6 +9,14 @@
 
 #ifndef __UAPI_EVDI_DRM_H__
 #define __UAPI_EVDI_DRM_H__
+
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
+#include <stdint.h>
+#endif
+
+#include "drm.h"
 
 /* Output events sent from driver to evdi lib */
 #define DRM_EVDI_EVENT_UPDATE_READY  0x80000000

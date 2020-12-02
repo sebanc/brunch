@@ -1,10 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /* The industrial I/O core in kernel channel mapping
  *
  * Copyright (c) 2011 Jonathan Cameron
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
  */
 #include <linux/err.h>
 #include <linux/export.h>
@@ -93,7 +90,7 @@ static const struct iio_chan_spec
 
 #ifdef CONFIG_OF
 
-static int iio_dev_node_match(struct device *dev, void *data)
+static int iio_dev_node_match(struct device *dev, const void *data)
 {
 	return dev->of_node == data && dev->type == &iio_device_type;
 }
@@ -183,8 +180,8 @@ err_free_channel:
 	return ERR_PTR(err);
 }
 
-static struct iio_channel *of_iio_channel_get_by_name(struct device_node *np,
-						      const char *name)
+struct iio_channel *of_iio_channel_get_by_name(struct device_node *np,
+					       const char *name)
 {
 	struct iio_channel *chan = NULL;
 
@@ -222,6 +219,7 @@ static struct iio_channel *of_iio_channel_get_by_name(struct device_node *np,
 
 	return chan;
 }
+EXPORT_SYMBOL_GPL(of_iio_channel_get_by_name);
 
 static struct iio_channel *of_iio_channel_get_all(struct device *dev)
 {
@@ -263,12 +261,6 @@ error_free_chans:
 }
 
 #else /* CONFIG_OF */
-
-static inline struct iio_channel *
-of_iio_channel_get_by_name(struct device_node *np, const char *name)
-{
-	return NULL;
-}
 
 static inline struct iio_channel *of_iio_channel_get_all(struct device *dev)
 {
@@ -403,6 +395,29 @@ void devm_iio_channel_release(struct device *dev, struct iio_channel *channel)
 			       devm_iio_channel_match, channel));
 }
 EXPORT_SYMBOL_GPL(devm_iio_channel_release);
+
+struct iio_channel *devm_of_iio_channel_get_by_name(struct device *dev,
+						    struct device_node *np,
+						    const char *channel_name)
+{
+	struct iio_channel **ptr, *channel;
+
+	ptr = devres_alloc(devm_iio_channel_free, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return ERR_PTR(-ENOMEM);
+
+	channel = of_iio_channel_get_by_name(np, channel_name);
+	if (IS_ERR(channel)) {
+		devres_free(ptr);
+		return channel;
+	}
+
+	*ptr = channel;
+	devres_add(dev, ptr);
+
+	return channel;
+}
+EXPORT_SYMBOL_GPL(devm_of_iio_channel_get_by_name);
 
 struct iio_channel *iio_channel_get_all(struct device *dev)
 {
@@ -733,11 +748,11 @@ static int iio_channel_read_avail(struct iio_channel *chan,
 						 vals, type, length, info);
 }
 
-int iio_read_avail_channel_raw(struct iio_channel *chan,
-			       const int **vals, int *length)
+int iio_read_avail_channel_attribute(struct iio_channel *chan,
+				     const int **vals, int *type, int *length,
+				     enum iio_chan_info_enum attribute)
 {
 	int ret;
-	int type;
 
 	mutex_lock(&chan->indio_dev->info_exist_lock);
 	if (!chan->indio_dev->info) {
@@ -745,10 +760,22 @@ int iio_read_avail_channel_raw(struct iio_channel *chan,
 		goto err_unlock;
 	}
 
-	ret = iio_channel_read_avail(chan,
-				     vals, &type, length, IIO_CHAN_INFO_RAW);
+	ret = iio_channel_read_avail(chan, vals, type, length, attribute);
 err_unlock:
 	mutex_unlock(&chan->indio_dev->info_exist_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iio_read_avail_channel_attribute);
+
+int iio_read_avail_channel_raw(struct iio_channel *chan,
+			       const int **vals, int *length)
+{
+	int ret;
+	int type;
+
+	ret = iio_read_avail_channel_attribute(chan, vals, &type, length,
+					 IIO_CHAN_INFO_RAW);
 
 	if (ret >= 0 && type != IIO_VAL_INT)
 		/* raw values are assumed to be IIO_VAL_INT */

@@ -123,6 +123,13 @@ enum  {
 	I2S_LRCLK_STRENGTH_HIGH,
 };
 
+enum  {
+	I2S_SCLK_STRENGTH_DISABLE,
+	I2S_SCLK_STRENGTH_LOW,
+	I2S_SCLK_STRENGTH_MEDIUM,
+	I2S_SCLK_STRENGTH_HIGH,
+};
+
 enum {
 	HP_POWER_EVENT,
 	DAC_POWER_EVENT,
@@ -143,19 +150,20 @@ struct sgtl5000_priv {
 	u8 micbias_resistor;
 	u8 micbias_voltage;
 	u8 lrclk_strength;
+	u8 sclk_strength;
 	u16 mute_state[LAST_POWER_EVENT + 1];
 };
 
 static inline int hp_sel_input(struct snd_soc_component *component)
 {
-	return (snd_soc_component_read32(component, SGTL5000_CHIP_ANA_CTRL) &
+	return (snd_soc_component_read(component, SGTL5000_CHIP_ANA_CTRL) &
 		SGTL5000_HP_SEL_MASK) >> SGTL5000_HP_SEL_SHIFT;
 }
 
 static inline u16 mute_output(struct snd_soc_component *component,
 			      u16 mute_mask)
 {
-	u16 mute_reg = snd_soc_component_read32(component,
+	u16 mute_reg = snd_soc_component_read(component,
 					      SGTL5000_CHIP_ANA_CTRL);
 
 	snd_soc_component_update_bits(component, SGTL5000_CHIP_ANA_CTRL,
@@ -172,7 +180,7 @@ static inline void restore_output(struct snd_soc_component *component,
 
 static void vag_power_on(struct snd_soc_component *component, u32 source)
 {
-	if (snd_soc_component_read32(component, SGTL5000_CHIP_ANA_POWER) &
+	if (snd_soc_component_read(component, SGTL5000_CHIP_ANA_POWER) &
 	    SGTL5000_VAG_POWERUP)
 		return;
 
@@ -217,7 +225,7 @@ static int vag_power_consumers(struct snd_soc_component *component,
 
 static void vag_power_off(struct snd_soc_component *component, u32 source)
 {
-	u16 ana_pwr = snd_soc_component_read32(component,
+	u16 ana_pwr = snd_soc_component_read(component,
 					     SGTL5000_CHIP_ANA_POWER);
 
 	if (!(ana_pwr & SGTL5000_VAG_POWERUP))
@@ -537,7 +545,7 @@ static int dac_get_volsw(struct snd_kcontrol *kcontrol,
 	int l;
 	int r;
 
-	reg = snd_soc_component_read32(component, SGTL5000_CHIP_DAC_VOL);
+	reg = snd_soc_component_read(component, SGTL5000_CHIP_DAC_VOL);
 
 	/* get left channel volume */
 	l = (reg & SGTL5000_DAC_VOL_LEFT_MASK) >> SGTL5000_DAC_VOL_LEFT_SHIFT;
@@ -625,7 +633,7 @@ static int avc_get_threshold(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
 	int db, i;
-	u16 reg = snd_soc_component_read32(component, SGTL5000_DAP_AVC_THRESHOLD);
+	u16 reg = snd_soc_component_read(component, SGTL5000_DAP_AVC_THRESHOLD);
 
 	/* register value 0 => -96dB */
 	if (!reg) {
@@ -712,6 +720,7 @@ static const struct snd_kcontrol_new sgtl5000_snd_controls[] = {
 			SGTL5000_CHIP_ANA_ADC_CTRL,
 			8, 1, 0, capture_6db_attenuate),
 	SOC_SINGLE("Capture ZC Switch", SGTL5000_CHIP_ANA_CTRL, 1, 1, 0),
+	SOC_SINGLE("Capture Switch", SGTL5000_CHIP_ANA_CTRL, 0, 1, 1),
 
 	SOC_DOUBLE_TLV("Headphone Playback Volume",
 			SGTL5000_CHIP_ANA_HP_CTRL,
@@ -766,7 +775,7 @@ static const struct snd_kcontrol_new sgtl5000_snd_controls[] = {
 };
 
 /* mute the codec used by alsa core */
-static int sgtl5000_digital_mute(struct snd_soc_dai *codec_dai, int mute)
+static int sgtl5000_mute_stream(struct snd_soc_dai *codec_dai, int mute, int direction)
 {
 	struct snd_soc_component *component = codec_dai->component;
 	u16 i2s_pwr = SGTL5000_I2S_IN_POWERUP;
@@ -1151,9 +1160,10 @@ static int sgtl5000_set_bias_level(struct snd_soc_component *component,
 
 static const struct snd_soc_dai_ops sgtl5000_ops = {
 	.hw_params = sgtl5000_pcm_hw_params,
-	.digital_mute = sgtl5000_digital_mute,
+	.mute_stream = sgtl5000_mute_stream,
 	.set_fmt = sgtl5000_set_dai_fmt,
 	.set_sysclk = sgtl5000_set_dai_sysclk,
+	.no_capture_mute = 1,
 };
 
 static struct snd_soc_dai_driver sgtl5000_dai = {
@@ -1316,11 +1326,11 @@ static int sgtl5000_set_power_regs(struct snd_soc_component *component)
 	}
 
 	/* reset value */
-	ana_pwr = snd_soc_component_read32(component, SGTL5000_CHIP_ANA_POWER);
+	ana_pwr = snd_soc_component_read(component, SGTL5000_CHIP_ANA_POWER);
 	ana_pwr |= SGTL5000_DAC_STEREO |
 			SGTL5000_ADC_STEREO |
 			SGTL5000_REFTOP_POWERUP;
-	lreg_ctrl = snd_soc_component_read32(component, SGTL5000_CHIP_LINREG_CTRL);
+	lreg_ctrl = snd_soc_component_read(component, SGTL5000_CHIP_LINREG_CTRL);
 
 	if (vddio < 3100 && vdda < 3100) {
 		/* enable internal oscillator used for charge pump */
@@ -1335,7 +1345,8 @@ static int sgtl5000_set_power_regs(struct snd_soc_component *component)
 		 * if vddio == vdda the source of charge pump should be
 		 * assigned manually to VDDIO
 		 */
-		if (vddio == vdda) {
+		if (regulator_is_equal(sgtl5000->supplies[VDDA].consumer,
+				       sgtl5000->supplies[VDDIO].consumer)) {
 			lreg_ctrl |= SGTL5000_VDDC_ASSN_OVRD;
 			lreg_ctrl |= SGTL5000_VDDC_MAN_ASSN_VDDIO <<
 				    SGTL5000_VDDC_MAN_ASSN_SHIFT;
@@ -1458,7 +1469,7 @@ static int sgtl5000_probe(struct snd_soc_component *component)
 
 	/* enable small pop, introduce 400ms delay in turning off */
 	snd_soc_component_update_bits(component, SGTL5000_CHIP_REF_CTRL,
-				SGTL5000_SMALL_POP, 1);
+				SGTL5000_SMALL_POP, SGTL5000_SMALL_POP);
 
 	/* disable short cut detector */
 	snd_soc_component_write(component, SGTL5000_CHIP_SHORT_CTRL, 0);
@@ -1472,7 +1483,9 @@ static int sgtl5000_probe(struct snd_soc_component *component)
 			SGTL5000_DAC_MUTE_RIGHT |
 			SGTL5000_DAC_MUTE_LEFT);
 
-	reg = ((sgtl5000->lrclk_strength) << SGTL5000_PAD_I2S_LRCLK_SHIFT | 0x5f);
+	reg = ((sgtl5000->lrclk_strength) << SGTL5000_PAD_I2S_LRCLK_SHIFT |
+	       (sgtl5000->sclk_strength) << SGTL5000_PAD_I2S_SCLK_SHIFT |
+	       0x1f);
 	snd_soc_component_write(component, SGTL5000_CHIP_PAD_STRENGTH, reg);
 
 	snd_soc_component_update_bits(component, SGTL5000_CHIP_ANA_CTRL,
@@ -1743,6 +1756,13 @@ static int sgtl5000_i2c_probe(struct i2c_client *client,
 		if (value > I2S_LRCLK_STRENGTH_HIGH)
 			value = I2S_LRCLK_STRENGTH_LOW;
 		sgtl5000->lrclk_strength = value;
+	}
+
+	sgtl5000->sclk_strength = I2S_SCLK_STRENGTH_LOW;
+	if (!of_property_read_u32(np, "sclk-strength", &value)) {
+		if (value > I2S_SCLK_STRENGTH_HIGH)
+			value = I2S_SCLK_STRENGTH_LOW;
+		sgtl5000->sclk_strength = value;
 	}
 
 	/* Ensure sgtl5000 will start with sane register values */

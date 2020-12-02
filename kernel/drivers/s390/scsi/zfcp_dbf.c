@@ -63,7 +63,8 @@ void zfcp_dbf_pl_write(struct zfcp_dbf *dbf, void *data, u16 length, char *area,
 
 /**
  * zfcp_dbf_hba_fsf_res - trace event for fsf responses
- * @tag: tag indicating which kind of unsolicited status has been received
+ * @tag: tag indicating which kind of FSF response has been received
+ * @level: trace level to be used for event
  * @req: request for which a response was received
  */
 void zfcp_dbf_hba_fsf_res(char *tag, int level, struct zfcp_fsf_req *req)
@@ -81,8 +82,8 @@ void zfcp_dbf_hba_fsf_res(char *tag, int level, struct zfcp_fsf_req *req)
 	rec->id = ZFCP_DBF_HBA_RES;
 	rec->fsf_req_id = req->req_id;
 	rec->fsf_req_status = req->status;
-	rec->fsf_cmd = req->fsf_command;
-	rec->fsf_seq_no = req->seq_no;
+	rec->fsf_cmd = q_head->fsf_command;
+	rec->fsf_seq_no = q_pref->req_seq_no;
 	rec->u.res.req_issued = req->issued;
 	rec->u.res.prot_status = q_pref->prot_status;
 	rec->u.res.fsf_status = q_head->fsf_status;
@@ -125,7 +126,7 @@ void zfcp_dbf_hba_fsf_uss(char *tag, struct zfcp_fsf_req *req)
 	rec->id = ZFCP_DBF_HBA_USS;
 	rec->fsf_req_id = req->req_id;
 	rec->fsf_req_status = req->status;
-	rec->fsf_cmd = req->fsf_command;
+	rec->fsf_cmd = FSF_QTCB_UNSOLICITED_STATUS;
 
 	if (!srb)
 		goto log;
@@ -151,7 +152,7 @@ log:
 
 /**
  * zfcp_dbf_hba_bit_err - trace event for bit error conditions
- * @tag: tag indicating which kind of unsolicited status has been received
+ * @tag: tag indicating which kind of bit error unsolicited status was received
  * @req: request which caused the bit_error condition
  */
 void zfcp_dbf_hba_bit_err(char *tag, struct zfcp_fsf_req *req)
@@ -172,7 +173,7 @@ void zfcp_dbf_hba_bit_err(char *tag, struct zfcp_fsf_req *req)
 	rec->id = ZFCP_DBF_HBA_BIT;
 	rec->fsf_req_id = req->req_id;
 	rec->fsf_req_status = req->status;
-	rec->fsf_cmd = req->fsf_command;
+	rec->fsf_cmd = FSF_QTCB_UNSOLICITED_STATUS;
 	memcpy(&rec->u.be, &sr_buf->payload.bit_error,
 	       sizeof(struct fsf_bit_error_payload));
 
@@ -222,6 +223,7 @@ void zfcp_dbf_hba_def_err(struct zfcp_adapter *adapter, u64 req_id, u16 scount,
 
 /**
  * zfcp_dbf_hba_basic - trace event for basic adapter events
+ * @tag: identifier for event
  * @adapter: pointer to struct zfcp_adapter
  */
 void zfcp_dbf_hba_basic(char *tag, struct zfcp_adapter *adapter)
@@ -355,7 +357,7 @@ void zfcp_dbf_rec_run_lvl(int level, char *tag, struct zfcp_erp_action *erp)
 	rec->u.run.fsf_req_id = erp->fsf_req_id;
 	rec->u.run.rec_status = erp->status;
 	rec->u.run.rec_step = erp->step;
-	rec->u.run.rec_action = erp->action;
+	rec->u.run.rec_action = erp->type;
 
 	if (erp->sdev)
 		rec->u.run.rec_count =
@@ -476,7 +478,8 @@ out:
 /**
  * zfcp_dbf_san_req - trace event for issued SAN request
  * @tag: identifier for event
- * @fsf_req: request containing issued CT data
+ * @fsf: request containing issued CT or ELS data
+ * @d_id: N_Port_ID where SAN request is sent to
  * d_id: destination ID
  */
 void zfcp_dbf_san_req(char *tag, struct zfcp_fsf_req *fsf, u32 d_id)
@@ -558,7 +561,7 @@ static u16 zfcp_dbf_san_res_cap_len_if_gpn_ft(char *tag,
 /**
  * zfcp_dbf_san_res - trace event for received SAN request
  * @tag: identifier for event
- * @fsf_req: request containing issued CT data
+ * @fsf: request containing received CT or ELS data
  */
 void zfcp_dbf_san_res(char *tag, struct zfcp_fsf_req *fsf)
 {
@@ -578,7 +581,7 @@ void zfcp_dbf_san_res(char *tag, struct zfcp_fsf_req *fsf)
 /**
  * zfcp_dbf_san_in_els - trace event for incoming ELS
  * @tag: identifier for event
- * @fsf_req: request containing issued CT data
+ * @fsf: request containing received ELS data
  */
 void zfcp_dbf_san_in_els(char *tag, struct zfcp_fsf_req *fsf)
 {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Surface dGPU hot-plug system driver.
  * Supports explicit setting of the dGPU power-state on the Surface Book 2 and
@@ -67,7 +68,8 @@ enum shps_dgpu_power {
 	SHPS_DGPU_POWER_UNKNOWN  = 2,
 };
 
-static const char* shps_dgpu_power_str(enum shps_dgpu_power power) {
+static const char *shps_dgpu_power_str(enum shps_dgpu_power power)
+{
 	if (power == SHPS_DGPU_POWER_OFF)
 		return "off";
 	else if (power == SHPS_DGPU_POWER_ON)
@@ -96,7 +98,7 @@ struct shps_driver_data {
 #define SHPS_STATE_BIT_WAKE_ENABLED	2	/* wakeup via base-presence GPIO enabled */
 
 
-#define SHPS_DGPU_PARAM_PERM		(S_IRUGO | S_IWUSR)
+#define SHPS_DGPU_PARAM_PERM		0644
 
 enum shps_dgpu_power_mp {
 	SHPS_DGPU_MP_POWER_OFF  = SHPS_DGPU_POWER_OFF,
@@ -113,13 +115,11 @@ static int param_dgpu_power_set(const char *val, const struct kernel_param *kp)
 	int status;
 
 	status = kstrtoint(val, 0, &power);
-	if (status) {
+	if (status)
 		return status;
-	}
 
-	if (power < __SHPS_DGPU_MP_POWER_START || power > __SHPS_DGPU_MP_POWER_END) {
+	if (power < __SHPS_DGPU_MP_POWER_START || power > __SHPS_DGPU_MP_POWER_END)
 		return -EINVAL;
-	}
 
 	return param_set_int(val, kp);
 }
@@ -160,18 +160,18 @@ static int dtx_cmd_simple(u8 cid)
 	return surface_sam_ssh_rqst(&rqst, NULL);
 }
 
-inline static int shps_dtx_latch_lock(void)
+static inline int shps_dtx_latch_lock(void)
 {
 	return dtx_cmd_simple(SAM_DTX_CID_LATCH_LOCK);
 }
 
-inline static int shps_dtx_latch_unlock(void)
+static inline int shps_dtx_latch_unlock(void)
 {
 	return dtx_cmd_simple(SAM_DTX_CID_LATCH_UNLOCK);
 }
 
 
-static int shps_dgpu_dsm_get_pci_addr(struct platform_device *pdev, const char* entry)
+static int shps_dgpu_dsm_get_pci_addr(struct platform_device *pdev, const char *entry)
 {
 	acpi_handle handle = ACPI_HANDLE(&pdev->dev);
 	union acpi_object *result;
@@ -225,7 +225,7 @@ static int shps_dgpu_dsm_get_pci_addr(struct platform_device *pdev, const char* 
 	return bus << 8 | PCI_DEVFN(dev, fun);
 }
 
-static struct pci_dev *shps_dgpu_dsm_get_pci_dev(struct platform_device *pdev, const char* entry)
+static struct pci_dev *shps_dgpu_dsm_get_pci_dev(struct platform_device *pdev, const char *entry)
 {
 	struct pci_dev *dev;
 	int addr;
@@ -276,7 +276,7 @@ static int __shps_dgpu_dsm_set_power_unlocked(struct platform_device *pdev, enum
 	param.integer.value = power == SHPS_DGPU_POWER_ON;
 
 	result = acpi_evaluate_dsm_typed(handle, &SHPS_DSM_UUID, SHPS_DSM_REVISION,
-	                                 SHPS_DSM_GPU_POWER, &param, ACPI_TYPE_BUFFER);
+					 SHPS_DSM_GPU_POWER, &param, ACPI_TYPE_BUFFER);
 
 	if (IS_ERR_OR_NULL(result))
 		return result ? PTR_ERR(result) : -EIO;
@@ -461,20 +461,23 @@ static int shps_dgpu_set_power(struct platform_device *pdev, enum shps_dgpu_powe
 		if (status)
 			shps_dtx_latch_unlock();
 
-		return status;
 	} else {
 		status = shps_dgpu_rp_set_power(pdev, power);
 		if (status)
 			return status;
 
-		return shps_dtx_latch_unlock();
+		status = shps_dtx_latch_unlock();
 	}
+
+	return status;
 }
 
 
 static int shps_dgpu_is_present(struct platform_device *pdev)
 {
-	struct shps_driver_data *drvdata = platform_get_drvdata(pdev);
+	struct shps_driver_data *drvdata;
+
+	drvdata = platform_get_drvdata(pdev);
 	return gpiod_get_value_cansleep(drvdata->gpio_dgpu_presence);
 }
 
@@ -702,9 +705,8 @@ static int shps_pm_resume(struct device *dev)
 	struct shps_driver_data *drvdata = platform_get_drvdata(pdev);
 	int status = 0;
 
-	if (test_and_clear_bit(SHPS_STATE_BIT_WAKE_ENABLED, &drvdata->state)) {
+	if (test_and_clear_bit(SHPS_STATE_BIT_WAKE_ENABLED, &drvdata->state))
 		status = disable_irq_wake(drvdata->irq_base_presence);
-	}
 
 	return status;
 }
@@ -976,15 +978,13 @@ static int shps_probe(struct platform_device *pdev)
 
 	// link to SSH
 	status = surface_sam_ssh_consumer_register(&pdev->dev);
-	if (status) {
+	if (status)
 		return status == -ENXIO ? -EPROBE_DEFER : status;
-	}
 
 	// link to SAN
 	status = surface_sam_san_consumer_register(&pdev->dev, 0);
-	if (status) {
+	if (status)
 		return status == -ENXIO ? -EPROBE_DEFER : status;
-	}
 
 	status = acpi_dev_add_driver_gpios(shps_dev, shps_acpi_gpios);
 	if (status)
@@ -1093,7 +1093,7 @@ static const struct acpi_device_id shps_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, shps_acpi_match);
 
-struct platform_driver surface_sam_hps = {
+static struct platform_driver surface_sam_hps = {
 	.probe = shps_probe,
 	.remove = shps_remove,
 	.shutdown = shps_shutdown,

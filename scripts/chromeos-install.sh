@@ -356,8 +356,8 @@ else
 			esac
 		done
 	fi
-	echo "ChromeOS installed."
-	grep -qi 'Microsoft' /proc/version || cat <<GRUB
+	echo "ChromeOS disk image created."
+	grep -qi 'Microsoft' /proc/version || cat <<GRUB | tee "$destination".grub.txt
 To boot directly from this image file, add the lines between stars to either:
 - A brunch usb flashdrive grub config file (then boot from usb and choose boot from disk image in the menu),
 - Or your hard disk grub install if you have one (refer to you distro's online resources).
@@ -369,7 +369,8 @@ menuentry "ChromeOS (boot from disk image)" {
 	search --no-floppy --set=root --file \$img_path
 	loopback loop \$img_path
 	linux (loop,7)/kernel boot=local noresume noswap loglevel=7 disablevmx=off \\
-		cros_secure cros_debug loop.max_part=16 img_part=\$img_part img_path=\$img_path
+		cros_secure cros_debug loop.max_part=16 img_part=\$img_part img_path=\$img_path \\
+		console= vt.global_cursor_default=0 brunch_bootsplash=default
 	initrd (loop,7)/lib/firmware/amd-ucode.img (loop,7)/lib/firmware/intel-ucode.img (loop,7)/initramfs.img
 }
 ********************************************************************************

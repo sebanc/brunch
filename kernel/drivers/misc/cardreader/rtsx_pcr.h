@@ -1,19 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /* Driver for Realtek PCI-Express card reader
  *
  * Copyright(c) 2009-2013 Realtek Semiconductor Corp. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, see <http://www.gnu.org/licenses/>.
  *
  * Author:
  *   Wei WANG <wei_wang@realsil.com.cn>
@@ -65,6 +53,7 @@ void rts524a_init_params(struct rtsx_pcr *pcr);
 void rts525a_init_params(struct rtsx_pcr *pcr);
 void rtl8411b_init_params(struct rtsx_pcr *pcr);
 void rts5260_init_params(struct rtsx_pcr *pcr);
+void rts5261_init_params(struct rtsx_pcr *pcr);
 
 static inline u8 map_sd_drive(int idx)
 {
@@ -112,6 +101,8 @@ void rtsx_pci_disable_ocp(struct rtsx_pcr *pcr);
 void rtsx_pci_enable_ocp(struct rtsx_pcr *pcr);
 int rtsx_pci_get_ocpstat(struct rtsx_pcr *pcr, u8 *val);
 void rtsx_pci_clear_ocpstat(struct rtsx_pcr *pcr);
+void rtsx_pci_enable_oobs_polling(struct rtsx_pcr *pcr);
+void rtsx_pci_disable_oobs_polling(struct rtsx_pcr *pcr);
 int rtsx_sd_power_off_card3v3(struct rtsx_pcr *pcr);
 int rtsx_ms_power_off_card3v3(struct rtsx_pcr *pcr);
 

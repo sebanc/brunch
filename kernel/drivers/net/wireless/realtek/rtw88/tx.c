@@ -196,7 +196,7 @@ static void rtw_tx_report_tx_status(struct rtw_dev *rtwdev,
 	ieee80211_tx_status_irqsafe(rtwdev->hw, skb);
 }
 
-void rtw_tx_report_handle(struct rtw_dev *rtwdev, struct sk_buff *skb)
+void rtw_tx_report_handle(struct rtw_dev *rtwdev, struct sk_buff *skb, int src)
 {
 	struct rtw_tx_report *tx_report = &rtwdev->tx_report;
 	struct rtw_c2h_cmd *c2h;
@@ -207,8 +207,13 @@ void rtw_tx_report_handle(struct rtw_dev *rtwdev, struct sk_buff *skb)
 
 	c2h = get_c2h_from_skb(skb);
 
-	sn = GET_CCX_REPORT_SEQNUM(c2h->payload);
-	st = GET_CCX_REPORT_STATUS(c2h->payload);
+	if (src == C2H_CCX_TX_RPT) {
+		sn = GET_CCX_REPORT_SEQNUM_V0(c2h->payload);
+		st = GET_CCX_REPORT_STATUS_V0(c2h->payload);
+	} else {
+		sn = GET_CCX_REPORT_SEQNUM_V1(c2h->payload);
+		st = GET_CCX_REPORT_STATUS_V1(c2h->payload);
+	}
 
 	spin_lock_irqsave(&tx_report->q_lock, flags);
 	skb_queue_walk_safe(&tx_report->queue, cur, tmp) {
@@ -514,12 +519,33 @@ static int rtw_txq_push_skb(struct rtw_dev *rtwdev,
 static struct sk_buff *rtw_txq_dequeue(struct rtw_dev *rtwdev,
 				       struct rtw_txq *rtwtxq)
 {
+	struct rtw_chip_info *chip = rtwdev->chip;
 	struct ieee80211_txq *txq = rtwtxq_to_txq(rtwtxq);
 	struct sk_buff *skb;
+	int headroom_needed;
 
-	skb = ieee80211_tx_dequeue(rtwdev->hw, txq);
-	if (!skb)
-		return NULL;
+	do {
+		skb = ieee80211_tx_dequeue(rtwdev->hw, txq);
+		if (!skb)
+			return NULL;
+
+		headroom_needed = chip->tx_pkt_desc_sz - skb_headroom(skb);
+		if (WARN_ONCE(headroom_needed > 0,
+			      "Insufficient headroom (%d bytes, need %d)\n",
+			      skb_headroom(skb), chip->tx_pkt_desc_sz)) {
+			if (skb_cloned(skb)) {
+				netdev_warn(skb->dev, "skb is cloned\n");
+				skb = skb_unshare(skb, GFP_ATOMIC);
+				if (!skb)
+					continue;
+				headroom_needed = chip->tx_pkt_desc_sz - skb_headroom(skb);
+			}
+			if (pskb_expand_head(skb, headroom_needed, 0, GFP_ATOMIC) < 0) {
+				kfree_skb(skb);
+				continue;
+			}
+		}
+	} while (!skb);
 
 	return skb;
 }

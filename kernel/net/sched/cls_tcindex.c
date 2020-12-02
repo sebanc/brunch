@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * net/sched/cls_tcindex.c	Packet classifier for skb->tc_index
  *
@@ -10,6 +11,7 @@
 #include <linux/skbuff.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
+#include <linux/refcount.h>
 #include <net/act_api.h>
 #include <net/netlink.h>
 #include <net/pkt_cls.h>
@@ -25,9 +27,12 @@
 #define DEFAULT_HASH_SIZE	64	/* optimized for diffserv */
 
 
+struct tcindex_data;
+
 struct tcindex_filter_result {
 	struct tcf_exts		exts;
 	struct tcf_result	res;
+	struct tcindex_data	*p;
 	struct rcu_work		rwork;
 };
 
@@ -48,12 +53,27 @@ struct tcindex_data {
 	u32 hash;		/* hash table size; 0 if undefined */
 	u32 alloc_hash;		/* allocated size */
 	u32 fall_through;	/* 0: only classify if explicit match */
+	refcount_t refcnt;	/* a temporary refcnt for perfect hash */
 	struct rcu_work rwork;
 };
 
 static inline int tcindex_filter_is_set(struct tcindex_filter_result *r)
 {
 	return tcf_exts_has_actions(&r->exts) || r->res.classid;
+}
+
+static void tcindex_data_get(struct tcindex_data *p)
+{
+	refcount_inc(&p->refcnt);
+}
+
+static void tcindex_data_put(struct tcindex_data *p)
+{
+	if (refcount_dec_and_test(&p->refcnt)) {
+		kfree(p->perfect);
+		kfree(p->h);
+		kfree(p);
+	}
 }
 
 static struct tcindex_filter_result *tcindex_lookup(struct tcindex_data *p,
@@ -131,6 +151,7 @@ static int tcindex_init(struct tcf_proto *tp)
 	p->mask = 0xffff;
 	p->hash = DEFAULT_HASH_SIZE;
 	p->fall_through = 1;
+	refcount_set(&p->refcnt, 1); /* Paired with tcindex_destroy_work() */
 
 	rcu_assign_pointer(tp->root, p);
 	return 0;
@@ -140,6 +161,7 @@ static void __tcindex_destroy_rexts(struct tcindex_filter_result *r)
 {
 	tcf_exts_destroy(&r->exts);
 	tcf_exts_put_net(&r->exts);
+	tcindex_data_put(r->p);
 }
 
 static void tcindex_destroy_rexts_work(struct work_struct *work)
@@ -173,7 +195,7 @@ static void tcindex_destroy_fexts_work(struct work_struct *work)
 }
 
 static int tcindex_delete(struct tcf_proto *tp, void *arg, bool *last,
-			  struct netlink_ext_ack *extack)
+			  bool rtnl_held, struct netlink_ext_ack *extack)
 {
 	struct tcindex_data *p = rtnl_dereference(tp->root);
 	struct tcindex_filter_result *r = arg;
@@ -211,6 +233,8 @@ found:
 		else
 			__tcindex_destroy_fexts(f);
 	} else {
+		tcindex_data_get(p);
+
 		if (tcf_exts_get_net(&r->exts))
 			tcf_queue_work(&r->rwork, tcindex_destroy_rexts_work);
 		else
@@ -227,9 +251,7 @@ static void tcindex_destroy_work(struct work_struct *work)
 					      struct tcindex_data,
 					      rwork);
 
-	kfree(p->perfect);
-	kfree(p->h);
-	kfree(p);
+	tcindex_data_put(p);
 }
 
 static inline int
@@ -246,10 +268,14 @@ static const struct nla_policy tcindex_policy[TCA_TCINDEX_MAX + 1] = {
 	[TCA_TCINDEX_CLASSID]		= { .type = NLA_U32 },
 };
 
-static int tcindex_filter_result_init(struct tcindex_filter_result *r)
+static int tcindex_filter_result_init(struct tcindex_filter_result *r,
+				      struct tcindex_data *p,
+				      struct net *net)
 {
 	memset(r, 0, sizeof(*r));
-	return tcf_exts_init(&r->exts, TCA_TCINDEX_ACT, TCA_TCINDEX_POLICE);
+	r->p = p;
+	return tcf_exts_init(&r->exts, net, TCA_TCINDEX_ACT,
+			     TCA_TCINDEX_POLICE);
 }
 
 static void tcindex_partial_destroy_work(struct work_struct *work)
@@ -258,8 +284,10 @@ static void tcindex_partial_destroy_work(struct work_struct *work)
 					      struct tcindex_data,
 					      rwork);
 
+	rtnl_lock();
 	kfree(p->perfect);
 	kfree(p);
+	rtnl_unlock();
 }
 
 static void tcindex_free_perfect_hash(struct tcindex_data *cp)
@@ -281,13 +309,11 @@ static int tcindex_alloc_perfect_hash(struct net *net, struct tcindex_data *cp)
 		return -ENOMEM;
 
 	for (i = 0; i < cp->hash; i++) {
-		err = tcf_exts_init(&cp->perfect[i].exts,
+		err = tcf_exts_init(&cp->perfect[i].exts, net,
 				    TCA_TCINDEX_ACT, TCA_TCINDEX_POLICE);
 		if (err < 0)
 			goto errout;
-#ifdef CONFIG_NET_CLS_ACT
-		cp->perfect[i].exts.net = net;
-#endif
+		cp->perfect[i].p = cp;
 	}
 
 	return 0;
@@ -310,10 +336,10 @@ tcindex_set_parms(struct net *net, struct tcf_proto *tp, unsigned long base,
 	int err, balloc = 0;
 	struct tcf_exts e;
 
-	err = tcf_exts_init(&e, TCA_TCINDEX_ACT, TCA_TCINDEX_POLICE);
+	err = tcf_exts_init(&e, net, TCA_TCINDEX_ACT, TCA_TCINDEX_POLICE);
 	if (err < 0)
 		return err;
-	err = tcf_exts_validate(net, tp, tb, est, &e, ovr, extack);
+	err = tcf_exts_validate(net, tp, tb, est, &e, ovr, true, extack);
 	if (err < 0)
 		goto errout;
 
@@ -332,6 +358,7 @@ tcindex_set_parms(struct net *net, struct tcf_proto *tp, unsigned long base,
 	cp->alloc_hash = p->alloc_hash;
 	cp->fall_through = p->fall_through;
 	cp->tp = tp;
+	refcount_set(&cp->refcnt, 1); /* Paired with tcindex_destroy_work() */
 
 	if (tb[TCA_TCINDEX_HASH])
 		cp->hash = nla_get_u32(tb[TCA_TCINDEX_HASH]);
@@ -364,7 +391,7 @@ tcindex_set_parms(struct net *net, struct tcf_proto *tp, unsigned long base,
 	}
 	cp->h = p->h;
 
-	err = tcindex_filter_result_init(&new_filter_result);
+	err = tcindex_filter_result_init(&new_filter_result, cp, net);
 	if (err < 0)
 		goto errout_alloc;
 	if (old_r)
@@ -432,7 +459,7 @@ tcindex_set_parms(struct net *net, struct tcf_proto *tp, unsigned long base,
 			goto errout_alloc;
 		f->key = handle;
 		f->next = NULL;
-		err = tcindex_filter_result_init(&f->result);
+		err = tcindex_filter_result_init(&f->result, cp, net);
 		if (err < 0) {
 			kfree(f);
 			goto errout_alloc;
@@ -445,7 +472,7 @@ tcindex_set_parms(struct net *net, struct tcf_proto *tp, unsigned long base,
 	}
 
 	if (old_r && old_r != r) {
-		err = tcindex_filter_result_init(old_r);
+		err = tcindex_filter_result_init(old_r, cp, net);
 		if (err < 0) {
 			kfree(f);
 			goto errout_alloc;
@@ -496,7 +523,7 @@ static int
 tcindex_change(struct net *net, struct sk_buff *in_skb,
 	       struct tcf_proto *tp, unsigned long base, u32 handle,
 	       struct nlattr **tca, void **arg, bool ovr,
-	       struct netlink_ext_ack *extack)
+	       bool rtnl_held, struct netlink_ext_ack *extack)
 {
 	struct nlattr *opt = tca[TCA_OPTIONS];
 	struct nlattr *tb[TCA_TCINDEX_MAX + 1];
@@ -511,7 +538,8 @@ tcindex_change(struct net *net, struct sk_buff *in_skb,
 	if (!opt)
 		return 0;
 
-	err = nla_parse_nested(tb, TCA_TCINDEX_MAX, opt, tcindex_policy, NULL);
+	err = nla_parse_nested_deprecated(tb, TCA_TCINDEX_MAX, opt,
+					  tcindex_policy, NULL);
 	if (err < 0)
 		return err;
 
@@ -519,7 +547,8 @@ tcindex_change(struct net *net, struct sk_buff *in_skb,
 				 tca[TCA_RATE], ovr, extack);
 }
 
-static void tcindex_walk(struct tcf_proto *tp, struct tcf_walker *walker)
+static void tcindex_walk(struct tcf_proto *tp, struct tcf_walker *walker,
+			 bool rtnl_held)
 {
 	struct tcindex_data *p = rtnl_dereference(tp->root);
 	struct tcindex_filter *f, *next;
@@ -555,7 +584,7 @@ static void tcindex_walk(struct tcf_proto *tp, struct tcf_walker *walker)
 	}
 }
 
-static void tcindex_destroy(struct tcf_proto *tp,
+static void tcindex_destroy(struct tcf_proto *tp, bool rtnl_held,
 			    struct netlink_ext_ack *extack)
 {
 	struct tcindex_data *p = rtnl_dereference(tp->root);
@@ -566,6 +595,14 @@ static void tcindex_destroy(struct tcf_proto *tp,
 	if (p->perfect) {
 		for (i = 0; i < p->hash; i++) {
 			struct tcindex_filter_result *r = p->perfect + i;
+
+			/* tcf_queue_work() does not guarantee the ordering we
+			 * want, so we have to take this refcnt temporarily to
+			 * ensure 'p' is freed after all tcindex_filter_result
+			 * here. Imperfect hash does not need this, because it
+			 * uses linked lists rather than an array.
+			 */
+			tcindex_data_get(p);
 
 			tcf_unbind_filter(tp, &r->res);
 			if (tcf_exts_get_net(&r->exts))
@@ -582,7 +619,7 @@ static void tcindex_destroy(struct tcf_proto *tp,
 
 		for (f = rtnl_dereference(p->h[i]); f; f = next) {
 			next = rtnl_dereference(f->next);
-			tcindex_delete(tp, &f->result, &last, NULL);
+			tcindex_delete(tp, &f->result, &last, rtnl_held, NULL);
 		}
 	}
 
@@ -591,7 +628,7 @@ static void tcindex_destroy(struct tcf_proto *tp,
 
 
 static int tcindex_dump(struct net *net, struct tcf_proto *tp, void *fh,
-			struct sk_buff *skb, struct tcmsg *t)
+			struct sk_buff *skb, struct tcmsg *t, bool rtnl_held)
 {
 	struct tcindex_data *p = rtnl_dereference(tp->root);
 	struct tcindex_filter_result *r = fh;
@@ -601,7 +638,7 @@ static int tcindex_dump(struct net *net, struct tcf_proto *tp, void *fh,
 		 tp, fh, skb, t, p, r);
 	pr_debug("p->perfect %p p->h %p\n", p->perfect, p->h);
 
-	nest = nla_nest_start(skb, TCA_OPTIONS);
+	nest = nla_nest_start_noflag(skb, TCA_OPTIONS);
 	if (nest == NULL)
 		goto nla_put_failure;
 

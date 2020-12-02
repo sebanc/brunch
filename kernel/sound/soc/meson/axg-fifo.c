@@ -19,7 +19,7 @@
  * This file implements the platform operations common to the playback and
  * capture frontend DAI. The logic behind this two types of fifo is very
  * similar but some difference exist.
- * These differences the respective DAI drivers
+ * These differences are handled in the respective DAI drivers
  */
 
 static struct snd_pcm_hardware axg_fifo_hw = {
@@ -47,7 +47,7 @@ static struct snd_soc_dai *axg_fifo_dai(struct snd_pcm_substream *ss)
 {
 	struct snd_soc_pcm_runtime *rtd = ss->private_data;
 
-	return rtd->cpu_dai;
+	return asoc_rtd_to_cpu(rtd, 0);
 }
 
 static struct axg_fifo *axg_fifo_data(struct snd_pcm_substream *ss)
@@ -70,7 +70,8 @@ static void __dma_enable(struct axg_fifo *fifo,  bool enable)
 			   enable ? CTRL0_DMA_EN : 0);
 }
 
-static int axg_fifo_pcm_trigger(struct snd_pcm_substream *ss, int cmd)
+int axg_fifo_pcm_trigger(struct snd_soc_component *component,
+			 struct snd_pcm_substream *ss, int cmd)
 {
 	struct axg_fifo *fifo = axg_fifo_data(ss);
 
@@ -91,8 +92,10 @@ static int axg_fifo_pcm_trigger(struct snd_pcm_substream *ss, int cmd)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(axg_fifo_pcm_trigger);
 
-static snd_pcm_uframes_t axg_fifo_pcm_pointer(struct snd_pcm_substream *ss)
+snd_pcm_uframes_t axg_fifo_pcm_pointer(struct snd_soc_component *component,
+				       struct snd_pcm_substream *ss)
 {
 	struct axg_fifo *fifo = axg_fifo_data(ss);
 	struct snd_pcm_runtime *runtime = ss->runtime;
@@ -102,15 +105,19 @@ static snd_pcm_uframes_t axg_fifo_pcm_pointer(struct snd_pcm_substream *ss)
 
 	return bytes_to_frames(runtime, addr - (unsigned int)runtime->dma_addr);
 }
+EXPORT_SYMBOL_GPL(axg_fifo_pcm_pointer);
 
-static int axg_fifo_pcm_hw_params(struct snd_pcm_substream *ss,
-				  struct snd_pcm_hw_params *params)
+int axg_fifo_pcm_hw_params(struct snd_soc_component *component,
+			   struct snd_pcm_substream *ss,
+			   struct snd_pcm_hw_params *params)
 {
 	struct snd_pcm_runtime *runtime = ss->runtime;
 	struct axg_fifo *fifo = axg_fifo_data(ss);
+	unsigned int burst_num, period, threshold;
 	dma_addr_t end_ptr;
-	unsigned int burst_num;
 	int ret;
+
+	period = params_period_bytes(params);
 
 	ret = snd_pcm_lib_malloc_pages(ss, params_buffer_bytes(params));
 	if (ret < 0)
@@ -122,8 +129,24 @@ static int axg_fifo_pcm_hw_params(struct snd_pcm_substream *ss,
 	regmap_write(fifo->map, FIFO_FINISH_ADDR, end_ptr);
 
 	/* Setup interrupt periodicity */
-	burst_num = params_period_bytes(params) / AXG_FIFO_BURST;
+	burst_num = period / AXG_FIFO_BURST;
 	regmap_write(fifo->map, FIFO_INT_ADDR, burst_num);
+
+	/*
+	 * Start the fifo request on the smallest of the following:
+	 * - Half the fifo size
+	 * - Half the period size
+	 */
+	threshold = min(period / 2,
+			(unsigned int)AXG_FIFO_MIN_DEPTH / 2);
+
+	/*
+	 * With the threshold in bytes, register value is:
+	 * V = (threshold / burst) - 1
+	 */
+	threshold /= AXG_FIFO_BURST;
+	regmap_field_write(fifo->field_threshold,
+			   threshold ? threshold - 1 : 0);
 
 	/* Enable block count irq */
 	regmap_update_bits(fifo->map, FIFO_CTRL0,
@@ -132,8 +155,29 @@ static int axg_fifo_pcm_hw_params(struct snd_pcm_substream *ss,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(axg_fifo_pcm_hw_params);
 
-static int axg_fifo_pcm_hw_free(struct snd_pcm_substream *ss)
+int g12a_fifo_pcm_hw_params(struct snd_soc_component *component,
+			    struct snd_pcm_substream *ss,
+			    struct snd_pcm_hw_params *params)
+{
+	struct axg_fifo *fifo = axg_fifo_data(ss);
+	struct snd_pcm_runtime *runtime = ss->runtime;
+	int ret;
+
+	ret = axg_fifo_pcm_hw_params(component, ss, params);
+	if (ret)
+		return ret;
+
+	/* Set the initial memory address of the DMA */
+	regmap_write(fifo->map, FIFO_INIT_ADDR, runtime->dma_addr);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(g12a_fifo_pcm_hw_params);
+
+int axg_fifo_pcm_hw_free(struct snd_soc_component *component,
+			 struct snd_pcm_substream *ss)
 {
 	struct axg_fifo *fifo = axg_fifo_data(ss);
 
@@ -143,6 +187,7 @@ static int axg_fifo_pcm_hw_free(struct snd_pcm_substream *ss)
 
 	return snd_pcm_lib_free_pages(ss);
 }
+EXPORT_SYMBOL_GPL(axg_fifo_pcm_hw_free);
 
 static void axg_fifo_ack_irq(struct axg_fifo *fifo, u8 mask)
 {
@@ -177,7 +222,8 @@ static irqreturn_t axg_fifo_pcm_irq_block(int irq, void *dev_id)
 	return IRQ_RETVAL(status);
 }
 
-static int axg_fifo_pcm_open(struct snd_pcm_substream *ss)
+int axg_fifo_pcm_open(struct snd_soc_component *component,
+		      struct snd_pcm_substream *ss)
 {
 	struct axg_fifo *fifo = axg_fifo_data(ss);
 	struct device *dev = axg_fifo_dev(ss);
@@ -239,8 +285,10 @@ free_irq:
 	free_irq(fifo->irq, ss);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(axg_fifo_pcm_open);
 
-static int axg_fifo_pcm_close(struct snd_pcm_substream *ss)
+int axg_fifo_pcm_close(struct snd_soc_component *component,
+		       struct snd_pcm_substream *ss)
 {
 	struct axg_fifo *fifo = axg_fifo_data(ss);
 	int ret;
@@ -256,17 +304,7 @@ static int axg_fifo_pcm_close(struct snd_pcm_substream *ss)
 
 	return ret;
 }
-
-const struct snd_pcm_ops axg_fifo_pcm_ops = {
-	.open =		axg_fifo_pcm_open,
-	.close =        axg_fifo_pcm_close,
-	.ioctl =	snd_pcm_lib_ioctl,
-	.hw_params =	axg_fifo_pcm_hw_params,
-	.hw_free =      axg_fifo_pcm_hw_free,
-	.pointer =	axg_fifo_pcm_pointer,
-	.trigger =	axg_fifo_pcm_trigger,
-};
-EXPORT_SYMBOL_GPL(axg_fifo_pcm_ops);
+EXPORT_SYMBOL_GPL(axg_fifo_pcm_close);
 
 int axg_fifo_pcm_new(struct snd_soc_pcm_runtime *rtd, unsigned int type)
 {
@@ -284,7 +322,7 @@ static const struct regmap_config axg_fifo_regmap_cfg = {
 	.reg_bits	= 32,
 	.val_bits	= 32,
 	.reg_stride	= 4,
-	.max_register	= FIFO_STATUS2,
+	.max_register	= FIFO_CTRL2,
 };
 
 int axg_fifo_probe(struct platform_device *pdev)
@@ -292,7 +330,6 @@ int axg_fifo_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	const struct axg_fifo_match_data *data;
 	struct axg_fifo *fifo;
-	struct resource *res;
 	void __iomem *regs;
 
 	data = of_device_get_match_data(dev);
@@ -306,8 +343,7 @@ int axg_fifo_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, fifo);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	regs = devm_ioremap_resource(dev, res);
+	regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(regs))
 		return PTR_ERR(regs);
 
@@ -340,11 +376,16 @@ int axg_fifo_probe(struct platform_device *pdev)
 		return fifo->irq;
 	}
 
+	fifo->field_threshold =
+		devm_regmap_field_alloc(dev, fifo->map, data->field_threshold);
+	if (IS_ERR(fifo->field_threshold))
+		return PTR_ERR(fifo->field_threshold);
+
 	return devm_snd_soc_register_component(dev, data->component_drv,
 					       data->dai_drv, 1);
 }
 EXPORT_SYMBOL_GPL(axg_fifo_probe);
 
-MODULE_DESCRIPTION("Amlogic AXG fifo driver");
+MODULE_DESCRIPTION("Amlogic AXG/G12A fifo driver");
 MODULE_AUTHOR("Jerome Brunet <jbrunet@baylibre.com>");
 MODULE_LICENSE("GPL v2");

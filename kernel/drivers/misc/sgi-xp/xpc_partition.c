@@ -93,13 +93,8 @@ xpc_get_rsvd_page_pa(int nasid)
 		if (ret != xpNeedMoreInfo)
 			break;
 
-		/* !!! L1_CACHE_ALIGN() is only a sn2-bte_copy requirement */
-		if (is_shub())
-			len = L1_CACHE_ALIGN(len);
-
 		if (len > buf_len) {
-			if (buf_base != NULL)
-				kfree(buf_base);
+			kfree(buf_base);
 			buf_len = L1_CACHE_ALIGN(len);
 			buf = xpc_kmalloc_cacheline_aligned(buf_len, GFP_KERNEL,
 							    &buf_base);
@@ -453,7 +448,6 @@ xpc_discovery(void)
 		case 32:
 			max_regions *= 2;
 			region_size = 16;
-			DBUG_ON(!is_shub2());
 		}
 	}
 

@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * common.c - C code for kernel entry and exit
  * Copyright (c) 2015 Andrew Lutomirski
- * GPL v2
  *
  * Based on asm and ptrace code by many authors.  The code here originated
  * in ptrace.c and signal.c.
@@ -25,12 +25,13 @@
 #include <linux/uprobes.h>
 #include <linux/livepatch.h>
 #include <linux/syscalls.h>
+#include <linux/uaccess.h>
 
 #include <asm/desc.h>
 #include <asm/traps.h>
 #include <asm/vdso.h>
-#include <linux/uaccess.h>
 #include <asm/cpufeature.h>
+#include <asm/fpu/api.h>
 #include <asm/nospec-branch.h>
 
 #define CREATE_TRACE_POINTS
@@ -71,23 +72,18 @@ static long syscall_trace_enter(struct pt_regs *regs)
 
 	struct thread_info *ti = current_thread_info();
 	unsigned long ret = 0;
-	bool emulated = false;
 	u32 work;
 
 	if (IS_ENABLED(CONFIG_DEBUG_ENTRY))
 		BUG_ON(regs != task_pt_regs(current));
 
-	work = READ_ONCE(ti->flags) & _TIF_WORK_SYSCALL_ENTRY;
+	work = READ_ONCE(ti->flags);
 
-	if (unlikely(work & _TIF_SYSCALL_EMU))
-		emulated = true;
-
-	if ((emulated || (work & _TIF_SYSCALL_TRACE)) &&
-	    tracehook_report_syscall_entry(regs))
-		return -1L;
-
-	if (emulated)
-		return -1L;
+	if (work & (_TIF_SYSCALL_TRACE | _TIF_SYSCALL_EMU)) {
+		ret = tracehook_report_syscall_entry(regs);
+		if (ret || (work & _TIF_SYSCALL_EMU))
+			return -1L;
+	}
 
 #ifdef CONFIG_SECCOMP
 	/*
@@ -141,7 +137,7 @@ static void exit_to_usermode_loop(struct pt_regs *regs, u32 cached_flags)
 	/*
 	 * In order to return to user mode, we need to have IRQs off with
 	 * none of EXIT_TO_USERMODE_LOOP_FLAGS set.  Several of these flags
-	 * can be set at any time on preemptable kernels if we have IRQs on,
+	 * can be set at any time on preemptible kernels if we have IRQs on,
 	 * so we need to loop.  Disabling preemption wouldn't help: doing the
 	 * work to clear some of the flags can sleep.
 	 */
@@ -196,6 +192,13 @@ __visible inline void prepare_exit_to_usermode(struct pt_regs *regs)
 
 	if (unlikely(cached_flags & EXIT_TO_USERMODE_LOOP_FLAGS))
 		exit_to_usermode_loop(regs, cached_flags);
+
+	/* Reload ti->flags; we may have rescheduled above. */
+	cached_flags = READ_ONCE(ti->flags);
+
+	fpregs_assert_state_consistent();
+	if (unlikely(cached_flags & _TIF_NEED_FPU_LOAD))
+		switch_fpu_return();
 
 #ifdef CONFIG_COMPAT
 	/*
@@ -290,12 +293,6 @@ __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 	if (READ_ONCE(ti->flags) & _TIF_WORK_SYSCALL_ENTRY)
 		nr = syscall_trace_enter(regs);
 
-	/*
-	 * NB: Native and x32 syscalls are dispatched from the same
-	 * table.  The only functional difference is the x32 bit in
-	 * regs->orig_ax, which changes the behavior of some syscalls.
-	 */
-	nr &= __SYSCALL_MASK;
 #ifdef CONFIG_ALT_SYSCALL
 	if (likely(nr < ti->nr_syscalls)) {
 		nr = array_index_nospec(nr, ti->nr_syscalls);
@@ -305,8 +302,15 @@ __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
 	if (likely(nr < NR_syscalls)) {
 		nr = array_index_nospec(nr, NR_syscalls);
 		regs->ax = sys_call_table[nr](regs);
-	}
+#ifdef CONFIG_X86_X32_ABI
+	} else if (likely((nr & __X32_SYSCALL_BIT) &&
+			  (nr & ~__X32_SYSCALL_BIT) < X32_NR_syscalls)) {
+		nr = array_index_nospec(nr & ~__X32_SYSCALL_BIT,
+					X32_NR_syscalls);
+		regs->ax = x32_sys_call_table[nr](regs);
 #endif
+	}
+#endif /* CONFIG_ALT_SYSCALL */
 
 	syscall_return_slowpath(regs);
 }

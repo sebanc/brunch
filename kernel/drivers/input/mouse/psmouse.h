@@ -126,6 +126,9 @@ struct psmouse {
 	void (*cleanup)(struct psmouse *psmouse);
 	int (*poll)(struct psmouse *psmouse);
 
+	int (*inhibit)(struct psmouse *psmouse);
+	int (*uninhibit)(struct psmouse *psmouse);
+
 	void (*pt_activate)(struct psmouse *psmouse);
 	void (*pt_deactivate)(struct psmouse *psmouse);
 };

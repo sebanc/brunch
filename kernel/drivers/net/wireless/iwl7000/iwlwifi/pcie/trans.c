@@ -1998,7 +1998,7 @@ void iwl_trans_pcie_free(struct iwl_trans *trans)
 	iwl_pcie_synchronize_irqs(trans);
 
 	if (trans->trans_cfg->gen2)
-		iwl_txq_gen2_tx_free(trans);
+		iwl_pcie_gen2_tx_free(trans);
 	else
 		iwl_pcie_tx_free(trans);
 	iwl_pcie_rx_free(trans);
@@ -2022,6 +2022,15 @@ void iwl_trans_pcie_free(struct iwl_trans *trans)
 
 	iwl_pcie_free_fw_monitor(trans);
 
+	for_each_possible_cpu(i) {
+		struct iwl_tso_hdr_page *p =
+			per_cpu_ptr(trans_pcie->tso_hdr_page, i);
+
+		if (p->page)
+			__free_page(p->page);
+	}
+
+	free_percpu(trans_pcie->tso_hdr_page);
 	mutex_destroy(&trans_pcie->mutex);
 	iwl_trans_free(trans);
 }
@@ -2198,18 +2207,36 @@ static int iwl_trans_pcie_read_mem(struct iwl_trans *trans, u32 addr,
 				   void *buf, int dwords)
 {
 	unsigned long flags;
-	int offs, ret = 0;
+	int offs = 0;
 	u32 *vals = buf;
 
-	if (iwl_trans_grab_nic_access(trans, &flags)) {
-		iwl_write32(trans, HBUS_TARG_MEM_RADDR, addr);
-		for (offs = 0; offs < dwords; offs++)
-			vals[offs] = iwl_read32(trans, HBUS_TARG_MEM_RDAT);
-		iwl_trans_release_nic_access(trans, &flags);
-	} else {
-		ret = -EBUSY;
+	while (offs < dwords) {
+		/* limit the time we spin here under lock to 1/2s */
+		ktime_t timeout = ktime_add_us(ktime_get(), 500 * USEC_PER_MSEC);
+
+		if (iwl_trans_grab_nic_access(trans, &flags)) {
+			iwl_write32(trans, HBUS_TARG_MEM_RADDR,
+				    addr + 4 * offs);
+
+			while (offs < dwords) {
+				vals[offs] = iwl_read32(trans,
+							HBUS_TARG_MEM_RDAT);
+				offs++;
+
+				/* calling ktime_get is expensive so
+				 * do it once in 128 reads
+				 */
+				if (offs % 128 == 0 && ktime_after(ktime_get(),
+								   timeout))
+					break;
+			}
+			iwl_trans_release_nic_access(trans, &flags);
+		} else {
+			return -EBUSY;
+		}
 	}
-	return ret;
+
+	return 0;
 }
 
 static int iwl_trans_pcie_write_mem(struct iwl_trans *trans, u32 addr,
@@ -2236,6 +2263,59 @@ static int iwl_trans_pcie_read_config32(struct iwl_trans *trans, u32 ofs,
 {
 	return pci_read_config_dword(IWL_TRANS_GET_PCIE_TRANS(trans)->pci_dev,
 				     ofs, val);
+}
+
+static void iwl_trans_pcie_freeze_txq_timer(struct iwl_trans *trans,
+					    unsigned long txqs,
+					    bool freeze)
+{
+	int queue;
+
+	for_each_set_bit(queue, &txqs, BITS_PER_LONG) {
+		struct iwl_txq *txq = trans->txqs.txq[queue];
+		unsigned long now;
+
+		spin_lock_bh(&txq->lock);
+
+		now = jiffies;
+
+		if (txq->frozen == freeze)
+			goto next_queue;
+
+		IWL_DEBUG_TX_QUEUES(trans, "%s TXQ %d\n",
+				    freeze ? "Freezing" : "Waking", queue);
+
+		txq->frozen = freeze;
+
+		if (txq->read_ptr == txq->write_ptr)
+			goto next_queue;
+
+		if (freeze) {
+			if (unlikely(time_after(now,
+						txq->stuck_timer.expires))) {
+				/*
+				 * The timer should have fired, maybe it is
+				 * spinning right now on the lock.
+				 */
+				goto next_queue;
+			}
+			/* remember how long until the timer fires */
+			txq->frozen_expiry_remainder =
+				txq->stuck_timer.expires - now;
+			del_timer(&txq->stuck_timer);
+			goto next_queue;
+		}
+
+		/*
+		 * Wake a non-empty queue -> arm timer with the
+		 * remainder before it froze
+		 */
+		mod_timer(&txq->stuck_timer,
+			  now + txq->frozen_expiry_remainder);
+
+next_queue:
+		spin_unlock_bh(&txq->lock);
+	}
 }
 
 static void iwl_trans_pcie_block_txq_ptrs(struct iwl_trans *trans, bool block)
@@ -2265,6 +2345,36 @@ static void iwl_trans_pcie_block_txq_ptrs(struct iwl_trans *trans, bool block)
 }
 
 #define IWL_FLUSH_WAIT_MS	2000
+
+void iwl_trans_pcie_log_scd_error(struct iwl_trans *trans, struct iwl_txq *txq)
+{
+	u32 txq_id = txq->id;
+	u32 status;
+	bool active;
+	u8 fifo;
+
+	if (trans->trans_cfg->use_tfh) {
+		IWL_ERR(trans, "Queue %d is stuck %d %d\n", txq_id,
+			txq->read_ptr, txq->write_ptr);
+		/* TODO: access new SCD registers and dump them */
+		return;
+	}
+
+	status = iwl_read_prph(trans, SCD_QUEUE_STATUS_BITS(txq_id));
+	fifo = (status >> SCD_QUEUE_STTS_REG_POS_TXF) & 0x7;
+	active = !!(status & BIT(SCD_QUEUE_STTS_REG_POS_ACTIVE));
+
+	IWL_ERR(trans,
+		"Queue %d is %sactive on fifo %d and stuck for %u ms. SW [%d, %d] HW [%d, %d] FH TRB=0x0%x\n",
+		txq_id, active ? "" : "in", fifo,
+		jiffies_to_msecs(txq->wd_timeout),
+		txq->read_ptr, txq->write_ptr,
+		iwl_read_prph(trans, SCD_QUEUE_RDPTR(txq_id)) &
+			(trans->trans_cfg->base_params->max_tfd_queue_size - 1),
+			iwl_read_prph(trans, SCD_QUEUE_WRPTR(txq_id)) &
+			(trans->trans_cfg->base_params->max_tfd_queue_size - 1),
+			iwl_read_direct32(trans, FH_TX_TRB_REG(fifo)));
+}
 
 static int iwl_trans_pcie_rxq_dma_data(struct iwl_trans *trans, int queue,
 				       struct iwl_trans_rxq_dma_data *data)
@@ -2334,7 +2444,7 @@ static int iwl_trans_pcie_wait_txq_empty(struct iwl_trans *trans, int txq_idx)
 	if (txq->read_ptr != txq->write_ptr) {
 		IWL_ERR(trans,
 			"fail to flush all tx fifo queues Q %d\n", txq_idx);
-		iwl_txq_log_scd_error(trans, txq);
+		iwl_trans_pcie_log_scd_error(trans, txq);
 		return -ETIMEDOUT;
 	}
 
@@ -2949,7 +3059,7 @@ static u32 iwl_trans_pcie_get_cmdlen(struct iwl_trans *trans, void *tfd)
 	int i;
 
 	for (i = 0; i < trans->txqs.tfd.max_tbs; i++)
-		cmdlen += iwl_txq_gen1_tfd_tb_get_len(trans, tfd, i);
+		cmdlen += iwl_pcie_tfd_tb_get_len(trans, tfd, i);
 
 	return cmdlen;
 }
@@ -3104,8 +3214,6 @@ iwl_trans_pcie_dump_pointers(struct iwl_trans *trans,
 		fw_mon_data->fw_mon_base_high_ptr =
 			cpu_to_le32(iwl_read_prph(trans, base_high));
 		write_ptr_val &= DBGC_CUR_DBGBUF_STATUS_OFFSET_MSK;
-		/* convert wrtPtr to DWs, to align with all HWs */
-		write_ptr_val >>= 2;
 	}
 	fw_mon_data->fw_mon_wr_ptr = cpu_to_le32(write_ptr_val);
 }
@@ -3297,7 +3405,7 @@ static struct iwl_trans_dump_data
 		spin_lock_bh(&cmdq->lock);
 		ptr = cmdq->write_ptr;
 		for (i = 0; i < cmdq->n_window; i++) {
-			u8 idx = iwl_txq_get_cmd_index(cmdq, ptr);
+			u8 idx = iwl_pcie_get_cmd_index(cmdq, ptr);
 			u8 tfdidx;
 			u32 caplen, cmdlen;
 
@@ -3320,7 +3428,7 @@ static struct iwl_trans_dump_data
 				txcmd = (void *)((u8 *)txcmd->data + caplen);
 			}
 
-			ptr = iwl_txq_dec_wrap(trans, ptr);
+			ptr = iwl_queue_dec_wrap(trans, ptr);
 		}
 		spin_unlock_bh(&cmdq->lock);
 
@@ -3413,7 +3521,7 @@ static const struct iwl_trans_ops trans_ops_pcie = {
 	.send_cmd = iwl_trans_pcie_send_hcmd,
 
 	.tx = iwl_trans_pcie_tx,
-	.reclaim = iwl_txq_reclaim,
+	.reclaim = iwl_trans_pcie_reclaim,
 
 	.txq_disable = iwl_trans_pcie_txq_disable,
 	.txq_enable = iwl_trans_pcie_txq_enable,
@@ -3422,7 +3530,7 @@ static const struct iwl_trans_ops trans_ops_pcie = {
 
 	.wait_tx_queues_empty = iwl_trans_pcie_wait_txqs_empty,
 
-	.freeze_txq_timer = iwl_trans_txq_freeze_timer,
+	.freeze_txq_timer = iwl_trans_pcie_freeze_txq_timer,
 	.block_txq_ptrs = iwl_trans_pcie_block_txq_ptrs,
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
 	.debugfs_cleanup = iwl_trans_pcie_debugfs_cleanup,
@@ -3439,13 +3547,13 @@ static const struct iwl_trans_ops trans_ops_pcie_gen2 = {
 
 	.send_cmd = iwl_trans_pcie_gen2_send_hcmd,
 
-	.tx = iwl_txq_gen2_tx,
-	.reclaim = iwl_txq_reclaim,
+	.tx = iwl_trans_pcie_gen2_tx,
+	.reclaim = iwl_trans_pcie_reclaim,
 
-	.set_q_ptrs = iwl_txq_set_q_ptrs,
+	.set_q_ptrs = iwl_trans_pcie_set_q_ptrs,
 
-	.txq_alloc = iwl_txq_dyn_alloc,
-	.txq_free = iwl_txq_dyn_free,
+	.txq_alloc = iwl_trans_pcie_dyn_txq_alloc,
+	.txq_free = iwl_trans_pcie_dyn_txq_free,
 	.wait_txq_empty = iwl_trans_pcie_wait_txq_empty,
 	.rxq_dma_data = iwl_trans_pcie_rxq_dma_data,
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
@@ -3492,6 +3600,11 @@ struct iwl_trans *iwl_trans_pcie_alloc(struct pci_dev *pdev,
 	}
 	INIT_WORK(&trans_pcie->rba.rx_alloc, iwl_pcie_rx_allocator_work);
 
+	trans_pcie->tso_hdr_page = alloc_percpu(struct iwl_tso_hdr_page);
+	if (!trans_pcie->tso_hdr_page) {
+		ret = -ENOMEM;
+		goto out_no_pci;
+	}
 	trans_pcie->debug_rfkill = -1;
 
 	if (!cfg_trans->base_params->pcie_l1_allowed) {
@@ -3623,6 +3736,7 @@ struct iwl_trans *iwl_trans_pcie_alloc(struct pci_dev *pdev,
 out_free_ict:
 	iwl_pcie_free_ict(trans);
 out_no_pci:
+	free_percpu(trans_pcie->tso_hdr_page);
 	destroy_workqueue(trans_pcie->rba.alloc_wq);
 out_free_trans:
 	iwl_trans_free(trans);

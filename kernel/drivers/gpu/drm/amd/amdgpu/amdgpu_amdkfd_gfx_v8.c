@@ -23,11 +23,10 @@
 #include <linux/module.h>
 #include <linux/fdtable.h>
 #include <linux/uaccess.h>
-#include <linux/firmware.h>
-#include <drm/drmP.h>
+#include <linux/mmu_context.h>
+
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
-#include "amdgpu_ucode.h"
 #include "gfx_v8_0.h"
 #include "gca/gfx_8_0_sh_mask.h"
 #include "gca/gfx_8_0_d.h"
@@ -94,7 +93,6 @@ static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 		uint8_t vmid);
-static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
 static void set_scratch_backing_va(struct kgd_dev *kgd,
 					uint64_t va, uint32_t vmid);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
@@ -128,13 +126,6 @@ static int get_tile_config(struct kgd_dev *kgd,
 }
 
 static const struct kfd2kgd_calls kfd2kgd = {
-	.init_gtt_mem_allocation = alloc_gtt_mem,
-	.free_gtt_mem = free_gtt_mem,
-	.get_local_mem_info = get_local_mem_info,
-	.get_gpu_clock_counter = get_gpu_clock_counter,
-	.get_max_engine_clock_in_mhz = get_max_engine_clock_in_mhz,
-	.alloc_pasid = amdgpu_pasid_alloc,
-	.free_pasid = amdgpu_pasid_free,
 	.program_sh_mem_settings = kgd_program_sh_mem_settings,
 	.set_pasid_vmid_mapping = kgd_set_pasid_vmid_mapping,
 	.init_interrupts = kgd_init_interrupts,
@@ -154,30 +145,11 @@ static const struct kfd2kgd_calls kfd2kgd = {
 			get_atc_vmid_pasid_mapping_pasid,
 	.get_atc_vmid_pasid_mapping_valid =
 			get_atc_vmid_pasid_mapping_valid,
-	.get_fw_version = get_fw_version,
 	.set_scratch_backing_va = set_scratch_backing_va,
 	.get_tile_config = get_tile_config,
-	.get_cu_info = get_cu_info,
-	.get_vram_usage = amdgpu_amdkfd_get_vram_usage,
-	.create_process_vm = amdgpu_amdkfd_gpuvm_create_process_vm,
-	.acquire_process_vm = amdgpu_amdkfd_gpuvm_acquire_process_vm,
-	.destroy_process_vm = amdgpu_amdkfd_gpuvm_destroy_process_vm,
-	.release_process_vm = amdgpu_amdkfd_gpuvm_release_process_vm,
-	.get_process_page_dir = amdgpu_amdkfd_gpuvm_get_process_page_dir,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
-	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
-	.free_memory_of_gpu = amdgpu_amdkfd_gpuvm_free_memory_of_gpu,
-	.map_memory_to_gpu = amdgpu_amdkfd_gpuvm_map_memory_to_gpu,
-	.unmap_memory_to_gpu = amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu,
-	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
-	.map_gtt_bo_to_kernel = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel,
-	.restore_process_bos = amdgpu_amdkfd_gpuvm_restore_process_bos,
 	.invalidate_tlbs = invalidate_tlbs,
 	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
-	.submit_ib = amdgpu_amdkfd_submit_ib,
-	.get_vm_fault_info = amdgpu_amdkfd_gpuvm_get_vm_fault_info,
-	.gpu_recover = amdgpu_amdkfd_gpu_reset,
-	.set_compute_idle = amdgpu_amdkfd_set_compute_idle
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void)
@@ -294,7 +266,7 @@ static inline uint32_t get_sdma_base_addr(struct vi_sdma_mqd *m)
 
 	retval = m->sdma_engine_id * SDMA1_REGISTER_OFFSET +
 		m->sdma_queue_id * KFD_VI_SDMA_QUEUE_OFFSET;
-	pr_debug("kfd: sdma base address: 0x%x\n", retval);
+	pr_debug("sdma base address: 0x%x\n", retval);
 
 	return retval;
 }
@@ -773,63 +745,6 @@ static void set_scratch_backing_va(struct kgd_dev *kgd,
 	lock_srbm(kgd, 0, 0, 0, vmid);
 	WREG32(mmSH_HIDDEN_PRIVATE_BASE_VMID, va);
 	unlock_srbm(kgd);
-}
-
-static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
-	const union amdgpu_firmware_header *hdr;
-
-	switch (type) {
-	case KGD_ENGINE_PFP:
-		hdr = (const union amdgpu_firmware_header *)
-						adev->gfx.pfp_fw->data;
-		break;
-
-	case KGD_ENGINE_ME:
-		hdr = (const union amdgpu_firmware_header *)
-						adev->gfx.me_fw->data;
-		break;
-
-	case KGD_ENGINE_CE:
-		hdr = (const union amdgpu_firmware_header *)
-						adev->gfx.ce_fw->data;
-		break;
-
-	case KGD_ENGINE_MEC1:
-		hdr = (const union amdgpu_firmware_header *)
-						adev->gfx.mec_fw->data;
-		break;
-
-	case KGD_ENGINE_MEC2:
-		hdr = (const union amdgpu_firmware_header *)
-						adev->gfx.mec2_fw->data;
-		break;
-
-	case KGD_ENGINE_RLC:
-		hdr = (const union amdgpu_firmware_header *)
-						adev->gfx.rlc_fw->data;
-		break;
-
-	case KGD_ENGINE_SDMA1:
-		hdr = (const union amdgpu_firmware_header *)
-						adev->sdma.instance[0].fw->data;
-		break;
-
-	case KGD_ENGINE_SDMA2:
-		hdr = (const union amdgpu_firmware_header *)
-						adev->sdma.instance[1].fw->data;
-		break;
-
-	default:
-		return 0;
-	}
-
-	if (hdr == NULL)
-		return 0;
-
-	/* Only 12 bit in use*/
-	return hdr->common.ucode_version;
 }
 
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,

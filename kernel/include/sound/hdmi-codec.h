@@ -1,18 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * hdmi-codec.h - HDMI Codec driver API
  *
  * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com
  *
  * Author: Jyri Sarha <jsarha@ti.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
  */
 
 #ifndef __HDMI_CODEC_H__
@@ -97,7 +89,8 @@ struct hdmi_codec_ops {
 	 * Mute/unmute HDMI audio stream.
 	 * Optional
 	 */
-	int (*digital_mute)(struct device *dev, void *data, bool enable);
+	int (*mute_stream)(struct device *dev, void *data,
+			   bool enable, int direction);
 
 	/*
 	 * Provides EDID-Like-Data from connected HDMI device.
@@ -120,6 +113,9 @@ struct hdmi_codec_ops {
 	int (*hook_plugged_cb)(struct device *dev, void *data,
 			       hdmi_codec_plugged_cb fn,
 			       struct device *codec_dev);
+
+	/* bit field */
+	unsigned int no_capture_mute:1;
 };
 
 /* HDMI codec initalization data */
@@ -133,9 +129,6 @@ struct hdmi_codec_pdata {
 
 struct snd_soc_component;
 struct snd_soc_jack;
-
-int hdmi_codec_set_jack_detect(struct snd_soc_component *component,
-			       struct snd_soc_jack *jack);
 
 #define HDMI_CODEC_DRV_NAME "hdmi-audio-codec"
 

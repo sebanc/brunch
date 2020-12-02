@@ -70,7 +70,6 @@
 #include <net/tcp.h>
 #include <asm/byteorder.h>
 #include <asm/processor.h>
-#include <net/busy_poll.h>
 
 #include "myri10ge_mcp.h"
 #include "myri10ge_mcp_gen_header.h"
@@ -1287,7 +1286,7 @@ myri10ge_vlan_rx(struct net_device *dev, void *addr, struct sk_buff *skb)
 {
 	u8 *va;
 	struct vlan_ethhdr *veh;
-	struct skb_frag_struct *frag;
+	skb_frag_t *frag;
 	__wsum vsum;
 
 	va = addr;
@@ -1307,8 +1306,8 @@ myri10ge_vlan_rx(struct net_device *dev, void *addr, struct sk_buff *skb)
 		skb->len -= VLAN_HLEN;
 		skb->data_len -= VLAN_HLEN;
 		frag = skb_shinfo(skb)->frags;
-		frag->page_offset += VLAN_HLEN;
-		skb_frag_size_set(frag, skb_frag_size(frag) - VLAN_HLEN);
+		skb_frag_off_add(frag, VLAN_HLEN);
+		skb_frag_size_sub(frag, VLAN_HLEN);
 	}
 }
 
@@ -1319,7 +1318,7 @@ myri10ge_rx_done(struct myri10ge_slice_state *ss, int len, __wsum csum)
 {
 	struct myri10ge_priv *mgp = ss->mgp;
 	struct sk_buff *skb;
-	struct skb_frag_struct *rx_frags;
+	skb_frag_t *rx_frags;
 	struct myri10ge_rx_buf *rx;
 	int i, idx, remainder, bytes;
 	struct pci_dev *pdev = mgp->pdev;
@@ -1352,7 +1351,7 @@ myri10ge_rx_done(struct myri10ge_slice_state *ss, int len, __wsum csum)
 		return 0;
 	}
 	rx_frags = skb_shinfo(skb)->frags;
-	/* Fill skb_frag_struct(s) with data from our receive */
+	/* Fill skb_frag_t(s) with data from our receive */
 	for (i = 0, remainder = len; remainder > 0; i++) {
 		myri10ge_unmap_rx_page(pdev, &rx->info[idx], bytes);
 		skb_fill_page_desc(skb, i, rx->info[idx].page,
@@ -1365,8 +1364,8 @@ myri10ge_rx_done(struct myri10ge_slice_state *ss, int len, __wsum csum)
 	}
 
 	/* remove padding */
-	rx_frags[0].page_offset += MXGEFW_PAD;
-	rx_frags[0].size -= MXGEFW_PAD;
+	skb_frag_off_add(&rx_frags[0], MXGEFW_PAD);
+	skb_frag_size_sub(&rx_frags[0], MXGEFW_PAD);
 	len -= MXGEFW_PAD;
 
 	skb->len = len;
@@ -1409,7 +1408,7 @@ myri10ge_tx_done(struct myri10ge_slice_state *ss, int mcp_index)
 		if (skb) {
 			ss->stats.tx_bytes += skb->len;
 			ss->stats.tx_packets++;
-			dev_kfree_skb_irq(skb);
+			dev_consume_skb_irq(skb);
 			if (len)
 				pci_unmap_single(pdev,
 						 dma_unmap_addr(&tx->info[idx],
@@ -1440,7 +1439,6 @@ myri10ge_tx_done(struct myri10ge_slice_state *ss, int mcp_index)
 			tx->queue_active = 0;
 			put_be32(htonl(1), tx->send_stop);
 			mb();
-			mmiowb();
 		}
 		__netif_tx_unlock(dev_queue);
 	}
@@ -2630,7 +2628,7 @@ static netdev_tx_t myri10ge_xmit(struct sk_buff *skb,
 	struct myri10ge_slice_state *ss;
 	struct mcp_kreq_ether_send *req;
 	struct myri10ge_tx_buf *tx;
-	struct skb_frag_struct *frag;
+	skb_frag_t *frag;
 	struct netdev_queue *netdev_queue;
 	dma_addr_t bus;
 	u32 low;
@@ -2862,7 +2860,6 @@ again:
 		tx->queue_active = 1;
 		put_be32(htonl(1), tx->send_go);
 		mb();
-		mmiowb();
 	}
 	tx->pkt_start++;
 	if ((avail - count) < MXGEFW_MAX_SEND_DESC) {
@@ -3040,7 +3037,6 @@ static int myri10ge_set_mac_address(struct net_device *dev, void *addr)
 static int myri10ge_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct myri10ge_priv *mgp = netdev_priv(dev);
-	int error = 0;
 
 	netdev_info(dev, "changing mtu from %d to %d\n", dev->mtu, new_mtu);
 	if (mgp->running) {
@@ -3052,7 +3048,7 @@ static int myri10ge_change_mtu(struct net_device *dev, int new_mtu)
 	} else
 		dev->mtu = new_mtu;
 
-	return error;
+	return 0;
 }
 
 /*
@@ -3605,9 +3601,9 @@ static int myri10ge_alloc_slices(struct myri10ge_priv *mgp)
 	for (i = 0; i < mgp->num_slices; i++) {
 		ss = &mgp->ss[i];
 		bytes = mgp->max_intr_slots * sizeof(*ss->rx_done.entry);
-		ss->rx_done.entry = dma_zalloc_coherent(&pdev->dev, bytes,
-							&ss->rx_done.bus,
-							GFP_KERNEL);
+		ss->rx_done.entry = dma_alloc_coherent(&pdev->dev, bytes,
+						       &ss->rx_done.bus,
+						       GFP_KERNEL);
 		if (ss->rx_done.entry == NULL)
 			goto abort;
 		bytes = sizeof(*ss->fw_stats);

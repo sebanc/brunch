@@ -1,12 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Generic NAND driver
  *
  * Author: Vitaly Wool <vitalywool@gmail.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
  */
 
 #include <linux/err.h>
@@ -15,8 +11,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/mtd/mtd.h>
-#include <linux/mtd/rawnand.h>
-#include <linux/mtd/partitions.h>
+#include <linux/mtd/platnand.h>
 
 struct plat_nand_data {
 	struct nand_chip	chip;
@@ -60,14 +55,14 @@ static int plat_nand_probe(struct platform_device *pdev)
 	mtd = nand_to_mtd(&data->chip);
 	mtd->dev.parent = &pdev->dev;
 
-	data->chip.IO_ADDR_R = data->io_base;
-	data->chip.IO_ADDR_W = data->io_base;
-	data->chip.cmd_ctrl = pdata->ctrl.cmd_ctrl;
-	data->chip.dev_ready = pdata->ctrl.dev_ready;
-	data->chip.select_chip = pdata->ctrl.select_chip;
-	data->chip.write_buf = pdata->ctrl.write_buf;
-	data->chip.read_buf = pdata->ctrl.read_buf;
-	data->chip.chip_delay = pdata->chip.chip_delay;
+	data->chip.legacy.IO_ADDR_R = data->io_base;
+	data->chip.legacy.IO_ADDR_W = data->io_base;
+	data->chip.legacy.cmd_ctrl = pdata->ctrl.cmd_ctrl;
+	data->chip.legacy.dev_ready = pdata->ctrl.dev_ready;
+	data->chip.legacy.select_chip = pdata->ctrl.select_chip;
+	data->chip.legacy.write_buf = pdata->ctrl.write_buf;
+	data->chip.legacy.read_buf = pdata->ctrl.read_buf;
+	data->chip.legacy.chip_delay = pdata->chip.chip_delay;
 	data->chip.options |= pdata->chip.options;
 	data->chip.bbt_options |= pdata->chip.bbt_options;
 

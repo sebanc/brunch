@@ -17,6 +17,12 @@
 
 #include <drm/drm.h>
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
+#include <stdint.h>
+#endif
+
 /**
  * User-desired buffer creation information structure.
  *

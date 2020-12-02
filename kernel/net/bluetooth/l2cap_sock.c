@@ -791,10 +791,13 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname,
 
 		conn = chan->conn;
 
-		/*change security for LE channels */
+		/* change security for LE channels */
 		if (chan->scid == L2CAP_CID_ATT) {
-			if (smp_conn_security(conn->hcon, sec.level))
+			if (smp_conn_security(conn->hcon, sec.level)) {
+				err = -EINVAL;
 				break;
+			}
+
 			set_bit(FLAG_PENDING_SECURITY, &chan->flags);
 			sk->sk_state = BT_CONFIG;
 			chan->state = BT_CONFIG;
@@ -1357,8 +1360,6 @@ static void l2cap_sock_teardown_cb(struct l2cap_chan *chan, int err)
 
 	parent = bt_sk(sk)->parent;
 
-	sock_set_flag(sk, SOCK_ZAPPED);
-
 	switch (chan->state) {
 	case BT_OPEN:
 	case BT_BOUND:
@@ -1385,8 +1386,11 @@ static void l2cap_sock_teardown_cb(struct l2cap_chan *chan, int err)
 
 		break;
 	}
-
 	release_sock(sk);
+
+	/* Only zap after cleanup to avoid use after free race */
+	sock_set_flag(sk, SOCK_ZAPPED);
+
 }
 
 static void l2cap_sock_state_change_cb(struct l2cap_chan *chan, int state,
@@ -1697,6 +1701,7 @@ static const struct proto_ops l2cap_sock_ops = {
 	.recvmsg	= l2cap_sock_recvmsg,
 	.poll		= bt_sock_poll,
 	.ioctl		= bt_sock_ioctl,
+	.gettstamp	= sock_gettstamp,
 	.mmap		= sock_no_mmap,
 	.socketpair	= sock_no_socketpair,
 	.shutdown	= l2cap_sock_shutdown,

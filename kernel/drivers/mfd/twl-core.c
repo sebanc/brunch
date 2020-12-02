@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * twl_core.c - driver for TWL4030/TWL5030/TWL60X0/TPS659x0 PM
  * and audio CODEC devices
@@ -12,20 +13,6 @@
  *
  * Code cleanup and modifications to IRQ handler.
  * by syed khasim <x0khasim@ti.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
 #include <linux/init.h>
@@ -1154,12 +1141,12 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		if (i == 0) {
 			twl->client = client;
 		} else {
-			twl->client = i2c_new_dummy(client->adapter,
+			twl->client = i2c_new_dummy_device(client->adapter,
 						    client->addr + i);
-			if (!twl->client) {
+			if (IS_ERR(twl->client)) {
 				dev_err(&client->dev,
 					"can't attach client %d\n", i);
-				status = -ENOMEM;
+				status = PTR_ERR(twl->client);
 				goto fail;
 			}
 		}

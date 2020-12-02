@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
 #
 # TLS configuration
 #
@@ -8,6 +9,7 @@ config TLS
 	select CRYPTO_AES
 	select CRYPTO_GCM
 	select STREAM_PARSER
+	select NET_SOCK_MSG
 	default n
 	---help---
 	Enable kernel support for TLS protocol. This allows symmetric

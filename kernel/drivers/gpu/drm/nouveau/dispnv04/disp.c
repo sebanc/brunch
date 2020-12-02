@@ -22,7 +22,6 @@
  * Author: Ben Skeggs
  */
 
-#include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
 
 #include "nouveau_drv.h"
@@ -210,7 +209,7 @@ nv04_display_create(struct drm_device *dev)
 	nouveau_display(dev)->fini = nv04_display_fini;
 
 	/* Pre-nv50 doesn't support atomic, so don't expose the ioctls */
-	dev->driver->driver_features &= ~DRIVER_ATOMIC;
+	dev->driver_features &= ~DRIVER_ATOMIC;
 
 	/* Request page flip completion event. */
 	if (drm->nvsw.client) {
@@ -228,7 +227,7 @@ nv04_display_create(struct drm_device *dev)
 	for (i = 0; i < dcb->entries; i++) {
 		struct dcb_output *dcbent = &dcb->entry[i];
 
-		connector = nouveau_connector_create(dev, dcbent->connector);
+		connector = nouveau_connector_create(dev, dcbent);
 		if (IS_ERR(connector))
 			continue;
 

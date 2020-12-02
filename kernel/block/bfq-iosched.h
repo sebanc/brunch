@@ -1,16 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * Header file for the BFQ I/O scheduler: data structures and
  * prototypes of interface functions among BFQ components.
- *
- *  This program is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU General Public License as
- *  published by the Free Software Foundation; either version 2 of the
- *  License, or (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  General Public License for more details.
  */
 #ifndef _BFQ_H
 #define _BFQ_H
@@ -177,6 +168,9 @@ struct bfq_entity {
 	/* budget, used also to calculate F_i: F_i = S_i + @budget / @weight */
 	int budget;
 
+	/* device weight, if non-zero, it overrides the default weight of
+	 * bfq_group_data */
+	int dev_weight;
 	/* weight of the queue */
 	int weight;
 	/* next weight if a change is in progress */
@@ -809,8 +803,13 @@ enum bfqq_expiration {
 	BFQQE_PREEMPTED		/* preemption in progress */
 };
 
+struct bfq_stat {
+	struct percpu_counter		cpu_cnt;
+	atomic64_t			aux_cnt;
+};
+
 struct bfqg_stats {
-#if defined(CONFIG_BFQ_GROUP_IOSCHED) && defined(CONFIG_DEBUG_BLK_CGROUP)
+#ifdef CONFIG_BFQ_CGROUP_DEBUG
 	/* number of ios merged */
 	struct blkg_rwstat		merged;
 	/* total time spent on device in ns, may not be accurate w/ queueing */
@@ -820,25 +819,25 @@ struct bfqg_stats {
 	/* number of IOs queued up */
 	struct blkg_rwstat		queued;
 	/* total disk time and nr sectors dispatched by this group */
-	struct blkg_stat		time;
+	struct bfq_stat		time;
 	/* sum of number of ios queued across all samples */
-	struct blkg_stat		avg_queue_size_sum;
+	struct bfq_stat		avg_queue_size_sum;
 	/* count of samples taken for average */
-	struct blkg_stat		avg_queue_size_samples;
+	struct bfq_stat		avg_queue_size_samples;
 	/* how many times this group has been removed from service tree */
-	struct blkg_stat		dequeue;
+	struct bfq_stat		dequeue;
 	/* total time spent waiting for it to be assigned a timeslice. */
-	struct blkg_stat		group_wait_time;
+	struct bfq_stat		group_wait_time;
 	/* time spent idling for this blkcg_gq */
-	struct blkg_stat		idle_time;
+	struct bfq_stat		idle_time;
 	/* total time with empty current active q with other requests queued */
-	struct blkg_stat		empty_time;
+	struct bfq_stat		empty_time;
 	/* fields after this shouldn't be cleared on stat reset */
 	u64				start_group_wait_time;
 	u64				start_idle_time;
 	u64				start_empty_time;
 	uint16_t			flags;
-#endif	/* CONFIG_BFQ_GROUP_IOSCHED && CONFIG_DEBUG_BLK_CGROUP */
+#endif /* CONFIG_BFQ_CGROUP_DEBUG */
 };
 
 #ifdef CONFIG_BFQ_GROUP_IOSCHED
@@ -917,6 +916,7 @@ struct bfq_group {
 
 #else
 struct bfq_group {
+	struct bfq_entity entity;
 	struct bfq_sched_data sched_data;
 
 	struct bfq_queue *async_bfqq[2][IOPRIO_BE_NR];
@@ -950,6 +950,7 @@ void bfq_bfqq_expire(struct bfq_data *bfqd, struct bfq_queue *bfqq,
 		     bool compensate, enum bfqq_expiration reason);
 void bfq_put_queue(struct bfq_queue *bfqq);
 void bfq_end_wr_async_queues(struct bfq_data *bfqd, struct bfq_group *bfqg);
+void bfq_release_process_ref(struct bfq_data *bfqd, struct bfq_queue *bfqq);
 void bfq_schedule_dispatch(struct bfq_data *bfqd);
 void bfq_put_async_queues(struct bfq_data *bfqd, struct bfq_group *bfqg);
 

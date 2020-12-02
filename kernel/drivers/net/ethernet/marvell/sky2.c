@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * New driver for Marvell Yukon 2 chipset.
  * Based on earlier sk98lin, and skge driver.
@@ -7,19 +8,6 @@
  * those should be done at higher levels.
  *
  * Copyright (C) 2005 Stephen Hemminger <shemminger@osdl.org>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -1139,9 +1127,6 @@ static inline void sky2_put_idx(struct sky2_hw *hw, unsigned q, u16 idx)
 	/* Make sure write' to descriptors are complete before we tell hardware */
 	wmb();
 	sky2_write16(hw, Y2_QADDR(q, PREF_UNIT_PUT_IDX), idx);
-
-	/* Synchronize I/O on since next processor may write to tail */
-	mmiowb();
 }
 
 
@@ -1354,7 +1339,6 @@ stopped:
 
 	/* reset the Rx prefetch unit */
 	sky2_write32(hw, Y2_QADDR(rxq, PREF_UNIT_CTRL), PREF_UNIT_RST_SET);
-	mmiowb();
 }
 
 /* Clean out receive buffer area, assumes receiver hardware stopped */
@@ -2486,13 +2470,11 @@ static struct sk_buff *receive_copy(struct sky2_port *sky2,
 		skb->ip_summed = re->skb->ip_summed;
 		skb->csum = re->skb->csum;
 		skb_copy_hash(skb, re->skb);
-		skb->vlan_proto = re->skb->vlan_proto;
-		skb->vlan_tci = re->skb->vlan_tci;
+		__vlan_hwaccel_copy_tag(skb, re->skb);
 
 		pci_dma_sync_single_for_device(sky2->hw->pdev, re->data_addr,
 					       length, PCI_DMA_FROMDEVICE);
-		re->skb->vlan_proto = 0;
-		re->skb->vlan_tci = 0;
+		__vlan_hwaccel_clear_tag(re->skb);
 		skb_clear_hash(re->skb);
 		re->skb->ip_summed = CHECKSUM_NONE;
 		skb_put(skb, length);
@@ -4624,19 +4606,7 @@ static int sky2_debug_show(struct seq_file *seq, void *v)
 	napi_enable(&hw->napi);
 	return 0;
 }
-
-static int sky2_debug_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, sky2_debug_show, inode->i_private);
-}
-
-static const struct file_operations sky2_debug_fops = {
-	.owner		= THIS_MODULE,
-	.open		= sky2_debug_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(sky2_debug);
 
 /*
  * Use network device events to create/remove/rename
@@ -4822,8 +4792,8 @@ static struct net_device *sky2_init_netdev(struct sky2_hw *hw, unsigned port,
 	 * 2) from internal registers set by bootloader
 	 */
 	iap = of_get_mac_address(hw->pdev->dev.of_node);
-	if (iap)
-		memcpy(dev->dev_addr, iap, ETH_ALEN);
+	if (!IS_ERR(iap))
+		ether_addr_copy(dev->dev_addr, iap);
 	else
 		memcpy_fromio(dev->dev_addr, hw->regs + B2_MAC_1 + port * 8,
 			      ETH_ALEN);
@@ -4945,6 +4915,13 @@ static const struct dmi_system_id msi_blacklist[] = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Gateway"),
 			DMI_MATCH(DMI_PRODUCT_NAME, "P-79"),
+		},
+	},
+	{
+		.ident = "ASUS P5W DH Deluxe",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTEK COMPUTER INC"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "P5W DH Deluxe"),
 		},
 	},
 	{
@@ -5197,8 +5174,7 @@ static void sky2_remove(struct pci_dev *pdev)
 
 static int sky2_suspend(struct device *dev)
 {
-	struct pci_dev *pdev = to_pci_dev(dev);
-	struct sky2_hw *hw = pci_get_drvdata(pdev);
+	struct sky2_hw *hw = dev_get_drvdata(dev);
 	int i;
 
 	if (!hw)

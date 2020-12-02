@@ -1,5 +1,0 @@
-config INTEL_IPTS
-	tristate "Intel Precise Touch & Stylus"
-	depends on DRM_I915 && HID && INTEL_MEI_ME
-	help
-	  Intel Precise Touch & Stylus support

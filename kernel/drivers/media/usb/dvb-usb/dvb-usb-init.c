@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * DVB USB library - provides a generic interface for a DVB USB device driver.
  *
  * dvb-usb-init.c
  *
  * Copyright (C) 2004-6 Patrick Boettcher (patrick.boettcher@posteo.de)
- *
- *	This program is free software; you can redistribute it and/or modify it
- *	under the terms of the GNU General Public License as published by the Free
- *	Software Foundation, version 2.
  *
  * see Documentation/media/dvb-drivers/dvb-usb.rst for more information
  */
@@ -98,7 +95,7 @@ static int dvb_usb_adapter_init(struct dvb_usb_device *d, short *adapter_nrs)
 
 	/*
 	 * when reloading the driver w/o replugging the device
-	 * sometimes a timeout occures, this helps
+	 * sometimes a timeout occurs, this helps
 	 */
 	if (d->props.generic_bulk_ctrl_endpoint != 0) {
 		usb_clear_halt(d->udev, usb_sndbulkpipe(d->udev, d->props.generic_bulk_ctrl_endpoint));
@@ -133,6 +130,10 @@ static int dvb_usb_exit(struct dvb_usb_device *d)
 	dvb_usb_i2c_exit(d);
 	deb_info("state should be zero now: %x\n", d->state);
 	d->state = DVB_USB_STATE_INIT;
+
+	if (d->priv != NULL && d->props.priv_destroy != NULL)
+		d->props.priv_destroy(d);
+
 	kfree(d->priv);
 	kfree(d);
 	return 0;
@@ -153,6 +154,15 @@ static int dvb_usb_init(struct dvb_usb_device *d, short *adapter_nums)
 		if (d->priv == NULL) {
 			err("no memory for priv in 'struct dvb_usb_device'");
 			return -ENOMEM;
+		}
+
+		if (d->props.priv_init != NULL) {
+			ret = d->props.priv_init(d);
+			if (ret != 0) {
+				kfree(d->priv);
+				d->priv = NULL;
+				return ret;
+			}
 		}
 	}
 

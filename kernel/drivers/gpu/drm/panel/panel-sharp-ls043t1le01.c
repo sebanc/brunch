@@ -1,35 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2015 Red Hat
  * Copyright (C) 2015 Sony Mobile Communications Inc.
  * Author: Werner Johansson <werner.johansson@sonymobile.com>
  *
  * Based on AUO panel driver by Rob Clark <robdclark@gmail.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/backlight.h>
+#include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/regulator/consumer.h>
 
-#include <drm/drmP.h>
+#include <video/mipi_display.h>
+
 #include <drm/drm_crtc.h>
+#include <drm/drm_device.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
-
-#include <video/mipi_display.h>
 
 struct sharp_nt_panel {
 	struct drm_panel base;
@@ -220,7 +210,8 @@ static const struct drm_display_mode default_mode = {
 	.vrefresh = 60,
 };
 
-static int sharp_nt_panel_get_modes(struct drm_panel *panel)
+static int sharp_nt_panel_get_modes(struct drm_panel *panel,
+				    struct drm_connector *connector)
 {
 	struct drm_display_mode *mode;
 
@@ -234,10 +225,10 @@ static int sharp_nt_panel_get_modes(struct drm_panel *panel)
 
 	drm_mode_set_name(mode);
 
-	drm_mode_probed_add(panel->connector, mode);
+	drm_mode_probed_add(connector, mode);
 
-	panel->connector->display_info.width_mm = 54;
-	panel->connector->display_info.height_mm = 95;
+	connector->display_info.width_mm = 54;
+	connector->display_info.height_mm = 95;
 
 	return 1;
 }
@@ -274,9 +265,8 @@ static int sharp_nt_panel_add(struct sharp_nt_panel *sharp_nt)
 	if (IS_ERR(sharp_nt->backlight))
 		return PTR_ERR(sharp_nt->backlight);
 
-	drm_panel_init(&sharp_nt->base);
-	sharp_nt->base.funcs = &sharp_nt_panel_funcs;
-	sharp_nt->base.dev = &sharp_nt->dsi->dev;
+	drm_panel_init(&sharp_nt->base, &sharp_nt->dsi->dev,
+		       &sharp_nt_panel_funcs, DRM_MODE_CONNECTOR_DSI);
 
 	return drm_panel_add(&sharp_nt->base);
 }

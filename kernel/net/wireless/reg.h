@@ -5,6 +5,7 @@
 
 /*
  * Copyright 2008-2011	Luis R. Rodriguez <mcgrof@qca.qualcomm.com>
+ * Copyright (C) 2019 Intel Corporation
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +23,7 @@
 enum ieee80211_regd_source {
 	REGD_SOURCE_INTERNAL_DB,
 	REGD_SOURCE_CRDA,
+	REGD_SOURCE_CACHED,
 };
 
 extern const struct ieee80211_regdomain __rcu *cfg80211_regdomain;
@@ -152,14 +154,6 @@ bool regulatory_indoor_allowed(void);
  * TODO: May be make this timeout available through regdb?
  */
 #define REG_PRE_CAC_EXPIRY_GRACE_MS 2000
-
-/**
- * regulatory_pre_cac_allowed - if pre-CAC allowed in the current dfs domain
- * @wiphy: wiphy for which pre-CAC capability is checked.
-
- * Pre-CAC is allowed only in ETSI domain.
- */
-bool regulatory_pre_cac_allowed(struct wiphy *wiphy);
 
 /**
  * regulatory_propagate_dfs_state - Propagate DFS channel state to other wiphys

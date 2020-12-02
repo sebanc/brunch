@@ -1,19 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * AMD Cryptographic Coprocessor (CCP) driver
  *
- * Copyright (C) 2013,2017 Advanced Micro Devices, Inc.
+ * Copyright (C) 2013-2019 Advanced Micro Devices, Inc.
  *
  * Author: Tom Lendacky <thomas.lendacky@amd.com>
  * Author: Gary R Hook <gary.hook@amd.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <crypto/scatterwalk.h>
 #include <crypto/des.h>
@@ -168,14 +164,13 @@ static int ccp_init_dm_workarea(struct ccp_dm_workarea *wa,
 	if (len <= CCP_DMAPOOL_MAX_SIZE) {
 		wa->dma_pool = cmd_q->dma_pool;
 
-		wa->address = dma_pool_alloc(wa->dma_pool, GFP_KERNEL,
+		wa->address = dma_pool_zalloc(wa->dma_pool, GFP_KERNEL,
 					     &wa->dma.address);
 		if (!wa->address)
 			return -ENOMEM;
 
 		wa->dma.length = CCP_DMAPOOL_MAX_SIZE;
 
-		memset(wa->address, 0, CCP_DMAPOOL_MAX_SIZE);
 	} else {
 		wa->address = kzalloc(len, GFP_KERNEL);
 		if (!wa->address)
@@ -929,8 +924,7 @@ ccp_run_aes_cmd(struct ccp_cmd_queue *cmd_q, struct ccp_cmd *cmd)
 		return -EINVAL;
 
 	if (((aes->mode == CCP_AES_MODE_ECB) ||
-	     (aes->mode == CCP_AES_MODE_CBC) ||
-	     (aes->mode == CCP_AES_MODE_CFB)) &&
+	     (aes->mode == CCP_AES_MODE_CBC)) &&
 	    (aes->src_len & (AES_BLOCK_SIZE - 1)))
 		return -EINVAL;
 
@@ -1752,7 +1746,7 @@ ccp_run_sha_cmd(struct ccp_cmd_queue *cmd_q, struct ccp_cmd *cmd)
 			break;
 		default:
 			ret = -EINVAL;
-			goto e_ctx;
+			goto e_data;
 		}
 	} else {
 		/* Stash the context */

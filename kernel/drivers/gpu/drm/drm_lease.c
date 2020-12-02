@@ -1,24 +1,20 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright © 2017 Keith Packard <keithp@keithp.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
  */
+#include <linux/file.h>
+#include <linux/uaccess.h>
 
-#include <drm/drmP.h>
-#include "drm_internal.h"
-#include "drm_legacy.h"
-#include "drm_crtc_internal.h"
-#include <drm/drm_lease.h>
 #include <drm/drm_auth.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_drv.h>
+#include <drm/drm_file.h>
+#include <drm/drm_lease.h>
+#include <drm/drm_print.h>
+
+#include "drm_crtc_internal.h"
+#include "drm_internal.h"
+#include "drm_legacy.h"
 
 #define drm_for_each_lessee(lessee, lessor) \
 	list_for_each_entry((lessee), &(lessor)->lessees, lessee_list)
@@ -39,7 +35,6 @@ struct drm_master *drm_lease_owner(struct drm_master *master)
 		master = master->lessor;
 	return master;
 }
-EXPORT_SYMBOL(drm_lease_owner);
 
 /**
  * _drm_find_lessee - find lessee by id (idr_mutex held)
@@ -112,12 +107,11 @@ static bool _drm_has_leased(struct drm_master *master, int id)
  */
 bool _drm_lease_held(struct drm_file *file_priv, int id)
 {
-	if (file_priv == NULL || file_priv->master == NULL)
+	if (!file_priv || !file_priv->master)
 		return true;
 
 	return _drm_lease_held_master(file_priv->master, id);
 }
-EXPORT_SYMBOL(_drm_lease_held);
 
 /**
  * drm_lease_held - check drm_mode_object lease status (idr_mutex not held)
@@ -135,7 +129,7 @@ bool drm_lease_held(struct drm_file *file_priv, int id)
 	struct drm_master *master;
 	bool ret;
 
-	if (file_priv == NULL || file_priv->master == NULL)
+	if (!file_priv || !file_priv->master || !file_priv->master->lessor)
 		return true;
 
 	master = file_priv->master;
@@ -144,7 +138,6 @@ bool drm_lease_held(struct drm_file *file_priv, int id)
 	mutex_unlock(&master->dev->mode_config.idr_mutex);
 	return ret;
 }
-EXPORT_SYMBOL(drm_lease_held);
 
 /**
  * drm_lease_filter_crtcs - restricted crtc set to leased values (idr_mutex not held)
@@ -162,7 +155,7 @@ uint32_t drm_lease_filter_crtcs(struct drm_file *file_priv, uint32_t crtcs_in)
 	int count_in, count_out;
 	uint32_t crtcs_out = 0;
 
-	if (file_priv == NULL || file_priv->master == NULL)
+	if (!file_priv || !file_priv->master || !file_priv->master->lessor)
 		return crtcs_in;
 
 	master = file_priv->master;
@@ -184,7 +177,6 @@ uint32_t drm_lease_filter_crtcs(struct drm_file *file_priv, uint32_t crtcs_in)
 	mutex_unlock(&master->dev->mode_config.idr_mutex);
 	return crtcs_out;
 }
-EXPORT_SYMBOL(drm_lease_filter_crtcs);
 
 /*
  * drm_lease_create - create a new drm_master with leased objects (idr_mutex not held)
@@ -195,7 +187,7 @@ EXPORT_SYMBOL(drm_lease_filter_crtcs);
  * make sure all of the desired objects can be leased, atomically
  * leasing them to the new drmmaster.
  *
- * 	ERR_PTR(-EACCESS)	some other master holds the title to any object
+ * 	ERR_PTR(-EACCES)	some other master holds the title to any object
  * 	ERR_PTR(-ENOENT)	some object is not a valid DRM object for this device
  * 	ERR_PTR(-EBUSY)		some other lessee holds title to this object
  *	ERR_PTR(-EEXIST)	same object specified more than once in the provided list
@@ -222,10 +214,8 @@ static struct drm_master *drm_lease_create(struct drm_master *lessor, struct idr
 
 	idr_for_each_entry(leases, entry, object) {
 		error = 0;
-		if (!idr_find(&dev->mode_config.crtc_idr, object))
+		if (!idr_find(&dev->mode_config.object_idr, object))
 			error = -ENOENT;
-		else if (!_drm_lease_held_master(lessor, object))
-			error = -EACCES;
 		else if (_drm_has_leased(lessor, object))
 			error = -EBUSY;
 
@@ -357,9 +347,9 @@ void drm_lease_revoke(struct drm_master *top)
 }
 
 static int validate_lease(struct drm_device *dev,
-			  struct drm_file *lessor_priv,
 			  int object_count,
-			  struct drm_mode_object **objects)
+			  struct drm_mode_object **objects,
+			  bool universal_planes)
 {
 	int o;
 	int has_crtc = -1;
@@ -376,14 +366,14 @@ static int validate_lease(struct drm_device *dev,
 		if (objects[o]->type == DRM_MODE_OBJECT_CONNECTOR && has_connector == -1)
 			has_connector = o;
 
-		if (lessor_priv->universal_planes) {
+		if (universal_planes) {
 			if (objects[o]->type == DRM_MODE_OBJECT_PLANE && has_plane == -1)
 				has_plane = o;
 		}
 	}
 	if (has_crtc == -1 || has_connector == -1)
 		return -EINVAL;
-	if (lessor_priv->universal_planes && has_plane == -1)
+	if (universal_planes && has_plane == -1)
 		return -EINVAL;
 	return 0;
 }
@@ -397,6 +387,8 @@ static int fill_object_idr(struct drm_device *dev,
 	struct drm_mode_object **objects;
 	u32 o;
 	int ret;
+	bool universal_planes = READ_ONCE(lessor_priv->universal_planes);
+
 	objects = kcalloc(object_count, sizeof(struct drm_mode_object *),
 			  GFP_KERNEL);
 	if (!objects)
@@ -405,11 +397,6 @@ static int fill_object_idr(struct drm_device *dev,
 	/* step one - get references to all the mode objects
 	   and check for validity. */
 	for (o = 0; o < object_count; o++) {
-		if ((int) object_ids[o] < 0) {
-			ret = -EINVAL;
-			goto out_free_objects;
-		}
-
 		objects[o] = drm_mode_object_find(dev, lessor_priv,
 						  object_ids[o],
 						  DRM_MODE_OBJECT_ANY);
@@ -419,14 +406,17 @@ static int fill_object_idr(struct drm_device *dev,
 		}
 
 		if (!drm_mode_object_lease_required(objects[o]->type)) {
+			DRM_DEBUG_KMS("invalid object for lease\n");
 			ret = -EINVAL;
 			goto out_free_objects;
 		}
 	}
 
-	ret = validate_lease(dev, lessor_priv, object_count, objects);
-	if (ret)
+	ret = validate_lease(dev, object_count, objects, universal_planes);
+	if (ret) {
+		DRM_DEBUG_LEASE("lease validation failed\n");
 		goto out_free_objects;
+	}
 
 	/* add their IDs to the lease request - taking into account
 	   universal planes */
@@ -438,7 +428,7 @@ static int fill_object_idr(struct drm_device *dev,
 		/*
 		 * We're using an IDR to hold the set of leased
 		 * objects, but we don't need to point at the object's
-		 * data structure from the lease as the main crtc_idr
+		 * data structure from the lease as the main object_idr
 		 * will be used to actually find that. Instead, all we
 		 * really want is a 'leased/not-leased' result, for
 		 * which any non-NULL pointer will work fine.
@@ -449,7 +439,7 @@ static int fill_object_idr(struct drm_device *dev,
 					object_id, ret);
 			goto out_free_objects;
 		}
-		if (obj->type == DRM_MODE_OBJECT_CRTC && !lessor_priv->universal_planes) {
+		if (obj->type == DRM_MODE_OBJECT_CRTC && !universal_planes) {
 			struct drm_crtc *crtc = obj_to_crtc(obj);
 			ret = idr_alloc(leases, &drm_lease_idr_object, crtc->primary->base.id, crtc->primary->base.id + 1, GFP_KERNEL);
 			if (ret < 0) {
@@ -509,15 +499,21 @@ int drm_mode_create_lease_ioctl(struct drm_device *dev,
 		return -EOPNOTSUPP;
 
 	/* Do not allow sub-leases */
-	if (lessor->lessor)
+	if (lessor->lessor) {
+		DRM_DEBUG_LEASE("recursive leasing not allowed\n");
 		return -EINVAL;
+	}
 
 	/* need some objects */
-	if (cl->object_count == 0)
+	if (cl->object_count == 0) {
+		DRM_DEBUG_LEASE("no objects in lease\n");
 		return -EINVAL;
+	}
 
-	if (cl->flags && (cl->flags & ~(O_CLOEXEC | O_NONBLOCK)))
+	if (cl->flags && (cl->flags & ~(O_CLOEXEC | O_NONBLOCK))) {
+		DRM_DEBUG_LEASE("invalid flags\n");
 		return -EINVAL;
+	}
 
 	object_count = cl->object_count;
 
@@ -533,6 +529,7 @@ int drm_mode_create_lease_ioctl(struct drm_device *dev,
 			      object_count, object_ids);
 	kfree(object_ids);
 	if (ret) {
+		DRM_DEBUG_LEASE("lease object lookup failed: %i\n", ret);
 		idr_destroy(&leases);
 		return ret;
 	}
@@ -681,7 +678,7 @@ int drm_mode_get_lease_ioctl(struct drm_device *dev,
 
 	if (lessee->lessor == NULL)
 		/* owner can use all objects */
-		object_idr = &lessee->dev->mode_config.crtc_idr;
+		object_idr = &lessee->dev->mode_config.object_idr;
 	else
 		/* lessee can only use allowed object */
 		object_idr = &lessee->leases;

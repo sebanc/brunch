@@ -188,7 +188,7 @@ static inline void vcpu_cache_mmio_info(struct kvm_vcpu *vcpu,
 {
 	u64 gen = kvm_memslots(vcpu->kvm)->generation;
 
-	if (unlikely(gen & 1))
+	if (unlikely(gen & KVM_MEMSLOT_GEN_UPDATE_IN_PROGRESS))
 		return;
 
 	/*
@@ -196,7 +196,7 @@ static inline void vcpu_cache_mmio_info(struct kvm_vcpu *vcpu,
 	 * actually a nGPA.
 	 */
 	vcpu->arch.mmio_gva = mmu_is_nested(vcpu) ? 0 : gva & PAGE_MASK;
-	vcpu->arch.access = access;
+	vcpu->arch.mmio_access = access;
 	vcpu->arch.mmio_gfn = gfn;
 	vcpu->arch.mmio_gen = gen;
 }
@@ -261,7 +261,7 @@ static inline bool kvm_check_has_quirk(struct kvm *kvm, u64 quirk)
 }
 
 void kvm_set_pending_timer(struct kvm_vcpu *vcpu);
-int kvm_inject_realmode_interrupt(struct kvm_vcpu *vcpu, int irq, int inc_eip);
+void kvm_inject_realmode_interrupt(struct kvm_vcpu *vcpu, int irq, int inc_eip);
 
 void kvm_write_tsc(struct kvm_vcpu *vcpu, struct msr_data *msr);
 u64 get_kvmclock_ns(struct kvm *kvm);
@@ -275,6 +275,8 @@ int kvm_write_guest_virt_system(struct kvm_vcpu *vcpu,
 	struct x86_exception *exception);
 
 int handle_ud(struct kvm_vcpu *vcpu);
+
+void kvm_deliver_exception_payload(struct kvm_vcpu *vcpu);
 
 void kvm_vcpu_mtrr_init(struct kvm_vcpu *vcpu);
 u8 kvm_mtrr_get_guest_memory_type(struct kvm_vcpu *vcpu, gfn_t gfn);
@@ -297,9 +299,9 @@ extern u64 kvm_supported_xcr0(void);
 
 extern unsigned int min_timer_period_us;
 
-extern unsigned int lapic_timer_advance_ns;
-
 extern bool enable_vmware_backdoor;
+
+extern int pi_inject_timer;
 
 extern struct static_key kvm_no_apic_vcpu;
 
@@ -336,6 +338,11 @@ static inline bool kvm_hlt_in_guest(struct kvm *kvm)
 static inline bool kvm_pause_in_guest(struct kvm *kvm)
 {
 	return kvm->arch.pause_in_guest;
+}
+
+static inline bool kvm_cstate_in_guest(struct kvm *kvm)
+{
+	return kvm->arch.cstate_in_guest;
 }
 
 DECLARE_PER_CPU(struct kvm_vcpu *, current_vcpu);

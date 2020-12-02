@@ -97,196 +97,6 @@ static void dwc2_enable_common_interrupts(struct dwc2_hsotg *hsotg)
 	dwc2_writel(hsotg, intmsk, GINTMSK);
 }
 
-/*
- * Initializes the FSLSPClkSel field of the HCFG register depending on the
- * PHY type
- */
-static void dwc2_init_fs_ls_pclk_sel(struct dwc2_hsotg *hsotg)
-{
-	u32 hcfg, val;
-
-	if ((hsotg->hw_params.hs_phy_type == GHWCFG2_HS_PHY_TYPE_ULPI &&
-	     hsotg->hw_params.fs_phy_type == GHWCFG2_FS_PHY_TYPE_DEDICATED &&
-	     hsotg->params.ulpi_fs_ls) ||
-	    hsotg->params.phy_type == DWC2_PHY_TYPE_PARAM_FS) {
-		/* Full speed PHY */
-		val = HCFG_FSLSPCLKSEL_48_MHZ;
-	} else {
-		/* High speed PHY running at full speed or high speed */
-		val = HCFG_FSLSPCLKSEL_30_60_MHZ;
-	}
-
-	dev_dbg(hsotg->dev, "Initializing HCFG.FSLSPClkSel to %08x\n", val);
-	hcfg = dwc2_readl(hsotg, HCFG);
-	hcfg &= ~HCFG_FSLSPCLKSEL_MASK;
-	hcfg |= val << HCFG_FSLSPCLKSEL_SHIFT;
-	dwc2_writel(hsotg, hcfg, HCFG);
-}
-
-static int dwc2_fs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
-{
-	u32 usbcfg, ggpio, i2cctl;
-	int retval = 0;
-
-	/*
-	 * core_init() is now called on every switch so only call the
-	 * following for the first time through
-	 */
-	if (select_phy) {
-		dev_dbg(hsotg->dev, "FS PHY selected\n");
-
-		usbcfg = dwc2_readl(hsotg, GUSBCFG);
-		if (!(usbcfg & GUSBCFG_PHYSEL)) {
-			usbcfg |= GUSBCFG_PHYSEL;
-			dwc2_writel(hsotg, usbcfg, GUSBCFG);
-
-			/* Reset after a PHY select */
-			retval = dwc2_core_reset(hsotg, false);
-
-			if (retval) {
-				dev_err(hsotg->dev,
-					"%s: Reset failed, aborting", __func__);
-				return retval;
-			}
-		}
-
-		if (hsotg->params.activate_stm_fs_transceiver) {
-			ggpio = dwc2_readl(hsotg, GGPIO);
-			if (!(ggpio & GGPIO_STM32_OTG_GCCFG_PWRDWN)) {
-				dev_dbg(hsotg->dev, "Activating transceiver\n");
-				/*
-				 * STM32F4x9 uses the GGPIO register as general
-				 * core configuration register.
-				 */
-				ggpio |= GGPIO_STM32_OTG_GCCFG_PWRDWN;
-				dwc2_writel(hsotg, ggpio, GGPIO);
-			}
-		}
-	}
-
-	/*
-	 * Program DCFG.DevSpd or HCFG.FSLSPclkSel to 48Mhz in FS. Also
-	 * do this on HNP Dev/Host mode switches (done in dev_init and
-	 * host_init).
-	 */
-	if (dwc2_is_host_mode(hsotg))
-		dwc2_init_fs_ls_pclk_sel(hsotg);
-
-	if (hsotg->params.i2c_enable) {
-		dev_dbg(hsotg->dev, "FS PHY enabling I2C\n");
-
-		/* Program GUSBCFG.OtgUtmiFsSel to I2C */
-		usbcfg = dwc2_readl(hsotg, GUSBCFG);
-		usbcfg |= GUSBCFG_OTG_UTMI_FS_SEL;
-		dwc2_writel(hsotg, usbcfg, GUSBCFG);
-
-		/* Program GI2CCTL.I2CEn */
-		i2cctl = dwc2_readl(hsotg, GI2CCTL);
-		i2cctl &= ~GI2CCTL_I2CDEVADDR_MASK;
-		i2cctl |= 1 << GI2CCTL_I2CDEVADDR_SHIFT;
-		i2cctl &= ~GI2CCTL_I2CEN;
-		dwc2_writel(hsotg, i2cctl, GI2CCTL);
-		i2cctl |= GI2CCTL_I2CEN;
-		dwc2_writel(hsotg, i2cctl, GI2CCTL);
-	}
-
-	return retval;
-}
-
-static int dwc2_hs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
-{
-	u32 usbcfg, usbcfg_old;
-	int retval = 0;
-
-	if (!select_phy)
-		return 0;
-
-	usbcfg = dwc2_readl(hsotg, GUSBCFG);
-	usbcfg_old = usbcfg;
-
-	/*
-	 * HS PHY parameters. These parameters are preserved during soft reset
-	 * so only program the first time. Do a soft reset immediately after
-	 * setting phyif.
-	 */
-	switch (hsotg->params.phy_type) {
-	case DWC2_PHY_TYPE_PARAM_ULPI:
-		/* ULPI interface */
-		dev_dbg(hsotg->dev, "HS ULPI PHY selected\n");
-		usbcfg |= GUSBCFG_ULPI_UTMI_SEL;
-		usbcfg &= ~(GUSBCFG_PHYIF16 | GUSBCFG_DDRSEL);
-		if (hsotg->params.phy_ulpi_ddr)
-			usbcfg |= GUSBCFG_DDRSEL;
-
-		/* Set external VBUS indicator as needed. */
-		if (hsotg->params.oc_disable)
-			usbcfg |= (GUSBCFG_ULPI_INT_VBUS_IND |
-				   GUSBCFG_INDICATORPASSTHROUGH);
-		break;
-	case DWC2_PHY_TYPE_PARAM_UTMI:
-		/* UTMI+ interface */
-		dev_dbg(hsotg->dev, "HS UTMI+ PHY selected\n");
-		usbcfg &= ~(GUSBCFG_ULPI_UTMI_SEL | GUSBCFG_PHYIF16);
-		if (hsotg->params.phy_utmi_width == 16)
-			usbcfg |= GUSBCFG_PHYIF16;
-		break;
-	default:
-		dev_err(hsotg->dev, "FS PHY selected at HS!\n");
-		break;
-	}
-
-	if (usbcfg != usbcfg_old) {
-		dwc2_writel(hsotg, usbcfg, GUSBCFG);
-
-		/* Reset after setting the PHY parameters */
-		retval = dwc2_core_reset(hsotg, false);
-		if (retval) {
-			dev_err(hsotg->dev,
-				"%s: Reset failed, aborting", __func__);
-			return retval;
-		}
-	}
-
-	return retval;
-}
-
-static int dwc2_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
-{
-	u32 usbcfg;
-	int retval = 0;
-
-	if ((hsotg->params.speed == DWC2_SPEED_PARAM_FULL ||
-	     hsotg->params.speed == DWC2_SPEED_PARAM_LOW) &&
-	    hsotg->params.phy_type == DWC2_PHY_TYPE_PARAM_FS) {
-		/* If FS/LS mode with FS/LS PHY */
-		retval = dwc2_fs_phy_init(hsotg, select_phy);
-		if (retval)
-			return retval;
-	} else {
-		/* High speed PHY */
-		retval = dwc2_hs_phy_init(hsotg, select_phy);
-		if (retval)
-			return retval;
-	}
-
-	if (hsotg->hw_params.hs_phy_type == GHWCFG2_HS_PHY_TYPE_ULPI &&
-	    hsotg->hw_params.fs_phy_type == GHWCFG2_FS_PHY_TYPE_DEDICATED &&
-	    hsotg->params.ulpi_fs_ls) {
-		dev_dbg(hsotg->dev, "Setting ULPI FSLS\n");
-		usbcfg = dwc2_readl(hsotg, GUSBCFG);
-		usbcfg |= GUSBCFG_ULPI_FS_LS;
-		usbcfg |= GUSBCFG_ULPI_CLK_SUSP_M;
-		dwc2_writel(hsotg, usbcfg, GUSBCFG);
-	} else {
-		usbcfg = dwc2_readl(hsotg, GUSBCFG);
-		usbcfg &= ~GUSBCFG_ULPI_FS_LS;
-		usbcfg &= ~GUSBCFG_ULPI_CLK_SUSP_M;
-		dwc2_writel(hsotg, usbcfg, GUSBCFG);
-	}
-
-	return retval;
-}
-
 static int dwc2_gahbcfg_init(struct dwc2_hsotg *hsotg)
 {
 	u32 ahbcfg = dwc2_readl(hsotg, GAHBCFG);
@@ -2437,25 +2247,31 @@ static void dwc2_core_host_init(struct dwc2_hsotg *hsotg)
 		num_channels = hsotg->params.host_channels;
 		for (i = 0; i < num_channels; i++) {
 			hcchar = dwc2_readl(hsotg, HCCHAR(i));
-			hcchar &= ~HCCHAR_CHENA;
-			hcchar |= HCCHAR_CHDIS;
-			hcchar &= ~HCCHAR_EPDIR;
-			dwc2_writel(hsotg, hcchar, HCCHAR(i));
+			if (hcchar & HCCHAR_CHENA) {
+				hcchar &= ~HCCHAR_CHENA;
+				hcchar |= HCCHAR_CHDIS;
+				hcchar &= ~HCCHAR_EPDIR;
+				dwc2_writel(hsotg, hcchar, HCCHAR(i));
+			}
 		}
 
 		/* Halt all channels to put them into a known state */
 		for (i = 0; i < num_channels; i++) {
 			hcchar = dwc2_readl(hsotg, HCCHAR(i));
-			hcchar |= HCCHAR_CHENA | HCCHAR_CHDIS;
-			hcchar &= ~HCCHAR_EPDIR;
-			dwc2_writel(hsotg, hcchar, HCCHAR(i));
-			dev_dbg(hsotg->dev, "%s: Halt channel %d\n",
-				__func__, i);
+			if (hcchar & HCCHAR_CHENA) {
+				hcchar |= HCCHAR_CHENA | HCCHAR_CHDIS;
+				hcchar &= ~HCCHAR_EPDIR;
+				dwc2_writel(hsotg, hcchar, HCCHAR(i));
+				dev_dbg(hsotg->dev, "%s: Halt channel %d\n",
+					__func__, i);
 
-			if (dwc2_hsotg_wait_bit_clear(hsotg, HCCHAR(i),
-						      HCCHAR_CHENA, 1000)) {
-				dev_warn(hsotg->dev, "Unable to clear enable on channel %d\n",
-					 i);
+				if (dwc2_hsotg_wait_bit_clear(hsotg, HCCHAR(i),
+							      HCCHAR_CHENA,
+							      1000)) {
+					dev_warn(hsotg->dev,
+						 "Unable to clear enable on channel %d\n",
+						 i);
+				}
 			}
 		}
 	}
@@ -3985,10 +3801,8 @@ static struct dwc2_hcd_urb *dwc2_hcd_urb_alloc(struct dwc2_hsotg *hsotg,
 					       gfp_t mem_flags)
 {
 	struct dwc2_hcd_urb *urb;
-	u32 size = sizeof(*urb) + iso_desc_count *
-		   sizeof(struct dwc2_hcd_iso_packet_desc);
 
-	urb = kzalloc(size, mem_flags);
+	urb = kzalloc(struct_size(urb, iso_descs, iso_desc_count), mem_flags);
 	if (urb)
 		urb->packet_count = iso_desc_count;
 	return urb;
@@ -4794,7 +4608,7 @@ static int _dwc2_hcd_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 
 	buf = urb->transfer_buffer;
 
-	if (hcd->self.uses_dma) {
+	if (hcd_uses_dma(hcd)) {
 		if (!buf && (urb->transfer_dma & 3)) {
 			dev_err(hsotg->dev,
 				"%s: unaligned transfer with no transfer_buffer",
@@ -4871,7 +4685,6 @@ fail2:
 	spin_unlock_irqrestore(&hsotg->lock, flags);
 	urb->hcpriv = NULL;
 	kfree(qtd);
-	qtd = NULL;
 fail1:
 	if (qh_allocated) {
 		struct dwc2_qtd *qtd2, *qtd2_tmp;
@@ -5249,12 +5062,12 @@ int dwc2_hcd_init(struct dwc2_hsotg *hsotg)
 		dwc2_hc_driver.reset_device = dwc2_reset_device;
 	}
 
+	if (hsotg->params.host_dma)
+		dwc2_hc_driver.flags |= HCD_DMA;
+
 	hcd = usb_create_hcd(&dwc2_hc_driver, hsotg->dev, dev_name(hsotg->dev));
 	if (!hcd)
 		goto error1;
-
-	if (!hsotg->params.host_dma)
-		hcd->self.uses_dma = 0;
 
 	hcd->has_tt = 1;
 

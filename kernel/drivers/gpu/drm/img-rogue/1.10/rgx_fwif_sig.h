@@ -44,7 +44,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if !defined (__RGX_FWIF_SIG_H__)
 #define __RGX_FWIF_SIG_H__
 
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 
 /************************************************************************
 * RGX FW signature checks

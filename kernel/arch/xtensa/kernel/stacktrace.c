@@ -44,6 +44,11 @@ void xtensa_backtrace_user(struct pt_regs *regs, unsigned int depth,
 	if (pc == 0 || pc >= TASK_SIZE || ufn(&frame, data))
 		return;
 
+	if (IS_ENABLED(CONFIG_USER_ABI_CALL0_ONLY) ||
+	    (IS_ENABLED(CONFIG_USER_ABI_CALL0_PROBE) &&
+	     !(regs->ps & PS_WOE_MASK)))
+		return;
+
 	/* Two steps:
 	 *
 	 * 1. Look through the register window for the
@@ -91,7 +96,7 @@ void xtensa_backtrace_user(struct pt_regs *regs, unsigned int depth,
 		pc = MAKE_PC_FROM_RA(a0, pc);
 
 		/* Check if the region is OK to access. */
-		if (!access_ok(VERIFY_READ, &SPILL_SLOT(a1, 0), 8))
+		if (!access_ok(&SPILL_SLOT(a1, 0), 8))
 			return;
 		/* Copy a1, a0 from user space stack frame. */
 		if (__get_user(a0, &SPILL_SLOT(a1, 0)) ||

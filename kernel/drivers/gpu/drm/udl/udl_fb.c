@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2012 Red Hat
  *
@@ -5,24 +6,20 @@
  * Copyright (C) 2009 Roberto De Ioris <roberto@unbit.it>
  * Copyright (C) 2009 Jaya Kumar <jayakumar.lkml@gmail.com>
  * Copyright (C) 2009 Bernie Thompson <bernie@plugable.com>
- *
- * This file is subject to the terms and conditions of the GNU General Public
- * License v2. See the file COPYING in the main directory of this archive for
- * more details.
  */
-#include <linux/module.h>
-#include <linux/slab.h>
-#include <linux/fb.h>
-#include <linux/dma-buf.h>
-#include <linux/mem_encrypt.h>
 
-#include <drm/drmP.h>
-#include <drm/drm_crtc.h>
+#include <linux/moduleparam.h>
+#include <linux/dma-buf.h>
+
 #include <drm/drm_crtc_helper.h>
-#include "udl_drv.h"
-#include "udl_cursor.h"
+#include <drm/drm_drv.h>
 
 #include <drm/drm_fb_helper.h>
+#include <drm/drm_fourcc.h>
+#include <drm/drm_modeset_helper.h>
+
+#include "udl_drv.h"
+#include "udl_cursor.h"
 
 #define DL_DEFIO_WRITE_DELAY    (HZ/20) /* fb_deferred_io.delay in jiffies */
 
@@ -33,7 +30,7 @@ module_param(fb_bpp, int, S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP);
 module_param(fb_defio, int, S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP);
 
 struct udl_fbdev {
-	struct drm_fb_helper helper;
+	struct drm_fb_helper helper; /* must be first */
 	struct udl_framebuffer ufb;
 	int fb_count;
 };
@@ -247,6 +244,7 @@ static int udl_fb_open(struct fb_info *info, int user)
 	return 0;
 }
 
+static struct fb_ops udlfb_ops;
 
 /*
  * Assumes caller is holding info->lock mutex (for open and release at least)
@@ -262,7 +260,7 @@ static int udl_fb_release(struct fb_info *info, int user)
 		fb_deferred_io_cleanup(info);
 		kfree(info->fbdefio);
 		info->fbdefio = NULL;
-		info->fbops->fb_mmap = udl_fb_mmap;
+		udlfb_ops.fb_mmap = udl_fb_mmap;
 	}
 #endif
 
@@ -329,7 +327,7 @@ static void udl_user_framebuffer_destroy(struct drm_framebuffer *fb)
 	struct udl_framebuffer *ufb = to_udl_fb(fb);
 
 	if (ufb->obj)
-		drm_gem_object_put_unlocked(&ufb->obj->base);
+		drm_gem_object_put(&ufb->obj->base);
 
 	drm_framebuffer_cleanup(fb);
 	kfree(ufb);
@@ -397,7 +395,6 @@ static int udlfb_create(struct drm_fb_helper *helper,
 		ret = PTR_ERR(info);
 		goto out_gfree;
 	}
-	info->par = ufbdev;
 
 	ret = udl_framebuffer_init(dev, &ufbdev->ufb, &mode_cmd, obj);
 	if (ret)
@@ -407,15 +404,12 @@ static int udlfb_create(struct drm_fb_helper *helper,
 
 	ufbdev->helper.fb = fb;
 
-	strcpy(info->fix.id, "udldrmfb");
-
 	info->screen_base = ufbdev->ufb.obj->vmapping;
 	info->fix.smem_len = size;
 	info->fix.smem_start = (unsigned long)ufbdev->ufb.obj->vmapping;
 
 	info->fbops = &udlfb_ops;
-	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
-	drm_fb_helper_fill_var(info, &ufbdev->helper, sizes->fb_width, sizes->fb_height);
+	drm_fb_helper_fill_info(info, &ufbdev->helper, sizes);
 
 	DRM_DEBUG_KMS("allocated %dx%d vmal %p\n",
 		      fb->width, fb->height,
@@ -423,7 +417,7 @@ static int udlfb_create(struct drm_fb_helper *helper,
 
 	return ret;
 out_gfree:
-	drm_gem_object_put_unlocked(&ufbdev->ufb.obj->base);
+	drm_gem_object_put(&ufbdev->ufb.obj->base);
 out:
 	return ret;
 }
@@ -440,7 +434,7 @@ static void udl_fbdev_destroy(struct drm_device *dev,
 	if (ufbdev->ufb.obj) {
 		drm_framebuffer_unregister_private(&ufbdev->ufb.base);
 		drm_framebuffer_cleanup(&ufbdev->ufb.base);
-		drm_gem_object_put_unlocked(&ufbdev->ufb.obj->base);
+		drm_gem_object_put(&ufbdev->ufb.obj->base);
 	}
 }
 
@@ -459,7 +453,7 @@ int udl_fbdev_init(struct drm_device *dev)
 
 	drm_fb_helper_prepare(dev, &ufbdev->helper, &udl_fb_helper_funcs);
 
-	ret = drm_fb_helper_init(dev, &ufbdev->helper, 1);
+	ret = drm_fb_helper_init(dev, &ufbdev->helper);
 	if (ret)
 		goto free;
 

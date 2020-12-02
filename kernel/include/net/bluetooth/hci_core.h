@@ -129,6 +129,14 @@ struct bdaddr_list {
 	u8 bdaddr_type;
 };
 
+struct bdaddr_list_with_irk {
+	struct list_head list;
+	bdaddr_t bdaddr;
+	u8 bdaddr_type;
+	u8 peer_irk[16];
+	u8 local_irk[16];
+};
+
 struct bdaddr_list_with_flags {
 	struct list_head list;
 	bdaddr_t bdaddr;
@@ -263,7 +271,6 @@ struct adv_monitor {
 /* Default min/max age of connection information (1s/3s) */
 #define DEFAULT_CONN_INFO_MIN_AGE	1000
 #define DEFAULT_CONN_INFO_MAX_AGE	3000
-
 /* Default authenticated payload timeout 30s */
 #define DEFAULT_AUTH_PAYLOAD_TIMEOUT   0x0bb8
 
@@ -378,8 +385,6 @@ struct hci_dev {
 	__u16		def_page_timeout;
 	__u16		def_multi_adv_rotation_duration;
 	__u16		def_le_autoconnect_timeout;
-	__s8		min_le_tx_power;
-	__s8		max_le_tx_power;
 
 	__u16		pkt_type;
 	__u16		esco_type;
@@ -420,6 +425,7 @@ struct hci_dev {
 	unsigned int	acl_pkts;
 	unsigned int	sco_pkts;
 	unsigned int	le_pkts;
+	unsigned int	wbs_pkt_len;
 
 	__u16		block_len;
 	__u16		block_mtu;
@@ -622,6 +628,7 @@ struct hci_conn {
 	__u16		disc_timeout;
 	__u16		conn_timeout;
 	__u16		setting;
+	__u16		auth_payload_timeout;
 	__u16		le_conn_min_interval;
 	__u16		le_conn_max_interval;
 	__u16		le_conn_interval;
@@ -1226,13 +1233,20 @@ int hci_inquiry(void __user *arg);
 
 struct bdaddr_list *hci_bdaddr_list_lookup(struct list_head *list,
 					   bdaddr_t *bdaddr, u8 type);
+struct bdaddr_list_with_irk *hci_bdaddr_list_lookup_with_irk(
+				    struct list_head *list, bdaddr_t *bdaddr,
+				    u8 type);
 struct bdaddr_list_with_flags *
 hci_bdaddr_list_lookup_with_flags(struct list_head *list, bdaddr_t *bdaddr,
 				  u8 type);
 int hci_bdaddr_list_add(struct list_head *list, bdaddr_t *bdaddr, u8 type);
+int hci_bdaddr_list_add_with_irk(struct list_head *list, bdaddr_t *bdaddr,
+				 u8 type, u8 *peer_irk, u8 *local_irk);
 int hci_bdaddr_list_add_with_flags(struct list_head *list, bdaddr_t *bdaddr,
 				   u8 type, u32 flags);
 int hci_bdaddr_list_del(struct list_head *list, bdaddr_t *bdaddr, u8 type);
+int hci_bdaddr_list_del_with_irk(struct list_head *list, bdaddr_t *bdaddr,
+				 u8 type);
 int hci_bdaddr_list_del_with_flags(struct list_head *list, bdaddr_t *bdaddr,
 				   u8 type);
 void hci_bdaddr_list_clear(struct list_head *list);
@@ -1469,16 +1483,34 @@ static inline void hci_auth_cfm(struct hci_conn *conn, __u8 status)
 		conn->security_cfm_cb(conn, status);
 }
 
-static inline void hci_encrypt_cfm(struct hci_conn *conn, __u8 status,
-								__u8 encrypt)
+static inline void hci_encrypt_cfm(struct hci_conn *conn, __u8 status)
 {
 	struct hci_cb *cb;
+	__u8 encrypt;
 
-	if (conn->sec_level == BT_SECURITY_SDP)
-		conn->sec_level = BT_SECURITY_LOW;
+	if (conn->state == BT_CONFIG) {
+		if (!status)
+			conn->state = BT_CONNECTED;
 
-	if (conn->pending_sec_level > conn->sec_level)
-		conn->sec_level = conn->pending_sec_level;
+		hci_connect_cfm(conn, status);
+		hci_conn_drop(conn);
+		return;
+	}
+
+	if (!test_bit(HCI_CONN_ENCRYPT, &conn->flags))
+		encrypt = 0x00;
+	else if (test_bit(HCI_CONN_AES_CCM, &conn->flags))
+		encrypt = 0x02;
+	else
+		encrypt = 0x01;
+
+	if (!status) {
+		if (conn->sec_level == BT_SECURITY_SDP)
+			conn->sec_level = BT_SECURITY_LOW;
+
+		if (conn->pending_sec_level > conn->sec_level)
+			conn->sec_level = conn->pending_sec_level;
+	}
 
 	mutex_lock(&hci_cb_list_lock);
 	list_for_each_entry(cb, &hci_cb_list, list) {

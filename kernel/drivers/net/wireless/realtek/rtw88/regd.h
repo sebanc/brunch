@@ -68,4 +68,6 @@ int rtw_regd_init(struct rtw_dev *rtwdev,
 		  void (*reg_notifier)(struct wiphy *wiphy,
 				       struct regulatory_request *request));
 void rtw_regd_notifier(struct wiphy *wiphy, struct regulatory_request *request);
+void rtw_regd_init_dfs_region(struct rtw_dev *rtwdev,
+			      enum nl80211_dfs_regions curr_region);
 #endif

@@ -154,6 +154,9 @@
 #define UVC_GUID_FORMAT_INVI \
 	{ 'I',  'N',  'V',  'I', 0xdb, 0x57, 0x49, 0x5e, \
 	 0x8e, 0x3f, 0xf4, 0x79, 0x53, 0x2b, 0x94, 0x6f}
+#define UVC_GUID_FORMAT_CNF4 \
+	{ 'C',  ' ',  ' ',  ' ', 0x00, 0x00, 0x10, 0x00, \
+	 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}
 
 #define UVC_GUID_FORMAT_D3DFMT_L8 \
 	{0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, \
@@ -195,6 +198,7 @@
 #define UVC_QUIRK_RESTRICT_FRAME_RATE	0x00000200
 #define UVC_QUIRK_RESTORE_CTRLS_ON_INIT	0x00000400
 #define UVC_QUIRK_FORCE_Y8		0x00000800
+#define UVC_QUIRK_FORCE_BPP		0x00001000
 
 /* Format flags */
 #define UVC_FMT_FLAG_COMPRESSED		0x00000001
@@ -234,7 +238,7 @@ struct uvc_control_mapping {
 	enum v4l2_ctrl_type v4l2_type;
 	u32 data_type;
 
-	struct uvc_menu_info *menu_info;
+	const struct uvc_menu_info *menu_info;
 	u32 menu_count;
 
 	u32 master_id;
@@ -617,8 +621,10 @@ struct uvc_streaming {
 	     (uvc_urb) < &(uvc_streaming)->uvc_urb[UVC_URBS]; \
 	     ++(uvc_urb))
 
-#define uvc_urb_index(uvc_urb) \
-	(unsigned int)((uvc_urb) - (&(uvc_urb)->stream->uvc_urb[0]))
+static inline u32 uvc_urb_index(const struct uvc_urb *uvc_urb)
+{
+	return uvc_urb - &uvc_urb->stream->uvc_urb[0];
+}
 
 struct uvc_device_info {
 	u32	quirks;

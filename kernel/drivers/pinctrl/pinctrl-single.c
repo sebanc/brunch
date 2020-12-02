@@ -1022,14 +1022,14 @@ static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
 		vals[found].reg = pcs->base + offset;
 		vals[found].val = pinctrl_spec.args[1];
 
-		dev_dbg(pcs->dev, "%s index: 0x%x value: 0x%x\n",
-			pinctrl_spec.np->name, offset, pinctrl_spec.args[1]);
+		dev_dbg(pcs->dev, "%pOFn index: 0x%x value: 0x%x\n",
+			pinctrl_spec.np, offset, pinctrl_spec.args[1]);
 
 		pin = pcs_get_pin_by_offset(pcs, offset);
 		if (pin < 0) {
 			dev_err(pcs->dev,
-				"could not add functions for %s %ux\n",
-				np->name, offset);
+				"could not add functions for %pOFn %ux\n",
+				np, offset);
 			break;
 		}
 		pins[found++] = pin;
@@ -1138,8 +1138,8 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
 		val = pinctrl_spec.args[1];
 		mask = pinctrl_spec.args[2];
 
-		dev_dbg(pcs->dev, "%s index: 0x%x value: 0x%x mask: 0x%x\n",
-			pinctrl_spec.np->name, offset, val, mask);
+		dev_dbg(pcs->dev, "%pOFn index: 0x%x value: 0x%x mask: 0x%x\n",
+			pinctrl_spec.np, offset, val, mask);
 
 		/* Parse pins in each row from LSB */
 		while (mask) {
@@ -1151,8 +1151,8 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
 
 			if ((mask & mask_pos) == 0) {
 				dev_err(pcs->dev,
-					"Invalid mask for %s at 0x%x\n",
-					np->name, offset);
+					"Invalid mask for %pOFn at 0x%x\n",
+					np, offset);
 				break;
 			}
 
@@ -1160,8 +1160,8 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
 
 			if (submask != mask_pos) {
 				dev_warn(pcs->dev,
-						"Invalid submask 0x%x for %s at 0x%x\n",
-						submask, np->name, offset);
+						"Invalid submask 0x%x for %pOFn at 0x%x\n",
+						submask, np, offset);
 				continue;
 			}
 
@@ -1172,8 +1172,8 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
 			pin = pcs_get_pin_by_offset(pcs, offset);
 			if (pin < 0) {
 				dev_err(pcs->dev,
-					"could not add functions for %s %ux\n",
-					np->name, offset);
+					"could not add functions for %pOFn %ux\n",
+					np, offset);
 				break;
 			}
 			pins[found++] = pin + pin_num_from_lsb;
@@ -1257,16 +1257,16 @@ static int pcs_dt_node_to_map(struct pinctrl_dev *pctldev,
 		ret = pcs_parse_bits_in_pinctrl_entry(pcs, np_config, map,
 				num_maps, pgnames);
 		if (ret < 0) {
-			dev_err(pcs->dev, "no pins entries for %s\n",
-				np_config->name);
+			dev_err(pcs->dev, "no pins entries for %pOFn\n",
+				np_config);
 			goto free_pgnames;
 		}
 	} else {
 		ret = pcs_parse_one_pinctrl_entry(pcs, np_config, map,
 				num_maps, pgnames);
 		if (ret < 0) {
-			dev_err(pcs->dev, "no pins entries for %s\n",
-				np_config->name);
+			dev_err(pcs->dev, "no pins entries for %pOFn\n",
+				np_config);
 			goto free_pgnames;
 		}
 	}

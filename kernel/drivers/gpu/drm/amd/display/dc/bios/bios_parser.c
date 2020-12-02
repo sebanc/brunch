@@ -23,6 +23,8 @@
  *
  */
 
+#include <linux/slab.h>
+
 #include "dm_services.h"
 
 #include "atom.h"
@@ -833,18 +835,6 @@ static enum bp_result bios_parser_enable_crtc(
 		return BP_RESULT_FAILURE;
 
 	return bp->cmd_tbl.enable_crtc(bp, id, enable);
-}
-
-static enum bp_result bios_parser_crtc_source_select(
-	struct dc_bios *dcb,
-	struct bp_crtc_source_select *bp_params)
-{
-	struct bios_parser *bp = BP_FROM_DCB(dcb);
-
-	if (!bp->cmd_tbl.select_crtc_source)
-		return BP_RESULT_FAILURE;
-
-	return bp->cmd_tbl.select_crtc_source(bp, bp_params);
 }
 
 static enum bp_result bios_parser_enable_disp_power_gating(
@@ -2030,7 +2020,7 @@ static uint32_t get_src_obj_list(struct bios_parser *bp, ATOM_OBJECT *object,
 static struct device_id device_type_from_device_id(uint16_t device_id)
 {
 
-	struct device_id result_device_id;
+	struct device_id result_device_id = {0};
 
 	switch (device_id) {
 	case ATOM_DEVICE_LCD1_SUPPORT:
@@ -2553,7 +2543,6 @@ static enum bp_result construct_integrated_info(
 
 	/* Sort voltage table from low to high*/
 	if (result == BP_RESULT_OK) {
-		struct clock_voltage_caps temp = {0, 0};
 		uint32_t i;
 		uint32_t j;
 
@@ -2563,10 +2552,8 @@ static enum bp_result construct_integrated_info(
 						info->disp_clk_voltage[j].max_supported_clk <
 						info->disp_clk_voltage[j-1].max_supported_clk) {
 					/* swap j and j - 1*/
-					temp = info->disp_clk_voltage[j-1];
-					info->disp_clk_voltage[j-1] =
-							info->disp_clk_voltage[j];
-					info->disp_clk_voltage[j] = temp;
+					swap(info->disp_clk_voltage[j - 1],
+					     info->disp_clk_voltage[j]);
 				}
 			}
 		}
@@ -2806,8 +2793,6 @@ static const struct dc_vbios_funcs vbios_funcs = {
 
 	.get_device_tag = bios_parser_get_device_tag,
 
-	.get_firmware_info = bios_parser_get_firmware_info,
-
 	.get_spread_spectrum_info = bios_parser_get_spread_spectrum_info,
 
 	.get_ss_entry_number = bios_parser_get_ss_entry_number,
@@ -2841,8 +2826,6 @@ static const struct dc_vbios_funcs vbios_funcs = {
 	.enable_spread_spectrum_on_ppll = bios_parser_enable_spread_spectrum_on_ppll,
 
 	.program_crtc_timing = bios_parser_program_crtc_timing, /* still use.  should probably retire and program directly */
-
-	.crtc_source_select = bios_parser_crtc_source_select,  /* still use.  should probably retire and program directly */
 
 	.program_display_engine_pll = bios_parser_program_display_engine_pll,
 
@@ -2934,6 +2917,7 @@ static bool bios_parser_construct(
 	dal_bios_parser_init_cmd_tbl_helper(&bp->cmd_helper, dce_version);
 
 	bp->base.integrated_info = bios_parser_create_integrated_info(&bp->base);
+	bp->base.fw_info_valid = bios_parser_get_firmware_info(&bp->base, &bp->base.fw_info) == BP_RESULT_OK;
 
 	return true;
 }

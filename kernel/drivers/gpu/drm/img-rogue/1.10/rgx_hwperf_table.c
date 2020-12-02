@@ -43,11 +43,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "img_defs.h"
 #include "rgx_fwif_hwperf.h"
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 #include "rgx_hwperf_table.h"
 
 /* Includes needed for PVRSRVKM (Server) context */
-#	include "rgx_bvnc_defs_km.h"
+#	include "km/rgx_bvnc_defs_km.h"
 #	if defined(__KERNEL__)
 #		include "rgxdevice.h"
 #	endif

@@ -18,8 +18,8 @@
 #include <asm/page.h>
 #include <asm/thread_info.h>
 
+#include <asm/core.h>
 #include <asm/vectors.h>
-#include <variant/core.h>
 
 OUTPUT_ARCH(xtensa)
 ENTRY(_start)
@@ -198,7 +198,6 @@ SECTIONS
     INIT_SETUP(XCHAL_ICACHE_LINESIZE)
     INIT_CALLS
     CON_INITCALL
-    SECURITY_INITCALL
     INIT_RAM_FS
   }
 
@@ -298,38 +297,11 @@ SECTIONS
 
   _end = .;
 
-  .xt.lit : { *(.xt.lit) }
-  .xt.prop : { *(.xt.prop) }
+  DWARF_DEBUG
 
-  .debug  0 :  { *(.debug) }
-  .line  0 :  { *(.line) }
-  .debug_srcinfo  0 :  { *(.debug_srcinfo) }
-  .debug_sfnames  0 :  { *(.debug_sfnames) }
-  .debug_aranges  0 :  { *(.debug_aranges) }
-  .debug_pubnames  0 :  { *(.debug_pubnames) }
-  .debug_info  0 :  { *(.debug_info) }
-  .debug_abbrev  0 :  { *(.debug_abbrev) }
-  .debug_line  0 :  { *(.debug_line) }
-  .debug_frame  0 :  { *(.debug_frame) }
-  .debug_str  0 :  { *(.debug_str) }
-  .debug_loc  0 :  { *(.debug_loc) }
-  .debug_macinfo  0 :  { *(.debug_macinfo) }
-  .debug_weaknames  0 :  { *(.debug_weaknames) }
-  .debug_funcnames  0 :  { *(.debug_funcnames) }
-  .debug_typenames  0 :  { *(.debug_typenames) }
-  .debug_varnames  0 :  { *(.debug_varnames) }
-
-  .xt.insn 0 :
-  {
-    *(.xt.insn)
-    *(.gnu.linkonce.x*)
-  }
-
-  .xt.lit 0 :
-  {
-    *(.xt.lit)
-    *(.gnu.linkonce.p*)
-  }
+  .xt.prop 0 : { KEEP(*(.xt.prop .xt.prop.* .gnu.linkonce.prop.*)) }
+  .xt.insn 0 : { KEEP(*(.xt.insn .xt.insn.* .gnu.linkonce.x*)) }
+  .xt.lit  0 : { KEEP(*(.xt.lit  .xt.lit.*  .gnu.linkonce.p*)) }
 
   /* Sections to be discarded */
   DISCARDS

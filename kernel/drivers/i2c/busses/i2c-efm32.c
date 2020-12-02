@@ -1,9 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2014 Uwe Kleine-Koenig for Pengutronix
- *
- * This program is free software; you can redistribute it and/or modify it under
- * the terms of the GNU General Public License version 2 as published by the
- * Free Software Foundation.
  */
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -391,7 +388,7 @@ static int efm32_i2c_probe(struct platform_device *pdev)
 	if (!ret) {
 		dev_dbg(&pdev->dev, "using frequency %u\n", frequency);
 	} else {
-		frequency = 100000;
+		frequency = I2C_MAX_STANDARD_MODE_FREQ;
 		dev_info(&pdev->dev, "defaulting to 100 kHz\n");
 	}
 	ddata->frequency = frequency;

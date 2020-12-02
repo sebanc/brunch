@@ -18,12 +18,6 @@
 #include "mtu3.h"
 #include "mtu3_dr.h"
 
-/* mt8183 etc */
-#define PERI_WK_CTRL0	0x20
-#define WC0_IS_C(x)	(u32)((((x) & 0xf) << 28))  /* cycle debounce */
-#define WC0_IS_P	BIT(12)	/* polarity */
-#define WC0_IS_EN	BIT(6)
-
 /* mt8173 etc */
 #define PERI_WK_CTRL1	0x4
 #define WC1_IS_C(x)	(((x) & 0xf) << 26)  /* cycle debounce */
@@ -36,8 +30,7 @@
 #define SSC_SPM_INT_EN		BIT(1)
 
 enum ssusb_uwk_vers {
-	SSUSB_UWK_V0 = 0,
-	SSUSB_UWK_V1,
+	SSUSB_UWK_V1 = 1,
 	SSUSB_UWK_V2,
 };
 
@@ -50,15 +43,10 @@ static void ssusb_wakeup_ip_sleep_set(struct ssusb_mtk *ssusb, bool enable)
 	u32 reg, msk, val;
 
 	switch (ssusb->uwk_vers) {
-	case SSUSB_UWK_V0:
-		reg = ssusb->uwk_reg_base + PERI_WK_CTRL0;
-		msk = WC0_IS_EN | WC0_IS_C(0xf) | WC0_IS_P;
-		val = enable ? (WC0_IS_EN | WC0_IS_C(0x3)) : 0;
-		break;
 	case SSUSB_UWK_V1:
 		reg = ssusb->uwk_reg_base + PERI_WK_CTRL1;
 		msk = WC1_IS_EN | WC1_IS_C(0xf) | WC1_IS_P;
-		val = enable ? (WC1_IS_EN | WC1_IS_C(0x3)) : 0;
+		val = enable ? (WC1_IS_EN | WC1_IS_C(0x8)) : 0;
 		break;
 	case SSUSB_UWK_V2:
 		reg = ssusb->uwk_reg_base + PERI_SSUSB_SPM_CTRL;
@@ -197,8 +185,6 @@ int ssusb_host_disable(struct ssusb_mtk *ssusb, bool suspend)
 			  (value & SSUSB_IP_SLEEP_STS), 100, 100000);
 	if (ret)
 		dev_err(ssusb->dev, "ip sleep failed!!!\n");
-	else /* wait for wakeup signal toggle done after enter ip-sleep */
-		usleep_range(245, 250);
 
 	return ret;
 }

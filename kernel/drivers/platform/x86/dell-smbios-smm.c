@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  SMI methods for use with dell-smbios
  *
@@ -5,10 +6,6 @@
  *  Copyright (c) 2014 Gabriele Mazzotta <gabriele.mzt@gmail.com>
  *  Copyright (c) 2014 Pali Rohár <pali.rohar@gmail.com>
  *  Copyright (c) 2017 Dell Inc.
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 as
- *  published by the Free Software Foundation.
  */
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
@@ -18,7 +15,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
-#include "../../firmware/dcdbas.h"
+#include "dcdbas.h"
 #include "dell-smbios.h"
 
 static int da_command_address;

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Defines for Mobile Industry Processor Interface (MIPI(R))
  * Display Working Group standards: DSI, DCS, DBI, DPI
@@ -5,10 +6,6 @@
  * Copyright (C) 2010 Guennadi Liakhovetski <g.liakhovetski@gmx.de>
  * Copyright (C) 2006 Nokia Corporation
  * Author: Imre Deak <imre.deak@nokia.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 #ifndef MIPI_DISPLAY_H
 #define MIPI_DISPLAY_H
@@ -19,6 +16,9 @@ enum {
 	MIPI_DSI_V_SYNC_END				= 0x11,
 	MIPI_DSI_H_SYNC_START				= 0x21,
 	MIPI_DSI_H_SYNC_END				= 0x31,
+
+	MIPI_DSI_COMPRESSION_MODE			= 0x07,
+	MIPI_DSI_END_OF_TRANSMISSION			= 0x08,
 
 	MIPI_DSI_COLOR_MODE_OFF				= 0x02,
 	MIPI_DSI_COLOR_MODE_ON				= 0x12,
@@ -37,18 +37,17 @@ enum {
 	MIPI_DSI_DCS_SHORT_WRITE_PARAM			= 0x15,
 
 	MIPI_DSI_DCS_READ				= 0x06,
-
-	MIPI_DSI_DCS_COMPRESSION_MODE                   = 0x07,
-	MIPI_DSI_PPS_LONG_WRITE                         = 0x0A,
+	MIPI_DSI_EXECUTE_QUEUE				= 0x16,
 
 	MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE		= 0x37,
-
-	MIPI_DSI_END_OF_TRANSMISSION			= 0x08,
 
 	MIPI_DSI_NULL_PACKET				= 0x09,
 	MIPI_DSI_BLANKING_PACKET			= 0x19,
 	MIPI_DSI_GENERIC_LONG_WRITE			= 0x29,
 	MIPI_DSI_DCS_LONG_WRITE				= 0x39,
+
+	MIPI_DSI_PICTURE_PARAMETER_SET			= 0x0a,
+	MIPI_DSI_COMPRESSED_PIXEL_STREAM		= 0x0b,
 
 	MIPI_DSI_LOOSELY_PACKED_PIXEL_STREAM_YCBCR20	= 0x0c,
 	MIPI_DSI_PACKED_PIXEL_STREAM_YCBCR24		= 0x1c,

@@ -2,7 +2,7 @@
  * Linux/PA-RISC Project (http://www.parisc-linux.org/)
  * 
  * System call entry code / Linux gateway page
- * Copyright (c) Matthew Wilcox 1999 <willy@bofh.ai>
+ * Copyright (c) Matthew Wilcox 1999 <willy@infradead.org>
  * Licensed under the GNU GPL.
  * thanks to Philipp Rumpf, Mike Shaver and various others
  * sorry about the wall, puffin..
@@ -640,8 +640,7 @@ cas_action:
 	sub,<>	%r28, %r25, %r0
 2:	stw	%r24, 0(%r26)
 	/* Free lock */
-	sync
-	stw	%r20, 0(%sr2,%r20)
+	stw,ma	%r20, 0(%sr2,%r20)
 #if ENABLE_LWS_DEBUG
 	/* Clear thread register indicator */
 	stw	%r0, 4(%sr2,%r20)
@@ -655,8 +654,7 @@ cas_action:
 3:		
 	/* Error occurred on load or store */
 	/* Free lock */
-	sync
-	stw	%r20, 0(%sr2,%r20)
+	stw,ma	%r20, 0(%sr2,%r20)
 #if ENABLE_LWS_DEBUG
 	stw	%r0, 4(%sr2,%r20)
 #endif
@@ -857,8 +855,7 @@ cas2_action:
 
 cas2_end:
 	/* Free lock */
-	sync
-	stw	%r20, 0(%sr2,%r20)
+	stw,ma	%r20, 0(%sr2,%r20)
 	/* Enable interrupts */
 	ssm	PSW_SM_I, %r0
 	/* Return to userspace, set no error */
@@ -868,8 +865,7 @@ cas2_end:
 22:
 	/* Error occurred on load or store */
 	/* Free lock */
-	sync
-	stw	%r20, 0(%sr2,%r20)
+	stw,ma	%r20, 0(%sr2,%r20)
 	ssm	PSW_SM_I, %r0
 	ldo	1(%r0),%r28
 	b	lws_exit
@@ -923,19 +919,24 @@ ENTRY(lws_table)
 END(lws_table)
 	/* End of lws table */
 
+#define __SYSCALL(nr, entry, nargs) ASM_ULONG_INSN entry
 	.align 8
 ENTRY(sys_call_table)
 	.export sys_call_table,data
-#include "syscall_table.S"
+#ifdef CONFIG_64BIT
+#include <asm/syscall_table_c32.h>   /* Compat syscalls */
+#else
+#include <asm/syscall_table_32.h>    /* 32-bit native syscalls */
+#endif
 END(sys_call_table)
 
 #ifdef CONFIG_64BIT
 	.align 8
 ENTRY(sys_call_table64)
-#define SYSCALL_TABLE_64BIT
-#include "syscall_table.S"
+#include <asm/syscall_table_64.h>    /* 64-bit native syscalls */
 END(sys_call_table64)
 #endif
+#undef __SYSCALL
 
 	/*
 		All light-weight-syscall atomic operations 

@@ -105,7 +105,7 @@ module_exit(iwl_xvt_exit);
  * A warning will be triggered on violation.
  */
 static const struct iwl_hcmd_names iwl_xvt_cmd_names[] = {
-	HCMD_NAME(UCODE_ALIVE_NTFY),
+	HCMD_NAME(MVM_ALIVE),
 	HCMD_NAME(INIT_COMPLETE_NOTIF),
 	HCMD_NAME(TX_CMD),
 	HCMD_NAME(SCD_QUEUE_CFG),
@@ -183,7 +183,6 @@ static const struct iwl_hcmd_names iwl_xvt_system_names[] = {
 };
 
 static const struct iwl_hcmd_names iwl_xvt_xvt_names[] = {
-	HCMD_NAME(DTS_MEASUREMENT_TRIGGER_NOTIF),
 	HCMD_NAME(MPAPD_EXEC_DONE_NOTIF),
 	HCMD_NAME(RUN_TIME_CALIB_DONE_NOTIF),
 	HCMD_NAME(IQ_CALIB_CONFIG_NOTIF),
@@ -263,6 +262,7 @@ static struct iwl_op_mode *iwl_xvt_start(struct iwl_trans *trans,
 	trans_cfg.bc_table_dword =
 		trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_AX210;
 	trans_cfg.scd_set_active = true;
+	trans->wide_cmd_header = true;
 
 	switch (iwlwifi_mod_params.amsdu_size) {
 	case IWL_AMSDU_DEF:
@@ -342,7 +342,6 @@ static struct iwl_op_mode *iwl_xvt_start(struct iwl_trans *trans,
 	return op_mode;
 
 out_free:
-	iwl_fw_runtime_free(&xvt->fwrt);
 	kfree(op_mode);
 
 	return NULL;
@@ -370,9 +369,6 @@ static void iwl_xvt_stop(struct iwl_op_mode *op_mode)
 		buffer = &xvt->reorder_bufs[i];
 		iwl_xvt_destroy_reorder_buffer(xvt, buffer);
 	}
-
-	iwl_fw_flush_dumps(&xvt->fwrt);
-	iwl_fw_runtime_free(&xvt->fwrt);
 
 	iwl_phy_db_free(xvt->phy_db);
 	xvt->phy_db = NULL;
@@ -821,9 +817,8 @@ static int iwl_xvt_sar_geo_init(struct iwl_xvt *xvt)
 	u16 len;
 	u32 n_bands;
 	int ret;
-	u8 cmd_ver = iwl_fw_lookup_cmd_ver(xvt->fw, PHY_OPS_GROUP,
-					   GEO_TX_POWER_LIMIT,
-					   IWL_FW_CMD_VER_UNKNOWN);
+	u8 cmd_ver = iwl_fw_lookup_cmd_ver(xvt->fw,
+					   PHY_OPS_GROUP, GEO_TX_POWER_LIMIT);
 
 	BUILD_BUG_ON(offsetof(struct iwl_geo_tx_power_profiles_cmd_v1, ops) !=
 		     offsetof(struct iwl_geo_tx_power_profiles_cmd_v2, ops) ||
@@ -871,7 +866,8 @@ static int iwl_xvt_sar_geo_init(struct iwl_xvt *xvt)
 }
 #endif /* CONFIG_ACPI */
 
-int iwl_xvt_sar_select_profile(struct iwl_xvt *xvt, int prof_a, int prof_b)
+static int
+iwl_xvt_sar_select_profile(struct iwl_xvt *xvt, int prof_a, int prof_b)
 {
 	struct iwl_dev_tx_power_cmd cmd = {
 		.common.set_mode = cpu_to_le32(IWL_TX_POWER_MODE_SET_CHAINS),
@@ -880,8 +876,7 @@ int iwl_xvt_sar_select_profile(struct iwl_xvt *xvt, int prof_a, int prof_b)
 	u16 len = 0;
 	u32 n_subbands;
 	u8 cmd_ver = iwl_fw_lookup_cmd_ver(xvt->fw, LONG_GROUP,
-					   REDUCE_TX_POWER_CMD,
-					   IWL_FW_CMD_VER_UNKNOWN);
+					   REDUCE_TX_POWER_CMD);
 	if (cmd_ver == 6) {
 		len = sizeof(cmd.v6);
 		n_subbands = IWL_NUM_SUB_BANDS_V2;

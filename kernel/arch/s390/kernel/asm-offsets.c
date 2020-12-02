@@ -16,6 +16,7 @@
 #include <asm/pgtable.h>
 #include <asm/gmap.h>
 #include <asm/nmi.h>
+#include <asm/stacktrace.h>
 
 int main(void)
 {
@@ -124,6 +125,8 @@ int main(void)
 	OFFSET(__LC_EXT_DAMAGE_CODE, lowcore, external_damage_code);
 	OFFSET(__LC_MCCK_FAIL_STOR_ADDR, lowcore, failing_storage_address);
 	OFFSET(__LC_LAST_BREAK, lowcore, breaking_event_addr);
+	OFFSET(__LC_RETURN_LPSWE, lowcore, return_lpswe);
+	OFFSET(__LC_RETURN_MCCK_LPSWE, lowcore, return_mcck_lpswe);
 	OFFSET(__LC_RST_OLD_PSW, lowcore, restart_old_psw);
 	OFFSET(__LC_EXT_OLD_PSW, lowcore, external_old_psw);
 	OFFSET(__LC_SVC_OLD_PSW, lowcore, svc_old_psw);
@@ -159,7 +162,7 @@ int main(void)
 	OFFSET(__LC_CURRENT, lowcore, current_task);
 	OFFSET(__LC_KERNEL_STACK, lowcore, kernel_stack);
 	OFFSET(__LC_ASYNC_STACK, lowcore, async_stack);
-	OFFSET(__LC_PANIC_STACK, lowcore, panic_stack);
+	OFFSET(__LC_NODAT_STACK, lowcore, nodat_stack);
 	OFFSET(__LC_RESTART_STACK, lowcore, restart_stack);
 	OFFSET(__LC_RESTART_FN, lowcore, restart_fn);
 	OFFSET(__LC_RESTART_DATA, lowcore, restart_data);

@@ -13,12 +13,12 @@
 #include <linux/sched.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/io.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/console.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/init.h>
 #include <linux/of.h>

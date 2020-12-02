@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /******************************************************************************
  * privcmd.c
  *
@@ -459,14 +460,14 @@ static long privcmd_ioctl_mmap_batch(
 			return -EFAULT;
 		/* Returns per-frame error in m.arr. */
 		m.err = NULL;
-		if (!access_ok(VERIFY_WRITE, m.arr, m.num * sizeof(*m.arr)))
+		if (!access_ok(m.arr, m.num * sizeof(*m.arr)))
 			return -EFAULT;
 		break;
 	case 2:
 		if (copy_from_user(&m, udata, sizeof(struct privcmd_mmapbatch_v2)))
 			return -EFAULT;
 		/* Returns per-frame error code in m.err. */
-		if (!access_ok(VERIFY_WRITE, m.err, m.num * (sizeof(*m.err))))
+		if (!access_ok(m.err, m.num * (sizeof(*m.err))))
 			return -EFAULT;
 		break;
 	default:
@@ -661,7 +662,7 @@ static long privcmd_ioctl_dm_op(struct file *file, void __user *udata)
 			goto out;
 		}
 
-		if (!access_ok(VERIFY_WRITE, kbufs[i].uptr,
+		if (!access_ok(kbufs[i].uptr,
 			       kbufs[i].size)) {
 			rc = -EFAULT;
 			goto out;
@@ -723,26 +724,6 @@ static long privcmd_ioctl_restrict(struct file *file, void __user *udata)
 	return 0;
 }
 
-struct remap_pfn {
-	struct mm_struct *mm;
-	struct page **pages;
-	pgprot_t prot;
-	unsigned long i;
-};
-
-static int remap_pfn_fn(pte_t *ptep, pgtable_t token, unsigned long addr,
-			void *data)
-{
-	struct remap_pfn *r = data;
-	struct page *page = r->pages[r->i];
-	pte_t pte = pte_mkspecial(pfn_pte(page_to_pfn(page), r->prot));
-
-	set_pte_at(r->mm, addr, ptep, pte);
-	r->i++;
-
-	return 0;
-}
-
 static long privcmd_ioctl_mmap_resource(struct file *file, void __user *udata)
 {
 	struct privcmd_data *data = file->private_data;
@@ -774,7 +755,8 @@ static long privcmd_ioctl_mmap_resource(struct file *file, void __user *udata)
 		goto out;
 	}
 
-	if (xen_feature(XENFEAT_auto_translated_physmap)) {
+	if (IS_ENABLED(CONFIG_XEN_AUTO_XLATE) &&
+	    xen_feature(XENFEAT_auto_translated_physmap)) {
 		unsigned int nr = DIV_ROUND_UP(kdata.num, XEN_PFN_PER_PAGE);
 		struct page **pages;
 		unsigned int i;
@@ -808,16 +790,9 @@ static long privcmd_ioctl_mmap_resource(struct file *file, void __user *udata)
 	if (rc)
 		goto out;
 
-	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-		struct remap_pfn r = {
-			.mm = vma->vm_mm,
-			.pages = vma->vm_private_data,
-			.prot = vma->vm_page_prot,
-		};
-
-		rc = apply_to_page_range(r.mm, kdata.addr,
-					 kdata.num << PAGE_SHIFT,
-					 remap_pfn_fn, &r);
+	if (IS_ENABLED(CONFIG_XEN_AUTO_XLATE) &&
+	    xen_feature(XENFEAT_auto_translated_physmap)) {
+		rc = xen_remap_vma_range(vma, kdata.addr, kdata.num << PAGE_SHIFT);
 	} else {
 		unsigned int domid =
 			(xdata.flags & XENMEM_rsrc_acq_caller_owned) ?
@@ -965,8 +940,7 @@ static int privcmd_mmap(struct file *file, struct vm_area_struct *vma)
  * on a per pfn/pte basis. Mapping calls that fail with ENOENT
  * can be then retried until success.
  */
-static int is_mapped_fn(pte_t *pte, struct page *pmd_page,
-	                unsigned long addr, void *data)
+static int is_mapped_fn(pte_t *pte, unsigned long addr, void *data)
 {
 	return pte_none(*pte) ? 0 : -EBUSY;
 }

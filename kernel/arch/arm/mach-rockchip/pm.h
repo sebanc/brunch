@@ -1,24 +1,19 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
  * Author: Tony Xie <tony.xie@rock-chips.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
  */
 
 #ifndef __MACH_ROCKCHIP_PM_H
 #define __MACH_ROCKCHIP_PM_H
 
-struct rk3288_ddr_save_data;
-int __init rk3288_ddr_suspend_init(struct rk3288_ddr_save_data *ddr_save);
-int rk3288_ddr_suspend(struct rk3288_ddr_save_data *ddr_save);
-void rk3288_ddr_resume(void);
+extern unsigned long rkpm_bootdata_cpusp;
+extern unsigned long rkpm_bootdata_cpu_code;
+extern unsigned long rkpm_bootdata_l2ctlr_f;
+extern unsigned long rkpm_bootdata_l2ctlr;
+extern unsigned long rkpm_bootdata_ddr_code;
+extern unsigned long rkpm_bootdata_ddr_data;
+extern unsigned long rk3288_bootram_sz;
 
 void rockchip_slp_cpu_resume(void);
 #ifdef CONFIG_PM_SLEEP

@@ -54,7 +54,6 @@
 #include <linux/list.h>
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
-#include <linux/idr.h>
 #include <linux/io.h>
 #include <linux/fs.h>
 #include <linux/completion.h>
@@ -65,6 +64,7 @@
 #include <linux/kthread.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+#include <linux/xarray.h>
 #include <rdma/ib_hdrs.h>
 #include <rdma/opa_addr.h>
 #include <linux/rhashtable.h>
@@ -73,6 +73,7 @@
 
 #include "chip_registers.h"
 #include "common.h"
+#include "opfn.h"
 #include "verbs.h"
 #include "pio.h"
 #include "chip.h"
@@ -80,6 +81,7 @@
 #include "qsfp.h"
 #include "platform.h"
 #include "affinity.h"
+#include "msix.h"
 
 /* bumped 1 from s/w major version of TrueScale */
 #define HFI1_CHIP_VERS_MAJ 3U
@@ -96,6 +98,8 @@
 
 #define NEIGHBOR_TYPE_HFI		0
 #define NEIGHBOR_TYPE_SWITCH	1
+
+#define HFI1_MAX_ACTIVE_WORKQUEUE_ENTRIES 5
 
 extern unsigned long hfi1_cap_mask;
 #define HFI1_CAP_KGET_MASK(mask, cap) ((mask) & HFI1_CAP_##cap)
@@ -194,6 +198,14 @@ struct exp_tid_set {
 };
 
 typedef int (*rhf_rcv_function_ptr)(struct hfi1_packet *packet);
+
+struct tid_queue {
+	struct list_head queue_head;
+			/* queue head for QP TID resource waiters */
+	u32 enqueue;	/* count of tid enqueues */
+	u32 dequeue;	/* count of tid dequeues */
+};
+
 struct hfi1_ctxtdata {
 	/* rcvhdrq base, needs mmap before useful */
 	void *rcvhdrq;
@@ -287,6 +299,12 @@ struct hfi1_ctxtdata {
 	/* PSM Specific fields */
 	/* lock protecting all Expected TID data */
 	struct mutex exp_mutex;
+	/* lock protecting all Expected TID data of kernel contexts */
+	spinlock_t exp_lock;
+	/* Queue for QP's waiting for HW TID flows */
+	struct tid_queue flow_queue;
+	/* Queue for QP's waiting for HW receive array entries */
+	struct tid_queue rarr_queue;
 	/* when waiting for rcv or pioavail */
 	wait_queue_head_t wait;
 	/* uuid from PSM */
@@ -319,6 +337,9 @@ struct hfi1_ctxtdata {
 	 */
 	u8 subctxt_cnt;
 
+	/* Bit mask to track free TID RDMA HW flows */
+	unsigned long flow_mask;
+	struct tid_flow_state flows[RXE_NUM_TID_FLOWS];
 };
 
 /**
@@ -518,6 +539,37 @@ static inline void hfi1_16B_set_qpn(struct opa_16b_mgmt *mgmt,
 	mgmt->src_qpn = cpu_to_be32(src_qp & OPA_16B_MGMT_QPN_MASK);
 }
 
+/**
+ * hfi1_get_rc_ohdr - get extended header
+ * @opah - the opaheader
+ */
+static inline struct ib_other_headers *
+hfi1_get_rc_ohdr(struct hfi1_opa_header *opah)
+{
+	struct ib_other_headers *ohdr;
+	struct ib_header *hdr = NULL;
+	struct hfi1_16b_header *hdr_16b = NULL;
+
+	/* Find out where the BTH is */
+	if (opah->hdr_type == HFI1_PKT_TYPE_9B) {
+		hdr = &opah->ibh;
+		if (ib_get_lnh(hdr) == HFI1_LRH_BTH)
+			ohdr = &hdr->u.oth;
+		else
+			ohdr = &hdr->u.l.oth;
+	} else {
+		u8 l4;
+
+		hdr_16b = &opah->opah;
+		l4  = hfi1_16B_get_l4(hdr_16b);
+		if (l4 == OPA_16B_L4_IB_LOCAL)
+			ohdr = &hdr_16b->u.oth;
+		else
+			ohdr = &hdr_16b->u.l.oth;
+	}
+	return ohdr;
+}
+
 struct rvt_sge_state;
 
 /*
@@ -622,6 +674,8 @@ struct rvt_sge_state;
 #define HFI1_RCVCTRL_NO_RHQ_DROP_DIS 0x8000
 #define HFI1_RCVCTRL_NO_EGR_DROP_ENB 0x10000
 #define HFI1_RCVCTRL_NO_EGR_DROP_DIS 0x20000
+#define HFI1_RCVCTRL_URGENT_ENB 0x40000
+#define HFI1_RCVCTRL_URGENT_DIS 0x80000
 
 /* partition enforcement flags */
 #define HFI1_PART_ENFORCE_IN	0x1
@@ -667,6 +721,14 @@ struct hfi1_msix_entry {
 	void *arg;
 	cpumask_t mask;
 	struct irq_affinity_notify notify;
+};
+
+struct hfi1_msix_info {
+	/* lock to synchronize in_use_msix access */
+	spinlock_t msix_lock;
+	DECLARE_BITMAP(in_use_msix, CCE_NUM_MSIX_VECTORS);
+	struct hfi1_msix_entry *msix_entries;
+	u16 max_requested;
 };
 
 /* per-SL CCA information */
@@ -990,11 +1052,10 @@ struct hfi1_asic_data {
 struct hfi1_vnic_data {
 	struct hfi1_ctxtdata *ctxt[HFI1_NUM_VNIC_CTXT];
 	struct kmem_cache *txreq_cache;
+	struct xarray vesws;
 	u8 num_vports;
-	struct idr vesw_idr;
 	u8 rmt_start;
 	u8 num_ctxt;
-	u32 msix_idx;
 };
 
 struct hfi1_vnic_vport_info;
@@ -1011,7 +1072,6 @@ struct sdma_vl_map;
 typedef int (*send_routine)(struct rvt_qp *, struct hfi1_pkt_state *, u64);
 struct hfi1_devdata {
 	struct hfi1_ibdev verbs_dev;     /* must be first */
-	struct list_head list;
 	/* pointers to related structs for this device */
 	/* pci access data structure */
 	struct pci_dev *pcidev;
@@ -1209,11 +1269,6 @@ struct hfi1_devdata {
 
 	struct diag_client *diag_client;
 
-	/* MSI-X information */
-	struct hfi1_msix_entry *msix_entries;
-	u32 num_msix_entries;
-	u32 first_dyn_msix_idx;
-
 	/* general interrupt: mask of handled interrupts */
 	u64 gi_mask[CCE_NUM_INT_CSRS];
 
@@ -1226,6 +1281,9 @@ struct hfi1_devdata {
 	 * 64 bit synthetic counters
 	 */
 	struct timer_list synth_stats_timer;
+
+	/* MSI-X information */
+	struct hfi1_msix_info msix_info;
 
 	/*
 	 * device counters
@@ -1353,6 +1411,8 @@ struct hfi1_devdata {
 
 	/* vnic data */
 	struct hfi1_vnic_data vnic;
+	/* Lock to protect IRQ SRC register access */
+	spinlock_t irq_src_lock;
 };
 
 static inline bool hfi1_vnic_is_rsm_full(struct hfi1_devdata *dd, int spare)
@@ -1401,8 +1461,7 @@ struct hfi1_filedata {
 	struct mm_struct *mm;
 };
 
-extern struct list_head hfi1_dev_list;
-extern spinlock_t hfi1_devs_lock;
+extern struct xarray hfi1_dev_table;
 struct hfi1_devdata *hfi1_lookup(int unit);
 
 static inline unsigned long uctxt_offset(struct hfi1_ctxtdata *uctxt)
@@ -1438,9 +1497,6 @@ int handle_receive_interrupt(struct hfi1_ctxtdata *rcd, int thread);
 int handle_receive_interrupt_nodma_rtail(struct hfi1_ctxtdata *rcd, int thread);
 int handle_receive_interrupt_dma_rtail(struct hfi1_ctxtdata *rcd, int thread);
 void set_all_slowpath(struct hfi1_devdata *dd);
-void hfi1_vnic_synchronize_irq(struct hfi1_devdata *dd);
-void hfi1_set_vnic_msix_info(struct hfi1_ctxtdata *rcd);
-void hfi1_reset_vnic_msix_info(struct hfi1_ctxtdata *rcd);
 
 extern const struct pci_device_id hfi1_pci_tbl[];
 void hfi1_make_ud_req_9B(struct rvt_qp *qp,
@@ -1909,10 +1965,8 @@ struct cc_state *get_cc_state_protected(struct hfi1_pportdata *ppd)
 #define HFI1_CTXT_WAITING_URG 4
 
 /* free up any allocated data at closes */
-struct hfi1_devdata *hfi1_init_dd(struct pci_dev *pdev,
-				  const struct pci_device_id *ent);
+int hfi1_init_dd(struct hfi1_devdata *dd);
 void hfi1_free_devdata(struct hfi1_devdata *dd);
-struct hfi1_devdata *hfi1_alloc_devdata(struct pci_dev *pdev, size_t extra);
 
 /* LED beaconing functions */
 void hfi1_start_led_override(struct hfi1_pportdata *ppd, unsigned int timeon,
@@ -1985,6 +2039,7 @@ static inline u32 get_rcvhdrtail(const struct hfi1_ctxtdata *rcd)
  */
 
 extern const char ib_hfi1_version[];
+extern const struct attribute_group ib_hfi1_attr_group;
 
 int hfi1_device_create(struct hfi1_devdata *dd);
 void hfi1_device_remove(struct hfi1_devdata *dd);
@@ -1996,16 +2051,15 @@ void hfi1_verbs_unregister_sysfs(struct hfi1_devdata *dd);
 /* Hook for sysfs read of QSFP */
 int qsfp_dump(struct hfi1_pportdata *ppd, char *buf, int len);
 
-int hfi1_pcie_init(struct pci_dev *pdev, const struct pci_device_id *ent);
-void hfi1_clean_up_interrupts(struct hfi1_devdata *dd);
+int hfi1_pcie_init(struct hfi1_devdata *dd);
 void hfi1_pcie_cleanup(struct pci_dev *pdev);
 int hfi1_pcie_ddinit(struct hfi1_devdata *dd, struct pci_dev *pdev);
 void hfi1_pcie_ddcleanup(struct hfi1_devdata *);
 int pcie_speeds(struct hfi1_devdata *dd);
-int request_msix(struct hfi1_devdata *dd, u32 msireq);
 int restore_pci_variables(struct hfi1_devdata *dd);
 int save_pci_variables(struct hfi1_devdata *dd);
 int do_pcie_gen3_transition(struct hfi1_devdata *dd);
+void tune_pcie_caps(struct hfi1_devdata *dd);
 int parse_platform_config(struct hfi1_devdata *dd);
 int get_platform_config_field(struct hfi1_devdata *dd,
 			      enum platform_config_table_type_encoding
@@ -2100,7 +2154,7 @@ static inline u64 hfi1_pkt_default_send_ctxt_mask(struct hfi1_devdata *dd,
 			SEND_CTXT_CHECK_ENABLE_DISALLOW_PBC_TEST_SMASK |
 #endif
 			HFI1_PKT_USER_SC_INTEGRITY;
-	else
+	else if (ctxt_type != SC_KERNEL)
 		base_sc_integrity |= HFI1_PKT_KERNEL_SC_INTEGRITY;
 
 	/* turn on send-side job key checks if !A0 */
@@ -2145,19 +2199,6 @@ static inline u64 hfi1_pkt_base_sdma_integrity(struct hfi1_devdata *dd)
 
 	return base_sdma_integrity;
 }
-
-/*
- * hfi1_early_err is used (only!) to print early errors before devdata is
- * allocated, or when dd->pcidev may not be valid, and at the tail end of
- * cleanup when devdata may have been freed, etc.  hfi1_dev_porterr is
- * the same as dd_dev_err, but is used when the message really needs
- * the IB port# to be definitive as to what's happening..
- */
-#define hfi1_early_err(dev, fmt, ...) \
-	dev_err(dev, fmt, ##__VA_ARGS__)
-
-#define hfi1_early_info(dev, fmt, ...) \
-	dev_info(dev, fmt, ##__VA_ARGS__)
 
 #define dd_dev_emerg(dd, fmt, ...) \
 	dev_emerg(&(dd)->pcidev->dev, "%s: " fmt, \

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * linux/fs/nfs/namespace.c
  *
@@ -30,9 +31,9 @@ int nfs_mountpoint_expiry_timeout = 500 * HZ;
 /*
  * nfs_path - reconstruct the path given an arbitrary dentry
  * @base - used to return pointer to the end of devname part of path
- * @dentry - pointer to dentry
+ * @dentry_in - pointer to dentry
  * @buffer - result buffer
- * @buflen - length of buffer
+ * @buflen_in - length of buffer
  * @flags - options (see below)
  *
  * Helper function for constructing the server pathname
@@ -47,15 +48,19 @@ int nfs_mountpoint_expiry_timeout = 500 * HZ;
  *		       the original device (export) name
  *		       (if unset, the original name is returned verbatim)
  */
-char *nfs_path(char **p, struct dentry *dentry, char *buffer, ssize_t buflen,
-	       unsigned flags)
+char *nfs_path(char **p, struct dentry *dentry_in, char *buffer,
+	       ssize_t buflen_in, unsigned flags)
 {
 	char *end;
 	int namelen;
 	unsigned seq;
 	const char *base;
+	struct dentry *dentry;
+	ssize_t buflen;
 
 rename_retry:
+	buflen = buflen_in;
+	dentry = dentry_in;
 	end = buffer+buflen;
 	*--end = '\0';
 	buflen--;
@@ -221,10 +226,10 @@ static struct vfsmount *nfs_do_clone_mount(struct nfs_server *server,
 
 /**
  * nfs_do_submount - set up mountpoint when crossing a filesystem boundary
- * @dentry - parent directory
- * @fh - filehandle for new root dentry
- * @fattr - attributes for new root inode
- * @authflavor - security flavor to use when performing the mount
+ * @dentry: parent directory
+ * @fh: filehandle for new root dentry
+ * @fattr: attributes for new root inode
+ * @authflavor: security flavor to use when performing the mount
  *
  */
 struct vfsmount *nfs_do_submount(struct dentry *dentry, struct nfs_fh *fh,

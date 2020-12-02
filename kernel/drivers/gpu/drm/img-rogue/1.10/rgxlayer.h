@@ -63,7 +63,7 @@ extern "C" {
 #include "img_defs.h"
 #include "img_types.h"
 #include "pvrsrv_error.h" /* includes pvrsrv_errors.h */
-#include "rgx_bvnc_defs_km.h"
+#include "km/rgx_bvnc_defs_km.h"
 
 #include "rgx_firmware_processor.h"
 /* includes:

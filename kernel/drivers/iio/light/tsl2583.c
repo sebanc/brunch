@@ -1,19 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Device driver for monitoring ambient light intensity (lux)
  * within the TAOS tsl258x family of devices (tsl2580, tsl2581, tsl2583).
  *
  * Copyright (c) 2011, TAOS Corporation.
  * Copyright (c) 2016-2017 Brian Masney <masneyb@onstation.org>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
  */
 
 #include <linux/kernel.h>
@@ -864,15 +855,6 @@ static int tsl2583_probe(struct i2c_client *clientp,
 			__func__);
 		return ret;
 	}
-
-	/*
-	 * This device is slow to resume - make it asynchronous
-	 * To get full async, we must enable this on both i2c and iio devs
-	 * and the i2c master.
-	 */
-	device_enable_async_suspend(&indio_dev->dev);
-	device_enable_async_suspend(&clientp->dev);
-	device_enable_async_suspend(&clientp->adapter->dev);
 
 	/* Load up the V2 defaults (these are hard coded defaults for now) */
 	tsl2583_defaults(chip);

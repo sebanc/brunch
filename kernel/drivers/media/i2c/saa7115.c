@@ -59,10 +59,16 @@ enum saa711x_model {
 	SAA7118,
 };
 
+enum saa711x_pads {
+	SAA711X_PAD_IF_INPUT,
+	SAA711X_PAD_VID_OUT,
+	SAA711X_NUM_PADS
+};
+
 struct saa711x_state {
 	struct v4l2_subdev sd;
 #ifdef CONFIG_MEDIA_CONTROLLER
-	struct media_pad pads[DEMOD_NUM_PADS];
+	struct media_pad pads[SAA711X_NUM_PADS];
 #endif
 	struct v4l2_ctrl_handler hdl;
 
@@ -1760,7 +1766,7 @@ static int saa711x_detect_chip(struct i2c_client *client,
 		 * exists. However, tests on a device labeled as:
 		 * "GM7113C 1145" returned "10" on all 16 chip
 		 * version (reg 0x00) reads. So, we need to also
-		 * accept at least verion 0. For now, let's just
+		 * accept at least version 0. For now, let's just
 		 * assume that a device that returns "0000" for
 		 * the lower nibble is a gm7113c.
 		 */
@@ -1834,13 +1840,15 @@ static int saa711x_probe(struct i2c_client *client,
 	v4l2_i2c_subdev_init(sd, client, &saa711x_ops);
 
 #if defined(CONFIG_MEDIA_CONTROLLER)
-	state->pads[DEMOD_PAD_IF_INPUT].flags = MEDIA_PAD_FL_SINK;
-	state->pads[DEMOD_PAD_VID_OUT].flags = MEDIA_PAD_FL_SOURCE;
-	state->pads[DEMOD_PAD_VBI_OUT].flags = MEDIA_PAD_FL_SOURCE;
+	state->pads[SAA711X_PAD_IF_INPUT].flags = MEDIA_PAD_FL_SINK;
+	state->pads[SAA711X_PAD_IF_INPUT].sig_type = PAD_SIGNAL_ANALOG;
+	state->pads[SAA711X_PAD_VID_OUT].flags = MEDIA_PAD_FL_SOURCE;
+	state->pads[SAA711X_PAD_VID_OUT].sig_type = PAD_SIGNAL_DV;
 
 	sd->entity.function = MEDIA_ENT_F_ATV_DECODER;
 
-	ret = media_entity_pads_init(&sd->entity, DEMOD_NUM_PADS, state->pads);
+	ret = media_entity_pads_init(&sd->entity, SAA711X_NUM_PADS,
+				     state->pads);
 	if (ret < 0)
 		return ret;
 #endif

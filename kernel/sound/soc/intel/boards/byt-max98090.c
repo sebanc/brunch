@@ -1,15 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Intel Baytrail SST MAX98090 machine driver
  * Copyright (c) 2014, Intel Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
  */
 
 #include <linux/init.h>
@@ -97,7 +89,7 @@ static int byt_max98090_init(struct snd_soc_pcm_runtime *runtime)
 
 	card->dapm.idle_bias_off = true;
 
-	ret = snd_soc_dai_set_sysclk(runtime->codec_dai,
+	ret = snd_soc_dai_set_sysclk(asoc_rtd_to_codec(runtime, 0),
 				     M98090_REG_SYSTEM_CLOCK,
 				     25000000, SND_SOC_CLOCK_IN);
 	if (ret < 0) {

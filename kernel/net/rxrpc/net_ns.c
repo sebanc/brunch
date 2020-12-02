@@ -1,12 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* rxrpc network namespace handling.
  *
  * Copyright (C) 2017 Red Hat, Inc. All Rights Reserved.
  * Written by David Howells (dhowells@redhat.com)
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public Licence
- * as published by the Free Software Foundation; either version
- * 2 of the Licence, or (at your option) any later version.
  */
 
 #include <linux/proc_fs.h>
@@ -101,6 +97,9 @@ static __net_init int rxrpc_init_net(struct net *net)
 			sizeof(struct seq_net_private));
 	proc_create_net("conns", 0444, rxnet->proc_net,
 			&rxrpc_connection_seq_ops,
+			sizeof(struct seq_net_private));
+	proc_create_net("peers", 0444, rxnet->proc_net,
+			&rxrpc_peer_seq_ops,
 			sizeof(struct seq_net_private));
 	return 0;
 

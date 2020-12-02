@@ -1,17 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Intel SST Firmware Loader
  *
  * Copyright (C) 2013, Intel Corporation. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License version
- * 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
  */
 
 #include <linux/kernel.h>
@@ -139,7 +130,7 @@ static void block_list_remove(struct sst_dsp *dsp,
 			err = block->ops->disable(block);
 			if (err < 0)
 				dev_err(dsp->dev,
-					"error: cant disable block %d:%d\n",
+					"error: can't disable block %d:%d\n",
 					block->type, block->index);
 		}
 	}
@@ -167,7 +158,7 @@ static int block_list_prepare(struct sst_dsp *dsp,
 			ret = block->ops->enable(block);
 			if (ret < 0) {
 				dev_err(dsp->dev,
-					"error: cant disable block %d:%d\n",
+					"error: can't disable block %d:%d\n",
 					block->type, block->index);
 				goto err;
 			}

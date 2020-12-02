@@ -1,19 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright (C) 2007-2018  B.A.T.M.A.N. contributors:
+/* Copyright (C) 2007-2019  B.A.T.M.A.N. contributors:
  *
  * Marek Lindner, Simon Wunderlich
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of version 2 of the GNU General Public
- * License as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _NET_BATMAN_ADV_TYPES_H_
@@ -26,20 +14,22 @@
 #include <linux/average.h>
 #include <linux/bitops.h>
 #include <linux/compiler.h>
+#include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/kref.h>
 #include <linux/mutex.h>
 #include <linux/netdevice.h>
 #include <linux/netlink.h>
 #include <linux/sched.h> /* for linux/wait.h */
+#include <linux/seq_file.h>
+#include <linux/skbuff.h>
 #include <linux/spinlock.h>
+#include <linux/timer.h>
 #include <linux/types.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 #include <uapi/linux/batadv_packet.h>
 #include <uapi/linux/batman_adv.h>
-
-struct seq_file;
 
 #ifdef CONFIG_BATMAN_ADV_DAT
 
@@ -131,6 +121,18 @@ struct batadv_hard_iface_bat_v {
 	/** @elp_wq: workqueue used to schedule ELP transmissions */
 	struct delayed_work elp_wq;
 
+	/** @aggr_wq: workqueue used to transmit queued OGM packets */
+	struct delayed_work aggr_wq;
+
+	/** @aggr_list: queue for to be aggregated OGM packets */
+	struct sk_buff_head aggr_list;
+
+	/** @aggr_len: size of the OGM aggregate (excluding ethernet header) */
+	unsigned int aggr_len;
+
+	/** @aggr_list_lock: protects aggr_list */
+	spinlock_t aggr_list_lock;
+
 	/**
 	 * @throughput_override: throughput override to disable link
 	 *  auto-detection
@@ -170,9 +172,6 @@ enum batadv_hard_iface_wifi_flags {
 struct batadv_hard_iface {
 	/** @list: list node for batadv_hardif_list */
 	struct list_head list;
-
-	/** @if_num: identificator of the interface */
-	unsigned int if_num;
 
 	/** @if_status: status of the interface for batman-adv */
 	char if_status;
@@ -237,6 +236,20 @@ struct batadv_hard_iface {
 };
 
 /**
+ * struct batadv_orig_ifinfo - B.A.T.M.A.N. IV private orig_ifinfo members
+ */
+struct batadv_orig_ifinfo_bat_iv {
+	/**
+	 * @bcast_own: bitfield which counts the number of our OGMs this
+	 * orig_node rebroadcasted "back" to us  (relative to last_real_seqno)
+	 */
+	DECLARE_BITMAP(bcast_own, BATADV_TQ_LOCAL_WINDOW_SIZE);
+
+	/** @bcast_own_sum: sum of bcast_own */
+	u8 bcast_own_sum;
+};
+
+/**
  * struct batadv_orig_ifinfo - originator info per outgoing interface
  */
 struct batadv_orig_ifinfo {
@@ -260,6 +273,9 @@ struct batadv_orig_ifinfo {
 
 	/** @batman_seqno_reset: time when the batman seqno window was reset */
 	unsigned long batman_seqno_reset;
+
+	/** @bat_iv: B.A.T.M.A.N. IV private structure */
+	struct batadv_orig_ifinfo_bat_iv bat_iv;
 
 	/** @refcount: number of contexts the object is used */
 	struct kref refcount;
@@ -343,19 +359,10 @@ struct batadv_orig_node_vlan {
  */
 struct batadv_orig_bat_iv {
 	/**
-	 * @bcast_own: set of bitfields (one per hard-interface) where each one
-	 * counts the number of our OGMs this orig_node rebroadcasted "back" to
-	 * us  (relative to last_real_seqno). Every bitfield is
-	 * BATADV_TQ_LOCAL_WINDOW_SIZE bits long.
-	 */
-	unsigned long *bcast_own;
-
-	/** @bcast_own_sum: sum of bcast_own */
-	u8 *bcast_own_sum;
-
-	/**
-	 * @ogm_cnt_lock: lock protecting bcast_own, bcast_own_sum,
-	 * neigh_node->bat_iv.real_bits & neigh_node->bat_iv.real_packet_count
+	 * @ogm_cnt_lock: lock protecting &batadv_orig_ifinfo_bat_iv.bcast_own,
+	 * &batadv_orig_ifinfo_bat_iv.bcast_own_sum,
+	 * &batadv_neigh_ifinfo_bat_iv.bat_iv.real_bits and
+	 * &batadv_neigh_ifinfo_bat_iv.real_packet_count
 	 */
 	spinlock_t ogm_cnt_lock;
 };
@@ -413,6 +420,17 @@ struct batadv_orig_node {
 	 *  list
 	 */
 	struct hlist_node mcast_want_all_ipv6_node;
+
+	/**
+	 * @mcast_want_all_rtr4_node: a list node for the mcast.want_all_rtr4
+	 *  list
+	 */
+	struct hlist_node mcast_want_all_rtr4_node;
+	/**
+	 * @mcast_want_all_rtr6_node: a list node for the mcast.want_all_rtr6
+	 *  list
+	 */
+	struct hlist_node mcast_want_all_rtr6_node;
 #endif
 
 	/** @capabilities: announced capabilities of this originator */
@@ -1095,11 +1113,14 @@ struct batadv_priv_gw {
 	/** @gateway_list: list of available gateway nodes */
 	struct hlist_head gateway_list;
 
-	/** @list_lock: lock protecting gateway_list & curr_gw */
+	/** @list_lock: lock protecting gateway_list, curr_gw, generation */
 	spinlock_t list_lock;
 
 	/** @curr_gw: pointer to currently selected gateway node */
 	struct batadv_gw_node __rcu *curr_gw;
+
+	/** @generation: current (generation) sequence number */
+	unsigned int generation;
 
 	/**
 	 * @mode: gateway operation: off, client or server (see batadv_gw_modes)
@@ -1177,6 +1198,26 @@ struct batadv_mcast_querier_state {
 };
 
 /**
+ * struct batadv_mcast_mla_flags - flags for the querier, bridge and tvlv state
+ */
+struct batadv_mcast_mla_flags {
+	/** @querier_ipv4: the current state of an IGMP querier in the mesh */
+	struct batadv_mcast_querier_state querier_ipv4;
+
+	/** @querier_ipv6: the current state of an MLD querier in the mesh */
+	struct batadv_mcast_querier_state querier_ipv6;
+
+	/** @enabled: whether the multicast tvlv is currently enabled */
+	unsigned char enabled:1;
+
+	/** @bridged: whether the soft interface has a bridge on top */
+	unsigned char bridged:1;
+
+	/** @tvlv_flags: the flags we have last sent in our mcast tvlv */
+	u8 tvlv_flags;
+};
+
+/**
  * struct batadv_priv_mcast - per mesh interface mcast data
  */
 struct batadv_priv_mcast {
@@ -1204,20 +1245,22 @@ struct batadv_priv_mcast {
 	 */
 	struct hlist_head want_all_ipv6_list;
 
-	/** @querier_ipv4: the current state of an IGMP querier in the mesh */
-	struct batadv_mcast_querier_state querier_ipv4;
+	/**
+	 * @want_all_rtr4_list: a list of orig_nodes wanting all routable IPv4
+	 *  multicast traffic
+	 */
+	struct hlist_head want_all_rtr4_list;
 
-	/** @querier_ipv6: the current state of an MLD querier in the mesh */
-	struct batadv_mcast_querier_state querier_ipv6;
+	/**
+	 * @want_all_rtr6_list: a list of orig_nodes wanting all routable IPv6
+	 *  multicast traffic
+	 */
+	struct hlist_head want_all_rtr6_list;
 
-	/** @flags: the flags we have last sent in our mcast tvlv */
-	u8 flags;
-
-	/** @enabled: whether the multicast tvlv is currently enabled */
-	unsigned char enabled:1;
-
-	/** @bridged: whether the soft interface has a bridge on top */
-	unsigned char bridged:1;
+	/**
+	 * @mla_flags: flags for the querier, bridge and tvlv state
+	 */
+	struct batadv_mcast_mla_flags mla_flags;
 
 	/**
 	 * @mla_lock: a lock protecting mla_list and mla_flags
@@ -1235,6 +1278,12 @@ struct batadv_priv_mcast {
 
 	/** @num_want_all_ipv6: counter for items in want_all_ipv6_list */
 	atomic_t num_want_all_ipv6;
+
+	/** @num_want_all_rtr4: counter for items in want_all_rtr4_list */
+	atomic_t num_want_all_rtr4;
+
+	/** @num_want_all_rtr6: counter for items in want_all_rtr6_list */
+	atomic_t num_want_all_rtr6;
 
 	/**
 	 * @want_lists_lock: lock for protecting modifications to mcasts
@@ -1569,6 +1618,12 @@ struct batadv_priv {
 	 *  node's sender/originating side
 	 */
 	atomic_t multicast_mode;
+
+	/**
+	 * @multicast_fanout: Maximum number of packet copies to generate for a
+	 *  multicast-to-unicast conversion
+	 */
+	atomic_t multicast_fanout;
 #endif
 
 	/** @orig_interval: OGM broadcast interval in milliseconds */
@@ -1608,9 +1663,6 @@ struct batadv_priv {
 
 	/** @batman_queue_left: number of remaining OGM packet slots */
 	atomic_t batman_queue_left;
-
-	/** @num_ifaces: number of interfaces assigned to this mesh interface */
-	unsigned int num_ifaces;
 
 	/** @mesh_obj: kobject for sysfs mesh subdirectory */
 	struct kobject *mesh_obj;
@@ -2194,28 +2246,6 @@ struct batadv_algo_neigh_ops {
  * struct batadv_algo_orig_ops - mesh algorithm callbacks (originator specific)
  */
 struct batadv_algo_orig_ops {
-	/**
-	 * @free: free the resources allocated by the routing algorithm for an
-	 *  orig_node object (optional)
-	 */
-	void (*free)(struct batadv_orig_node *orig_node);
-
-	/**
-	 * @add_if: ask the routing algorithm to apply the needed changes to the
-	 *  orig_node due to a new hard-interface being added into the mesh
-	 *  (optional)
-	 */
-	int (*add_if)(struct batadv_orig_node *orig_node,
-		      unsigned int max_if_num);
-
-	/**
-	 * @del_if: ask the routing algorithm to apply the needed changes to the
-	 *  orig_node due to an hard-interface being removed from the mesh
-	 *  (optional)
-	 */
-	int (*del_if)(struct batadv_orig_node *orig_node,
-		      unsigned int max_if_num, unsigned int del_if_num);
-
 #ifdef CONFIG_BATMAN_ADV_DEBUGFS
 	/** @print: print the originator table (optional) */
 	void (*print)(struct batadv_priv *priv, struct seq_file *seq,

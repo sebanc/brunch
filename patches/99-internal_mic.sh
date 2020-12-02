@@ -16,5 +16,10 @@ script
 end script
 INTERNALMICFIX
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
+	cat >/system/etc/modprobe.d/alsa-order.conf <<SNDCARDORDER
+options snd-hda-intel id=HDMI index=1
+options snd-hdmi-lpe-audio index=1
+SNDCARDORDER
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 fi
 exit $ret

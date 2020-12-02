@@ -1,14 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #ifndef MTK_DRM_DDP_COMP_H
@@ -86,8 +78,6 @@ struct mtk_ddp_comp_funcs {
 	void (*stop)(struct mtk_ddp_comp *comp);
 	void (*enable_vblank)(struct mtk_ddp_comp *comp, struct drm_crtc *crtc);
 	void (*disable_vblank)(struct mtk_ddp_comp *comp);
-	void (*prepare)(struct mtk_ddp_comp *comp);
-	void (*unprepare)(struct mtk_ddp_comp *comp);
 	unsigned int (*supported_rotations)(struct mtk_ddp_comp *comp);
 	unsigned int (*layer_nr)(struct mtk_ddp_comp *comp);
 	int (*layer_check)(struct mtk_ddp_comp *comp,
@@ -97,8 +87,7 @@ struct mtk_ddp_comp_funcs {
 			     struct mtk_plane_state *state,
 			     struct cmdq_pkt *cmdq_pkt);
 	void (*gamma_set)(struct mtk_ddp_comp *comp,
-			  struct drm_crtc_state *state,
-			  struct cmdq_pkt *cmdq_pkt);
+			  struct drm_crtc_state *state);
 	void (*bgclr_in_on)(struct mtk_ddp_comp *comp);
 	void (*bgclr_in_off)(struct mtk_ddp_comp *comp);
 	void (*ctm_set)(struct mtk_ddp_comp *comp,
@@ -109,7 +98,7 @@ struct mtk_ddp_comp {
 	struct clk *clk;
 	void __iomem *regs;
 	int irq;
-	struct device *dev;
+	struct device *larb_dev;
 	enum mtk_ddp_comp_id id;
 	const struct mtk_ddp_comp_funcs *funcs;
 	resource_size_t regs_pa;
@@ -123,18 +112,6 @@ static inline void mtk_ddp_comp_config(struct mtk_ddp_comp *comp,
 {
 	if (comp->funcs && comp->funcs->config)
 		comp->funcs->config(comp, w, h, vrefresh, bpc, cmdq_pkt);
-}
-
-static inline void mtk_ddp_comp_prepare(struct mtk_ddp_comp *comp)
-{
-	if (comp->funcs && comp->funcs->prepare)
-		comp->funcs->prepare(comp);
-}
-
-static inline void mtk_ddp_comp_unprepare(struct mtk_ddp_comp *comp)
-{
-	if (comp->funcs && comp->funcs->unprepare)
-		comp->funcs->unprepare(comp);
 }
 
 static inline void mtk_ddp_comp_start(struct mtk_ddp_comp *comp)
@@ -198,11 +175,10 @@ static inline void mtk_ddp_comp_layer_config(struct mtk_ddp_comp *comp,
 }
 
 static inline void mtk_ddp_gamma_set(struct mtk_ddp_comp *comp,
-				     struct drm_crtc_state *state,
-				     struct cmdq_pkt *cmdq_pkt)
+				     struct drm_crtc_state *state)
 {
 	if (comp->funcs && comp->funcs->gamma_set)
-		comp->funcs->gamma_set(comp, state, cmdq_pkt);
+		comp->funcs->gamma_set(comp, state);
 }
 
 static inline void mtk_ddp_comp_bgclr_in_on(struct mtk_ddp_comp *comp)
@@ -226,6 +202,8 @@ static inline void mtk_ddp_ctm_set(struct mtk_ddp_comp *comp,
 
 int mtk_ddp_comp_get_id(struct device_node *node,
 			enum mtk_ddp_comp_type comp_type);
+unsigned int mtk_drm_find_possible_crtc_by_comp(struct drm_device *drm,
+						struct mtk_ddp_comp ddp_comp);
 int mtk_ddp_comp_init(struct device *dev, struct device_node *comp_node,
 		      struct mtk_ddp_comp *comp, enum mtk_ddp_comp_id comp_id,
 		      const struct mtk_ddp_comp_funcs *funcs);
@@ -233,8 +211,6 @@ int mtk_ddp_comp_register(struct drm_device *drm, struct mtk_ddp_comp *comp);
 void mtk_ddp_comp_unregister(struct drm_device *drm, struct mtk_ddp_comp *comp);
 void mtk_dither_set(struct mtk_ddp_comp *comp, unsigned int bpc,
 		    unsigned int CFG, struct cmdq_pkt *cmdq_pkt);
-void mtk_gamma_set(struct mtk_ddp_comp *comp, struct drm_crtc_state *state,
-		   struct cmdq_pkt *cmdq_pkt);
 enum mtk_ddp_comp_type mtk_ddp_comp_get_type(enum mtk_ddp_comp_id comp_id);
 void mtk_ddp_write(struct cmdq_pkt *cmdq_pkt, unsigned int value,
 		   struct mtk_ddp_comp *comp, unsigned int offset);

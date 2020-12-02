@@ -31,20 +31,27 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <linux/anon_inodes.h>
+#include <linux/dma-fence.h>
+#include <linux/file.h>
+#include <linux/module.h>
+#include <linux/pci.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
-#include <linux/module.h>
 
 #include <drm/drm_client.h>
+#include <drm/drm_drv.h>
 #include <drm/drm_file.h>
-#include <drm/drmP.h>
+#include <drm/drm_print.h>
 
-#include "drm_legacy.h"
-#include "drm_internal.h"
 #include "drm_crtc_internal.h"
+#include "drm_internal.h"
+#include "drm_legacy.h"
 
 /* from BKL pushdown */
 DEFINE_MUTEX(drm_global_mutex);
+
+#define MAX_DRM_OPEN_COUNT		128
 
 /**
  * DOC: file operations
@@ -100,8 +107,6 @@ DEFINE_MUTEX(drm_global_mutex);
  * :ref:`IOCTL support in the userland interfaces chapter<drm_driver_ioctl>`.
  */
 
-static int drm_open_helper(struct file *filp, struct drm_minor *minor);
-
 /**
  * drm_file_alloc - allocate file context
  * @minor: minor to allocate on
@@ -128,7 +133,6 @@ struct drm_file *drm_file_alloc(struct drm_minor *minor)
 
 	/* for compatibility root is always authenticated */
 	file->authenticated = capable(CAP_SYS_ADMIN);
-	file->lock_count = 0;
 
 	INIT_LIST_HEAD(&file->lhead);
 	INIT_LIST_HEAD(&file->fbs);
@@ -147,8 +151,7 @@ struct drm_file *drm_file_alloc(struct drm_minor *minor)
 	if (drm_core_check_feature(dev, DRIVER_SYNCOBJ))
 		drm_syncobj_open(file);
 
-	if (drm_core_check_feature(dev, DRIVER_PRIME))
-		drm_prime_init_file_private(&file->prime);
+	drm_prime_init_file_private(&file->prime);
 
 	if (dev->driver->open) {
 		ret = dev->driver->open(dev, file);
@@ -159,8 +162,7 @@ struct drm_file *drm_file_alloc(struct drm_minor *minor)
 	return file;
 
 out_prime_destroy:
-	if (drm_core_check_feature(dev, DRIVER_PRIME))
-		drm_prime_destroy_file_private(&file->prime);
+	drm_prime_destroy_file_private(&file->prime);
 	if (drm_core_check_feature(dev, DRIVER_SYNCOBJ))
 		drm_syncobj_release(file);
 	if (drm_core_check_feature(dev, DRIVER_GEM))
@@ -253,8 +255,7 @@ void drm_file_free(struct drm_file *file)
 	if (dev->driver->postclose)
 		dev->driver->postclose(dev, file);
 
-	if (drm_core_check_feature(dev, DRIVER_PRIME))
-		drm_prime_destroy_file_private(&file->prime);
+	drm_prime_destroy_file_private(&file->prime);
 
 	WARN_ON(!list_empty(&file->event_list));
 
@@ -262,73 +263,17 @@ void drm_file_free(struct drm_file *file)
 	kfree(file);
 }
 
-static int drm_setup(struct drm_device * dev)
+static void drm_close_helper(struct file *filp)
 {
-	int ret;
+	struct drm_file *file_priv = filp->private_data;
+	struct drm_device *dev = file_priv->minor->dev;
 
-	if (dev->driver->firstopen &&
-	    drm_core_check_feature(dev, DRIVER_LEGACY)) {
-		ret = dev->driver->firstopen(dev);
-		if (ret != 0)
-			return ret;
-	}
+	mutex_lock(&dev->filelist_mutex);
+	list_del(&file_priv->lhead);
+	mutex_unlock(&dev->filelist_mutex);
 
-	ret = drm_legacy_dma_setup(dev);
-	if (ret < 0)
-		return ret;
-
-
-	DRM_DEBUG("\n");
-	return 0;
+	drm_file_free(file_priv);
 }
-
-/**
- * drm_open - open method for DRM file
- * @inode: device inode
- * @filp: file pointer.
- *
- * This function must be used by drivers as their &file_operations.open method.
- * It looks up the correct DRM device and instantiates all the per-file
- * resources for it. It also calls the &drm_driver.open driver callback.
- *
- * RETURNS:
- *
- * 0 on success or negative errno value on falure.
- */
-int drm_open(struct inode *inode, struct file *filp)
-{
-	struct drm_device *dev;
-	struct drm_minor *minor;
-	int retcode;
-	int need_setup = 0;
-
-	minor = drm_minor_acquire(iminor(inode));
-	if (IS_ERR(minor))
-		return PTR_ERR(minor);
-
-	dev = minor->dev;
-	if (!dev->open_count++)
-		need_setup = 1;
-
-	/* share address_space across all char-devs of a single device */
-	filp->f_mapping = dev->anon_inode->i_mapping;
-
-	retcode = drm_open_helper(filp, minor);
-	if (retcode)
-		goto err_undo;
-	if (need_setup) {
-		retcode = drm_setup(dev);
-		if (retcode)
-			goto err_undo;
-	}
-	return 0;
-
-err_undo:
-	dev->open_count--;
-	drm_minor_release(minor);
-	return retcode;
-}
-EXPORT_SYMBOL(drm_open);
 
 /*
  * Check whether DRI will run on this CPU.
@@ -411,29 +356,60 @@ static int drm_open_helper(struct file *filp, struct drm_minor *minor)
 	return 0;
 }
 
-static void drm_legacy_dev_reinit(struct drm_device *dev)
+/**
+ * drm_open - open method for DRM file
+ * @inode: device inode
+ * @filp: file pointer.
+ *
+ * This function must be used by drivers as their &file_operations.open method.
+ * It looks up the correct DRM device and instantiates all the per-file
+ * resources for it. It also calls the &drm_driver.open driver callback.
+ *
+ * RETURNS:
+ *
+ * 0 on success or negative errno value on falure.
+ */
+int drm_open(struct inode *inode, struct file *filp)
 {
-	if (dev->irq_enabled)
-		drm_irq_uninstall(dev);
+	struct drm_device *dev;
+	struct drm_minor *minor;
+	int retcode;
+	int need_setup = 0;
 
-	mutex_lock(&dev->struct_mutex);
+	minor = drm_minor_acquire(iminor(inode));
+	if (IS_ERR(minor))
+		return PTR_ERR(minor);
 
-	drm_legacy_agp_clear(dev);
+	dev = minor->dev;
+	if (!dev->open_count++)
+		need_setup = 1;
 
-	drm_legacy_sg_cleanup(dev);
-	drm_legacy_vma_flush(dev);
-	drm_legacy_dma_takedown(dev);
+	if (dev->open_count >= MAX_DRM_OPEN_COUNT) {
+		retcode = -EPERM;
+		goto err_undo;
+	}
 
-	mutex_unlock(&dev->struct_mutex);
+	/* share address_space across all char-devs of a single device */
+	filp->f_mapping = dev->anon_inode->i_mapping;
 
-	dev->sigdata.lock = NULL;
+	retcode = drm_open_helper(filp, minor);
+	if (retcode)
+		goto err_undo;
+	if (need_setup) {
+		retcode = drm_legacy_setup(dev);
+		if (retcode) {
+			drm_close_helper(filp);
+			goto err_undo;
+		}
+	}
+	return 0;
 
-	dev->context_flag = 0;
-	dev->last_context = 0;
-	dev->if_version = 0;
-
-	DRM_DEBUG("lastclose completed\n");
+err_undo:
+	dev->open_count--;
+	drm_minor_release(minor);
+	return retcode;
 }
+EXPORT_SYMBOL(drm_open);
 
 void drm_lastclose(struct drm_device * dev)
 {
@@ -473,11 +449,7 @@ int drm_release(struct inode *inode, struct file *filp)
 
 	DRM_DEBUG("open_count = %d\n", dev->open_count);
 
-	mutex_lock(&dev->filelist_mutex);
-	list_del(&file_priv->lhead);
-	mutex_unlock(&dev->filelist_mutex);
-
-	drm_file_free(file_priv);
+	drm_close_helper(filp);
 
 	if (!--dev->open_count)
 		drm_lastclose(dev);
@@ -523,7 +495,7 @@ ssize_t drm_read(struct file *filp, char __user *buffer,
 	struct drm_device *dev = file_priv->minor->dev;
 	ssize_t ret;
 
-	if (!access_ok(VERIFY_WRITE, buffer, count))
+	if (!access_ok(buffer, count))
 		return -EFAULT;
 
 	ret = mutex_lock_interruptible(&file_priv->event_read_lock);
@@ -700,7 +672,7 @@ int drm_event_reserve_init(struct drm_device *dev,
 EXPORT_SYMBOL(drm_event_reserve_init);
 
 /**
- * drm_event_cancel_free - free a DRM event and release it's space
+ * drm_event_cancel_free - free a DRM event and release its space
  * @dev: DRM device
  * @p: tracking structure for the pending event
  *
@@ -791,3 +763,43 @@ void drm_send_event(struct drm_device *dev, struct drm_pending_event *e)
 	spin_unlock_irqrestore(&dev->event_lock, irqflags);
 }
 EXPORT_SYMBOL(drm_send_event);
+
+/**
+ * mock_drm_getfile - Create a new struct file for the drm device
+ * @minor: drm minor to wrap (e.g. #drm_device.primary)
+ * @flags: file creation mode (O_RDWR etc)
+ *
+ * This create a new struct file that wraps a DRM file context around a
+ * DRM minor. This mimicks userspace opening e.g. /dev/dri/card0, but without
+ * invoking userspace. The struct file may be operated on using its f_op
+ * (the drm_device.driver.fops) to mimick userspace operations, or be supplied
+ * to userspace facing functions as an internal/anonymous client.
+ *
+ * RETURNS:
+ * Pointer to newly created struct file, ERR_PTR on failure.
+ */
+struct file *mock_drm_getfile(struct drm_minor *minor, unsigned int flags)
+{
+	struct drm_device *dev = minor->dev;
+	struct drm_file *priv;
+	struct file *file;
+
+	priv = drm_file_alloc(minor);
+	if (IS_ERR(priv))
+		return ERR_CAST(priv);
+
+	file = anon_inode_getfile("drm", dev->driver->fops, priv, flags);
+	if (IS_ERR(file)) {
+		drm_file_free(priv);
+		return file;
+	}
+
+	/* Everyone shares a single global address space */
+	file->f_mapping = dev->anon_inode->i_mapping;
+
+	drm_dev_get(dev);
+	priv->filp = file;
+
+	return file;
+}
+EXPORT_SYMBOL_FOR_TESTS_ONLY(mock_drm_getfile);

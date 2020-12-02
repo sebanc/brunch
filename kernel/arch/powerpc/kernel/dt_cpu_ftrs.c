@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright 2017, Nicholas Piggin, IBM Corporation
- * Licensed under GPLv2.
  */
 
 #define pr_fmt(fmt) "dt-cpu-ftrs: " fmt
@@ -101,7 +101,7 @@ static void __restore_cpu_cpufeatures(void)
 	if (hv_mode) {
 		mtspr(SPRN_LPID, 0);
 		mtspr(SPRN_HFSCR, system_registers.hfscr);
-		mtspr(SPRN_PCR, 0);
+		mtspr(SPRN_PCR, PCR_MASK);
 	}
 	mtspr(SPRN_FSCR, system_registers.fscr);
 
@@ -139,11 +139,11 @@ static void __init cpufeatures_setup_cpu(void)
 	/* Initialize the base environment -- clear FSCR/HFSCR.  */
 	hv_mode = !!(mfmsr() & MSR_HV);
 	if (hv_mode) {
-		/* CPU_FTR_HVMODE is used early in PACA setup */
 		cur_cpu_spec->cpu_features |= CPU_FTR_HVMODE;
 		mtspr(SPRN_HFSCR, 0);
 	}
 	mtspr(SPRN_FSCR, 0);
+	mtspr(SPRN_PCR, PCR_MASK);
 
 	/*
 	 * LPCR does not get cleared, to match behaviour with secondaries
@@ -846,7 +846,6 @@ static int __init process_cpufeatures_node(unsigned long node,
 	int len;
 
 	f = &dt_cpu_features[i];
-	memset(f, 0, sizeof(struct dt_cpu_feature));
 
 	f->node = node;
 
@@ -1041,9 +1040,12 @@ static int __init dt_cpu_ftrs_scan_callback(unsigned long node, const char
 	/* Count and allocate space for cpu features */
 	of_scan_flat_dt_subnodes(node, count_cpufeatures_subnodes,
 						&nr_dt_cpu_features);
-	dt_cpu_features = __va(
-		memblock_alloc(sizeof(struct dt_cpu_feature)*
-				nr_dt_cpu_features, PAGE_SIZE));
+	dt_cpu_features = memblock_alloc(sizeof(struct dt_cpu_feature) * nr_dt_cpu_features, PAGE_SIZE);
+	if (!dt_cpu_features)
+		panic("%s: Failed to allocate %zu bytes align=0x%lx\n",
+		      __func__,
+		      sizeof(struct dt_cpu_feature) * nr_dt_cpu_features,
+		      PAGE_SIZE);
 
 	cpufeatures_setup_start(isa);
 

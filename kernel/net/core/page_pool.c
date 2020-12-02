@@ -4,15 +4,22 @@
  *	Author:	Jesper Dangaard Brouer <netoptimizer@brouer.com>
  *	Copyright (C) 2016 Red Hat, Inc.
  */
+
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/device.h>
 
 #include <net/page_pool.h>
 #include <linux/dma-direction.h>
 #include <linux/dma-mapping.h>
 #include <linux/page-flags.h>
 #include <linux/mm.h> /* for __put_page() */
+
+#include <trace/events/page_pool.h>
+
+#define DEFER_TIME (msecs_to_jiffies(1000))
+#define DEFER_WARN_INTERVAL (60 * HZ)
 
 static int page_pool_init(struct page_pool *pool,
 			  const struct page_pool_params *params)
@@ -43,13 +50,21 @@ static int page_pool_init(struct page_pool *pool,
 	if (ptr_ring_init(&pool->ring, ring_qsize, GFP_KERNEL) < 0)
 		return -ENOMEM;
 
+	atomic_set(&pool->pages_state_release_cnt, 0);
+
+	/* Driver calling page_pool_create() also call page_pool_destroy() */
+	refcount_set(&pool->user_cnt, 1);
+
+	if (pool->p.flags & PP_FLAG_DMA_MAP)
+		get_device(pool->p.dev);
+
 	return 0;
 }
 
 struct page_pool *page_pool_create(const struct page_pool_params *params)
 {
 	struct page_pool *pool;
-	int err = 0;
+	int err;
 
 	pool = kzalloc_node(sizeof(*pool), GFP_KERNEL, params->nid);
 	if (!pool)
@@ -61,6 +76,7 @@ struct page_pool *page_pool_create(const struct page_pool_params *params)
 		kfree(pool);
 		return ERR_PTR(err);
 	}
+
 	return pool;
 }
 EXPORT_SYMBOL(page_pool_create);
@@ -69,11 +85,8 @@ EXPORT_SYMBOL(page_pool_create);
 static struct page *__page_pool_get_cached(struct page_pool *pool)
 {
 	struct ptr_ring *r = &pool->ring;
+	bool refill = false;
 	struct page *page;
-
-	/* Quicker fallback, avoid locks when ring is empty */
-	if (__ptr_ring_empty(r))
-		return NULL;
 
 	/* Test for safe-context, caller should provide this guarantee */
 	if (likely(in_serving_softirq())) {
@@ -82,27 +95,23 @@ static struct page *__page_pool_get_cached(struct page_pool *pool)
 			page = pool->alloc.cache[--pool->alloc.count];
 			return page;
 		}
-		/* Slower-path: Alloc array empty, time to refill
-		 *
-		 * Open-coded bulk ptr_ring consumer.
-		 *
-		 * Discussion: the ring consumer lock is not really
-		 * needed due to the softirq/NAPI protection, but
-		 * later need the ability to reclaim pages on the
-		 * ring. Thus, keeping the locks.
-		 */
-		spin_lock(&r->consumer_lock);
-		while ((page = __ptr_ring_consume(r))) {
-			if (pool->alloc.count == PP_ALLOC_CACHE_REFILL)
-				break;
-			pool->alloc.cache[pool->alloc.count++] = page;
-		}
-		spin_unlock(&r->consumer_lock);
-		return page;
+		refill = true;
 	}
 
-	/* Slow-path: Get page from locked ring queue */
-	page = ptr_ring_consume(&pool->ring);
+	/* Quicker fallback, avoid locks when ring is empty */
+	if (__ptr_ring_empty(r))
+		return NULL;
+
+	/* Slow-path: Get page from locked ring queue,
+	 * refill alloc array if requested.
+	 */
+	spin_lock(&r->consumer_lock);
+	page = __ptr_ring_consume(r);
+	if (refill)
+		pool->alloc.count = __ptr_ring_consume_batched(r,
+							pool->alloc.cache,
+							PP_ALLOC_CACHE_REFILL);
+	spin_unlock(&r->consumer_lock);
 	return page;
 }
 
@@ -136,19 +145,26 @@ static struct page *__page_pool_alloc_pages_slow(struct page_pool *pool,
 	if (!(pool->p.flags & PP_FLAG_DMA_MAP))
 		goto skip_dma_map;
 
-	/* Setup DMA mapping: use page->private for DMA-addr
+	/* Setup DMA mapping: use 'struct page' area for storing DMA-addr
+	 * since dma_addr_t can be either 32 or 64 bits and does not always fit
+	 * into page private data (i.e 32bit cpu with 64bit DMA caps)
 	 * This mapping is kept for lifetime of page, until leaving pool.
 	 */
-	dma = dma_map_page(pool->p.dev, page, 0,
-			   (PAGE_SIZE << pool->p.order),
-			   pool->p.dma_dir);
+	dma = dma_map_page_attrs(pool->p.dev, page, 0,
+				 (PAGE_SIZE << pool->p.order),
+				 pool->p.dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
 	if (dma_mapping_error(pool->p.dev, dma)) {
 		put_page(page);
 		return NULL;
 	}
-	set_page_private(page, dma); /* page->private = dma; */
+	page->dma_addr = dma;
 
 skip_dma_map:
+	/* Track how many pages are held 'in-flight' */
+	pool->pages_state_hold_cnt++;
+
+	trace_page_pool_state_hold(pool, page, pool->pages_state_hold_cnt);
+
 	/* When page just alloc'ed is should/must have refcnt 1. */
 	return page;
 }
@@ -171,23 +187,64 @@ struct page *page_pool_alloc_pages(struct page_pool *pool, gfp_t gfp)
 }
 EXPORT_SYMBOL(page_pool_alloc_pages);
 
+/* Calculate distance between two u32 values, valid if distance is below 2^(31)
+ *  https://en.wikipedia.org/wiki/Serial_number_arithmetic#General_Solution
+ */
+#define _distance(a, b)	(s32)((a) - (b))
+
+static s32 page_pool_inflight(struct page_pool *pool)
+{
+	u32 release_cnt = atomic_read(&pool->pages_state_release_cnt);
+	u32 hold_cnt = READ_ONCE(pool->pages_state_hold_cnt);
+	s32 inflight;
+
+	inflight = _distance(hold_cnt, release_cnt);
+
+	trace_page_pool_inflight(pool, inflight, hold_cnt, release_cnt);
+	WARN(inflight < 0, "Negative(%d) inflight packet-pages", inflight);
+
+	return inflight;
+}
+
 /* Cleanup page_pool state from page */
 static void __page_pool_clean_page(struct page_pool *pool,
 				   struct page *page)
 {
-	if (!(pool->p.flags & PP_FLAG_DMA_MAP))
-		return;
+	dma_addr_t dma;
+	int count;
 
+	if (!(pool->p.flags & PP_FLAG_DMA_MAP))
+		goto skip_dma_unmap;
+
+	dma = page->dma_addr;
 	/* DMA unmap */
-	dma_unmap_page(pool->p.dev, page_private(page),
-		       PAGE_SIZE << pool->p.order, pool->p.dma_dir);
-	set_page_private(page, 0);
+	dma_unmap_page_attrs(pool->p.dev, dma,
+			     PAGE_SIZE << pool->p.order, pool->p.dma_dir,
+			     DMA_ATTR_SKIP_CPU_SYNC);
+	page->dma_addr = 0;
+skip_dma_unmap:
+	/* This may be the last page returned, releasing the pool, so
+	 * it is not safe to reference pool afterwards.
+	 */
+	count = atomic_inc_return(&pool->pages_state_release_cnt);
+	trace_page_pool_state_release(pool, page, count);
 }
+
+/* unmap the page and clean our state */
+void page_pool_unmap_page(struct page_pool *pool, struct page *page)
+{
+	/* When page is unmapped, this implies page will not be
+	 * returned to page_pool.
+	 */
+	__page_pool_clean_page(pool, page);
+}
+EXPORT_SYMBOL(page_pool_unmap_page);
 
 /* Return a page to the page allocator, cleaning up our state */
 static void __page_pool_return_page(struct page_pool *pool, struct page *page)
 {
 	__page_pool_clean_page(pool, page);
+
 	put_page(page);
 	/* An optimization would be to call __free_pages(page, pool->p.order)
 	 * knowing page is not part of page-cache (thus avoiding a
@@ -279,21 +336,20 @@ static void __page_pool_empty_ring(struct page_pool *pool)
 	}
 }
 
-static void __page_pool_destroy_rcu(struct rcu_head *rcu)
+static void page_pool_free(struct page_pool *pool)
 {
-	struct page_pool *pool;
+	if (pool->disconnect)
+		pool->disconnect(pool);
 
-	pool = container_of(rcu, struct page_pool, rcu);
-
-	WARN(pool->alloc.count, "API usage violation");
-
-	__page_pool_empty_ring(pool);
 	ptr_ring_cleanup(&pool->ring, NULL);
+
+	if (pool->p.flags & PP_FLAG_DMA_MAP)
+		put_device(pool->p.dev);
+
 	kfree(pool);
 }
 
-/* Cleanup and release resources */
-void page_pool_destroy(struct page_pool *pool)
+static void page_pool_scrub(struct page_pool *pool)
 {
 	struct page *page;
 
@@ -310,8 +366,64 @@ void page_pool_destroy(struct page_pool *pool)
 	 * be in-flight.
 	 */
 	__page_pool_empty_ring(pool);
+}
 
-	/* An xdp_mem_allocator can still ref page_pool pointer */
-	call_rcu(&pool->rcu, __page_pool_destroy_rcu);
+static int page_pool_release(struct page_pool *pool)
+{
+	int inflight;
+
+	page_pool_scrub(pool);
+	inflight = page_pool_inflight(pool);
+	if (!inflight)
+		page_pool_free(pool);
+
+	return inflight;
+}
+
+static void page_pool_release_retry(struct work_struct *wq)
+{
+	struct delayed_work *dwq = to_delayed_work(wq);
+	struct page_pool *pool = container_of(dwq, typeof(*pool), release_dw);
+	int inflight;
+
+	inflight = page_pool_release(pool);
+	if (!inflight)
+		return;
+
+	/* Periodic warning */
+	if (time_after_eq(jiffies, pool->defer_warn)) {
+		int sec = (s32)((u32)jiffies - (u32)pool->defer_start) / HZ;
+
+		pr_warn("%s() stalled pool shutdown %d inflight %d sec\n",
+			__func__, inflight, sec);
+		pool->defer_warn = jiffies + DEFER_WARN_INTERVAL;
+	}
+
+	/* Still not ready to be disconnected, retry later */
+	schedule_delayed_work(&pool->release_dw, DEFER_TIME);
+}
+
+void page_pool_use_xdp_mem(struct page_pool *pool, void (*disconnect)(void *))
+{
+	refcount_inc(&pool->user_cnt);
+	pool->disconnect = disconnect;
+}
+
+void page_pool_destroy(struct page_pool *pool)
+{
+	if (!pool)
+		return;
+
+	if (!page_pool_put(pool))
+		return;
+
+	if (!page_pool_release(pool))
+		return;
+
+	pool->defer_start = jiffies;
+	pool->defer_warn  = jiffies + DEFER_WARN_INTERVAL;
+
+	INIT_DELAYED_WORK(&pool->release_dw, page_pool_release_retry);
+	schedule_delayed_work(&pool->release_dw, DEFER_TIME);
 }
 EXPORT_SYMBOL(page_pool_destroy);

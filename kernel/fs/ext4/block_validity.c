@@ -255,6 +255,7 @@ int ext4_setup_system_zone(struct super_block *sb)
 		return -ENOMEM;
 
 	for (i=0; i < ngroups; i++) {
+		cond_resched();
 		if (ext4_bg_has_super(sb, i) &&
 		    ((i < 5) || ((i % flex_size) == 0)))
 			add_system_zone(system_blks,

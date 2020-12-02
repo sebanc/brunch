@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 #include <linux/export.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/task.h>
@@ -130,6 +131,7 @@ struct fs_struct *copy_fs_struct(struct fs_struct *old)
 	}
 	return fs;
 }
+EXPORT_SYMBOL_GPL(copy_fs_struct);
 
 int unshare_fs_struct(void)
 {

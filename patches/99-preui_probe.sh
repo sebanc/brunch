@@ -8,7 +8,7 @@ start on starting boot-services
 
 script
 	modprobe i915
-	udevadm trigger --action=add --subsystem-match=pci --subsystem-match=i2c --subsystem-match=hid --subsystem-match=iio
+	udevadm trigger --action=add --subsystem-match=pci --subsystem-match=usb --subsystem-match=i2c --subsystem-match=hid --subsystem-match=iio
 end script
 PREUIPROBE
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi

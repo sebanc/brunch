@@ -1,12 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * Definitions for measuring cputime on powerpc machines.
  *
  * Copyright (C) 2006 Paul Mackerras, IBM Corp.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  *
  * If we have CONFIG_VIRT_CPU_ACCOUNTING_NATIVE, we measure cpu time in
  * the same units as the timebase.  Otherwise we measure cpu time
@@ -61,7 +57,6 @@ static inline void arch_vtime_task_switch(struct task_struct *prev)
 	struct cpu_accounting_data *acct0 = get_accounting(prev);
 
 	acct->starttime = acct0->starttime;
-	acct->startspurr = acct0->startspurr;
 }
 #endif
 

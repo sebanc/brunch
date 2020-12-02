@@ -717,11 +717,11 @@ static int chromeos_process_mlst(struct acpi_device *device)
 	for (j = 0; j < po->package.count; j++) {
 		union acpi_object *element = po->package.elements + j;
 		int copy_size = 0;
-		char method[ACPI_NAME_SIZE + 1];
+		char method[ACPI_NAMESEG_SIZE + 1];
 
 		if (element->type == ACPI_TYPE_STRING) {
 			copy_size = min(element->string.length,
-					(u32)ACPI_NAME_SIZE);
+					(u32)ACPI_NAMESEG_SIZE);
 			memcpy(method, element->string.pointer, copy_size);
 			method[copy_size] = '\0';
 			add_acpi_method(device, method);

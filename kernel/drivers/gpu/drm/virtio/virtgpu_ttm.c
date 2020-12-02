@@ -25,17 +25,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <linux/delay.h>
+
+#include <drm/drm.h>
+#include <drm/drm_file.h>
 #include <drm/ttm/ttm_bo_api.h>
 #include <drm/ttm/ttm_bo_driver.h>
-#include <drm/ttm/ttm_placement.h>
-#include <drm/ttm/ttm_page_alloc.h>
 #include <drm/ttm/ttm_module.h>
-#include <drm/drmP.h>
-#include <drm/drm.h>
+#include <drm/ttm/ttm_page_alloc.h>
+#include <drm/ttm/ttm_placement.h>
 #include <drm/virtgpu_drm.h>
-#include "virtgpu_drv.h"
 
-#include <linux/delay.h>
+#include "virtgpu_drv.h"
 
 static struct
 virtio_gpu_device *virtio_gpu_get_vgdev(struct ttm_bo_device *bdev)
@@ -223,7 +224,9 @@ static int virtio_gpu_ttm_vram_unbind(struct ttm_tt *ttm)
 		virtio_gpu_get_vgdev(gtt->obj->tbo.bdev);
 	struct virtio_gpu_object *obj = gtt->obj;
 
-	virtio_gpu_cmd_resource_v2_unref(vgdev, obj->hw_res_handle, NULL);
+	if (obj->mapped)
+		virtio_gpu_cmd_unmap(vgdev, obj->hw_res_handle);
+
 	return 0;
 }
 
@@ -277,6 +280,7 @@ static struct ttm_tt *virtio_gpu_ttm_tt_create(struct ttm_buffer_object *bo,
 	struct virtio_gpu_device *vgdev;
 	struct virtio_gpu_object *obj;
 	struct virtio_gpu_ttm_tt *gtt;
+	uint32_t has_guest;
 
 	vgdev = virtio_gpu_get_vgdev(bo->bdev);
 	obj = container_of(bo, struct virtio_gpu_object, tbo);
@@ -285,8 +289,9 @@ static struct ttm_tt *virtio_gpu_ttm_tt_create(struct ttm_buffer_object *bo,
 	if (gtt == NULL)
 		return NULL;
 	gtt->obj = obj;
-
-	if (obj->guest_memory_type == VIRTIO_GPU_MEMORY_HOST_COHERENT) {
+	has_guest = (obj->blob_mem == VIRTGPU_BLOB_MEM_GUEST ||
+	             obj->blob_mem == VIRTGPU_BLOB_MEM_HOST3D_GUEST);
+	if (!has_guest && obj->blob) {
 		gtt->ttm.ttm.func = &virtio_gpu_vram_func;
 		if (ttm_tt_init(&gtt->ttm.ttm, bo, page_flags)) {
 			kfree(gtt);
@@ -345,7 +350,7 @@ int virtio_gpu_ttm_init(struct virtio_gpu_device *vgdev)
 		goto err_mm_init;
 	}
 
-	if (vgdev->has_host_coherent) {
+	if (vgdev->has_host_visible) {
 		r = ttm_bo_init_mm(&vgdev->mman.bdev, TTM_PL_VRAM,
 				   vgdev->csize >> PAGE_SHIFT);
 		if (r) {

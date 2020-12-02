@@ -66,7 +66,7 @@ static int ath10k_wow_cleanup(struct ath10k *ar)
 	return 0;
 }
 
-/**
+/*
  * Convert a 802.3 format to a 802.11 format.
  *         +------------+-----------+--------+----------------+
  * 802.3:  |dest mac(6B)|src mac(6B)|type(2B)|     body...    |
@@ -77,9 +77,8 @@ static int ath10k_wow_cleanup(struct ath10k *ar)
  * 802.11: |4B|dest mac(6B)| 6B |src mac(6B)|  8B  |type(2B)|  body...  |
  *         +--+------------+----+-----------+---------------+-----------+
  */
-static void ath10k_wow_convert_8023_to_80211
-					(struct cfg80211_pkt_pattern *new,
-					const struct cfg80211_pkt_pattern *old)
+static void ath10k_wow_convert_8023_to_80211(struct cfg80211_pkt_pattern *new,
+					     const struct cfg80211_pkt_pattern *old)
 {
 	u8 hdr_8023_pattern[ETH_HLEN] = {};
 	u8 hdr_8023_bit_mask[ETH_HLEN] = {};
@@ -124,7 +123,7 @@ static void ath10k_wow_convert_8023_to_80211
 	       &old_hdr_mask->h_proto,
 	       sizeof(old_hdr_mask->h_proto));
 
-	/* Caculate new pkt_offset */
+	/* Calculate new pkt_offset */
 	if (old->pkt_offset < ETH_ALEN)
 		new->pkt_offset = old->pkt_offset +
 			offsetof(struct ieee80211_hdr_3addr, addr1);
@@ -135,7 +134,7 @@ static void ath10k_wow_convert_8023_to_80211
 	else
 		new->pkt_offset = old->pkt_offset + hdr_len + rfc_len - ETH_HLEN;
 
-	/* Caculate new hdr end offset */
+	/* Calculate new hdr end offset */
 	if (total_len > ETH_HLEN)
 		hdr_80211_end_offset = hdr_len + rfc_len;
 	else if (total_len > offsetof(struct ethhdr, h_proto))

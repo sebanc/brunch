@@ -71,6 +71,9 @@ struct ath10k_pktlog_hdr {
 /* FIXME: How to calculate the buffer size sanely? */
 #define ATH10K_FW_STATS_BUF_SIZE (1024 * 1024)
 
+#define ATH10K_TX_POWER_MAX_VAL 70
+#define ATH10K_TX_POWER_MIN_VAL 0
+
 extern unsigned int ath10k_debug_mask;
 
 __printf(2, 3) void ath10k_info(struct ath10k *ar, const char *fmt, ...);
@@ -122,9 +125,6 @@ static inline int ath10k_debug_is_extd_tx_stats_enabled(struct ath10k *ar)
 {
 	return ar->debug.enable_extd_tx_stats;
 }
-
-int ath10k_debug_fw_stats_request(struct ath10k *ar);
-
 #else
 
 static inline int ath10k_debug_start(struct ath10k *ar)
@@ -192,11 +192,6 @@ static inline int ath10k_debug_is_extd_tx_stats_enabled(struct ath10k *ar)
 	return 0;
 }
 
-static inline int ath10k_debug_fw_stats_request(struct ath10k *ar)
-{
-	return 0;
-}
-
 #define ATH10K_DFS_STAT_INC(ar, c) do { } while (0)
 
 #define ath10k_debug_get_et_strings NULL
@@ -210,12 +205,12 @@ void ath10k_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 void ath10k_sta_update_rx_duration(struct ath10k *ar,
 				   struct ath10k_fw_stats *stats);
 void ath10k_sta_update_rx_tid_stats(struct ath10k *ar, u8 *first_hdr,
-				    unsigned long int num_msdus,
+				    unsigned long num_msdus,
 				    enum ath10k_pkt_rx_err err,
-				    unsigned long int unchain_cnt,
-				    unsigned long int drop_cnt,
-				    unsigned long int drop_cnt_filter,
-				    unsigned long int queued_msdus);
+				    unsigned long unchain_cnt,
+				    unsigned long drop_cnt,
+				    unsigned long drop_cnt_filter,
+				    unsigned long queued_msdus);
 void ath10k_sta_update_rx_tid_stats_ampdu(struct ath10k *ar,
 					  u16 peer_id, u8 tid,
 					  struct htt_rx_indication_mpdu_range *ranges,
@@ -229,12 +224,12 @@ void ath10k_sta_update_rx_duration(struct ath10k *ar,
 
 static inline
 void ath10k_sta_update_rx_tid_stats(struct ath10k *ar, u8 *first_hdr,
-				    unsigned long int num_msdus,
+				    unsigned long num_msdus,
 				    enum ath10k_pkt_rx_err err,
-				    unsigned long int unchain_cnt,
-				    unsigned long int drop_cnt,
-				    unsigned long int drop_cnt_filter,
-				    unsigned long int queued_msdus)
+				    unsigned long unchain_cnt,
+				    unsigned long drop_cnt,
+				    unsigned long drop_cnt_filter,
+				    unsigned long queued_msdus)
 {
 }
 

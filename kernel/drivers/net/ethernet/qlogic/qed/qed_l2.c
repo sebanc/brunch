@@ -1894,6 +1894,7 @@ static void _qed_get_vport_stats(struct qed_dev *cdev,
 		struct qed_hwfn *p_hwfn = &cdev->hwfns[i];
 		struct qed_ptt *p_ptt = IS_PF(cdev) ? qed_ptt_acquire(p_hwfn)
 						    :  NULL;
+		bool b_get_port_stats;
 
 		if (IS_PF(cdev)) {
 			/* The main vport index is relative first */
@@ -1908,8 +1909,9 @@ static void _qed_get_vport_stats(struct qed_dev *cdev,
 			continue;
 		}
 
+		b_get_port_stats = IS_PF(cdev) && IS_LEAD_HWFN(p_hwfn);
 		__qed_get_vport_stats(p_hwfn, p_ptt, stats, fw_vport,
-				      IS_PF(cdev) ? true : false);
+				      b_get_port_stats);
 
 out:
 		if (IS_PF(cdev) && p_ptt)
@@ -1999,6 +2001,9 @@ void qed_arfs_mode_configure(struct qed_hwfn *p_hwfn,
 			     struct qed_ptt *p_ptt,
 			     struct qed_arfs_config_params *p_cfg_params)
 {
+	if (test_bit(QED_MF_DISABLE_ARFS, &p_hwfn->cdev->mf_bits))
+		return;
+
 	if (p_cfg_params->mode != QED_FILTER_CONFIG_MODE_DISABLE) {
 		qed_gft_config(p_hwfn, p_ptt, p_hwfn->rel_pf_id,
 			       p_cfg_params->tcp,
@@ -2105,7 +2110,7 @@ int qed_get_rxq_coalesce(struct qed_hwfn *p_hwfn,
 
 	rc = qed_dmae_grc2host(p_hwfn, p_ptt, CAU_REG_SB_VAR_MEMORY +
 			       p_cid->sb_igu_id * sizeof(u64),
-			       (u64)(uintptr_t)&sb_entry, 2, 0);
+			       (u64)(uintptr_t)&sb_entry, 2, NULL);
 	if (rc) {
 		DP_ERR(p_hwfn, "dmae_grc2host failed %d\n", rc);
 		return rc;
@@ -2138,7 +2143,7 @@ int qed_get_txq_coalesce(struct qed_hwfn *p_hwfn,
 
 	rc = qed_dmae_grc2host(p_hwfn, p_ptt, CAU_REG_SB_VAR_MEMORY +
 			       p_cid->sb_igu_id * sizeof(u64),
-			       (u64)(uintptr_t)&sb_entry, 2, 0);
+			       (u64)(uintptr_t)&sb_entry, 2, NULL);
 	if (rc) {
 		DP_ERR(p_hwfn, "dmae_grc2host failed %d\n", rc);
 		return rc;
@@ -2867,7 +2872,8 @@ static int qed_get_coalesce(struct qed_dev *cdev, u16 *coal, void *handle)
 	p_hwfn = p_cid->p_owner;
 	rc = qed_get_queue_coalesce(p_hwfn, coal, handle);
 	if (rc)
-		DP_NOTICE(p_hwfn, "Unable to read queue coalescing\n");
+		DP_VERBOSE(cdev, QED_MSG_DEBUG,
+			   "Unable to read queue coalescing\n");
 
 	return rc;
 }

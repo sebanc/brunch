@@ -1,21 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (C) 2006, 2007, 2009 Rusty Russell, IBM Corporation
  * Copyright (C) 2009, 2010, 2011 Red Hat, Inc.
  * Copyright (C) 2009, 2010, 2011 Amit Shah <amit.shah@redhat.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include <linux/cdev.h>
 #include <linux/debugfs.h>
@@ -1309,7 +1296,7 @@ static const struct attribute_group port_attribute_group = {
 	.attrs = port_sysfs_entries,
 };
 
-static int debugfs_show(struct seq_file *s, void *data)
+static int port_debugfs_show(struct seq_file *s, void *data)
 {
 	struct port *port = s->private;
 
@@ -1327,18 +1314,7 @@ static int debugfs_show(struct seq_file *s, void *data)
 	return 0;
 }
 
-static int debugfs_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, debugfs_show, inode->i_private);
-}
-
-static const struct file_operations port_debugfs_ops = {
-	.owner = THIS_MODULE,
-	.open = debugfs_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(port_debugfs);
 
 static void set_console_size(struct port *port, u16 rows, u16 cols)
 {
@@ -1492,7 +1468,7 @@ static int add_port(struct ports_device *portdev, u32 id)
 		port->debugfs_file = debugfs_create_file(debugfs_name, 0444,
 							 pdrvdata.debugfs_dir,
 							 port,
-							 &port_debugfs_ops);
+							 &port_debugfs_fops);
 	}
 	return 0;
 

@@ -814,9 +814,7 @@ int mlx4_ib_device_register_sysfs(struct mlx4_ib_dev *dev)
 	if (!mlx4_is_master(dev->dev))
 		return 0;
 
-	dev->iov_parent =
-		kobject_create_and_add("iov",
-				       kobject_get(dev->ib_dev.ports_parent->parent));
+	dev->iov_parent = kobject_create_and_add("iov", &dev->ib_dev.dev.kobj);
 	if (!dev->iov_parent) {
 		ret = -ENOMEM;
 		goto err;
@@ -846,7 +844,6 @@ err_add_entries:
 err_ports:
 	kobject_put(dev->iov_parent);
 err:
-	kobject_put(dev->ib_dev.ports_parent->parent);
 	pr_err("mlx4_ib_device_register_sysfs error (%d)\n", ret);
 	return ret;
 }
@@ -882,5 +879,4 @@ void mlx4_ib_device_unregister_sysfs(struct mlx4_ib_dev *device)
 	kobject_put(device->ports_parent);
 	kobject_put(device->iov_parent);
 	kobject_put(device->iov_parent);
-	kobject_put(device->ib_dev.ports_parent->parent);
 }

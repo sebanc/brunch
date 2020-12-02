@@ -24,12 +24,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <drm/drm_vblank.h>
-#include <drm/drmP.h>
 #include <linux/export.h>
+#include <linux/moduleparam.h>
 
-#include "drm_trace.h"
+#include <drm/drm_crtc.h>
+#include <drm/drm_drv.h>
+#include <drm/drm_framebuffer.h>
+#include <drm/drm_print.h>
+#include <drm/drm_vblank.h>
+
 #include "drm_internal.h"
+#include "drm_trace.h"
 
 /**
  * DOC: vblank handling
@@ -48,7 +53,7 @@
  * Drivers must initialize the vertical blanking handling core with a call to
  * drm_vblank_init(). Minimally, a driver needs to implement
  * &drm_crtc_funcs.enable_vblank and &drm_crtc_funcs.disable_vblank plus call
- * drm_crtc_handle_vblank() in it's vblank interrupt handler for working vblank
+ * drm_crtc_handle_vblank() in its vblank interrupt handler for working vblank
  * support.
  *
  * Vertical blanking interrupts can be enabled by the DRM core or by drivers
@@ -235,12 +240,16 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 		 * on the difference in the timestamps and the
 		 * frame/field duration.
 		 */
+
+		DRM_DEBUG_VBL("crtc %u: Calculating number of vblanks."
+			      " diff_ns = %lld, framedur_ns = %d)\n",
+			      pipe, (long long) diff_ns, framedur_ns);
+
 		diff = DIV_ROUND_CLOSEST_ULL(diff_ns, framedur_ns);
 
 		if (diff == 0 && in_vblank_irq)
-			DRM_DEBUG_VBL("crtc %u: Redundant vblirq ignored."
-				      " diff_ns = %lld, framedur_ns = %d)\n",
-				      pipe, (long long) diff_ns, framedur_ns);
+			DRM_DEBUG_VBL("crtc %u: Redundant vblirq ignored\n",
+				      pipe);
 	} else {
 		/* some kind of default for drivers w/o accurate vbl timestamping */
 		diff = in_vblank_irq ? 1 : 0;
@@ -310,7 +319,7 @@ u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
 	u64 vblank;
 	unsigned long flags;
 
-	WARN_ONCE(drm_debug & DRM_UT_VBL && !dev->driver->get_vblank_timestamp,
+	WARN_ONCE(drm_debug_enabled(DRM_UT_VBL) && !dev->driver->get_vblank_timestamp,
 		  "This function requires support for accurate vblank timestamps.");
 
 	spin_lock_irqsave(&dev->vblank_time_lock, flags);
@@ -684,7 +693,7 @@ bool drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 	 */
 	*vblank_time = ktime_sub_ns(etime, delta_ns);
 
-	if ((drm_debug & DRM_UT_VBL) == 0)
+	if (!drm_debug_enabled(DRM_UT_VBL))
 		return true;
 
 	ts_etime = ktime_to_timespec64(etime);
@@ -1314,7 +1323,7 @@ void drm_vblank_restore(struct drm_device *dev, unsigned int pipe)
 	assert_spin_locked(&dev->vblank_time_lock);
 
 	vblank = &dev->vblank[pipe];
-	WARN_ONCE((drm_debug & DRM_UT_VBL) && !vblank->framedur_ns,
+	WARN_ONCE(drm_debug_enabled(DRM_UT_VBL) && !vblank->framedur_ns,
 		  "Cannot compute missed vblanks without frame duration\n");
 	framedur_ns = vblank->framedur_ns;
 
@@ -1660,12 +1669,28 @@ int drm_wait_vblank_ioctl(struct drm_device *dev, void *data,
 	}
 
 	if (req_seq != seq) {
+		int wait;
+
 		DRM_DEBUG("waiting on vblank count %llu, crtc %u\n",
 			  req_seq, pipe);
-		DRM_WAIT_ON(ret, vblank->queue, 3 * HZ,
-			    vblank_passed(drm_vblank_count(dev, pipe),
-					  req_seq) ||
-			    !READ_ONCE(vblank->enabled));
+		wait = wait_event_interruptible_timeout(vblank->queue,
+			vblank_passed(drm_vblank_count(dev, pipe), req_seq) ||
+				      !READ_ONCE(vblank->enabled),
+			msecs_to_jiffies(3000));
+
+		switch (wait) {
+		case 0:
+			/* timeout */
+			ret = -EBUSY;
+			break;
+		case -ERESTARTSYS:
+			/* interrupted by signal */
+			ret = -EINTR;
+			break;
+		default:
+			ret = 0;
+			break;
+		}
 	}
 
 	if (ret != -EINTR) {

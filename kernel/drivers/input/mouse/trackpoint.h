@@ -1,11 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * IBM TrackPoint PS/2 mouse driver
  *
  * Stephen Evanchik <evanchsa@gmail.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
  */
 
 #ifndef _TRACKPOINT_H
@@ -39,6 +36,7 @@
  */
 #define TP_RECALIB		0x51	/* Recalibrate */
 #define TP_POWER_DOWN		0x44	/* Can only be undone through HW reset */
+#define TP_ELAN_POWER_UP	0xBB
 #define TP_EXT_DEV		0x21	/* Determines if external device is connected (RO) */
 #define TP_EXT_BTN		0x4B	/* Read extended button status */
 #define TP_POR			0x7F	/* Execute Power on Reset */
@@ -112,7 +110,7 @@
 #define TP_TOGGLE_EXT_TAG	0x22	/* Bit 3 of the first packet coming from the
 					   external device will be forced to 1 */
 #define TP_MASK_EXT_TAG			0x04
-
+#define TP_TOGGLE_ELAN_SLEEP	0x8
 
 /* Power on Self Test Results */
 #define TP_POR_SUCCESS		0x3B
@@ -160,14 +158,6 @@ struct trackpoint_data {
 	bool ext_dev;
 };
 
-#ifdef CONFIG_MOUSE_PS2_TRACKPOINT
 int trackpoint_detect(struct psmouse *psmouse, bool set_properties);
-#else
-static inline int trackpoint_detect(struct psmouse *psmouse,
-				    bool set_properties)
-{
-	return -ENOSYS;
-}
-#endif /* CONFIG_MOUSE_PS2_TRACKPOINT */
 
 #endif /* _TRACKPOINT_H */

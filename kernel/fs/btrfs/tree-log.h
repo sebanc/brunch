@@ -15,7 +15,6 @@
 struct btrfs_log_ctx {
 	int log_ret;
 	int log_transid;
-	int io_err;
 	bool log_new_dentries;
 	struct inode *inode;
 	struct list_head list;
@@ -26,22 +25,19 @@ static inline void btrfs_init_log_ctx(struct btrfs_log_ctx *ctx,
 {
 	ctx->log_ret = 0;
 	ctx->log_transid = 0;
-	ctx->io_err = 0;
 	ctx->log_new_dentries = false;
 	ctx->inode = inode;
 	INIT_LIST_HEAD(&ctx->list);
 }
 
-static inline void btrfs_set_log_full_commit(struct btrfs_fs_info *fs_info,
-					     struct btrfs_trans_handle *trans)
+static inline void btrfs_set_log_full_commit(struct btrfs_trans_handle *trans)
 {
-	WRITE_ONCE(fs_info->last_trans_log_full_commit, trans->transid);
+	WRITE_ONCE(trans->fs_info->last_trans_log_full_commit, trans->transid);
 }
 
-static inline int btrfs_need_log_full_commit(struct btrfs_fs_info *fs_info,
-					     struct btrfs_trans_handle *trans)
+static inline int btrfs_need_log_full_commit(struct btrfs_trans_handle *trans)
 {
-	return READ_ONCE(fs_info->last_trans_log_full_commit) ==
+	return READ_ONCE(trans->fs_info->last_trans_log_full_commit) ==
 		trans->transid;
 }
 
@@ -65,7 +61,7 @@ int btrfs_del_inode_ref_in_log(struct btrfs_trans_handle *trans,
 			       const char *name, int name_len,
 			       struct btrfs_inode *inode, u64 dirid);
 void btrfs_end_log_trans(struct btrfs_root *root);
-int btrfs_pin_log_trans(struct btrfs_root *root);
+void btrfs_pin_log_trans(struct btrfs_root *root);
 void btrfs_record_unlink_dir(struct btrfs_trans_handle *trans,
 			     struct btrfs_inode *dir, struct btrfs_inode *inode,
 			     int for_rename);

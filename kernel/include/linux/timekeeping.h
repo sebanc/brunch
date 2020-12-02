@@ -113,6 +113,34 @@ static inline ktime_t ktime_get_coarse_clocktai(void)
 	return ktime_get_coarse_with_offset(TK_OFFS_TAI);
 }
 
+static inline ktime_t ktime_get_coarse(void)
+{
+	struct timespec64 ts;
+
+	ktime_get_coarse_ts64(&ts);
+	return timespec64_to_ktime(ts);
+}
+
+static inline u64 ktime_get_coarse_ns(void)
+{
+	return ktime_to_ns(ktime_get_coarse());
+}
+
+static inline u64 ktime_get_coarse_real_ns(void)
+{
+	return ktime_to_ns(ktime_get_coarse_real());
+}
+
+static inline u64 ktime_get_coarse_boottime_ns(void)
+{
+	return ktime_to_ns(ktime_get_coarse_boottime());
+}
+
+static inline u64 ktime_get_coarse_clocktai_ns(void)
+{
+	return ktime_to_ns(ktime_get_coarse_clocktai());
+}
+
 /**
  * ktime_mono_to_real - Convert monotonic time to clock realtime
  */
@@ -131,12 +159,12 @@ static inline u64 ktime_get_real_ns(void)
 	return ktime_to_ns(ktime_get_real());
 }
 
-static inline u64 ktime_get_boot_ns(void)
+static inline u64 ktime_get_boottime_ns(void)
 {
 	return ktime_to_ns(ktime_get_boottime());
 }
 
-static inline u64 ktime_get_tai_ns(void)
+static inline u64 ktime_get_clocktai_ns(void)
 {
 	return ktime_to_ns(ktime_get_clocktai());
 }
@@ -261,31 +289,5 @@ extern void read_persistent_clock64(struct timespec64 *ts);
 void read_persistent_wall_and_boot_offset(struct timespec64 *wall_clock,
 					  struct timespec64 *boot_offset);
 extern int update_persistent_clock64(struct timespec64 now);
-
-/*
- * deprecated aliases, don't use in new code
- */
-#define getnstimeofday64(ts)		ktime_get_real_ts64(ts)
-#define get_monotonic_boottime64(ts)	ktime_get_boottime_ts64(ts)
-#define getrawmonotonic64(ts)		ktime_get_raw_ts64(ts)
-#define timekeeping_clocktai64(ts)	ktime_get_clocktai_ts64(ts)
-
-static inline struct timespec64 current_kernel_time64(void)
-{
-	struct timespec64 ts;
-
-	ktime_get_coarse_real_ts64(&ts);
-
-	return ts;
-}
-
-static inline struct timespec64 get_monotonic_coarse64(void)
-{
-	struct timespec64 ts;
-
-	ktime_get_coarse_ts64(&ts);
-
-	return ts;
-}
 
 #endif

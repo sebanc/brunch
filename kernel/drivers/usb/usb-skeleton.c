@@ -35,9 +35,11 @@ MODULE_DEVICE_TABLE(usb, skel_table);
 
 /* our private defines. if this grows any larger, use your own .h file */
 #define MAX_TRANSFER		(PAGE_SIZE - 512)
-/* MAX_TRANSFER is chosen so that the VM is not stressed by
-   allocations > PAGE_SIZE and the number of packets in a page
-   is an integer 512 is the largest possible packet on EHCI */
+/*
+ * MAX_TRANSFER is chosen so that the VM is not stressed by
+ * allocations > PAGE_SIZE and the number of packets in a page
+ * is an integer 512 is the largest possible packet on EHCI
+ */
 #define WRITES_IN_FLIGHT	8
 /* arbitrarily chosen */
 
@@ -228,8 +230,7 @@ static ssize_t skel_read(struct file *file, char *buffer, size_t count,
 
 	dev = file->private_data;
 
-	/* if we cannot read at all, return EOF */
-	if (!dev->bulk_in_urb || !count)
+	if (!count)
 		return 0;
 
 	/* no concurrent readers */
@@ -573,6 +574,7 @@ static void skel_disconnect(struct usb_interface *interface)
 	dev->disconnected = 1;
 	mutex_unlock(&dev->io_mutex);
 
+	usb_kill_urb(dev->bulk_in_urb);
 	usb_kill_anchored_urbs(&dev->submitted);
 
 	/* decrement our usage count */

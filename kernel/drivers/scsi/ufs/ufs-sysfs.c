@@ -122,17 +122,20 @@ static void ufshcd_auto_hibern8_update(struct ufs_hba *hba, u32 ahit)
 {
 	unsigned long flags;
 
-	if (!(hba->capabilities & MASK_AUTO_HIBERN8_SUPPORT))
+	if (!ufshcd_is_auto_hibern8_supported(hba))
 		return;
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
-	if (hba->ahit == ahit)
-		goto out_unlock;
-	hba->ahit = ahit;
-	if (!pm_runtime_suspended(hba->dev))
-		ufshcd_writel(hba, hba->ahit, REG_AUTO_HIBERNATE_IDLE_TIMER);
-out_unlock:
+	if (hba->ahit != ahit)
+		hba->ahit = ahit;
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
+	if (!pm_runtime_suspended(hba->dev)) {
+		pm_runtime_get_sync(hba->dev);
+		ufshcd_hold(hba, false);
+		ufshcd_auto_hibern8_enable(hba);
+		ufshcd_release(hba);
+		pm_runtime_put(hba->dev);
+	}
 }
 
 /* Convert Auto-Hibernate Idle Timer register value to microseconds */
@@ -164,7 +167,7 @@ static ssize_t auto_hibern8_show(struct device *dev,
 {
 	struct ufs_hba *hba = dev_get_drvdata(dev);
 
-	if (!(hba->capabilities & MASK_AUTO_HIBERN8_SUPPORT))
+	if (!ufshcd_is_auto_hibern8_supported(hba))
 		return -EOPNOTSUPP;
 
 	return snprintf(buf, PAGE_SIZE, "%d\n", ufshcd_ahit_to_us(hba->ahit));
@@ -177,7 +180,7 @@ static ssize_t auto_hibern8_store(struct device *dev,
 	struct ufs_hba *hba = dev_get_drvdata(dev);
 	unsigned int timer;
 
-	if (!(hba->capabilities & MASK_AUTO_HIBERN8_SUPPORT))
+	if (!ufshcd_is_auto_hibern8_supported(hba))
 		return -EOPNOTSUPP;
 
 	if (kstrtouint(buf, 0, &timer))
@@ -571,9 +574,10 @@ static ssize_t _name##_show(struct device *dev,				\
 	int ret;							\
 	int desc_len = QUERY_DESC_MAX_SIZE;				\
 	u8 *desc_buf;							\
+									\
 	desc_buf = kzalloc(QUERY_DESC_MAX_SIZE, GFP_ATOMIC);		\
-	if (!desc_buf)							\
-		return -ENOMEM;						\
+	if (!desc_buf)                                                  \
+		return -ENOMEM;                                         \
 	ret = ufshcd_query_descriptor_retry(hba,			\
 		UPIU_QUERY_OPCODE_READ_DESC, QUERY_DESC_IDN_DEVICE,	\
 		0, 0, desc_buf, &desc_len);				\
@@ -582,14 +586,13 @@ static ssize_t _name##_show(struct device *dev,				\
 		goto out;						\
 	}								\
 	index = desc_buf[DEVICE_DESC_PARAM##_pname];			\
-	memset(desc_buf, 0, QUERY_DESC_MAX_SIZE);			\
-	if (ufshcd_read_string_desc(hba, index, desc_buf,		\
-		QUERY_DESC_MAX_SIZE, true)) {				\
-		ret = -EINVAL;						\
+	kfree(desc_buf);						\
+	desc_buf = NULL;						\
+	ret = ufshcd_read_string_desc(hba, index, &desc_buf,		\
+				      SD_ASCII_STD);			\
+	if (ret < 0)							\
 		goto out;						\
-	}								\
-	ret = snprintf(buf, PAGE_SIZE, "%s\n",				\
-		desc_buf + QUERY_DESC_HDR_SIZE);			\
+	ret = snprintf(buf, PAGE_SIZE, "%s\n", desc_buf);		\
 out:									\
 	kfree(desc_buf);						\
 	return ret;							\
@@ -616,7 +619,7 @@ static const struct attribute_group ufs_sysfs_string_descriptors_group = {
 	.attrs = ufs_sysfs_string_descriptors,
 };
 
-#define UFS_FLAG_SHOW(_name, _uname)					\
+#define UFS_FLAG(_name, _uname)						\
 static ssize_t _name##_show(struct device *dev,				\
 	struct device_attribute *attr, char *buf)			\
 {									\
@@ -626,52 +629,17 @@ static ssize_t _name##_show(struct device *dev,				\
 		QUERY_FLAG_IDN##_uname, &flag))				\
 		return -EINVAL;						\
 	return sprintf(buf, "%s\n", flag ? "true" : "false");		\
-}
-
-#define UFS_FLAG_STORE(_name, _uname)					\
-static ssize_t _name##_store(struct device *dev,			\
-	struct device_attribute *attr, const char *buf,			\
-	size_t count)							\
-{									\
-	bool flag;							\
-	struct ufs_hba *hba = dev_get_drvdata(dev);			\
-	enum query_opcode op;						\
-	if (kstrtobool(buf, &flag))					\
-		return -EINVAL;						\
-	op = flag ? UPIU_QUERY_OPCODE_SET_FLAG :			\
-		UPIU_QUERY_OPCODE_CLEAR_FLAG;				\
-	if (ufshcd_query_flag(hba, op, QUERY_FLAG_IDN##_uname, NULL))	\
-		return -EINVAL;						\
-	return count;							\
 }									\
-
-#define UFS_FLAG_RO(_name, _uname)	\
-UFS_FLAG_SHOW(_name, _uname)		\
 static DEVICE_ATTR_RO(_name)
 
-#define UFS_FLAG_WO(_name, _uname)					\
-UFS_FLAG_STORE(_name, _uname)						\
-static ssize_t _name##_show(struct device *dev,				\
-	struct device_attribute *attr, char *buf)			\
-{									\
-	return -EOPNOTSUPP;						\
-}									\
-static DEVICE_ATTR_RW(_name)
-
-#define UFS_FLAG_RW(_name, _uname)					\
-UFS_FLAG_SHOW(_name, _uname)						\
-UFS_FLAG_STORE(_name, _uname)						\
-static DEVICE_ATTR_RW(_name)
-
-UFS_FLAG_RW(device_init, _FDEVICEINIT);
-UFS_FLAG_RW(permanent_wpe, _PERMANENT_WPE);
-UFS_FLAG_RW(power_on_wpe, _PWR_ON_WPE);
-UFS_FLAG_RW(bkops_enable, _BKOPS_EN);
-UFS_FLAG_RO(life_span_mode_enable, _LIFE_SPAN_MODE_ENABLE);
-UFS_FLAG_WO(purge_enable, _PURGE_ENABLE);
-UFS_FLAG_RW(phy_resource_removal, _FPHYRESOURCEREMOVAL);
-UFS_FLAG_RO(busy_rtc, _BUSY_RTC);
-UFS_FLAG_RO(disable_fw_update, _PERMANENTLY_DISABLE_FW_UPDATE);
+UFS_FLAG(device_init, _FDEVICEINIT);
+UFS_FLAG(permanent_wpe, _PERMANENT_WPE);
+UFS_FLAG(power_on_wpe, _PWR_ON_WPE);
+UFS_FLAG(bkops_enable, _BKOPS_EN);
+UFS_FLAG(life_span_mode_enable, _LIFE_SPAN_MODE_ENABLE);
+UFS_FLAG(phy_resource_removal, _FPHYRESOURCEREMOVAL);
+UFS_FLAG(busy_rtc, _BUSY_RTC);
+UFS_FLAG(disable_fw_update, _PERMANENTLY_DISABLE_FW_UPDATE);
 
 static struct attribute *ufs_sysfs_device_flags[] = {
 	&dev_attr_device_init.attr,
@@ -679,7 +647,6 @@ static struct attribute *ufs_sysfs_device_flags[] = {
 	&dev_attr_power_on_wpe.attr,
 	&dev_attr_bkops_enable.attr,
 	&dev_attr_life_span_mode_enable.attr,
-	&dev_attr_purge_enable.attr,
 	&dev_attr_phy_resource_removal.attr,
 	&dev_attr_busy_rtc.attr,
 	&dev_attr_disable_fw_update.attr,
@@ -691,7 +658,7 @@ static const struct attribute_group ufs_sysfs_flags_group = {
 	.attrs = ufs_sysfs_device_flags,
 };
 
-#define UFS_ATTRIBUTE_SHOW(_name, _uname)				\
+#define UFS_ATTRIBUTE(_name, _uname)					\
 static ssize_t _name##_show(struct device *dev,				\
 	struct device_attribute *attr, char *buf)			\
 {									\
@@ -701,45 +668,25 @@ static ssize_t _name##_show(struct device *dev,				\
 		QUERY_ATTR_IDN##_uname, 0, 0, &value))			\
 		return -EINVAL;						\
 	return sprintf(buf, "0x%08X\n", value);				\
-}
-
-#define UFS_ATTRIBUTE_RO(_name, _uname)					\
-UFS_ATTRIBUTE_SHOW(_name, _uname)					\
+}									\
 static DEVICE_ATTR_RO(_name)
 
-#define UFS_ATTRIBUTE_RW(_name, _uname)					\
-UFS_ATTRIBUTE_SHOW(_name, _uname)					\
-static ssize_t _name##_store(struct device *dev,			\
-		struct device_attribute *attr, const char *buf,		\
-		size_t count)						\
-{									\
-	struct ufs_hba *hba = dev_get_drvdata(dev);			\
-	u32 value;							\
-	if (kstrtou32(buf, 0, &value))					\
-		return -EINVAL;						\
-	if (ufshcd_query_attr(hba, UPIU_QUERY_OPCODE_WRITE_ATTR,	\
-		QUERY_ATTR_IDN##_uname, 0, 0, &value))			\
-		return -EINVAL;						\
-	return count;							\
-}									\
-static DEVICE_ATTR_RW(_name)
-
-UFS_ATTRIBUTE_RW(boot_lun_enabled, _BOOT_LU_EN);
-UFS_ATTRIBUTE_RO(current_power_mode, _POWER_MODE);
-UFS_ATTRIBUTE_RW(active_icc_level, _ACTIVE_ICC_LVL);
-UFS_ATTRIBUTE_RW(ooo_data_enabled, _OOO_DATA_EN);
-UFS_ATTRIBUTE_RO(bkops_status, _BKOPS_STATUS);
-UFS_ATTRIBUTE_RO(purge_status, _PURGE_STATUS);
-UFS_ATTRIBUTE_RW(max_data_in_size, _MAX_DATA_IN);
-UFS_ATTRIBUTE_RW(max_data_out_size, _MAX_DATA_OUT);
-UFS_ATTRIBUTE_RW(reference_clock_frequency, _REF_CLK_FREQ);
-UFS_ATTRIBUTE_RW(configuration_descriptor_lock, _CONF_DESC_LOCK);
-UFS_ATTRIBUTE_RW(max_number_of_rtt, _MAX_NUM_OF_RTT);
-UFS_ATTRIBUTE_RW(exception_event_control, _EE_CONTROL);
-UFS_ATTRIBUTE_RO(exception_event_status, _EE_STATUS);
-UFS_ATTRIBUTE_RO(ffu_status, _FFU_STATUS);
-UFS_ATTRIBUTE_RO(psa_state, _PSA_STATE);
-UFS_ATTRIBUTE_RO(psa_data_size, _PSA_DATA_SIZE);
+UFS_ATTRIBUTE(boot_lun_enabled, _BOOT_LU_EN);
+UFS_ATTRIBUTE(current_power_mode, _POWER_MODE);
+UFS_ATTRIBUTE(active_icc_level, _ACTIVE_ICC_LVL);
+UFS_ATTRIBUTE(ooo_data_enabled, _OOO_DATA_EN);
+UFS_ATTRIBUTE(bkops_status, _BKOPS_STATUS);
+UFS_ATTRIBUTE(purge_status, _PURGE_STATUS);
+UFS_ATTRIBUTE(max_data_in_size, _MAX_DATA_IN);
+UFS_ATTRIBUTE(max_data_out_size, _MAX_DATA_OUT);
+UFS_ATTRIBUTE(reference_clock_frequency, _REF_CLK_FREQ);
+UFS_ATTRIBUTE(configuration_descriptor_lock, _CONF_DESC_LOCK);
+UFS_ATTRIBUTE(max_number_of_rtt, _MAX_NUM_OF_RTT);
+UFS_ATTRIBUTE(exception_event_control, _EE_CONTROL);
+UFS_ATTRIBUTE(exception_event_status, _EE_STATUS);
+UFS_ATTRIBUTE(ffu_status, _FFU_STATUS);
+UFS_ATTRIBUTE(psa_state, _PSA_STATE);
+UFS_ATTRIBUTE(psa_data_size, _PSA_DATA_SIZE);
 
 static struct attribute *ufs_sysfs_attributes[] = {
 	&dev_attr_boot_lun_enabled.attr,

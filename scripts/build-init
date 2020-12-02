@@ -1,7 +1,14 @@
 #!/bin/bash
-export PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-export LD_LIBRARY_PATH=/lib64:/lib:/usr/lib64:/usr/lib:/usr/local/lib64:/usr/local/lib
-export PKG_CONFIG_PATH=/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/spice-pkg/usr/lib64/pkgconfig:/home/chronos/spice-pkg/usr/share/pkgconfig
+export HOME=/home/chronos
+export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib:/lib64:/lib
+export C_INCLUDE_PATH=/usr/local/include/ncurses
+export GCONV_PATH=/usr/local/lib64/gconv
+export PERL5LIB=/usr/local/lib/perl5/5.32.0
+export PKG_CONFIG_PATH=/home/chronos/inih-pkg/usr/lib64/pkgconfig:/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig:/usr/local/lib64/pkgconfig
+export PYTHON=/usr/local/bin/python3
+export PYTHONHOME=/usr/local
+export SGML_CATALOG_FILES="/usr/local/etc/sgml/catalog"
+export XML_CATALOG_FILES="/usr/local/etc/xml/catalog"
 export LANGUAGE=en_US.UTF-8
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
@@ -169,38 +176,16 @@ write_base_table() {
 }
 
 cd /home/chronos/
-mkdir ./source
 
 version="$(/opt/google/chrome/chrome --version)"
 version=r"${version:14:2}"
 echo "Entered chroot with kernel $kernel and recovery version $version"
 
-curl -Ls https://raw.github.com/skycocker/chromebrew/master/install.sh | bash
+sudo chown 1000:1000 /usr/local
 
-#Method to use when Chromebrew is broken
-#curl -Ls https://raw.githubusercontent.com/skycocker/chromebrew/17c190887e6907ffe8ebf247323753c4e7bd1fb1/install.sh > install.sh
-#In install.sh Replace git reset --hard origin/"${BRANCH}" with git reset --hard 2ef13a0703 # 2ef13a0703 is the last working commit
-#sed -i 's#git reset --hard origin/"${BRANCH}"#git reset --hard 17c190887e#g' ./install.sh
-#bash ./install.sh
-
-yes | crew install docbook make patch wget xmlcatmgr
-mkdir -p /usr/local/etc/xml
-ln -s /usr/local/docbook/catalog.xml /usr/local/etc/xml/catalog.xml
-
-yes | crew install alsa_lib autoconf_archive cpio expect glib libaio libjpeg libopus libusb pixman python3 six socat
-crew remove libgcrypt
-python3 -m ensurepip
-pip3 install pyparsing
-pip3 install cryptography
-
-sudo rm /etc/ld.so.cache
-sudo ldconfig
-
-cp /usr/local/bin/ld.gold /usr/local/bin/ld
-sudo rm /usr/lib64/libstdc++.so*
-
-sudo ln -s /usr/local/lib64/libc_nonshared.a /usr/lib64/libc_nonshared.a
-sudo ln -s /usr/local/lib64/libmvec_nonshared.a /usr/lib64/libmvec_nonshared.a
+curl -L https://github.com/sebanc/brunch-toolchain/releases/download/20201130/brunch_toolchain_20201130.tar.gz -o brunch_toolchain.tar.gz
+tar zxf brunch_toolchain.tar.gz -C /usr/local
+sudo rm /usr/lib64/libc.so /usr/lib64/libm.so
 
 mkdir -p ./version-pkg/etc
 echo "Brunch $version k$kernel $(date +"%Y%m%d")" > ./version-pkg/etc/brunch_version
@@ -209,20 +194,53 @@ tar zcvf ../rootc/packages/version.tar.gz * --owner=0 --group=0
 cd ..
 rm -rf ./version-pkg
 
+git clone -b master https://github.com/godspeed1989/fbv.git fbv
+cd ./fbv
+./configure --prefix=/
+make -j$(($(nproc)-1))
+mkdir -p ../initramfs/{bin,lib64}
+cp ./fbv ../initramfs/bin/
+for i in $(ldd ./fbv | cut -d' ' -f3); do cp "$i" ../initramfs/lib64/; done
+cd ..
+rm -rf ./fbv
+
+if [ "$kernel" == "5.4" ]; then
+
+git clone -b master https://github.com/linux-surface/iptsd.git iptsd
+cd iptsd
+meson --prefix="/home/chronos/ipts-pkg/usr" build/
+meson configure build/
+ninja -C build/ install
+mkdir -p /home/chronos/ipts-pkg/etc/init
+cat >/home/chronos/ipts-pkg/etc/init/ipts.conf <<IPTS
+start on stopped udev-trigger
+
+script
+	insmod /lib/modules/ipts.ko
+	iptsd
+end script
+IPTS
+cd ..
+rm -rf ./iptsd ./inih-pkg
+cd ./ipts-pkg
+tar zcvf ../rootc/packages/ipts.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./ipts-pkg
+
+fi
+
 mkdir -p ./binaries-pkg/usr/sbin
 
 git clone -b master https://git.code.sf.net/p/linuxconsole/code linuxconsole
-cp -r ./linuxconsole ./source/
 cd linuxconsole/utils
-make inputattach
+make -j$(($(nproc)-1)) inputattach
 cp inputattach ../../binaries-pkg/usr/sbin/
 cd ../..
 rm -rf ./linuxconsole
 
 git clone --depth=1 -b msr-tools-1.3 https://github.com/intel/msr-tools.git
-cp -r ./msr-tools ./source/
 cd msr-tools
-make
+make -j$(($(nproc)-1))
 cp cpuid ../binaries-pkg/usr/sbin/
 cp rdmsr ../binaries-pkg/usr/sbin/
 cp wrmsr ../binaries-pkg/usr/sbin/
@@ -230,27 +248,24 @@ cd ..
 rm -rf ./msr-tools
 
 git clone --depth=1 -b master git://thekelleys.org.uk/dnsmasq.git
-cp -r ./dnsmasq ./source/
 cd dnsmasq
 sed -i "s#PREFIX        = /usr/local#PREFIX        = /usr#g" ./Makefile
-make
+make -j$(($(nproc)-1))
 cp ./src/dnsmasq ../binaries-pkg/usr/sbin/
 cd ..
 rm -rf ./dnsmasq
 
 git clone --depth=1 -b master https://github.com/tinyproxy/tinyproxy.git
-cp -r ./tinyproxy ./source/
 cd tinyproxy
 ./autogen.sh --prefix=/usr
-make
+make -j$(($(nproc)-1))
 cp ./src/tinyproxy ../binaries-pkg/usr/sbin/
 cd ..
 rm -rf ./tinyproxy
 
 git clone --depth=1 -b master https://github.com/plougher/squashfs-tools.git
-cp -r ./squashfs-tools ./source/
 cd squashfs-tools/squashfs-tools
-make
+make -j$(($(nproc)-1))
 cp mksquashfs ../../binaries-pkg/usr/sbin/
 cp unsquashfs ../../binaries-pkg/usr/sbin/
 cd ../..
@@ -261,53 +276,46 @@ tar zcvf ../rootc/packages/binaries.tar.gz * --owner=0 --group=0
 cd ..
 rm -rf ./binaries-pkg
 
-git clone --depth=1 -b master https://github.com/freedesktop/spice-protocol.git
-cp -r ./spice-protocol ./source/
-cd ./spice-protocol
-meson --prefix="/home/chronos/spice-pkg/usr" build/
-meson configure build/
-ninja -C build/ install
+git clone -b master https://github.com/jirka-h/haveged.git
+cd haveged
+./configure --prefix=/usr --libdir=/usr/lib64 --disable-init --enable-tune=no
+make -j$(($(nproc)-1))
+make DESTDIR=/home/chronos/haveged-pkg install
 cd ..
-rm -rf ./spice-protocol
+rm -rf ./haveged
 
-git clone -b master https://github.com/freedesktop/spice-usbredir.git
-cp -r ./spice-usbredir ./source/
-cd ./spice-usbredir
-sed -i '/AC_CONFIG_SRCDIR/ a AC_CONFIG_AUX_DIR([.])' ./configure.ac
-./autogen.sh --prefix=/usr --libdir=/usr/lib64 CFLAGS=-fstack-protector-all
-make
-make DESTDIR=/home/chronos/spice-pkg install
-sed -i "s#/usr#/home/chronos/spice-pkg/usr#g" /home/chronos/spice-pkg/usr/lib64/pkgconfig/libusbredir*.pc
+git clone -b popt-1.18-release https://github.com/rpm-software-management/popt.git
+cd ./popt
+./autogen.sh
+./configure --prefix=/usr --libdir=/usr/lib64
+make -j$(($(nproc)-1))
+make DESTDIR=/home/chronos/efibootmgr-pkg install
 cd ..
-rm -rf ./spice-usbredir
+rm -rf ./popt
 
-git clone -b master https://github.com/freedesktop/spice.git
-cp -r ./spice ./source/
-cd ./spice
-./autogen.sh --prefix=/usr --libdir=/usr/lib64 CFLAGS=-fstack-protector-all
-make
-make DESTDIR=/home/chronos/spice-pkg install
-sed -i "s#/usr#/home/chronos/spice-pkg/usr#g" /home/chronos/spice-pkg/usr/lib64/pkgconfig/spice-server.pc
-for i in $(ldd ../spice-pkg/usr/lib64/libspice-server.so | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do cp "$i" ../spice-pkg/usr/lib64/; done
+git clone -b 37 https://github.com/rhboot/efivar.git
+cd ./efivar
+sed -i "s# --add-needed##g" ./gcc.specs
+make -j$(($(nproc)-1)) CFLAGS="-Wno-address-of-packed-member"
+make DESTDIR=/home/chronos/efibootmgr-pkg install
+sed -i "s#/usr#/home/chronos/efibootmgr-pkg/usr#g" /home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig/*
 cd ..
-rm -rf ./spice
+rm -rf ./efivar
 
-git clone --depth=1 -b master git://git.qemu-project.org/qemu.git
-cp -r ./qemu ./source/
-cd ./qemu
-./configure --prefix=/usr --libdir=/usr/lib64 --target-list=x86_64-softmmu --enable-kvm --enable-spice --enable-linux-aio --enable-usb-redir --audio-drv-list=alsa --disable-guest-agent --disable-curses --disable-nettle
-make DESTDIR=/home/chronos/qemu-pkg install
-ln -s qemu-system-x86_64 ../qemu-pkg/usr/bin/qemu
-rm -r ../qemu-pkg/usr/include ../qemu-pkg/usr/share/applications ../qemu-pkg/usr/share/icons
-mkdir -p ../qemu-pkg/usr/lib64
-cp -a ../spice-pkg/usr/lib64/*.so* ../qemu-pkg/usr/lib64/
-cd ../qemu-pkg
-tar zcvf ../rootc/packages/qemu.tar.gz * --owner=0 --group=0
+git clone -b master https://github.com/rhboot/efibootmgr.git
+cd ./efibootmgr
+make -j$(($(nproc)-1)) EFIDIR=boot EFI_LOADER=grubx64.efi CFLAGS="-Wno-pointer-sign" C_INCLUDE_PATH=/home/chronos/efibootmgr-pkg/usr/include
+make EFIDIR=boot EFI_LOADER=grubx64.efi DESTDIR=/home/chronos/efibootmgr-pkg install
 cd ..
-rm -rf ./qemu ./qemu-pkg ./spice-pkg
+rm -rf ./efibootmgr
+
+cd ./efibootmgr-pkg
+sed -i "s#/home/chronos/efibootmgr-pkg/usr#/usr#g" /home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig/*
+tar zcvf ../rootc/packages/efibootmgr.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./efibootmgr-pkg
 
 git clone --depth=1 -b master https://github.com/stefanberger/libtpms.git
-cp -r ./libtpms ./source/
 cd ./libtpms
 ./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib64 --with-openssl --with-tpm2
 make install
@@ -315,13 +323,12 @@ cd ..
 rm -rf ./libtpms
 
 git clone --depth=1 -b master https://github.com/stefanberger/swtpm.git
-cp -r ./swtpm ./source/
 cd ./swtpm
 sed -i '/AC_CONFIG_SRCDIR/ a AC_CONFIG_AUX_DIR([.])' ./configure.ac
-./autogen.sh --prefix=/usr --libdir=/usr/lib64 with_seccomp=no with_swtpm_setup=no with_gnutls=no with_cuse=no with_swtpm_setup=no
-make
+./autogen.sh --prefix=/usr --libdir=/usr/lib64 --disable-python-installation with_seccomp=no with_swtpm_setup=no with_gnutls=no with_cuse=no with_swtpm_setup=no
+make -j$(($(nproc)-1))
 make DESTDIR=/home/chronos/swtpm-pkg install
-for i in $(ldd ../swtpm-pkg/usr/bin/swtpm | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do cp "$i" ../swtpm-pkg/usr/lib64/; done
+for i in $(ldd ../swtpm-pkg/usr/bin/swtpm | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../swtpm-pkg/usr/lib64/; fi; done
 cd ..
 rm -rf ./swtpm
 
@@ -333,7 +340,7 @@ rm -r `ls swtpm_* | grep -v 'swtpm_ioctl'`
 cd ../..
 mkdir -p ./etc/init
 cat >./etc/init/swtpm.conf <<SWTPM
-start on starting boot-services
+start on stopped startup
 
 script
    modprobe tpm_vtpm_proxy
@@ -351,62 +358,55 @@ cd ..
 rm -rf ./swtpm-pkg
 
 git clone -b master https://github.com/ThomasDickey/ncurses-snapshots.git
-cp -r ./ncurses-snapshots ./source/
 cd ./ncurses-snapshots
 ./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal --enable-pc-files --with-libtool --with-pkg-config-libdir=/usr/lib64/pkgconfig
-make
-sudo make install
+make -j$(($(nproc)-1))
 make DESTDIR=/home/chronos/ncurses-pkg install
 cd ../ncurses-pkg
 tar zcvf ../rootc/packages/ncurses.tar.gz * --owner=0 --group=0
 cd ..
-rm -rf ./ncurses ./ncurses-pkg
-crew remove ncurses
+rm -rf ./ncurses
+sed -i "s#/usr#/home/chronos/ncurses-pkg/usr#g" /home/chronos/ncurses-pkg/usr/lib64/pkgconfig/*
 
 git clone -b master git://git.savannah.gnu.org/nano.git
-cp -r ./nano ./source/
 cd ./nano
 ./autogen.sh
 ./configure --prefix=/usr --libdir=/usr/lib64
-make
+make -j$(($(nproc)-1))
 make DESTDIR=/home/chronos/nano-pkg install
 mkdir -p ../nano-pkg/usr/lib64
-for i in $(ldd ../nano-pkg/usr/bin/nano | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do cp "$i" ../nano-pkg/usr/lib64/; done
+for i in $(ldd ../nano-pkg/usr/bin/nano | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../nano-pkg/usr/lib64/; fi; done
 cd ../nano-pkg
 tar zcvf ../rootc/packages/nano.tar.gz * --owner=0 --group=0
 cd ..
-rm -rf ./nano ./nano-pkg
+rm -rf ./ncurses-pkg ./nano ./nano-pkg
 
 git clone --depth=1 -b master https://github.com/mirror/busybox.git
-cp -r busybox ./source/
 cd busybox
 make defconfig
 sed -i 's/# CONFIG_INSTALL_NO_USR is not set/CONFIG_INSTALL_NO_USR=y/g' .config
 sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/g' .config
-make
+make -j$(($(nproc)-1))
 cd ..
 
-cd ./source
-tar zcf /out/sources_"$version"_k"$kernel"_"$(date +"%Y%m%d")".tar.gz * --owner=0 --group=0
-cd ..
-rm -rf ./source
-
-sudo chown -R chronos:chronos ./initramfs
 cd initramfs
-mkdir bin etc lib lib64 proc sbin sys tmp usr
+mkdir -p bin data etc lib lib64 proc sbin sys tmp usr
 cp ../busybox/busybox ./bin/busybox
-for i in $(ldd /sbin/blkid | cut -d' ' -f3); do cp "$i" ./lib64; done
+for i in $(ldd /sbin/blkid | cut -d' ' -f3); do cp "$i" ./lib64/; done
 cp /sbin/blkid ./sbin/
-for i in $(ldd /usr/bin/cgpt | cut -d' ' -f3); do cp "$i" ./lib64; done
+for i in $(ldd /usr/bin/cgpt | cut -d' ' -f3); do cp "$i" ./lib64/; done
 cp /usr/bin/cgpt ./sbin/
-for i in $(ldd /sbin/e2fsck | cut -d' ' -f3); do cp "$i" ./lib64; done
+for i in $(ldd /sbin/e2fsck | cut -d' ' -f3); do cp "$i" ./lib64/; done
 cp /sbin/e2fsck ./sbin/
-for i in $(ldd /sbin/losetup | cut -d' ' -f3); do cp "$i" ./lib64; done
+for i in $(ldd /sbin/losetup | cut -d' ' -f3); do cp "$i" ./lib64/; done
 cp /sbin/losetup ./sbin/
-for i in $(ldd /usr/bin/ntfs-3g | cut -d' ' -f3); do cp "$i" ./lib64; done
+for i in $(ldd /usr/bin/ntfs-3g | cut -d' ' -f3); do cp "$i" ./lib64/; done
 cp /usr/bin/ntfs-3g ./sbin/
-for i in $(ldd /usr/bin/pv | cut -d' ' -f3); do cp "$i" ./lib64; done
+for i in $(ldd /usr/bin/pv | cut -d' ' -f3); do cp "$i" ./lib64/; done
 cp /usr/bin/pv ./sbin/
+cp ../haveged-pkg/usr/sbin/haveged ./sbin/
+cp ../haveged-pkg/usr/lib64/libhavege.so* ./lib64/
+cp /lib64/ld-linux-x86-64.so.2 ./lib64/
 sudo chmod 0755 ./sbin/*
 find . | cpio -o -H newc | gzip > ../rootc/initramfs.img
 cd ..

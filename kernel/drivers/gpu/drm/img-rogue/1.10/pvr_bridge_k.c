@@ -48,13 +48,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvr_bridge.h"
 #include "pvr_bridge_k.h"
 #include "connection_server.h"
-#include "syscommon.h"
+#include "system/syscommon.h"
 #include "pvr_debug.h"
 #include "pvr_debugfs.h"
 #include "private_data.h"
 #include "linkage.h"
 #include "pmr.h"
-#include "rgx_bvnc_defs_km.h"
+#include "km/rgx_bvnc_defs_km.h"
 #include "pvrsrv_bridge_init.h"
 
 #include <drm/drmP.h>

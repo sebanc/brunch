@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * ISHTP client driver for talking to the Chrome OS EC firmware running
- * on Intel Integrated Sensor Hub (ISH) using the ISH Transport protocol
- * (ISH-TP).
- *
- * Copyright (c) 2019, Intel Corporation.
- */
+// ISHTP interface for ChromeOS Embedded Controller
+//
+// Copyright (c) 2019, Intel Corporation.
+//
+// ISHTP client driver for talking to the Chrome OS EC firmware running
+// on Intel Integrated Sensor Hub (ISH) using the ISH Transport protocol
+// (ISH-TP).
 
 #include <linux/delay.h>
-#include <linux/mfd/core.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/platform_data/cros_ec_commands.h>
@@ -82,21 +81,17 @@ DECLARE_RWSEM(init_lock);
 
 /**
  * struct response_info - Encapsulate firmware response related
- *			information for passing between function
- *			ish_send() and process_recv() callback.
- * @data:		Copy the data received from firmware here.
- * @max_size:		Max size allocated for the @data buffer. If the
- *			received data exceeds this value, we log an
- *			error.
- * @size:		Actual size of data received from firmware.
- * @error:		0 for success, negative error code for a
- *			failure in function process_recv().
- * @token:		Expected token for response that we are waiting on.
- * @received:		Set to true on receiving a valid firmware
- *			response to host command
- * @wait_queue:		Wait queue for Host firmware loading where the
- *			client sends message to ISH firmware and waits
- *			for response
+ * information for passing between function ish_send() and
+ * process_recv() callback.
+ *
+ * @data: Copy the data received from firmware here.
+ * @max_size: Max size allocated for the @data buffer. If the received
+ * data exceeds this value, we log an error.
+ * @size: Actual size of data received from firmware.
+ * @error: 0 for success, negative error code for a failure in process_recv().
+ * @token: Expected token for response that we are waiting on.
+ * @received: Set to true on receiving a valid firmware	response to host command
+ * @wait_queue: Wait queue for host to wait for firmware response.
  */
 struct response_info {
 	void *data;
@@ -110,14 +105,13 @@ struct response_info {
 
 /**
  * struct ishtp_cl_data - Encapsulate per ISH TP Client.
- * @cros_ish_cl:	ISHTP firmware client instance.
- * @cl_device:		ISHTP client device instance.
- * @response:		Firmware response information for passing
- *			between function ish_send() and process_recv()
- *			callback.
- * @work_ishtp_reset:	Work queue reset handling.
- * @work_ec_evt:	Work queue for EC events.
- * @ec_dev:		CrOS EC MFD device.
+ *
+ * @cros_ish_cl: ISHTP firmware client instance.
+ * @cl_device: ISHTP client device instance.
+ * @response: Response info passing between ish_send() and process_recv().
+ * @work_ishtp_reset: Work queue reset handling.
+ * @work_ec_evt: Work queue for EC events.
+ * @ec_dev: CrOS EC MFD device.
  *
  * This structure is used to store per client data.
  */
@@ -138,7 +132,7 @@ struct ishtp_cl_data {
 
 /**
  * ish_evt_handler - ISH to AP event handler
- * @work:		Work struct
+ * @work: Work struct
  */
 static void ish_evt_handler(struct work_struct *work)
 {
@@ -154,12 +148,13 @@ static void ish_evt_handler(struct work_struct *work)
 
 /**
  * ish_send() - Send message from host to firmware
- * @client_data:	Client data instance
- * @out_msg:		Message buffer to be sent to firmware
- * @out_size:		Size of out going message
- * @in_msg:		Message buffer where the incoming data copied.
- *			This buffer is allocated by calling
- * @in_size:		Max size of incoming message
+ *
+ * @client_data: Client data instance
+ * @out_msg: Message buffer to be sent to firmware
+ * @out_size: Size of out going message
+ * @in_msg: Message buffer where the incoming data is copied. This buffer
+ * is allocated by calling
+ * @in_size: Max size of incoming message
  *
  * Return: Number of bytes copied in the in_msg on success, negative
  * error code on failure.
@@ -345,8 +340,7 @@ end_error:
 
 /**
  * ish_event_cb() - bus driver callback for incoming message
- * @cl_device:		ISHTP client device for which this message is
- *			targeted.
+ * @cl_device: ISHTP client device for which this message is targeted.
  *
  * Remove the packet from the list and process the message by calling
  * process_recv.
@@ -371,7 +365,7 @@ static void ish_event_cb(struct ishtp_cl_device *cl_device)
 
 /**
  * cros_ish_init() - Init function for ISHTP client
- * @cros_ish_cl:	ISHTP client instance
+ * @cros_ish_cl: ISHTP client instance
  *
  * This function complete the initializtion of the client.
  *
@@ -426,7 +420,7 @@ err_cl_unlink:
 
 /**
  * cros_ish_deinit() - Deinit function for ISHTP client
- * @cros_ish_cl:	ISHTP client instance
+ * @cros_ish_cl: ISHTP client instance
  *
  * Unlink and free cros_ec client
  */
@@ -443,8 +437,11 @@ static void cros_ish_deinit(struct ishtp_cl *cros_ish_cl)
 
 /**
  * prepare_cros_ec_rx() - Check & prepare receive buffer
- * @in_msg:		Incoming message buffer
- * @cros_ec_command	cros_ec command used to send & receive data
+ * @ec_dev: CrOS EC MFD device.
+ * @in_msg: Incoming message buffer
+ * @msg: cros_ec command used to send & receive data
+ *
+ * Return: 0 for success, negative error code for failure.
  *
  * Check the received buffer. Convert to cros_ec_command format.
  */
@@ -496,13 +493,6 @@ static int cros_ec_pkt_xfer_ish(struct cros_ec_device *ec_dev,
 	size_t in_size = sizeof(struct cros_ish_in_msg) + msg->insize;
 	size_t out_size = sizeof(struct cros_ish_out_msg) + msg->outsize;
 
-	/* Proceed only if reset-init is not in progress */
-	if (!down_read_trylock(&init_lock)) {
-		dev_warn(dev,
-			 "Host is not ready to send messages to ISH. Try again\n");
-		return -EAGAIN;
-	}
-
 	/* Sanity checks */
 	if (in_size > ec_dev->din_size) {
 		dev_err(dev,
@@ -516,6 +506,13 @@ static int cros_ec_pkt_xfer_ish(struct cros_ec_device *ec_dev,
 			"Outgoing payload size %zu is too large for ec_dev->dout_size %d\n",
 			out_size, ec_dev->dout_size);
 		return -EMSGSIZE;
+	}
+
+	/* Proceed only if reset-init is not in progress */
+	if (!down_read_trylock(&init_lock)) {
+		dev_warn(dev,
+			 "Host is not ready to send messages to ISH. Try again\n");
+		return -EAGAIN;
 	}
 
 	/* Prepare the package to be sent over ISH TP */
@@ -637,7 +634,7 @@ static void reset_handler(struct work_struct *work)
 
 /**
  * cros_ec_ishtp_probe() - ISHTP client driver probe callback
- * @cl_device:		ISHTP client device instance
+ * @cl_device: ISHTP client device instance
  *
  * Return: 0 for success, negative error code for failure.
  */
@@ -682,8 +679,10 @@ static int cros_ec_ishtp_probe(struct ishtp_cl_device *cl_device)
 
 	/* Register croc_ec_dev mfd */
 	rv = cros_ec_dev_init(client_data);
-	if (rv)
+	if (rv) {
+		down_write(&init_lock);
 		goto end_cros_ec_dev_init_error;
+	}
 
 	return 0;
 
@@ -702,7 +701,7 @@ end_ishtp_cl_alloc_error:
 
 /**
  * cros_ec_ishtp_remove() - ISHTP client driver remove callback
- * @cl_device:		ISHTP client device instance
+ * @cl_device: ISHTP client device instance
  *
  * Return: 0
  */
@@ -721,7 +720,7 @@ static int cros_ec_ishtp_remove(struct ishtp_cl_device *cl_device)
 
 /**
  * cros_ec_ishtp_reset() - ISHTP client driver reset callback
- * @cl_device:		ISHTP client device instance
+ * @cl_device: ISHTP client device instance
  *
  * Return: 0
  */
@@ -737,7 +736,7 @@ static int cros_ec_ishtp_reset(struct ishtp_cl_device *cl_device)
 
 /**
  * cros_ec_ishtp_suspend() - ISHTP client driver suspend callback
- * @device:	device instance
+ * @device: device instance
  *
  * Return: 0 for success, negative error code for failure.
  */
@@ -752,7 +751,7 @@ static int __maybe_unused cros_ec_ishtp_suspend(struct device *device)
 
 /**
  * cros_ec_ishtp_resume() - ISHTP client driver resume callback
- * @device:	device instance
+ * @device: device instance
  *
  * Return: 0 for success, negative error code for failure.
  */
@@ -789,7 +788,7 @@ static void __exit cros_ec_ishtp_mod_exit(void)
 	ishtp_cl_driver_unregister(&cros_ec_ishtp_driver);
 }
 
-late_initcall(cros_ec_ishtp_mod_init);
+module_init(cros_ec_ishtp_mod_init);
 module_exit(cros_ec_ishtp_mod_exit);
 
 MODULE_DESCRIPTION("ChromeOS EC ISHTP Client Driver");

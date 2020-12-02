@@ -1,14 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * File Name:
  *   skfddi.c
  *
  * Copyright Information:
  *   Copyright SysKonnect 1998,1999.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  *
  * The information in this file is provided "AS IS" without warranty.
  *
@@ -409,10 +405,10 @@ static  int skfp_driver_init(struct net_device *dev)
 	if (bp->SharedMemSize > 0) {
 		bp->SharedMemSize += 16;	// for descriptor alignment
 
-		bp->SharedMemAddr = dma_zalloc_coherent(&bp->pdev.dev,
-							bp->SharedMemSize,
-							&bp->SharedMemDMA,
-							GFP_ATOMIC);
+		bp->SharedMemAddr = dma_alloc_coherent(&bp->pdev.dev,
+						       bp->SharedMemSize,
+						       &bp->SharedMemDMA,
+						       GFP_ATOMIC);
 		if (!bp->SharedMemAddr) {
 			printk("could not allocate mem for ");
 			printk("hardware module: %ld byte\n",

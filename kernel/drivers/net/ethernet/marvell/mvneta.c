@@ -27,6 +27,7 @@
 #include <linux/of_irq.h>
 #include <linux/of_mdio.h>
 #include <linux/of_net.h>
+#include <linux/phy/phy.h>
 #include <linux/phy.h>
 #include <linux/phylink.h>
 #include <linux/platform_device.h>
@@ -103,9 +104,11 @@
 #define      MVNETA_TX_IN_PRGRS                  BIT(1)
 #define      MVNETA_TX_FIFO_EMPTY                BIT(8)
 #define MVNETA_RX_MIN_FRAME_SIZE                 0x247c
+/* Only exists on Armada XP and Armada 370 */
 #define MVNETA_SERDES_CFG			 0x24A0
 #define      MVNETA_SGMII_SERDES_PROTO		 0x0cc7
 #define      MVNETA_QSGMII_SERDES_PROTO		 0x0667
+#define      MVNETA_HSGMII_SERDES_PROTO		 0x1107
 #define MVNETA_TYPE_PRIO                         0x24bc
 #define      MVNETA_FORCE_UNI                    BIT(21)
 #define MVNETA_TXQ_CMD_1                         0x24e4
@@ -221,6 +224,8 @@
 #define      MVNETA_GMAC_AN_FLOW_CTRL_EN         BIT(11)
 #define      MVNETA_GMAC_CONFIG_FULL_DUPLEX      BIT(12)
 #define      MVNETA_GMAC_AN_DUPLEX_EN            BIT(13)
+#define MVNETA_GMAC_CTRL_4                       0x2c90
+#define      MVNETA_GMAC4_SHORT_PREAMBLE_ENABLE  BIT(1)
 #define MVNETA_MIB_COUNTERS_BASE                 0x3000
 #define      MVNETA_MIB_LATE_COLLISION           0x7c
 #define MVNETA_DA_FILT_SPEC_MCAST                0x3400
@@ -436,6 +441,8 @@ struct mvneta_port {
 	struct device_node *dn;
 	unsigned int tx_csum_limit;
 	struct phylink *phylink;
+	struct phylink_config phylink_config;
+	struct phy *comphy;
 
 	struct mvneta_bm *bm_priv;
 	struct mvneta_bm_pool *pool_long;
@@ -493,7 +500,7 @@ struct mvneta_port {
 #if defined(__LITTLE_ENDIAN)
 struct mvneta_tx_desc {
 	u32  command;		/* Options used by HW for packet transmitting.*/
-	u16  reserverd1;	/* csum_l4 (for future use)		*/
+	u16  reserved1;		/* csum_l4 (for future use)		*/
 	u16  data_size;		/* Data size of transmitted packet in bytes */
 	u32  buf_phys_addr;	/* Physical addr of transmitted buffer	*/
 	u32  reserved2;		/* hw_cmd - (for future use, PMT)	*/
@@ -518,7 +525,7 @@ struct mvneta_rx_desc {
 #else
 struct mvneta_tx_desc {
 	u16  data_size;		/* Data size of transmitted packet in bytes */
-	u16  reserverd1;	/* csum_l4 (for future use)		*/
+	u16  reserved1;		/* csum_l4 (for future use)		*/
 	u32  command;		/* Options used by HW for packet transmitting.*/
 	u32  reserved2;		/* hw_cmd - (for future use, PMT)	*/
 	u32  buf_phys_addr;	/* Physical addr of transmitted buffer	*/
@@ -1119,7 +1126,7 @@ static void mvneta_bm_update_mtu(struct mvneta_port *pp, int mtu)
 			SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(bm_pool->pkt_size));
 
 	/* Fill entire long pool */
-	num = hwbm_pool_add(hwbm_pool, hwbm_pool->size, GFP_ATOMIC);
+	num = hwbm_pool_add(hwbm_pool, hwbm_pool->size);
 	if (num != hwbm_pool->size) {
 		WARN(1, "pool %d: %d of %d allocated\n",
 		     bm_pool->id, num, hwbm_pool->size);
@@ -2079,10 +2086,7 @@ static int mvneta_rx_swbm(struct napi_struct *napi,
 		/* Linux processing */
 		rxq->skb->protocol = eth_type_trans(rxq->skb, dev);
 
-		if (dev->features & NETIF_F_GRO)
-			napi_gro_receive(napi, rxq->skb);
-		else
-			netif_receive_skb(rxq->skb);
+		napi_gro_receive(napi, rxq->skb);
 
 		/* clean uncomplete skb pointer in queue */
 		rxq->skb = NULL;
@@ -2363,10 +2367,10 @@ static int mvneta_tx_frag_process(struct mvneta_port *pp, struct sk_buff *skb,
 
 	for (i = 0; i < nr_frags; i++) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-		void *addr = page_address(frag->page.p) + frag->page_offset;
+		void *addr = skb_frag_address(frag);
 
 		tx_desc = mvneta_txq_next_desc_get(txq);
-		tx_desc->data_size = frag->size;
+		tx_desc->data_size = skb_frag_size(frag);
 
 		tx_desc->buf_phys_addr =
 			dma_map_single(pp->dev->dev.parent, addr,
@@ -2481,7 +2485,7 @@ out:
 		if (txq->count >= txq->tx_stop_threshold)
 			netif_tx_stop_queue(nq);
 
-		if (!skb->xmit_more || netif_xmit_stopped(nq) ||
+		if (!netdev_xmit_more() || netif_xmit_stopped(nq) ||
 		    txq->pending + frags > MVNETA_TXQ_DEC_SENT_MASK)
 			mvneta_txq_pend_desc_add(pp, txq, frags);
 		else
@@ -2523,12 +2527,13 @@ static void mvneta_tx_done_gbe(struct mvneta_port *pp, u32 cause_tx_done)
 {
 	struct mvneta_tx_queue *txq;
 	struct netdev_queue *nq;
+	int cpu = smp_processor_id();
 
 	while (cause_tx_done) {
 		txq = mvneta_tx_done_policy(pp, cause_tx_done);
 
 		nq = netdev_get_tx_queue(pp->dev, txq->id);
-		__netif_tx_lock(nq, smp_processor_id());
+		__netif_tx_lock(nq, cpu);
 
 		if (txq->count)
 			mvneta_txq_done(pp, txq);
@@ -3161,9 +3166,60 @@ static int mvneta_setup_txqs(struct mvneta_port *pp)
 	return 0;
 }
 
+static int mvneta_comphy_init(struct mvneta_port *pp, phy_interface_t interface)
+{
+	int ret;
+
+	ret = phy_set_mode_ext(pp->comphy, PHY_MODE_ETHERNET, interface);
+	if (ret)
+		return ret;
+
+	return phy_power_on(pp->comphy);
+}
+
+static int mvneta_config_interface(struct mvneta_port *pp,
+				   phy_interface_t interface)
+{
+	int ret = 0;
+
+	if (pp->comphy) {
+		if (interface == PHY_INTERFACE_MODE_SGMII ||
+		    interface == PHY_INTERFACE_MODE_1000BASEX ||
+		    interface == PHY_INTERFACE_MODE_2500BASEX) {
+			ret = mvneta_comphy_init(pp, interface);
+		}
+	} else {
+		switch (interface) {
+		case PHY_INTERFACE_MODE_QSGMII:
+			mvreg_write(pp, MVNETA_SERDES_CFG,
+				    MVNETA_QSGMII_SERDES_PROTO);
+			break;
+
+		case PHY_INTERFACE_MODE_SGMII:
+		case PHY_INTERFACE_MODE_1000BASEX:
+			mvreg_write(pp, MVNETA_SERDES_CFG,
+				    MVNETA_SGMII_SERDES_PROTO);
+			break;
+
+		case PHY_INTERFACE_MODE_2500BASEX:
+			mvreg_write(pp, MVNETA_SERDES_CFG,
+				    MVNETA_HSGMII_SERDES_PROTO);
+			break;
+		default:
+			break;
+		}
+	}
+
+	pp->phy_interface = interface;
+
+	return ret;
+}
+
 static void mvneta_start_dev(struct mvneta_port *pp)
 {
 	int cpu;
+
+	WARN_ON(mvneta_config_interface(pp, pp->phy_interface));
 
 	mvneta_max_rx_size_set(pp, pp->pkt_size);
 	mvneta_txq_max_tx_size_set(pp, pp->pkt_size);
@@ -3227,6 +3283,8 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
 
 	mvneta_tx_reset(pp);
 	mvneta_rx_reset(pp);
+
+	WARN_ON(phy_power_off(pp->comphy));
 }
 
 static void mvneta_percpu_enable(void *arg)
@@ -3349,9 +3407,12 @@ static int mvneta_set_mac_addr(struct net_device *dev, void *addr)
 	return 0;
 }
 
-static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
+static void mvneta_validate(struct phylink_config *config,
+			    unsigned long *supported,
 			    struct phylink_link_state *state)
 {
+	struct net_device *ndev = to_net_dev(config->dev);
+	struct mvneta_port *pp = netdev_priv(ndev);
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 
 	/* We only support QSGMII, SGMII, 802.3z and RGMII modes */
@@ -3370,9 +3431,16 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
 
 	/* Asymmetric pause is unsupported */
 	phylink_set(mask, Pause);
+
 	/* Half-duplex at speeds higher than 100Mbit is unsupported */
-	phylink_set(mask, 1000baseT_Full);
-	phylink_set(mask, 1000baseX_Full);
+	if (pp->comphy || state->interface != PHY_INTERFACE_MODE_2500BASEX) {
+		phylink_set(mask, 1000baseT_Full);
+		phylink_set(mask, 1000baseX_Full);
+	}
+	if (pp->comphy || state->interface == PHY_INTERFACE_MODE_2500BASEX) {
+		phylink_set(mask, 2500baseT_Full);
+		phylink_set(mask, 2500baseX_Full);
+	}
 
 	if (!phy_interface_mode_is_8023z(state->interface)) {
 		/* 10M and 100M are only supported in non-802.3z mode */
@@ -3386,18 +3454,26 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
 		   __ETHTOOL_LINK_MODE_MASK_NBITS);
 	bitmap_and(state->advertising, state->advertising, mask,
 		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+
+	/* We can only operate at 2500BaseX or 1000BaseX.  If requested
+	 * to advertise both, only report advertising at 2500BaseX.
+	 */
+	phylink_helper_basex_speed(state);
 }
 
-static int mvneta_mac_link_state(struct net_device *ndev,
+static int mvneta_mac_link_state(struct phylink_config *config,
 				 struct phylink_link_state *state)
 {
+	struct net_device *ndev = to_net_dev(config->dev);
 	struct mvneta_port *pp = netdev_priv(ndev);
 	u32 gmac_stat;
 
 	gmac_stat = mvreg_read(pp, MVNETA_GMAC_STATUS);
 
 	if (gmac_stat & MVNETA_GMAC_SPEED_1000)
-		state->speed = SPEED_1000;
+		state->speed =
+			state->interface == PHY_INTERFACE_MODE_2500BASEX ?
+			SPEED_2500 : SPEED_1000;
 	else if (gmac_stat & MVNETA_GMAC_SPEED_100)
 		state->speed = SPEED_100;
 	else
@@ -3416,8 +3492,9 @@ static int mvneta_mac_link_state(struct net_device *ndev,
 	return 1;
 }
 
-static void mvneta_mac_an_restart(struct net_device *ndev)
+static void mvneta_mac_an_restart(struct phylink_config *config)
 {
+	struct net_device *ndev = to_net_dev(config->dev);
 	struct mvneta_port *pp = netdev_priv(ndev);
 	u32 gmac_an = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
 
@@ -3427,18 +3504,21 @@ static void mvneta_mac_an_restart(struct net_device *ndev)
 		    gmac_an & ~MVNETA_GMAC_INBAND_RESTART_AN);
 }
 
-static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
-	const struct phylink_link_state *state)
+static void mvneta_mac_config(struct phylink_config *config, unsigned int mode,
+			      const struct phylink_link_state *state)
 {
+	struct net_device *ndev = to_net_dev(config->dev);
 	struct mvneta_port *pp = netdev_priv(ndev);
 	u32 new_ctrl0, gmac_ctrl0 = mvreg_read(pp, MVNETA_GMAC_CTRL_0);
 	u32 new_ctrl2, gmac_ctrl2 = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+	u32 new_ctrl4, gmac_ctrl4 = mvreg_read(pp, MVNETA_GMAC_CTRL_4);
 	u32 new_clk, gmac_clk = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
 	u32 new_an, gmac_an = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
 
 	new_ctrl0 = gmac_ctrl0 & ~MVNETA_GMAC0_PORT_1000BASE_X;
 	new_ctrl2 = gmac_ctrl2 & ~(MVNETA_GMAC2_INBAND_AN_ENABLE |
 				   MVNETA_GMAC2_PORT_RESET);
+	new_ctrl4 = gmac_ctrl4 & ~(MVNETA_GMAC4_SHORT_PREAMBLE_ENABLE);
 	new_clk = gmac_clk & ~MVNETA_GMAC_1MS_CLOCK_ENABLE;
 	new_an = gmac_an & ~(MVNETA_GMAC_INBAND_AN_ENABLE |
 			     MVNETA_GMAC_INBAND_RESTART_AN |
@@ -3471,7 +3551,7 @@ static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
 		if (state->duplex)
 			new_an |= MVNETA_GMAC_CONFIG_FULL_DUPLEX;
 
-		if (state->speed == SPEED_1000)
+		if (state->speed == SPEED_1000 || state->speed == SPEED_2500)
 			new_an |= MVNETA_GMAC_CONFIG_GMII_SPEED;
 		else if (state->speed == SPEED_100)
 			new_an |= MVNETA_GMAC_CONFIG_MII_SPEED;
@@ -3510,10 +3590,25 @@ static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
 			    MVNETA_GMAC_FORCE_LINK_DOWN);
 	}
 
+
+	/* When at 2.5G, the link partner can send frames with shortened
+	 * preambles.
+	 */
+	if (state->interface == PHY_INTERFACE_MODE_2500BASEX)
+		new_ctrl4 |= MVNETA_GMAC4_SHORT_PREAMBLE_ENABLE;
+
+	if (pp->phy_interface != state->interface) {
+		if (pp->comphy)
+			WARN_ON(phy_power_off(pp->comphy));
+		WARN_ON(mvneta_config_interface(pp, state->interface));
+	}
+
 	if (new_ctrl0 != gmac_ctrl0)
 		mvreg_write(pp, MVNETA_GMAC_CTRL_0, new_ctrl0);
 	if (new_ctrl2 != gmac_ctrl2)
 		mvreg_write(pp, MVNETA_GMAC_CTRL_2, new_ctrl2);
+	if (new_ctrl4 != gmac_ctrl4)
+		mvreg_write(pp, MVNETA_GMAC_CTRL_4, new_ctrl4);
 	if (new_clk != gmac_clk)
 		mvreg_write(pp, MVNETA_GMAC_CLOCK_DIVIDER, new_clk);
 	if (new_an != gmac_an)
@@ -3538,9 +3633,10 @@ static void mvneta_set_eee(struct mvneta_port *pp, bool enable)
 	mvreg_write(pp, MVNETA_LPI_CTRL_1, lpi_ctl1);
 }
 
-static void mvneta_mac_link_down(struct net_device *ndev, unsigned int mode,
-				 phy_interface_t interface)
+static void mvneta_mac_link_down(struct phylink_config *config,
+				 unsigned int mode, phy_interface_t interface)
 {
+	struct net_device *ndev = to_net_dev(config->dev);
 	struct mvneta_port *pp = netdev_priv(ndev);
 	u32 val;
 
@@ -3557,10 +3653,11 @@ static void mvneta_mac_link_down(struct net_device *ndev, unsigned int mode,
 	mvneta_set_eee(pp, false);
 }
 
-static void mvneta_mac_link_up(struct net_device *ndev, unsigned int mode,
+static void mvneta_mac_link_up(struct phylink_config *config, unsigned int mode,
 			       phy_interface_t interface,
 			       struct phy_device *phy)
 {
+	struct net_device *ndev = to_net_dev(config->dev);
 	struct mvneta_port *pp = netdev_priv(ndev);
 	u32 val;
 
@@ -3805,9 +3902,6 @@ static int mvneta_open(struct net_device *dev)
 		if (ret)
 			goto err_free_online_hp;
 	}
-
-	/* In default link is down */
-	netif_carrier_off(pp->dev);
 
 	ret = mvneta_mdio_probe(pp);
 	if (ret < 0) {
@@ -4254,8 +4348,7 @@ static int mvneta_ethtool_set_eee(struct net_device *dev,
 
 	/* The Armada 37x documents do not give limits for this other than
 	 * it being an 8-bit register. */
-	if (eee->tx_lpi_enabled &&
-	    (eee->tx_lpi_timer < 0 || eee->tx_lpi_timer > 255))
+	if (eee->tx_lpi_enabled && eee->tx_lpi_timer > 255)
 		return -EINVAL;
 
 	lpi_ctl0 = mvreg_read(pp, MVNETA_LPI_CTRL_0);
@@ -4408,12 +4501,10 @@ static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
 	/* MAC Cause register should be cleared */
 	mvreg_write(pp, MVNETA_UNIT_INTR_CAUSE, 0);
 
-	if (phy_mode == PHY_INTERFACE_MODE_QSGMII)
-		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_QSGMII_SERDES_PROTO);
-	else if (phy_mode == PHY_INTERFACE_MODE_SGMII ||
-		 phy_mode == PHY_INTERFACE_MODE_1000BASEX)
-		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
-	else if (!phy_interface_mode_is_rgmii(phy_mode))
+	if (phy_mode != PHY_INTERFACE_MODE_QSGMII &&
+	    phy_mode != PHY_INTERFACE_MODE_SGMII &&
+	    !phy_interface_mode_is_8023z(phy_mode) &&
+	    !phy_interface_mode_is_rgmii(phy_mode))
 		return -EINVAL;
 
 	return 0;
@@ -4422,12 +4513,12 @@ static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
 /* Device initialization routine */
 static int mvneta_probe(struct platform_device *pdev)
 {
-	struct resource *res;
 	struct device_node *dn = pdev->dev.of_node;
 	struct device_node *bm_node;
 	struct mvneta_port *pp;
 	struct net_device *dev;
 	struct phylink *phylink;
+	struct phy *comphy;
 	const char *dt_mac_addr;
 	char hw_mac_addr[ETH_ALEN];
 	const char *mac_from;
@@ -4436,15 +4527,14 @@ static int mvneta_probe(struct platform_device *pdev)
 	int err;
 	int cpu;
 
-	dev = alloc_etherdev_mqs(sizeof(struct mvneta_port), txq_number, rxq_number);
+	dev = devm_alloc_etherdev_mqs(&pdev->dev, sizeof(struct mvneta_port),
+				      txq_number, rxq_number);
 	if (!dev)
 		return -ENOMEM;
 
 	dev->irq = irq_of_parse_and_map(dn, 0);
-	if (dev->irq == 0) {
-		err = -EINVAL;
-		goto err_free_netdev;
-	}
+	if (dev->irq == 0)
+		return -EINVAL;
 
 	phy_mode = of_get_phy_mode(dn);
 	if (phy_mode < 0) {
@@ -4453,8 +4543,22 @@ static int mvneta_probe(struct platform_device *pdev)
 		goto err_free_irq;
 	}
 
-	phylink = phylink_create(dev, pdev->dev.fwnode, phy_mode,
-				 &mvneta_phylink_ops);
+	comphy = devm_of_phy_get(&pdev->dev, dn, NULL);
+	if (comphy == ERR_PTR(-EPROBE_DEFER)) {
+		err = -EPROBE_DEFER;
+		goto err_free_irq;
+	} else if (IS_ERR(comphy)) {
+		comphy = NULL;
+	}
+
+	pp = netdev_priv(dev);
+	spin_lock_init(&pp->lock);
+
+	pp->phylink_config.dev = &dev->dev;
+	pp->phylink_config.type = PHYLINK_NETDEV;
+
+	phylink = phylink_create(&pp->phylink_config, pdev->dev.fwnode,
+				 phy_mode, &mvneta_phylink_ops);
 	if (IS_ERR(phylink)) {
 		err = PTR_ERR(phylink);
 		goto err_free_irq;
@@ -4466,9 +4570,8 @@ static int mvneta_probe(struct platform_device *pdev)
 
 	dev->ethtool_ops = &mvneta_eth_tool_ops;
 
-	pp = netdev_priv(dev);
-	spin_lock_init(&pp->lock);
 	pp->phylink = phylink;
+	pp->comphy = comphy;
 	pp->phy_interface = phy_mode;
 	pp->dn = dn;
 
@@ -4493,8 +4596,7 @@ static int mvneta_probe(struct platform_device *pdev)
 	if (!IS_ERR(pp->clk_bus))
 		clk_prepare_enable(pp->clk_bus);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	pp->base = devm_ioremap_resource(&pdev->dev, res);
+	pp->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(pp->base)) {
 		err = PTR_ERR(pp->base);
 		goto err_clk;
@@ -4515,9 +4617,9 @@ static int mvneta_probe(struct platform_device *pdev)
 	}
 
 	dt_mac_addr = of_get_mac_address(dn);
-	if (dt_mac_addr) {
+	if (!IS_ERR(dt_mac_addr)) {
 		mac_from = "device tree";
-		memcpy(dev->dev_addr, dt_mac_addr, ETH_ALEN);
+		ether_addr_copy(dev->dev_addr, dt_mac_addr);
 	} else {
 		mvneta_get_mac_addr(pp, hw_mac_addr);
 		if (is_valid_ether_addr(hw_mac_addr)) {
@@ -4589,10 +4691,10 @@ static int mvneta_probe(struct platform_device *pdev)
 	if (err < 0)
 		goto err_netdev;
 
-	err = mvneta_port_power_up(pp, phy_mode);
+	err = mvneta_port_power_up(pp, pp->phy_interface);
 	if (err < 0) {
 		dev_err(&pdev->dev, "can't power up port\n");
-		goto err_netdev;
+		return err;
 	}
 
 	/* Armada3700 network controller does not support per-cpu
@@ -4611,7 +4713,8 @@ static int mvneta_probe(struct platform_device *pdev)
 		}
 	}
 
-	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_TSO;
+	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
+			NETIF_F_TSO | NETIF_F_RXCSUM;
 	dev->hw_features |= dev->features;
 	dev->vlan_features |= dev->features;
 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
@@ -4653,8 +4756,6 @@ err_free_phylink:
 		phylink_destroy(pp->phylink);
 err_free_irq:
 	irq_dispose_mapping(dev->irq);
-err_free_netdev:
-	free_netdev(dev);
 	return err;
 }
 
@@ -4671,7 +4772,6 @@ static int mvneta_remove(struct platform_device *pdev)
 	free_percpu(pp->stats);
 	irq_dispose_mapping(dev->irq);
 	phylink_destroy(pp->phylink);
-	free_netdev(dev);
 
 	if (pp->bm_priv) {
 		mvneta_bm_pool_destroy(pp->bm_priv, pp->pool_long, 1 << pp->id);

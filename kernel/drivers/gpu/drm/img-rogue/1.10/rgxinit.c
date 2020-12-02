@@ -51,7 +51,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvr_notifier.h"
 #include "pvrsrv.h"
 #include "pvrsrv_bridge_init.h"
-#include "syscommon.h"
+#include "system/syscommon.h"
 #include "rgx_heaps.h"
 #include "rgxheapconfig.h"
 #include "rgxpower.h"
@@ -97,7 +97,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxta3d.h"
 #include "rgxtimecorr.h"
 
-#include "rgx_bvnc_defs_km.h"
+#include "km/rgx_bvnc_defs_km.h"
 #if defined(PDUMP)
 #include "rgxstartstop.h"
 #endif

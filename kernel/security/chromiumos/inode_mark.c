@@ -110,7 +110,7 @@ static int chromiumos_handle_fsnotify_event(struct fsnotify_group *group,
 					    struct inode *inode,
 					    u32 mask, const void *data,
 					    int data_type,
-					    const unsigned char *file_name,
+					    const struct qstr *file_name,
 					    u32 cookie,
 					    struct fsnotify_iter_info *iter_info)
 {
@@ -222,7 +222,7 @@ chromiumos_inode_mark_create(
 
 	inode_mark->policies[type] = policy;
 	ret = fsnotify_add_mark_locked(&inode_mark->mark, &inode->i_fsnotify_marks,
-				       type, false);
+				       type, false, NULL);
 	if (ret)
 		goto out;
 

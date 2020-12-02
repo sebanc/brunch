@@ -1,11 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  linux/arch/arm/kernel/entry-common.S
  *
  *  Copyright (C) 2000 Russell King
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <asm/assembler.h>
@@ -227,13 +224,7 @@ ENTRY(vector_swi)
 
 	uaccess_disable tbl
 
-	get_thread_info tsk
-
-#ifdef CONFIG_ALT_SYSCALL
-	ldr	tbl, [tsk, #TI_SYS_CALL_TABLE]	@ load per-thread syscall table pointer
-#else
 	adr	tbl, sys_call_table		@ load syscall table pointer
-#endif
 
 #if defined(CONFIG_OABI_COMPAT)
 	/*
@@ -249,7 +240,7 @@ ENTRY(vector_swi)
 	bic	scno, scno, #0xff000000		@ mask off SWI op-code
 	eor	scno, scno, #__NR_SYSCALL_BASE	@ check OS number
 #endif
-
+	get_thread_info tsk
 	/*
 	 * Reload the registers that may have been corrupted on entry to
 	 * the syscall assembly (by tracing or context tracking.)
@@ -374,17 +365,12 @@ ENTRY(\sym)
 sys_syscall:
 		bic	scno, r0, #__NR_OABI_SYSCALL_BASE
 		cmp	scno, #__NR_syscall - __NR_SYSCALL_BASE
-#ifdef CONFIG_ALT_SYSCALL
-		ldrne	r10, [tsk, #TI_NR_SYSCALLS]
-		cmpne	scno, r10		@ check per-thread range
-#else
 		cmpne	scno, #NR_syscalls	@ check range
-#endif
 #ifdef CONFIG_CPU_SPECTRE
 		movhs	scno, #0
 		csdb
 #endif
-		stmloia	sp, {r5, r6}		@ shuffle args
+		stmialo	sp, {r5, r6}		@ shuffle args
 		movlo	r0, r1
 		movlo	r1, r2
 		movlo	r2, r3

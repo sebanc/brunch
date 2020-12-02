@@ -48,7 +48,7 @@ static inline void prandom_state_selftest(void)
 }
 #endif
 
-DEFINE_PER_CPU(struct rnd_state, net_rand_state);
+DEFINE_PER_CPU(struct rnd_state, net_rand_state)  __latent_entropy;
 
 /**
  *	prandom_u32_state - seeded pseudo-random number generator.
@@ -171,9 +171,9 @@ static void prandom_seed_early(struct rnd_state *state, u32 seed,
 
 /**
  *	prandom_seed - add entropy to pseudo random number generator
- *	@seed: seed value
+ *	@entropy: entropy value
  *
- *	Add some additional seeding to the prandom pool.
+ *	Add some additional entropy to the prandom pool.
  */
 void prandom_seed(u32 entropy)
 {

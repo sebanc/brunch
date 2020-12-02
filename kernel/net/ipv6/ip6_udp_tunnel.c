@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/socket.h>
@@ -28,6 +29,13 @@ int udp_sock_create6(struct net *net, struct udp_port_cfg *cfg,
 
 		err = kernel_setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY,
 					(char *) &val, sizeof(val));
+		if (err < 0)
+			goto error;
+	}
+	if (cfg->bind_ifindex) {
+		err = kernel_setsockopt(sock, SOL_SOCKET, SO_BINDTOIFINDEX,
+					(void *)&cfg->bind_ifindex,
+					sizeof(cfg->bind_ifindex));
 		if (err < 0)
 			goto error;
 	}

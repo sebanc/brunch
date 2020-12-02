@@ -23,6 +23,9 @@
 #include <asm/unaligned.h>
 
 #include "ieee80211_i.h"
+#ifdef CPTCFG_IWLMVM_VENDOR_CMDS
+#include "packet_filtering.h"
+#endif
 #include "driver-ops.h"
 #include "led.h"
 #include "mesh.h"
@@ -93,44 +96,13 @@ static u8 *ieee80211_get_bssid(struct ieee80211_hdr *hdr, size_t len,
  * This function cleans up the SKB, i.e. it removes all the stuff
  * only useful for monitoring.
  */
-static struct sk_buff *ieee80211_clean_skb(struct sk_buff *skb,
-					   unsigned int present_fcs_len,
-					   unsigned int rtap_space)
+static void remove_monitor_info(struct sk_buff *skb,
+				unsigned int present_fcs_len,
+				unsigned int rtap_space)
 {
-	struct ieee80211_hdr *hdr;
-	unsigned int hdrlen;
-	__le16 fc;
-
 	if (present_fcs_len)
 		__pskb_trim(skb, skb->len - present_fcs_len);
 	__pskb_pull(skb, rtap_space);
-
-	hdr = (void *)skb->data;
-	fc = hdr->frame_control;
-
-	/*
-	 * Remove the HT-Control field (if present) on management
-	 * frames after we've sent the frame to monitoring. We
-	 * (currently) don't need it, and don't properly parse
-	 * frames with it present, due to the assumption of a
-	 * fixed management header length.
-	 */
-	if (likely(!ieee80211_is_mgmt(fc) || !ieee80211_has_order(fc)))
-		return skb;
-
-	hdrlen = ieee80211_hdrlen(fc);
-	hdr->frame_control &= ~cpu_to_le16(IEEE80211_FCTL_ORDER);
-
-	if (!pskb_may_pull(skb, hdrlen)) {
-		dev_kfree_skb(skb);
-		return NULL;
-	}
-
-	memmove(skb->data + IEEE80211_HT_CTL_LEN, skb->data,
-		hdrlen - IEEE80211_HT_CTL_LEN);
-	__pskb_pull(skb, IEEE80211_HT_CTL_LEN);
-
-	return skb;
 }
 
 static inline bool should_drop_frame(struct sk_buff *skb, int present_fcs_len,
@@ -857,8 +829,8 @@ ieee80211_rx_monitor(struct ieee80211_local *local, struct sk_buff *origskb,
 			return NULL;
 		}
 
-		return ieee80211_clean_skb(origskb, present_fcs_len,
-					   rtap_space);
+		remove_monitor_info(origskb, present_fcs_len, rtap_space);
+		return origskb;
 	}
 
 	ieee80211_handle_mu_mimo_mon(monitor_sdata, origskb, rtap_space);
@@ -901,7 +873,8 @@ ieee80211_rx_monitor(struct ieee80211_local *local, struct sk_buff *origskb,
 	if (!origskb)
 		return NULL;
 
-	return ieee80211_clean_skb(origskb, present_fcs_len, rtap_space);
+	remove_monitor_info(origskb, present_fcs_len, rtap_space);
+	return origskb;
 }
 
 static void ieee80211_parse_qos(struct ieee80211_rx_data *rx)
@@ -1481,7 +1454,8 @@ ieee80211_rx_h_check_dup(struct ieee80211_rx_data *rx)
 		return RX_CONTINUE;
 
 	if (ieee80211_is_ctl(hdr->frame_control) ||
-	    ieee80211_is_any_nullfunc(hdr->frame_control) ||
+	    ieee80211_is_nullfunc(hdr->frame_control) ||
+	    ieee80211_is_qos_nullfunc(hdr->frame_control) ||
 	    is_multicast_ether_addr(hdr->addr1))
 		return RX_CONTINUE;
 
@@ -1868,7 +1842,8 @@ ieee80211_rx_h_sta_process(struct ieee80211_rx_data *rx)
 	 * Drop (qos-)data::nullfunc frames silently, since they
 	 * are used only to control station power saving mode.
 	 */
-	if (ieee80211_is_any_nullfunc(hdr->frame_control)) {
+	if (ieee80211_is_nullfunc(hdr->frame_control) ||
+	    ieee80211_is_qos_nullfunc(hdr->frame_control)) {
 		I802_DEBUG_INC(rx->local->rx_handlers_drop_nullfunc);
 
 		/*
@@ -2399,7 +2374,7 @@ static int ieee80211_drop_unencrypted(struct ieee80211_rx_data *rx, __le16 fc)
 
 	/* Drop unencrypted frames if key is set. */
 	if (unlikely(!ieee80211_has_protected(fc) &&
-		     !ieee80211_is_any_nullfunc(fc) &&
+		     !ieee80211_is_nullfunc(fc) &&
 		     ieee80211_is_data(fc) && rx->key))
 		return -EACCES;
 
@@ -2527,8 +2502,7 @@ static void ieee80211_deliver_skb_to_local_stack(struct sk_buff *skb,
 	struct net_device *dev = sdata->dev;
 
 	if (unlikely((skb->protocol == sdata->control_port_protocol ||
-		     (skb->protocol == cpu_to_be16(ETH_P_PREAUTH) &&
-		      !sdata->control_port_no_preauth)) &&
+		      skb->protocol == cpu_to_be16(ETH_P_PREAUTH)) &&
 		     sdata->control_port_over_nl80211)) {
 		struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
 		bool noencrypt = !(status->flag & RX_FLAG_DECRYPTED);
@@ -2561,6 +2535,23 @@ ieee80211_deliver_skb(struct ieee80211_rx_data *rx)
 	skb = rx->skb;
 	xmit_skb = NULL;
 
+#ifdef CPTCFG_IWLMVM_VENDOR_CMDS
+	/*
+	 * Filter packets in case that configured to do so by user space,
+	 * and we are associated to an Hotspot AP and have an IP address.
+	 */
+	if (sdata->vif.filter_grat_arp_unsol_na &&
+	    sdata->vif.bss_conf.arp_addr_cnt &&
+	    ieee80211_is_gratuitous_arp_unsolicited_na(skb)) {
+		dev_kfree_skb(skb);
+		return;
+	}
+	if (sdata->vif.filter_gtk && sdata->vif.bss_conf.arp_addr_cnt &&
+	    ieee80211_is_shared_gtk(skb)) {
+		dev_kfree_skb(skb);
+		return;
+	}
+#endif
 	ieee80211_rx_stats(dev, skb->len);
 
 	if (rx->sta) {
@@ -3370,6 +3361,19 @@ ieee80211_rx_h_action(struct ieee80211_rx_data *rx)
 			}
 		}
 		break;
+	case WLAN_CATEGORY_SA_QUERY:
+		if (len < (IEEE80211_MIN_ACTION_SIZE +
+			   sizeof(mgmt->u.action.u.sa_query)))
+			break;
+
+		switch (mgmt->u.action.u.sa_query.action) {
+		case WLAN_ACTION_SA_QUERY_REQUEST:
+			if (sdata->vif.type != NL80211_IFTYPE_STATION)
+				break;
+			ieee80211_process_sa_query_req(sdata, mgmt, len);
+			goto handled;
+		}
+		break;
 	case WLAN_CATEGORY_SELF_PROTECTED:
 		if (len < (IEEE80211_MIN_ACTION_SIZE +
 			   sizeof(mgmt->u.action.u.self_prot.action_code)))
@@ -3456,41 +3460,6 @@ ieee80211_rx_h_userspace_mgmt(struct ieee80211_rx_data *rx)
 	}
 
 	return RX_CONTINUE;
-}
-
-static ieee80211_rx_result debug_noinline
-ieee80211_rx_h_action_post_userspace(struct ieee80211_rx_data *rx)
-{
-	struct ieee80211_sub_if_data *sdata = rx->sdata;
-	struct ieee80211_mgmt *mgmt = (struct ieee80211_mgmt *) rx->skb->data;
-	int len = rx->skb->len;
-
-	if (!ieee80211_is_action(mgmt->frame_control))
-		return RX_CONTINUE;
-
-	switch (mgmt->u.action.category) {
-	case WLAN_CATEGORY_SA_QUERY:
-		if (len < (IEEE80211_MIN_ACTION_SIZE +
-			   sizeof(mgmt->u.action.u.sa_query)))
-			break;
-
-		switch (mgmt->u.action.u.sa_query.action) {
-		case WLAN_ACTION_SA_QUERY_REQUEST:
-			if (sdata->vif.type != NL80211_IFTYPE_STATION)
-				break;
-			ieee80211_process_sa_query_req(sdata, mgmt, len);
-			goto handled;
-		}
-		break;
-	}
-
-	return RX_CONTINUE;
-
- handled:
-	if (rx->sta)
-		rx->sta->rx_stats.packets++;
-	dev_kfree_skb(rx->skb);
-	return RX_QUEUED;
 }
 
 static ieee80211_rx_result debug_noinline
@@ -3773,7 +3742,6 @@ static void ieee80211_rx_handlers(struct ieee80211_rx_data *rx,
 		CALL_RXH(ieee80211_rx_h_mgmt_check);
 		CALL_RXH(ieee80211_rx_h_action);
 		CALL_RXH(ieee80211_rx_h_userspace_mgmt);
-		CALL_RXH(ieee80211_rx_h_action_post_userspace);
 		CALL_RXH(ieee80211_rx_h_action_return);
 		CALL_RXH(ieee80211_rx_h_mgmt);
 
@@ -4193,6 +4161,12 @@ void ieee80211_check_fast_rx(struct sta_info *sta)
 		fastrx.icv_len = key->conf.icv_len;
 	}
 
+#ifdef CPTCFG_IWLMVM_VENDOR_CMDS
+	if (sdata->vif.filter_grat_arp_unsol_na &&
+	    sdata->vif.bss_conf.arp_addr_cnt)
+		fastrx.drop_grat_arp_unsol_na = true;
+#endif
+
 	assign = true;
  clear_rcu:
 	rcu_read_unlock();
@@ -4401,6 +4375,12 @@ static bool ieee80211_invoke_fast_rx(struct ieee80211_rx_data *rx,
 	memcpy(skb_push(skb, sizeof(addrs)), &addrs, sizeof(addrs));
 
 	skb->dev = fast_rx->dev;
+
+#ifdef CPTCFG_IWLMVM_VENDOR_CMDS
+	if (fast_rx->drop_grat_arp_unsol_na &&
+	    ieee80211_is_gratuitous_arp_unsolicited_na(skb))
+		goto drop;
+#endif
 
 	ieee80211_rx_stats(fast_rx->dev, skb->len);
 

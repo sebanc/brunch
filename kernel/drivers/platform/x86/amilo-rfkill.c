@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Support for rfkill on some Fujitsu-Siemens Amilo laptops.
  * Copyright 2011 Ben Hutchings.
@@ -6,11 +7,6 @@
  * Copyright 2005 Alejandro Vidal Mata & Javier Vidal Mata.
  * and on the fsaa1655g driver, which is:
  * Copyright 2006 Martin Večeřa.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include <linux/module.h>
@@ -32,12 +28,8 @@
 static int amilo_a1655_rfkill_set_block(void *data, bool blocked)
 {
 	u8 param = blocked ? A1655_WIFI_OFF : A1655_WIFI_ON;
-	int rc;
 
-	i8042_lock_chip();
-	rc = i8042_command(&param, A1655_WIFI_COMMAND);
-	i8042_unlock_chip();
-	return rc;
+	return i8042_command(&param, A1655_WIFI_COMMAND);
 }
 
 static const struct rfkill_ops amilo_a1655_rfkill_ops = {

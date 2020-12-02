@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Intel Broxton-P I2S Machine Driver
  *
@@ -5,15 +6,6 @@
  *
  * Modified from:
  *   Intel Skylake I2S Machine driver
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License version
- * 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 #include <linux/input.h>
@@ -29,6 +21,7 @@
 #include "../../codecs/da7219.h"
 #include "../../codecs/da7219-aad.h"
 #include "../common/soc-intel-quirks.h"
+#include "hda_dsp_common.h"
 
 #define BXT_DIALOG_CODEC_DAI	"da7219-hifi"
 #define BXT_MAXIM_CODEC_DAI	"HiFi"
@@ -51,14 +44,8 @@ struct bxt_hdmi_pcm {
 
 struct bxt_card_private {
 	struct list_head hdmi_pcm_list;
+	bool common_hdmi_codec_drv;
 	int spkamp;
-};
-
-static struct snd_soc_dai_link_component platform_component[] = {
-	{
-		/* name might be overridden during probe */
-		.name = "0000:00:1f.3"
-	}
 };
 
 enum {
@@ -222,8 +209,8 @@ static int broxton_ssp_fixup(struct snd_soc_pcm_runtime *rtd,
 static int broxton_da7219_codec_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int ret;
-	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-	struct snd_soc_component *component = rtd->codec_dai->component;
+	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+	struct snd_soc_component *component = asoc_rtd_to_codec(rtd, 0)->component;
 	int clk_freq;
 
 	/* Configure sysclk for codec */
@@ -269,7 +256,7 @@ static int broxton_da7219_codec_init(struct snd_soc_pcm_runtime *rtd)
 static int broxton_hdmi_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct bxt_card_private *ctx = snd_soc_card_get_drvdata(rtd->card);
-	struct snd_soc_dai *dai = rtd->codec_dai;
+	struct snd_soc_dai *dai = asoc_rtd_to_codec(rtd, 0);
 	struct bxt_hdmi_pcm *pcm;
 
 	pcm = devm_kzalloc(rtd->card->dev, sizeof(*pcm), GFP_KERNEL);
@@ -287,7 +274,7 @@ static int broxton_hdmi_init(struct snd_soc_pcm_runtime *rtd)
 static int broxton_da7219_fe_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_dapm_context *dapm;
-	struct snd_soc_component *component = rtd->cpu_dai->component;
+	struct snd_soc_component *component = asoc_rtd_to_cpu(rtd, 0)->component;
 
 	dapm = snd_soc_component_get_dapm(component);
 	snd_soc_dapm_ignore_suspend(dapm, "Reference Capture");
@@ -650,11 +637,11 @@ static struct snd_soc_dai_link broxton_dais[] = {
 
 static struct snd_soc_codec_conf max98390_codec_confs[] = {
 	{
-		.dev_name = MAX98390_DEV0_NAME,
+		.dlc = COMP_CODEC_CONF(MAX98390_DEV0_NAME),
 		.name_prefix = "Left",
 	},
 	{
-		.dev_name = MAX98390_DEV1_NAME,
+		.dlc = COMP_CODEC_CONF(MAX98390_DEV1_NAME),
 		.name_prefix = "Right",
 	},
 };
@@ -668,7 +655,7 @@ static int bxt_card_late_probe(struct snd_soc_card *card)
 	const struct snd_kcontrol_new *controls;
 	const struct snd_soc_dapm_widget *widgets;
 	const struct snd_soc_dapm_route *routes;
-	int num_controls, num_widgets, num_routes, ret, i = 0;
+	int num_controls, num_widgets, num_routes, err, i = 0;
 	char jack_name[NAME_SIZE];
 
 	switch (ctx->spkamp) {
@@ -690,25 +677,25 @@ static int bxt_card_late_probe(struct snd_soc_card *card)
 		break;
 	default:
 		dev_err(card->dev, "Invalid speaker amplifier %d\n", ctx->spkamp);
-		break;
+		return -EINVAL;
 	}
 
-	ret = snd_soc_dapm_new_controls(&card->dapm, widgets, num_widgets);
-	if (ret) {
+	err = snd_soc_dapm_new_controls(&card->dapm, widgets, num_widgets);
+	if (err) {
 		dev_err(card->dev, "Fail to new widgets\n");
-		return ret;
+		return err;
 	}
 
-	ret = snd_soc_add_card_controls(card, controls, num_controls);
-	if (ret) {
+	err = snd_soc_add_card_controls(card, controls, num_controls);
+	if (err) {
 		dev_err(card->dev, "Fail to add controls\n");
-		return ret;
+		return err;
 	}
 
-	ret = snd_soc_dapm_add_routes(&card->dapm, routes, num_routes);
-	if (ret) {
+	err = snd_soc_dapm_add_routes(&card->dapm, routes, num_routes);
+	if (err) {
 		dev_err(card->dev, "Fail to add routes\n");
-		return ret;
+		return err;
 	}
 
 	if (soc_intel_is_glk())
@@ -718,27 +705,34 @@ static int bxt_card_late_probe(struct snd_soc_card *card)
 		snd_soc_dapm_add_routes(&card->dapm, broxton_map,
 					ARRAY_SIZE(broxton_map));
 
+	if (list_empty(&ctx->hdmi_pcm_list))
+		return -EINVAL;
+
+	if (ctx->common_hdmi_codec_drv) {
+		pcm = list_first_entry(&ctx->hdmi_pcm_list, struct bxt_hdmi_pcm,
+				       head);
+		component = pcm->codec_dai->component;
+		return hda_dsp_hdmi_build_controls(card, component);
+	}
+
 	list_for_each_entry(pcm, &ctx->hdmi_pcm_list, head) {
 		component = pcm->codec_dai->component;
 		snprintf(jack_name, sizeof(jack_name),
 			"HDMI/DP, pcm=%d Jack", pcm->device);
-		ret = snd_soc_card_jack_new(card, jack_name,
+		err = snd_soc_card_jack_new(card, jack_name,
 					SND_JACK_AVOUT, &broxton_hdmi[i],
 					NULL, 0);
 
-		if (ret)
-			return ret;
+		if (err)
+			return err;
 
-		ret = hdac_hdmi_jack_init(pcm->codec_dai, pcm->device,
+		err = hdac_hdmi_jack_init(pcm->codec_dai, pcm->device,
 						&broxton_hdmi[i]);
-		if (ret < 0)
-			return ret;
+		if (err < 0)
+			return err;
 
 		i++;
 	}
-
-	if (!component)
-		return -EINVAL;
 
 	return hdac_hdmi_jack_port_init(component, &card->dapm);
 }
@@ -827,18 +821,19 @@ static int broxton_audio_probe(struct platform_device *pdev)
 				broxton_dais[i].name = "SSP0-Codec";
 				broxton_dais[i].cpus->dai_name = "SSP0 Pin";
 			}
-			broxton_dais[i].platforms = platform_component;
 		}
 	}
 
 	/* override plaform name, if required */
-	mach = (&pdev->dev)->platform_data;
+	mach = pdev->dev.platform_data;
 	platform_name = mach->mach_params.platform;
 
 	ret = snd_soc_fixup_dai_links_platform_name(&broxton_audio_card,
 						    platform_name);
 	if (ret)
 		return ret;
+
+	ctx->common_hdmi_codec_drv = mach->mach_params.common_hdmi_codec_drv;
 
 	return devm_snd_soc_register_card(&pdev->dev, &broxton_audio_card);
 }

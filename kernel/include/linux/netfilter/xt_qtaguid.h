@@ -3,6 +3,7 @@
 
 /* For now we just replace the xt_owner.
  * FIXME: make iptables aware of qtaguid. */
+#include <linux/net.h>
 #include <linux/netfilter/xt_owner.h>
 
 #define XT_QTAGUID_UID    XT_OWNER_UID

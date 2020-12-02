@@ -1,13 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Supports for the button array on SoC tablets originally running
  * Windows 8.
  *
  * (C) Copyright 2014 Intel Corporation
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; version 2
- * of the License.
  */
 
 #include <linux/module.h>
@@ -106,7 +102,7 @@ soc_button_device_create(struct platform_device *pdev,
 			 * In some cases the resources table we parse points to
 			 * such a virtual GPIO, since these are not real GPIOs
 			 * we do not have a driver for these so they will never
-			 * show up, therefor we ignore -EPROBE_DEFER.
+			 * show up, therefore we ignore -EPROBE_DEFER.
 			 */
 			continue;
 		}
@@ -131,25 +127,19 @@ soc_button_device_create(struct platform_device *pdev,
 	gpio_keys_pdata->nbuttons = n_buttons;
 	gpio_keys_pdata->rep = autorepeat;
 
-	pd = platform_device_alloc("gpio-keys", PLATFORM_DEVID_AUTO);
-	if (!pd) {
-		error = -ENOMEM;
+	pd = platform_device_register_resndata(&pdev->dev, "gpio-keys",
+					       PLATFORM_DEVID_AUTO, NULL, 0,
+					       gpio_keys_pdata,
+					       sizeof(*gpio_keys_pdata));
+	error = PTR_ERR_OR_ZERO(pd);
+	if (error) {
+		dev_err(&pdev->dev,
+			"failed registering gpio-keys: %d\n", error);
 		goto err_free_mem;
 	}
 
-	error = platform_device_add_data(pd, gpio_keys_pdata,
-					 sizeof(*gpio_keys_pdata));
-	if (error)
-		goto err_free_pdev;
-
-	error = platform_device_add(pd);
-	if (error)
-		goto err_free_pdev;
-
 	return pd;
 
-err_free_pdev:
-	platform_device_put(pd);
 err_free_mem:
 	devm_kfree(&pdev->dev, gpio_keys_pdata);
 	return ERR_PTR(error);
@@ -202,6 +192,10 @@ static int soc_button_parse_btn_desc(struct device *dev,
 		info->name = "power";
 		info->event_code = KEY_POWER;
 		info->wakeup = true;
+	} else if (upage == 0x01 && usage == 0xca) {
+		info->name = "rotation lock switch";
+		info->event_type = EV_SW;
+		info->event_code = SW_ROTATE_LOCK;
 	} else if (upage == 0x07 && usage == 0xe3) {
 		info->name = "home";
 		info->event_code = KEY_LEFTMETA;

@@ -196,8 +196,7 @@ enum iwl_rx_phy_flags {
  * @RX_MPDU_RES_STATUS_SEC_TKIP_ENC: this frame is encrypted using TKIP
  * @RX_MPDU_RES_STATUS_SEC_EXT_ENC: this frame is encrypted using extension
  *	algorithm
- * @RX_MPDU_RES_STATUS_SEC_CMAC_GMAC_ENC: this frame is protected using
- *	CMAC or GMAC
+ * @RX_MPDU_RES_STATUS_SEC_CCM_CMAC_ENC: this frame is encrypted using CCM_CMAC
  * @RX_MPDU_RES_STATUS_SEC_ENC_ERR: this frame couldn't be decrypted
  * @RX_MPDU_RES_STATUS_SEC_ENC_MSK: bitmask of the encryption algorithm
  * @RX_MPDU_RES_STATUS_DEC_DONE: this frame has been successfully decrypted
@@ -224,7 +223,7 @@ enum iwl_mvm_rx_status {
 	RX_MPDU_RES_STATUS_SEC_CCM_ENC			= (2 << 8),
 	RX_MPDU_RES_STATUS_SEC_TKIP_ENC			= (3 << 8),
 	RX_MPDU_RES_STATUS_SEC_EXT_ENC			= (4 << 8),
-	RX_MPDU_RES_STATUS_SEC_CMAC_GMAC_ENC		= (6 << 8),
+	RX_MPDU_RES_STATUS_SEC_CCM_CMAC_ENC		= (6 << 8),
 	RX_MPDU_RES_STATUS_SEC_ENC_ERR			= (7 << 8),
 	RX_MPDU_RES_STATUS_SEC_ENC_MSK			= (7 << 8),
 	RX_MPDU_RES_STATUS_DEC_DONE			= BIT(11),
@@ -296,8 +295,6 @@ enum iwl_rx_mpdu_status {
 	IWL_RX_MPDU_STATUS_ICV_OK		= BIT(5),
 	IWL_RX_MPDU_STATUS_MIC_OK		= BIT(6),
 	IWL_RX_MPDU_RES_STATUS_TTAK_OK		= BIT(7),
-	/* overlayed since IWL_UCODE_TLV_API_DEPRECATE_TTAK */
-	IWL_RX_MPDU_STATUS_REPLAY_ERROR		= BIT(7),
 	IWL_RX_MPDU_STATUS_SEC_MASK		= 0x7 << 8,
 	IWL_RX_MPDU_STATUS_SEC_UNKNOWN		= IWL_RX_MPDU_STATUS_SEC_MASK,
 	IWL_RX_MPDU_STATUS_SEC_NONE		= 0x0 << 8,
@@ -311,11 +308,17 @@ enum iwl_rx_mpdu_status {
 	IWL_RX_MPDU_STATUS_EXT_IV_MATCH		= BIT(13),
 	IWL_RX_MPDU_STATUS_KEY_ID_MATCH		= BIT(14),
 	IWL_RX_MPDU_STATUS_ROBUST_MNG_FRAME	= BIT(15),
+};
 
-	IWL_RX_MPDU_STATUS_KEY			= 0x3f0000,
-	IWL_RX_MPDU_STATUS_DUPLICATE		= BIT(22),
+enum iwl_rx_mpdu_hash_filter {
+	IWL_RX_MPDU_HF_A1_HASH_MASK		= 0x3f,
+	IWL_RX_MPDU_HF_FILTER_STATUS_MASK	= 0xc0,
+};
 
-	IWL_RX_MPDU_STATUS_STA_ID		= 0x1f000000,
+enum iwl_rx_mpdu_sta_id_flags {
+	IWL_RX_MPDU_SIF_STA_ID_MASK		= 0x1f,
+	IWL_RX_MPDU_SIF_RRF_ABORT		= 0x20,
+	IWL_RX_MPDU_SIF_FILTER_STATUS_MASK	= 0xc0,
 };
 
 #define IWL_RX_REORDER_DATA_INVALID_BAID 0x7f
@@ -670,8 +673,15 @@ struct iwl_rx_mpdu_desc {
 	/**
 	 * @status: &enum iwl_rx_mpdu_status
 	 */
-	__le32 status;
-
+	__le16 status;
+	/**
+	 * @hash_filter: hash filter value
+	 */
+	u8 hash_filter;
+	/**
+	 * @sta_id_flags: &enum iwl_rx_mpdu_sta_id_flags
+	 */
+	u8 sta_id_flags;
 	/* DW6 */
 	/**
 	 * @reorder_data: &enum iwl_rx_mpdu_reorder_data

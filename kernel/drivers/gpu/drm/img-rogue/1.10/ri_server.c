@@ -1432,6 +1432,7 @@ IMG_BOOL RIGetListEntryKM(IMG_PID pid,
 
 	default:
 		PVR_DPF((PVR_DBG_ERROR, "%s: Bad %d)",__func__, g_bNextGetState));
+		/* fall-through */
 
 	case RI_GET_STATE_END:
 		/* Reset state ready for the next ri_mem_area file to display */

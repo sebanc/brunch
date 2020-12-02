@@ -722,15 +722,72 @@ cur_state_store(struct device *dev, struct device_attribute *attr,
 	return result ? result : count;
 }
 
+static ssize_t
+bind_tz_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct thermal_cooling_device *cdev = to_cooling_device(dev);
+	struct thermal_zone_device *tz;
+	char *orig, *name;
+	int res = 0;
+
+	orig = kstrndup(buf, count, GFP_KERNEL);
+	if (!orig)
+		return -ENOMEM;
+
+	name = strstrip(orig);
+
+	tz = thermal_zone_get_zone_by_name(name);
+	if (IS_ERR_OR_NULL(tz))
+		return -EINVAL;
+
+	res = thermal_zone_bind_cooling_device(tz, THERMAL_TRIPS_NONE, cdev,
+					       THERMAL_NO_LIMIT,
+					       THERMAL_NO_LIMIT,
+					       THERMAL_WEIGHT_DEFAULT);
+
+	kfree(orig);
+	return res ? res : count;
+}
+
+static ssize_t
+unbind_tz_store(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct thermal_cooling_device *cdev = to_cooling_device(dev);
+	struct thermal_zone_device *tz;
+	char *name, *orig;
+	int res = 0;
+
+	orig = kstrndup(buf, count, GFP_KERNEL);
+	if (!orig)
+		return -ENOMEM;
+
+	name = strstrip(orig);
+
+	tz = thermal_zone_get_zone_by_name(name);
+	if (IS_ERR_OR_NULL(tz))
+		return -EINVAL;
+
+	res = thermal_zone_unbind_cooling_device(tz, THERMAL_TRIPS_NONE, cdev);
+
+	kfree(orig);
+	return res ? res : count;
+}
+
 static struct device_attribute
 dev_attr_cdev_type = __ATTR(type, 0444, cdev_type_show, NULL);
 static DEVICE_ATTR_RO(max_state);
 static DEVICE_ATTR_RW(cur_state);
+static DEVICE_ATTR_WO(bind_tz);
+static DEVICE_ATTR_WO(unbind_tz);
 
 static struct attribute *cooling_device_attrs[] = {
 	&dev_attr_cdev_type.attr,
 	&dev_attr_max_state.attr,
 	&dev_attr_cur_state.attr,
+	&dev_attr_bind_tz.attr,
+	&dev_attr_unbind_tz.attr,
 	NULL,
 };
 
@@ -975,6 +1032,26 @@ trip_point_show(struct device *dev, struct device_attribute *attr, char *buf)
 		return sprintf(buf, "-1\n");
 	else
 		return sprintf(buf, "%d\n", instance->trip);
+}
+
+ssize_t trip_point_store(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	struct thermal_instance *instance;
+	int ret, trip;
+
+	ret = kstrtoint(buf, 0, &trip);
+	if (ret)
+		return ret;
+
+	instance = container_of(attr, struct thermal_instance, attr);
+
+	if (trip >= instance->tz->trips || trip < THERMAL_TRIPS_NONE)
+		return -EINVAL;
+
+	instance->trip = trip;
+
+	return count;
 }
 
 ssize_t

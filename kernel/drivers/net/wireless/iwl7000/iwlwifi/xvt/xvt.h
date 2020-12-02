@@ -516,4 +516,3 @@ static inline int iwl_xvt_dbgfs_register(struct iwl_xvt *xvt,
 #endif
 
 int iwl_xvt_init_sar_tables(struct iwl_xvt *xvt);
-int iwl_xvt_sar_select_profile(struct iwl_xvt *xvt, int prof_a, int prof_b);

@@ -1,17 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
- *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation; either version 2 of the License, or
- *   (at your option) any later version.
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, write to the Free Software
- *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
 #include <linux/init.h>
@@ -19,6 +7,7 @@
 #include <linux/usb.h>
 #include <linux/usb/audio.h>
 #include <linux/usb/midi.h>
+#include <linux/bits.h>
 
 #include <sound/control.h>
 #include <sound/core.h>
@@ -682,15 +671,133 @@ static int snd_usb_cm106_boot_quirk(struct usb_device *dev)
 }
 
 /*
- * C-Media CM6206 is based on CM106 with two additional
- * registers that are not documented in the data sheet.
- * Values here are chosen based on sniffing USB traffic
- * under Windows.
+ * CM6206 registers from the CM6206 datasheet rev 2.1
  */
+#define CM6206_REG0_DMA_MASTER BIT(15)
+#define CM6206_REG0_SPDIFO_RATE_48K (2 << 12)
+#define CM6206_REG0_SPDIFO_RATE_96K (7 << 12)
+/* Bit 4 thru 11 is the S/PDIF category code */
+#define CM6206_REG0_SPDIFO_CAT_CODE_GENERAL (0 << 4)
+#define CM6206_REG0_SPDIFO_EMPHASIS_CD BIT(3)
+#define CM6206_REG0_SPDIFO_COPYRIGHT_NA BIT(2)
+#define CM6206_REG0_SPDIFO_NON_AUDIO BIT(1)
+#define CM6206_REG0_SPDIFO_PRO_FORMAT BIT(0)
+
+#define CM6206_REG1_TEST_SEL_CLK BIT(14)
+#define CM6206_REG1_PLLBIN_EN BIT(13)
+#define CM6206_REG1_SOFT_MUTE_EN BIT(12)
+#define CM6206_REG1_GPIO4_OUT BIT(11)
+#define CM6206_REG1_GPIO4_OE BIT(10)
+#define CM6206_REG1_GPIO3_OUT BIT(9)
+#define CM6206_REG1_GPIO3_OE BIT(8)
+#define CM6206_REG1_GPIO2_OUT BIT(7)
+#define CM6206_REG1_GPIO2_OE BIT(6)
+#define CM6206_REG1_GPIO1_OUT BIT(5)
+#define CM6206_REG1_GPIO1_OE BIT(4)
+#define CM6206_REG1_SPDIFO_INVALID BIT(3)
+#define CM6206_REG1_SPDIF_LOOP_EN BIT(2)
+#define CM6206_REG1_SPDIFO_DIS BIT(1)
+#define CM6206_REG1_SPDIFI_MIX BIT(0)
+
+#define CM6206_REG2_DRIVER_ON BIT(15)
+#define CM6206_REG2_HEADP_SEL_SIDE_CHANNELS (0 << 13)
+#define CM6206_REG2_HEADP_SEL_SURROUND_CHANNELS (1 << 13)
+#define CM6206_REG2_HEADP_SEL_CENTER_SUBW (2 << 13)
+#define CM6206_REG2_HEADP_SEL_FRONT_CHANNELS (3 << 13)
+#define CM6206_REG2_MUTE_HEADPHONE_RIGHT BIT(12)
+#define CM6206_REG2_MUTE_HEADPHONE_LEFT BIT(11)
+#define CM6206_REG2_MUTE_REAR_SURROUND_RIGHT BIT(10)
+#define CM6206_REG2_MUTE_REAR_SURROUND_LEFT BIT(9)
+#define CM6206_REG2_MUTE_SIDE_SURROUND_RIGHT BIT(8)
+#define CM6206_REG2_MUTE_SIDE_SURROUND_LEFT BIT(7)
+#define CM6206_REG2_MUTE_SUBWOOFER BIT(6)
+#define CM6206_REG2_MUTE_CENTER BIT(5)
+#define CM6206_REG2_MUTE_RIGHT_FRONT BIT(3)
+#define CM6206_REG2_MUTE_LEFT_FRONT BIT(3)
+#define CM6206_REG2_EN_BTL BIT(2)
+#define CM6206_REG2_MCUCLKSEL_1_5_MHZ (0)
+#define CM6206_REG2_MCUCLKSEL_3_MHZ (1)
+#define CM6206_REG2_MCUCLKSEL_6_MHZ (2)
+#define CM6206_REG2_MCUCLKSEL_12_MHZ (3)
+
+/* Bit 11..13 sets the sensitivity to FLY tuner volume control VP/VD signal */
+#define CM6206_REG3_FLYSPEED_DEFAULT (2 << 11)
+#define CM6206_REG3_VRAP25EN BIT(10)
+#define CM6206_REG3_MSEL1 BIT(9)
+#define CM6206_REG3_SPDIFI_RATE_44_1K BIT(0 << 7)
+#define CM6206_REG3_SPDIFI_RATE_48K BIT(2 << 7)
+#define CM6206_REG3_SPDIFI_RATE_32K BIT(3 << 7)
+#define CM6206_REG3_PINSEL BIT(6)
+#define CM6206_REG3_FOE BIT(5)
+#define CM6206_REG3_ROE BIT(4)
+#define CM6206_REG3_CBOE BIT(3)
+#define CM6206_REG3_LOSE BIT(2)
+#define CM6206_REG3_HPOE BIT(1)
+#define CM6206_REG3_SPDIFI_CANREC BIT(0)
+
+#define CM6206_REG5_DA_RSTN BIT(13)
+#define CM6206_REG5_AD_RSTN BIT(12)
+#define CM6206_REG5_SPDIFO_AD2SPDO BIT(12)
+#define CM6206_REG5_SPDIFO_SEL_FRONT (0 << 9)
+#define CM6206_REG5_SPDIFO_SEL_SIDE_SUR (1 << 9)
+#define CM6206_REG5_SPDIFO_SEL_CEN_LFE (2 << 9)
+#define CM6206_REG5_SPDIFO_SEL_REAR_SUR (3 << 9)
+#define CM6206_REG5_CODECM BIT(8)
+#define CM6206_REG5_EN_HPF BIT(7)
+#define CM6206_REG5_T_SEL_DSDA4 BIT(6)
+#define CM6206_REG5_T_SEL_DSDA3 BIT(5)
+#define CM6206_REG5_T_SEL_DSDA2 BIT(4)
+#define CM6206_REG5_T_SEL_DSDA1 BIT(3)
+#define CM6206_REG5_T_SEL_DSDAD_NORMAL 0
+#define CM6206_REG5_T_SEL_DSDAD_FRONT 4
+#define CM6206_REG5_T_SEL_DSDAD_S_SURROUND 5
+#define CM6206_REG5_T_SEL_DSDAD_CEN_LFE 6
+#define CM6206_REG5_T_SEL_DSDAD_R_SURROUND 7
+
 static int snd_usb_cm6206_boot_quirk(struct usb_device *dev)
 {
 	int err  = 0, reg;
-	int val[] = {0x2004, 0x3000, 0xf800, 0x143f, 0x0000, 0x3000};
+	int val[] = {
+		/*
+		 * Values here are chosen based on sniffing USB traffic
+		 * under Windows.
+		 *
+		 * REG0: DAC is master, sample rate 48kHz, no copyright
+		 */
+		CM6206_REG0_SPDIFO_RATE_48K |
+		CM6206_REG0_SPDIFO_COPYRIGHT_NA,
+		/*
+		 * REG1: PLL binary search enable, soft mute enable.
+		 */
+		CM6206_REG1_PLLBIN_EN |
+		CM6206_REG1_SOFT_MUTE_EN,
+		/*
+		 * REG2: enable output drivers,
+		 * select front channels to the headphone output,
+		 * then mute the headphone channels, run the MCU
+		 * at 1.5 MHz.
+		 */
+		CM6206_REG2_DRIVER_ON |
+		CM6206_REG2_HEADP_SEL_FRONT_CHANNELS |
+		CM6206_REG2_MUTE_HEADPHONE_RIGHT |
+		CM6206_REG2_MUTE_HEADPHONE_LEFT,
+		/*
+		 * REG3: default flyspeed, set 2.5V mic bias
+		 * enable all line out ports and enable SPDIF
+		 */
+		CM6206_REG3_FLYSPEED_DEFAULT |
+		CM6206_REG3_VRAP25EN |
+		CM6206_REG3_FOE |
+		CM6206_REG3_ROE |
+		CM6206_REG3_CBOE |
+		CM6206_REG3_LOSE |
+		CM6206_REG3_HPOE |
+		CM6206_REG3_SPDIFI_CANREC,
+		/* REG4 is just a bunch of GPIO lines */
+		0x0000,
+		/* REG5: de-assert AD/DA reset signals */
+		CM6206_REG5_DA_RSTN |
+		CM6206_REG5_AD_RSTN };
 
 	for (reg = 0; reg < ARRAY_SIZE(val); reg++) {
 		err = snd_usb_cm106_write_int_reg(dev, reg, val[reg]);
@@ -735,11 +842,13 @@ static int snd_usb_novation_boot_quirk(struct usb_device *dev)
 static int snd_usb_accessmusic_boot_quirk(struct usb_device *dev)
 {
 	int err, actual_length;
-
 	/* "midi send" enable */
 	static const u8 seq[] = { 0x4e, 0x73, 0x52, 0x01 };
+	void *buf;
 
-	void *buf = kmemdup(seq, ARRAY_SIZE(seq), GFP_KERNEL);
+	if (snd_usb_pipe_sanity_check(dev, usb_sndintpipe(dev, 0x05)))
+		return -EINVAL;
+	buf = kmemdup(seq, ARRAY_SIZE(seq), GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 	err = usb_interrupt_msg(dev, usb_sndintpipe(dev, 0x05), buf,
@@ -764,7 +873,11 @@ static int snd_usb_accessmusic_boot_quirk(struct usb_device *dev)
 
 static int snd_usb_nativeinstruments_boot_quirk(struct usb_device *dev)
 {
-	int ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+	int ret;
+
+	if (snd_usb_pipe_sanity_check(dev, usb_sndctrlpipe(dev, 0)))
+		return -EINVAL;
+	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 				  0xaf, USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 				  1, 0, NULL, 0, 1000);
 
@@ -871,6 +984,8 @@ static int snd_usb_axefx3_boot_quirk(struct usb_device *dev)
 
 	dev_dbg(&dev->dev, "Waiting for Axe-Fx III to boot up...\n");
 
+	if (snd_usb_pipe_sanity_check(dev, usb_sndctrlpipe(dev, 0)))
+		return -EINVAL;
 	/* If the Axe-Fx III has not fully booted, it will timeout when trying
 	 * to enable the audio streaming interface. A more generous timeout is
 	 * used here to detect when the Axe-Fx III has finished booting as the
@@ -891,6 +1006,134 @@ static int snd_usb_axefx3_boot_quirk(struct usb_device *dev)
 	if (err < 0)
 		dev_dbg(&dev->dev,
 			"error stopping Axe-Fx III interface: %d\n", err);
+
+	return 0;
+}
+
+
+#define MICROBOOK_BUF_SIZE 128
+
+static int snd_usb_motu_microbookii_communicate(struct usb_device *dev, u8 *buf,
+						int buf_size, int *length)
+{
+	int err, actual_length;
+
+	if (snd_usb_pipe_sanity_check(dev, usb_sndintpipe(dev, 0x01)))
+		return -EINVAL;
+	err = usb_interrupt_msg(dev, usb_sndintpipe(dev, 0x01), buf, *length,
+				&actual_length, 1000);
+	if (err < 0)
+		return err;
+
+	print_hex_dump(KERN_DEBUG, "MicroBookII snd: ", DUMP_PREFIX_NONE, 16, 1,
+		       buf, actual_length, false);
+
+	memset(buf, 0, buf_size);
+
+	if (snd_usb_pipe_sanity_check(dev, usb_rcvintpipe(dev, 0x82)))
+		return -EINVAL;
+	err = usb_interrupt_msg(dev, usb_rcvintpipe(dev, 0x82), buf, buf_size,
+				&actual_length, 1000);
+	if (err < 0)
+		return err;
+
+	print_hex_dump(KERN_DEBUG, "MicroBookII rcv: ", DUMP_PREFIX_NONE, 16, 1,
+		       buf, actual_length, false);
+
+	*length = actual_length;
+	return 0;
+}
+
+static int snd_usb_motu_microbookii_boot_quirk(struct usb_device *dev)
+{
+	int err, actual_length, poll_attempts = 0;
+	static const u8 set_samplerate_seq[] = { 0x00, 0x00, 0x00, 0x00,
+						 0x00, 0x00, 0x0b, 0x14,
+						 0x00, 0x00, 0x00, 0x01 };
+	static const u8 poll_ready_seq[] = { 0x00, 0x04, 0x00, 0x00,
+					     0x00, 0x00, 0x0b, 0x18 };
+	u8 *buf = kzalloc(MICROBOOK_BUF_SIZE, GFP_KERNEL);
+
+	if (!buf)
+		return -ENOMEM;
+
+	dev_info(&dev->dev, "Waiting for MOTU Microbook II to boot up...\n");
+
+	/* First we tell the device which sample rate to use. */
+	memcpy(buf, set_samplerate_seq, sizeof(set_samplerate_seq));
+	actual_length = sizeof(set_samplerate_seq);
+	err = snd_usb_motu_microbookii_communicate(dev, buf, MICROBOOK_BUF_SIZE,
+						   &actual_length);
+
+	if (err < 0) {
+		dev_err(&dev->dev,
+			"failed setting the sample rate for Motu MicroBook II: %d\n",
+			err);
+		goto free_buf;
+	}
+
+	/* Then we poll every 100 ms until the device informs of its readiness. */
+	while (true) {
+		if (++poll_attempts > 100) {
+			dev_err(&dev->dev,
+				"failed booting Motu MicroBook II: timeout\n");
+			err = -ENODEV;
+			goto free_buf;
+		}
+
+		memset(buf, 0, MICROBOOK_BUF_SIZE);
+		memcpy(buf, poll_ready_seq, sizeof(poll_ready_seq));
+
+		actual_length = sizeof(poll_ready_seq);
+		err = snd_usb_motu_microbookii_communicate(
+			dev, buf, MICROBOOK_BUF_SIZE, &actual_length);
+		if (err < 0) {
+			dev_err(&dev->dev,
+				"failed booting Motu MicroBook II: communication error %d\n",
+				err);
+			goto free_buf;
+		}
+
+		/* the device signals its readiness through a message of the
+		 * form
+		 *           XX 06 00 00 00 00 0b 18  00 00 00 01
+		 * If the device is not yet ready to accept audio data, the
+		 * last byte of that sequence is 00.
+		 */
+		if (actual_length == 12 && buf[actual_length - 1] == 1)
+			break;
+
+		msleep(100);
+	}
+
+	dev_info(&dev->dev, "MOTU MicroBook II ready\n");
+
+free_buf:
+	kfree(buf);
+	return err;
+}
+
+static int snd_usb_motu_m_series_boot_quirk(struct usb_device *dev)
+{
+	int ret;
+
+	if (snd_usb_pipe_sanity_check(dev, usb_sndctrlpipe(dev, 0)))
+		return -EINVAL;
+	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+			      1, USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+			      0x0, 0, NULL, 0, 1000);
+
+	if (ret < 0)
+		return ret;
+
+	msleep(2000);
+
+	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+			      1, USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+			      0x20, 0, NULL, 0, 1000);
+
+	if (ret < 0)
+		return ret;
 
 	return 0;
 }
@@ -1072,6 +1315,29 @@ int snd_usb_apply_boot_quirk(struct usb_device *dev,
 		return snd_usb_gamecon780_boot_quirk(dev);
 	case USB_ID(0x2466, 0x8010): /* Fractal Audio Axe-Fx 3 */
 		return snd_usb_axefx3_boot_quirk(dev);
+	case USB_ID(0x07fd, 0x0004): /* MOTU MicroBook II */
+		/*
+		 * For some reason interface 3 with vendor-spec class is
+		 * detected on MicroBook IIc.
+		 */
+		if (get_iface_desc(intf->altsetting)->bInterfaceClass ==
+		    USB_CLASS_VENDOR_SPEC &&
+		    get_iface_desc(intf->altsetting)->bInterfaceNumber < 3)
+			return snd_usb_motu_microbookii_boot_quirk(dev);
+		break;
+	}
+
+	return 0;
+}
+
+int snd_usb_apply_boot_quirk_once(struct usb_device *dev,
+				  struct usb_interface *intf,
+				  const struct snd_usb_audio_quirk *quirk,
+				  unsigned int id)
+{
+	switch (id) {
+	case USB_ID(0x07fd, 0x0008): /* MOTU M Series */
+		return snd_usb_motu_m_series_boot_quirk(dev);
 	}
 
 	return 0;
@@ -1338,12 +1604,13 @@ void snd_usb_ctl_msg_quirk(struct usb_device *dev, unsigned int pipe,
 	    && (requesttype & USB_TYPE_MASK) == USB_TYPE_CLASS)
 		msleep(20);
 
-	/* Zoom R16/24, Logitech H650e, Jabra 550a, Kingston HyperX needs a tiny
-	 * delay here, otherwise requests like get/set frequency return as
-	 * failed despite actually succeeding.
+	/* Zoom R16/24, Logitech H650e/H570e, Jabra 550a, Kingston HyperX
+	 *  needs a tiny delay here, otherwise requests like get/set
+	 *  frequency return as failed despite actually succeeding.
 	 */
 	if ((chip->usb_id == USB_ID(0x1686, 0x00dd) ||
 	     chip->usb_id == USB_ID(0x046d, 0x0a46) ||
+	     chip->usb_id == USB_ID(0x046d, 0x0a56) ||
 	     chip->usb_id == USB_ID(0x0b0e, 0x0349) ||
 	     chip->usb_id == USB_ID(0x0951, 0x16ad)) &&
 	    (requesttype & USB_TYPE_MASK) == USB_TYPE_CLASS)
@@ -1508,6 +1775,27 @@ void snd_usb_audioformat_attributes_quirk(struct snd_usb_audio *chip,
 			fp->ep_attr |= USB_ENDPOINT_SYNC_ADAPTIVE;
 		else
 			fp->ep_attr |= USB_ENDPOINT_SYNC_SYNC;
+		break;
+	case USB_ID(0x07fd, 0x0004):  /* MOTU MicroBook IIc */
+		/*
+		 * MaxPacketsOnly attribute is erroneously set in endpoint
+		 * descriptors. As a result this card produces noise with
+		 * all sample rates other than 96 KHz.
+		 */
+		fp->attributes &= ~UAC_EP_CS_ATTR_FILL_MAX;
+		break;
+	case USB_ID(0x1235, 0x8202):  /* Focusrite Scarlett 2i2 2nd gen */
+	case USB_ID(0x1235, 0x8205):  /* Focusrite Scarlett Solo 2nd gen */
+		/*
+		 * Reports that playback should use Synch: Synchronous
+		 * while still providing a feedback endpoint.
+		 * Synchronous causes snapping on some sample rates.
+		 * Force it to use Synch: Asynchronous.
+		 */
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			fp->ep_attr &= ~USB_ENDPOINT_SYNCTYPE;
+			fp->ep_attr |= USB_ENDPOINT_SYNC_ASYNC;
+		}
 		break;
 	}
 }

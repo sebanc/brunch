@@ -14,7 +14,6 @@
 #include <drm/drm_connector.h>
 #include <drm/drm_device.h>
 #include <drm/drm_dp_helper.h>
-#include <drm/drm_dp_mst_helper.h>
 
 /*
  * Unfortunately it turns out that we have a chicken-and-egg situation
@@ -249,10 +248,6 @@ void drm_dp_cec_irq(struct drm_dp_aux *aux)
 	if (!aux->transfer)
 		return;
 
-	if (aux->is_remote) {
-		schedule_work(&aux->cec.mst_irq_work);
-		return;
-	}
 	mutex_lock(&aux->cec.lock);
 	if (!aux->cec.adap)
 		goto unlock;
@@ -281,23 +276,6 @@ static bool drm_dp_cec_cap(struct drm_dp_aux *aux, u8 *cec_cap)
 	return true;
 }
 
-static void drm_dp_cec_mst_irq_work(struct work_struct *work)
-{
-	struct drm_dp_aux *aux = container_of(work, struct drm_dp_aux,
-					      cec.mst_irq_work);
-	struct drm_dp_mst_port *port =
-		container_of(aux, struct drm_dp_mst_port, aux);
-
-	port = drm_dp_mst_topology_get_port_validated(port->mgr, port);
-	if (!port)
-		return;
-	mutex_lock(&aux->cec.lock);
-	if (aux->cec.adap)
-		drm_dp_cec_handle_irq(aux);
-	mutex_unlock(&aux->cec.lock);
-	drm_dp_mst_topology_put_port(port);
-}
-
 /*
  * Called if the HPD was low for more than drm_dp_cec_unregister_delay
  * seconds. This unregisters the CEC adapter.
@@ -319,8 +297,7 @@ static void drm_dp_cec_unregister_work(struct work_struct *work)
  * were unchanged and just update the CEC physical address. Otherwise
  * unregister the old CEC adapter and create a new one.
  */
-static void drm_dp_cec_handle_set_edid(struct drm_dp_aux *aux,
-				       const struct edid *edid)
+void drm_dp_cec_set_edid(struct drm_dp_aux *aux, const struct edid *edid)
 {
 	struct drm_connector *connector = aux->cec.connector;
 	u32 cec_caps = CEC_CAP_DEFAULTS | CEC_CAP_NEEDS_HPD |
@@ -328,6 +305,10 @@ static void drm_dp_cec_handle_set_edid(struct drm_dp_aux *aux,
 	struct cec_connector_info conn_info;
 	unsigned int num_las = 1;
 	u8 cap;
+
+	/* No transfer function was set, so not a DP connector */
+	if (!aux->transfer)
+		return;
 
 #ifndef CONFIG_MEDIA_CEC_RC
 	/*
@@ -339,7 +320,6 @@ static void drm_dp_cec_handle_set_edid(struct drm_dp_aux *aux,
 	 */
 	cec_caps &= ~CEC_CAP_RC;
 #endif
-	cancel_work_sync(&aux->cec.mst_irq_work);
 	cancel_delayed_work_sync(&aux->cec.unregister_work);
 
 	mutex_lock(&aux->cec.lock);
@@ -395,39 +375,7 @@ static void drm_dp_cec_handle_set_edid(struct drm_dp_aux *aux,
 unlock:
 	mutex_unlock(&aux->cec.lock);
 }
-
-void drm_dp_cec_set_edid(struct drm_dp_aux *aux, const struct edid *edid)
-{
-	/* No transfer function was set, so not a DP connector */
-	if (!aux->transfer)
-		return;
-
-	if (aux->is_remote)
-		schedule_work(&aux->cec.mst_set_edid_work);
-	else
-		drm_dp_cec_handle_set_edid(aux, edid);
-}
 EXPORT_SYMBOL(drm_dp_cec_set_edid);
-
-static void drm_dp_cec_mst_set_edid_work(struct work_struct *work)
-{
-	struct drm_dp_aux *aux =
-		container_of(work, struct drm_dp_aux, cec.mst_set_edid_work);
-	struct drm_dp_mst_port *port =
-		container_of(aux, struct drm_dp_mst_port, aux);
-	struct edid *edid = NULL;
-
-	port = drm_dp_mst_topology_get_port_validated(port->mgr, port);
-	if (!port)
-		return;
-
-	edid = drm_get_edid(port->connector, &port->aux.ddc);
-
-	if (edid)
-		drm_dp_cec_handle_set_edid(aux, edid);
-
-	drm_dp_mst_topology_put_port(port);
-}
 
 /*
  * The EDID disappeared (likely because of the HPD going down).
@@ -445,8 +393,6 @@ void drm_dp_cec_unset_edid(struct drm_dp_aux *aux)
 		goto unlock;
 
 	cec_phys_addr_invalidate(aux->cec.adap);
-	cancel_work_sync(&aux->cec.mst_irq_work);
-
 	/*
 	 * We're done if we want to keep the CEC device
 	 * (drm_dp_cec_unregister_delay is >= NEVER_UNREG_DELAY) or if the
@@ -487,8 +433,6 @@ void drm_dp_cec_register_connector(struct drm_dp_aux *aux,
 	aux->cec.connector = connector;
 	INIT_DELAYED_WORK(&aux->cec.unregister_work,
 			  drm_dp_cec_unregister_work);
-	INIT_WORK(&aux->cec.mst_irq_work, drm_dp_cec_mst_irq_work);
-	INIT_WORK(&aux->cec.mst_set_edid_work, drm_dp_cec_mst_set_edid_work);
 }
 EXPORT_SYMBOL(drm_dp_cec_register_connector);
 
@@ -498,8 +442,6 @@ EXPORT_SYMBOL(drm_dp_cec_register_connector);
  */
 void drm_dp_cec_unregister_connector(struct drm_dp_aux *aux)
 {
-	cancel_work_sync(&aux->cec.mst_irq_work);
-	cancel_work_sync(&aux->cec.mst_set_edid_work);
 	if (!aux->cec.adap)
 		return;
 	cancel_delayed_work_sync(&aux->cec.unregister_work);

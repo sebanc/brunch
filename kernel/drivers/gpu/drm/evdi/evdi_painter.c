@@ -680,7 +680,7 @@ static int evdi_painter_disconnect(struct evdi_device *evdi,
 	evdi_painter_set_new_scanout_buffer(evdi, NULL);
 
 	if (painter->scanout_fb) {
-		drm_framebuffer_unreference(&painter->scanout_fb->base);
+		drm_framebuffer_put(&painter->scanout_fb->base);
 		painter->scanout_fb = NULL;
 	}
 
@@ -919,7 +919,7 @@ void evdi_painter_set_new_scanout_buffer(struct evdi_device *evdi,
 	struct evdi_framebuffer *oldfb = NULL;
 
 	if (newfb)
-		drm_framebuffer_reference(&newfb->base);
+		drm_framebuffer_get(&newfb->base);
 
 	mutex_lock(&painter->new_scanout_fb_lock);
 	oldfb = painter->new_scanout_fb;
@@ -927,7 +927,7 @@ void evdi_painter_set_new_scanout_buffer(struct evdi_device *evdi,
 	mutex_unlock(&painter->new_scanout_fb_lock);
 
 	if (oldfb)
-		drm_framebuffer_unreference(&oldfb->base);
+		drm_framebuffer_put(&oldfb->base);
 }
 
 void evdi_painter_commit_scanout_buffer(struct evdi_device *evdi)
@@ -942,7 +942,7 @@ void evdi_painter_commit_scanout_buffer(struct evdi_device *evdi)
 	newfb = painter->new_scanout_fb;
 
 	if (newfb)
-		drm_framebuffer_reference(&newfb->base);
+		drm_framebuffer_get(&newfb->base);
 
 	oldfb = painter->scanout_fb;
 	painter->scanout_fb = newfb;
@@ -951,7 +951,7 @@ void evdi_painter_commit_scanout_buffer(struct evdi_device *evdi)
 	painter_unlock(painter);
 
 	if (oldfb)
-		drm_framebuffer_unreference(&oldfb->base);
+		drm_framebuffer_put(&oldfb->base);
 }
 
 bool evdi_painter_needs_full_modeset(struct evdi_device *evdi)

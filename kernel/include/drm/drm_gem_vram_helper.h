@@ -36,7 +36,6 @@ struct vm_area_struct;
  * video memory becomes scarce.
  */
 struct drm_gem_vram_object {
-	struct drm_gem_object gem;
 	struct ttm_buffer_object bo;
 	struct ttm_bo_kmap_obj kmap;
 
@@ -68,7 +67,7 @@ static inline struct drm_gem_vram_object *drm_gem_vram_of_bo(
 static inline struct drm_gem_vram_object *drm_gem_vram_of_gem(
 	struct drm_gem_object *gem)
 {
-	return container_of(gem, struct drm_gem_vram_object, gem);
+	return container_of(gem, struct drm_gem_vram_object, bo.base);
 }
 
 struct drm_gem_vram_object *drm_gem_vram_create(struct drm_device *dev,
@@ -77,25 +76,19 @@ struct drm_gem_vram_object *drm_gem_vram_create(struct drm_device *dev,
 						unsigned long pg_align,
 						bool interruptible);
 void drm_gem_vram_put(struct drm_gem_vram_object *gbo);
-int drm_gem_vram_reserve(struct drm_gem_vram_object *gbo, bool no_wait);
-void drm_gem_vram_unreserve(struct drm_gem_vram_object *gbo);
 u64 drm_gem_vram_mmap_offset(struct drm_gem_vram_object *gbo);
 s64 drm_gem_vram_offset(struct drm_gem_vram_object *gbo);
 int drm_gem_vram_pin(struct drm_gem_vram_object *gbo, unsigned long pl_flag);
 int drm_gem_vram_unpin(struct drm_gem_vram_object *gbo);
-int drm_gem_vram_push_to_system(struct drm_gem_vram_object *gbo);
-void *drm_gem_vram_kmap_at(struct drm_gem_vram_object *gbo, bool map,
-			   bool *is_iomem, struct ttm_bo_kmap_obj *kmap);
 void *drm_gem_vram_kmap(struct drm_gem_vram_object *gbo, bool map,
 			bool *is_iomem);
-void drm_gem_vram_kunmap_at(struct drm_gem_vram_object *gbo,
-			    struct ttm_bo_kmap_obj *kmap);
 void drm_gem_vram_kunmap(struct drm_gem_vram_object *gbo);
 
 int drm_gem_vram_fill_create_dumb(struct drm_file *file,
 				  struct drm_device *dev,
 				  struct ttm_bo_device *bdev,
 				  unsigned long pg_align,
+				  unsigned long pitch_align,
 				  bool interruptible,
 				  struct drm_mode_create_dumb *args);
 
@@ -115,7 +108,6 @@ extern const struct drm_vram_mm_funcs drm_gem_vram_mm_funcs;
  * Helpers for struct drm_driver
  */
 
-void drm_gem_vram_driver_gem_free_object_unlocked(struct drm_gem_object *gem);
 int drm_gem_vram_driver_dumb_create(struct drm_file *file,
 				    struct drm_device *dev,
 				    struct drm_mode_create_dumb *args);
@@ -131,30 +123,8 @@ int drm_gem_vram_driver_dumb_mmap_offset(struct drm_file *file,
  * &struct drm_driver with default functions.
  */
 #define DRM_GEM_VRAM_DRIVER \
-	.gem_free_object_unlocked = \
-		drm_gem_vram_driver_gem_free_object_unlocked, \
 	.dumb_create		  = drm_gem_vram_driver_dumb_create, \
-	.dumb_map_offset	  = drm_gem_vram_driver_dumb_mmap_offset
-
-/*
- * PRIME helpers for struct drm_driver
- */
-
-int drm_gem_vram_driver_gem_prime_pin(struct drm_gem_object *obj);
-void drm_gem_vram_driver_gem_prime_unpin(struct drm_gem_object *obj);
-void *drm_gem_vram_driver_gem_prime_vmap(struct drm_gem_object *obj);
-void drm_gem_vram_driver_gem_prime_vunmap(struct drm_gem_object *obj,
-					  void *vaddr);
-int drm_gem_vram_driver_gem_prime_mmap(struct drm_gem_object *obj,
-				       struct vm_area_struct *vma);
-
-#define DRM_GEM_VRAM_DRIVER_PRIME \
-	.gem_prime_export = drm_gem_prime_export, \
-	.gem_prime_import = drm_gem_prime_import, \
-	.gem_prime_pin	  = drm_gem_vram_driver_gem_prime_pin, \
-	.gem_prime_unpin  = drm_gem_vram_driver_gem_prime_unpin, \
-	.gem_prime_vmap	  = drm_gem_vram_driver_gem_prime_vmap, \
-	.gem_prime_vunmap = drm_gem_vram_driver_gem_prime_vunmap, \
-	.gem_prime_mmap	  = drm_gem_vram_driver_gem_prime_mmap
+	.dumb_map_offset	  = drm_gem_vram_driver_dumb_mmap_offset, \
+	.gem_prime_mmap		  = drm_gem_prime_mmap
 
 #endif

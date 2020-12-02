@@ -1,25 +1,24 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2017, Fuzhou Rockchip Electronics Co., Ltd
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include <linux/backlight.h>
+#include <linux/delay.h>
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/regulator/consumer.h>
 
-#include <drm/drmP.h>
-#include <drm/drm_crtc.h>
-#include <drm/drm_mipi_dsi.h>
-#include <drm/drm_panel.h>
-
 #include <video/mipi_display.h>
+
+#include <drm/drm_crtc.h>
+#include <drm/drm_device.h>
+#include <drm/drm_mipi_dsi.h>
+#include <drm/drm_modes.h>
+#include <drm/drm_panel.h>
+#include <drm/drm_print.h>
 
 struct panel_init_cmd {
 	size_t len;
@@ -55,7 +54,6 @@ struct innolux_panel {
 
 	struct backlight_device *backlight;
 	struct regulator_bulk_data *supplies;
-	unsigned int num_supplies;
 	struct gpio_desc *enable_gpio;
 
 	bool prepared;
@@ -405,7 +403,8 @@ static const struct panel_desc innolux_p097pfg_panel_desc = {
 	.sleep_mode_delay = 100, /* T15 */
 };
 
-static int innolux_panel_get_modes(struct drm_panel *panel)
+static int innolux_panel_get_modes(struct drm_panel *panel,
+				   struct drm_connector *connector)
 {
 	struct innolux_panel *innolux = to_innolux_panel(panel);
 	const struct drm_display_mode *m = innolux->desc->mode;
@@ -420,13 +419,11 @@ static int innolux_panel_get_modes(struct drm_panel *panel)
 
 	drm_mode_set_name(mode);
 
-	drm_mode_probed_add(panel->connector, mode);
+	drm_mode_probed_add(connector, mode);
 
-	panel->connector->display_info.width_mm =
-			innolux->desc->size.width;
-	panel->connector->display_info.height_mm =
-			innolux->desc->size.height;
-	panel->connector->display_info.bpc = innolux->desc->bpc;
+	connector->display_info.width_mm = innolux->desc->size.width;
+	connector->display_info.height_mm = innolux->desc->size.height;
+	connector->display_info.bpc = innolux->desc->bpc;
 
 	return 1;
 }
@@ -489,9 +486,8 @@ static int innolux_panel_add(struct mipi_dsi_device *dsi,
 	if (IS_ERR(innolux->backlight))
 		return PTR_ERR(innolux->backlight);
 
-	drm_panel_init(&innolux->base);
-	innolux->base.funcs = &innolux_panel_funcs;
-	innolux->base.dev = dev;
+	drm_panel_init(&innolux->base, dev, &innolux_panel_funcs,
+		       DRM_MODE_CONNECTOR_DSI);
 
 	err = drm_panel_add(&innolux->base);
 	if (err < 0)
@@ -505,8 +501,7 @@ static int innolux_panel_add(struct mipi_dsi_device *dsi,
 
 static void innolux_panel_del(struct innolux_panel *innolux)
 {
-	if (innolux->base.dev)
-		drm_panel_remove(&innolux->base);
+	drm_panel_remove(&innolux->base);
 }
 
 static int innolux_panel_probe(struct mipi_dsi_device *dsi)

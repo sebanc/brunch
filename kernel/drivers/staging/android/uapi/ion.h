@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  * drivers/staging/android/uapi/ion.h
  *
@@ -124,4 +124,11 @@ struct ion_heap_query {
 #define ION_IOC_HEAP_QUERY     _IOWR(ION_IOC_MAGIC, 8, \
 					struct ion_heap_query)
 
+/**
+ * DOC: ION_IOC_HEAP_ABI_VERSION - return ABI version
+ *
+ * Returns ABI version for this driver
+ */
+#define ION_IOC_ABI_VERSION    _IOR(ION_IOC_MAGIC, 9, \
+					__u32)
 #endif /* _UAPI_LINUX_ION_H */

@@ -67,48 +67,10 @@ static int __init fault_init(void)
 }
 early_initcall(fault_init);
 
-static inline int notify_page_fault(struct pt_regs *regs)
-{
-	int ret = 0;
-
-	/* kprobe_running() needs smp_processor_id() */
-	if (kprobes_built_in() && !user_mode(regs)) {
-		preempt_disable();
-		if (kprobe_running() && kprobe_fault_handler(regs, 14))
-			ret = 1;
-		preempt_enable();
-	}
-	return ret;
-}
-
-
-/*
- * Unlock any spinlocks which will prevent us from getting the
- * message out.
- */
-void bust_spinlocks(int yes)
-{
-	if (yes) {
-		oops_in_progress = 1;
-	} else {
-		int loglevel_save = console_loglevel;
-		console_unblank();
-		oops_in_progress = 0;
-		/*
-		 * OK, the message is on the console.  Now we call printk()
-		 * without oops_in_progress set so that printk will give klogd
-		 * a poke.  Hold onto your hats...
-		 */
-		console_loglevel = 15;
-		printk(" ");
-		console_loglevel = loglevel_save;
-	}
-}
-
 /*
  * Find out which address space caused the exception.
  */
-static inline enum fault_type get_fault_type(struct pt_regs *regs)
+static enum fault_type get_fault_type(struct pt_regs *regs)
 {
 	unsigned long trans_exc_code;
 
@@ -238,6 +200,8 @@ static void dump_fault_info(struct pt_regs *regs)
 		asce = S390_lowcore.kernel_asce;
 		pr_cont("kernel ");
 		break;
+	default:
+		unreachable();
 	}
 	pr_cont("ASCE.\n");
 	dump_pagetable(asce, regs->int_parm_long & __FAIL_ADDR_MASK);
@@ -270,8 +234,19 @@ static noinline void do_sigsegv(struct pt_regs *regs, int si_code)
 {
 	report_user_fault(regs, SIGSEGV, 1);
 	force_sig_fault(SIGSEGV, si_code,
-			(void __user *)(regs->int_parm_long & __FAIL_ADDR_MASK),
-			current);
+			(void __user *)(regs->int_parm_long & __FAIL_ADDR_MASK));
+}
+
+const struct exception_table_entry *s390_search_extables(unsigned long addr)
+{
+	const struct exception_table_entry *fixup;
+
+	fixup = search_extable(__start_dma_ex_table,
+			       __stop_dma_ex_table - __start_dma_ex_table,
+			       addr);
+	if (!fixup)
+		fixup = search_exception_tables(addr);
+	return fixup;
 }
 
 static noinline void do_no_context(struct pt_regs *regs)
@@ -279,7 +254,7 @@ static noinline void do_no_context(struct pt_regs *regs)
 	const struct exception_table_entry *fixup;
 
 	/* Are we prepared to handle this kernel fault?  */
-	fixup = search_exception_tables(regs->psw.addr);
+	fixup = s390_search_extables(regs->psw.addr);
 	if (fixup) {
 		regs->psw.addr = extable_fixup(fixup);
 		return;
@@ -320,8 +295,7 @@ static noinline void do_sigbus(struct pt_regs *regs)
 	 * or user mode.
 	 */
 	force_sig_fault(SIGBUS, BUS_ADRERR,
-			(void __user *)(regs->int_parm_long & __FAIL_ADDR_MASK),
-			current);
+			(void __user *)(regs->int_parm_long & __FAIL_ADDR_MASK));
 }
 
 static noinline int signal_return(struct pt_regs *regs)
@@ -353,6 +327,7 @@ static noinline void do_fault_error(struct pt_regs *regs, int access,
 	case VM_FAULT_BADACCESS:
 		if (access == VM_EXEC && signal_return(regs) == 0)
 			break;
+		/* fallthrough */
 	case VM_FAULT_BADMAP:
 		/* Bad memory access. Check if it is kernel or user space. */
 		if (user_mode(regs)) {
@@ -362,7 +337,9 @@ static noinline void do_fault_error(struct pt_regs *regs, int access,
 			do_sigsegv(regs, si_code);
 			break;
 		}
+		/* fallthrough */
 	case VM_FAULT_BADCONTEXT:
+		/* fallthrough */
 	case VM_FAULT_PFAULT:
 		do_no_context(regs);
 		break;
@@ -424,7 +401,7 @@ static inline vm_fault_t do_exception(struct pt_regs *regs, int access)
 	 */
 	clear_pt_regs_flag(regs, PIF_PER_TRAP);
 
-	if (notify_page_fault(regs))
+	if (kprobe_page_fault(regs, 14))
 		return 0;
 
 	mm = tsk->mm;
@@ -452,7 +429,7 @@ static inline vm_fault_t do_exception(struct pt_regs *regs, int access)
 
 	address = trans_exc_code & __FAIL_ADDR_MASK;
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, address);
-	flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
+	flags = FAULT_FLAG_DEFAULT;
 	if (user_mode(regs))
 		flags |= FAULT_FLAG_USER;
 	if (access == VM_WRITE || (trans_exc_code & store_indication) == 0x400)
@@ -503,8 +480,7 @@ retry:
 	 * the fault.
 	 */
 	fault = handle_mm_fault(vma, address, flags);
-	/* No reason to continue if interrupted by SIGKILL. */
-	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
+	if (fault_signal_pending(fault, regs)) {
 		fault = VM_FAULT_SIGNAL;
 		if (flags & FAULT_FLAG_RETRY_NOWAIT)
 			goto out_up;
@@ -537,10 +513,7 @@ retry:
 				fault = VM_FAULT_PFAULT;
 				goto out_up;
 			}
-			/* Clear FAULT_FLAG_ALLOW_RETRY to avoid any risk
-			 * of starvation. */
-			flags &= ~(FAULT_FLAG_ALLOW_RETRY |
-				   FAULT_FLAG_RETRY_NOWAIT);
+			flags &= ~FAULT_FLAG_RETRY_NOWAIT;
 			flags |= FAULT_FLAG_TRIED;
 			down_read(&mm->mmap_sem);
 			goto retry;
@@ -639,17 +612,19 @@ struct pfault_refbk {
 	u64 reserved;
 } __attribute__ ((packed, aligned(8)));
 
+static struct pfault_refbk pfault_init_refbk = {
+	.refdiagc = 0x258,
+	.reffcode = 0,
+	.refdwlen = 5,
+	.refversn = 2,
+	.refgaddr = __LC_LPP,
+	.refselmk = 1ULL << 48,
+	.refcmpmk = 1ULL << 48,
+	.reserved = __PF_RES_FIELD
+};
+
 int pfault_init(void)
 {
-	struct pfault_refbk refbk = {
-		.refdiagc = 0x258,
-		.reffcode = 0,
-		.refdwlen = 5,
-		.refversn = 2,
-		.refgaddr = __LC_LPP,
-		.refselmk = 1ULL << 48,
-		.refcmpmk = 1ULL << 48,
-		.reserved = __PF_RES_FIELD };
         int rc;
 
 	if (pfault_disable)
@@ -661,18 +636,20 @@ int pfault_init(void)
 		"1:	la	%0,8\n"
 		"2:\n"
 		EX_TABLE(0b,1b)
-		: "=d" (rc) : "a" (&refbk), "m" (refbk) : "cc");
+		: "=d" (rc)
+		: "a" (&pfault_init_refbk), "m" (pfault_init_refbk) : "cc");
         return rc;
 }
 
+static struct pfault_refbk pfault_fini_refbk = {
+	.refdiagc = 0x258,
+	.reffcode = 1,
+	.refdwlen = 5,
+	.refversn = 2,
+};
+
 void pfault_fini(void)
 {
-	struct pfault_refbk refbk = {
-		.refdiagc = 0x258,
-		.reffcode = 1,
-		.refdwlen = 5,
-		.refversn = 2,
-	};
 
 	if (pfault_disable)
 		return;
@@ -681,7 +658,7 @@ void pfault_fini(void)
 		"	diag	%0,0,0x258\n"
 		"0:	nopr	%%r7\n"
 		EX_TABLE(0b,0b)
-		: : "a" (&refbk), "m" (refbk) : "cc");
+		: : "a" (&pfault_fini_refbk), "m" (pfault_fini_refbk) : "cc");
 }
 
 static DEFINE_SPINLOCK(pfault_lock);

@@ -24,6 +24,7 @@
  */
 
 #include <linux/irqdomain.h>
+#include <linux/pci.h>
 #include <linux/pm_domain.h>
 #include <linux/platform_device.h>
 #include <sound/designware_i2s.h>
@@ -135,7 +136,8 @@ static int acp_poweroff(struct generic_pm_domain *genpd)
 	 * 2. power off the acp tiles
 	 * 3. check and enter ulv state
 	 */
-		if (adev->powerplay.pp_funcs->set_powergating_by_smu)
+		if (adev->powerplay.pp_funcs &&
+			adev->powerplay.pp_funcs->set_powergating_by_smu)
 			amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_ACP, true);
 	}
 	return 0;
@@ -527,7 +529,8 @@ static int acp_set_powergating_state(void *handle,
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	bool enable = state == AMD_PG_STATE_GATE ? true : false;
 
-	if (adev->powerplay.pp_funcs->set_powergating_by_smu)
+	if (adev->powerplay.pp_funcs &&
+		adev->powerplay.pp_funcs->set_powergating_by_smu)
 		amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_ACP, enable);
 
 	return 0;

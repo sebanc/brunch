@@ -18,10 +18,6 @@
 
 #define DEC_8190_ALIGN_MASK	0x07U
 
-#define HANTRO_VP8_HEADER_SIZE		1280
-#define HANTRO_VP8_HW_PARAMS_SIZE	5487
-#define HANTRO_VP8_RET_PARAMS_SIZE	488
-
 struct hantro_dev;
 struct hantro_ctx;
 struct hantro_buf;
@@ -45,44 +41,6 @@ struct hantro_aux_buf {
  */
 struct hantro_jpeg_enc_hw_ctx {
 	struct hantro_aux_buf bounce_buffer;
-};
-
-/**
- * struct hantro_vp8_enc_buf_data - mode-specific per-buffer data
- * @dct_offset:		Offset inside the buffer to DCT partition.
- * @hdr_size:		Size of header data in the buffer.
- * @ext_hdr_size:	Size of ext header data in the buffer.
- * @dct_size:		Size of DCT partition in the buffer.
- * @header:		Frame header to copy to destination buffer.
- */
-struct hantro_vp8_enc_buf_data {
-	size_t dct_offset;
-	size_t hdr_size;
-	size_t ext_hdr_size;
-	size_t dct_size;
-	u8 header[HANTRO_VP8_HEADER_SIZE];
-};
-
-/**
- * struct hantro_vp8_enc_hw_ctx - Context private data specific to codec mode.
- * @ctrl_buf:		VP8 control buffer.
- * @ext_buf:		VP8 ext data buffer.
- * @mv_buf:			VP8 motion vector buffer.
- * @ref_rec_ptr:	Bit flag for swapping ref and rec buffers every frame.
- */
-struct hantro_vp8_enc_hw_ctx {
-	struct hantro_aux_buf ctrl_buf;
-	struct hantro_aux_buf ext_buf;
-	struct hantro_aux_buf mv_buf;
-
-	struct hantro_aux_buf priv_src;
-	struct hantro_aux_buf priv_dst;
-
-	struct hantro_vp8_enc_buf_data buf_data;
-
-	struct v4l2_rect src_crop;
-
-	u8 ref_rec_ptr:1;
 };
 
 /* Max. number of entries in the DPB (HW limitation). */
@@ -200,13 +158,6 @@ void rk3399_vpu_jpeg_enc_run(struct hantro_ctx *ctx);
 int hantro_jpeg_enc_init(struct hantro_ctx *ctx);
 void hantro_jpeg_enc_exit(struct hantro_ctx *ctx);
 
-void hantro_h1_vp8_enc_run(struct hantro_ctx *ctx);
-int hantro_vp8_enc_init(struct hantro_ctx *ctx);
-void hantro_vp8_enc_done(struct hantro_ctx *ctx, enum vb2_buffer_state result);
-void hantro_vp8_enc_assemble_bitstream(struct hantro_ctx *ctx,
-				       struct vb2_buffer *vb);
-void hantro_vp8_enc_exit(struct hantro_ctx *ctx);
-
 struct vb2_buffer *hantro_h264_get_ref_buf(struct hantro_ctx *ctx,
 					   unsigned int dpb_idx);
 int hantro_h264_dec_prepare_run(struct hantro_ctx *ctx);
@@ -227,8 +178,5 @@ int hantro_vp8_dec_init(struct hantro_ctx *ctx);
 void hantro_vp8_dec_exit(struct hantro_ctx *ctx);
 void hantro_vp8_prob_update(struct hantro_ctx *ctx,
 			    const struct v4l2_ctrl_vp8_frame_header *hdr);
-
-int hantro_dummy_enc_init(struct hantro_dev *dev);
-void hantro_dummy_enc_release(struct hantro_dev *vpu);
 
 #endif /* HANTRO_HW_H_ */

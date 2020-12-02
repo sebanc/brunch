@@ -46,13 +46,22 @@ static LIST_HEAD(panel_list);
 /**
  * drm_panel_init - initialize a panel
  * @panel: DRM panel
+ * @dev: parent device of the panel
+ * @funcs: panel operations
+ * @connector_type: the connector type (DRM_MODE_CONNECTOR_*) corresponding to
+ *	the panel interface
  *
- * Sets up internal fields of the panel so that it can subsequently be added
- * to the registry.
+ * Initialize the panel structure for subsequent registration with
+ * drm_panel_add().
  */
-void drm_panel_init(struct drm_panel *panel)
+void drm_panel_init(struct drm_panel *panel, struct device *dev,
+		    const struct drm_panel_funcs *funcs, int connector_type)
 {
 	INIT_LIST_HEAD(&panel->list);
+	panel->dev = dev;
+	panel->funcs = funcs;
+	panel->connector_type = connector_type;
+	BLOCKING_INIT_NOTIFIER_HEAD(&panel->nh);
 }
 EXPORT_SYMBOL(drm_panel_init);
 
@@ -106,23 +115,10 @@ EXPORT_SYMBOL(drm_panel_remove);
  */
 int drm_panel_attach(struct drm_panel *panel, struct drm_connector *connector)
 {
-	struct drm_display_info *info;
-
-	if (panel->connector)
+	if (panel->drm)
 		return -EBUSY;
 
-	panel->connector = connector;
 	panel->drm = connector->dev;
-	info = &connector->display_info;
-	info->width_mm = panel->width_mm;
-	info->height_mm = panel->height_mm;
-	info->bpc = panel->bpc;
-	info->panel_orientation = panel->orientation;
-	info->bus_flags = panel->bus_flags;
-	if (panel->bus_formats)
-		drm_display_info_set_bus_formats(&connector->display_info,
-						 panel->bus_formats,
-						 panel->num_bus_formats);
 
 	return 0;
 }
@@ -137,31 +133,10 @@ EXPORT_SYMBOL(drm_panel_attach);
  *
  * This function should not be called by the panel device itself. It
  * is only for the drm device that called drm_panel_attach().
- *
- * Return: 0 on success or a negative error code on failure.
  */
-int drm_panel_detach(struct drm_panel *panel)
+void drm_panel_detach(struct drm_panel *panel)
 {
-	struct drm_display_info *info;
-
-	if (!panel->connector)
-		goto out;
-
-	info = &panel->connector->display_info;
-	info->width_mm = 0;
-	info->height_mm = 0;
-	info->bpc = 0;
-	info->panel_orientation = DRM_MODE_PANEL_ORIENTATION_UNKNOWN;
-	info->bus_flags = 0;
-	kfree(info->bus_formats);
-	info->bus_formats = NULL;
-	info->num_bus_formats = 0;
-
-out:
-	panel->connector = NULL;
 	panel->drm = NULL;
-
-	return 0;
 }
 EXPORT_SYMBOL(drm_panel_detach);
 
@@ -188,24 +163,6 @@ int drm_panel_prepare(struct drm_panel *panel)
 EXPORT_SYMBOL(drm_panel_prepare);
 
 /**
- * drm_panel_prepare_power - power on a panel's power
- * @panel: DRM panel
- *
- * Calling this function will enable power and deassert any reset signals to
- * the panel.
- *
- * Return: 0 on success or a negative error code on failure.
- */
-int drm_panel_prepare_power(struct drm_panel *panel)
-{
-	if (panel && panel->funcs && panel->funcs->prepare_power)
-		return panel->funcs->prepare_power(panel);
-
-	return panel ? -ENOSYS : -EINVAL;
-}
-EXPORT_SYMBOL(drm_panel_prepare_power);
-
-/**
  * drm_panel_unprepare - power off a panel
  * @panel: DRM panel
  *
@@ -227,26 +184,6 @@ int drm_panel_unprepare(struct drm_panel *panel)
 	return 0;
 }
 EXPORT_SYMBOL(drm_panel_unprepare);
-
-/**
- * drm_panel_unprepare_power - power off a panel
- * @panel: DRM panel
- *
- * Calling this function will completely power off a panel (assert the panel's
- * reset, turn off power supplies, ...). After this function has completed, it
- * is usually no longer possible to communicate with the panel until another
- * call to drm_panel_prepare_power and drm_panel_prepare().
- *
- * Return: 0 on success or a negative error code on failure.
- */
-int drm_panel_unprepare_power(struct drm_panel *panel)
-{
-	if (panel && panel->funcs && panel->funcs->unprepare_power)
-		return panel->funcs->unprepare_power(panel);
-
-	return panel ? -ENOSYS : -EINVAL;
-}
-EXPORT_SYMBOL(drm_panel_unprepare_power);
 
 /**
  * drm_panel_enable - enable a panel
@@ -312,6 +249,7 @@ EXPORT_SYMBOL(drm_panel_disable);
 /**
  * drm_panel_get_modes - probe the available display modes of a panel
  * @panel: DRM panel
+ * @connector: DRM connector
  *
  * The modes probed from the panel are automatically added to the connector
  * that the panel is attached to.
@@ -319,13 +257,14 @@ EXPORT_SYMBOL(drm_panel_disable);
  * Return: The number of modes available from the panel on success or a
  * negative error code on failure.
  */
-int drm_panel_get_modes(struct drm_panel *panel)
+int drm_panel_get_modes(struct drm_panel *panel,
+			struct drm_connector *connector)
 {
 	if (!panel)
 		return -EINVAL;
 
 	if (panel->funcs && panel->funcs->get_modes)
-		return panel->funcs->get_modes(panel);
+		return panel->funcs->get_modes(panel, connector);
 
 	return -EOPNOTSUPP;
 }
@@ -380,7 +319,7 @@ EXPORT_SYMBOL(of_drm_find_panel);
  * rotation in the device tree is counter clockwise.
  *
  * Return: 0 when a valid rotation value (0, 90, 180, or 270) is read or the
- * rotation property doesn't exist. -EERROR otherwise.
+ * rotation property doesn't exist. Return a negative error code on failure.
  */
 int of_drm_get_panel_orientation(const struct device_node *np,
 				 enum drm_panel_orientation *orientation)
@@ -412,6 +351,27 @@ int of_drm_get_panel_orientation(const struct device_node *np,
 }
 EXPORT_SYMBOL(of_drm_get_panel_orientation);
 #endif
+
+int drm_panel_notifier_register(struct drm_panel *panel,
+	struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&panel->nh, nb);
+}
+EXPORT_SYMBOL(drm_panel_notifier_register);
+
+int drm_panel_notifier_unregister(struct drm_panel *panel,
+	struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&panel->nh, nb);
+}
+EXPORT_SYMBOL(drm_panel_notifier_unregister);
+
+int drm_panel_notifier_call_chain(struct drm_panel *panel,
+	unsigned long val, void *v)
+{
+	return blocking_notifier_call_chain(&panel->nh, val, v);
+}
+EXPORT_SYMBOL(drm_panel_notifier_call_chain);
 
 #if IS_REACHABLE(CONFIG_BACKLIGHT_CLASS_DEVICE)
 /**

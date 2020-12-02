@@ -4,14 +4,12 @@
 #ifndef KSYM_FUNC
 #define KSYM_FUNC(x) x
 #endif
-#ifdef CONFIG_64BIT
-#ifndef KSYM_ALIGN
-#define KSYM_ALIGN 8
-#endif
-#else
-#ifndef KSYM_ALIGN
+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
 #define KSYM_ALIGN 4
-#endif
+#elif defined(CONFIG_64BIT)
+#define KSYM_ALIGN 8
+#else
+#define KSYM_ALIGN 4
 #endif
 #ifndef KCRC_ALIGN
 #define KCRC_ALIGN 4
@@ -19,11 +17,11 @@
 
 .macro __put, val, name
 #ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-	.long	\val - ., \name - .
+	.long	\val - ., \name - ., 0
 #elif defined(CONFIG_64BIT)
-	.quad	\val, \name
+	.quad	\val, \name, 0
 #else
-	.long	\val, \name
+	.long	\val, \name, 0
 #endif
 .endm
 
@@ -57,18 +55,20 @@ __kcrctab_\name:
 #endif
 #endif
 .endm
-#undef __put
 
-#if defined(__KSYM_DEPS__)
-
-#define __EXPORT_SYMBOL(sym, val, sec)	=== __KSYM_##sym ===
-
-#elif defined(CONFIG_TRIM_UNUSED_KSYMS)
+#if defined(CONFIG_TRIM_UNUSED_KSYMS)
 
 #include <linux/kconfig.h>
 #include <generated/autoksyms.h>
 
+.macro __ksym_marker sym
+	.section ".discard.ksym","a"
+__ksym_marker_\sym:
+	 .previous
+.endm
+
 #define __EXPORT_SYMBOL(sym, val, sec)				\
+	__ksym_marker sym;					\
 	__cond_export_sym(sym, val, sec, __is_defined(__KSYM_##sym))
 #define __cond_export_sym(sym, val, sec, conf)			\
 	___cond_export_sym(sym, val, sec, conf)

@@ -14,6 +14,7 @@
 #include "disk-io.h"
 #include "transaction.h"
 #include "dev-replace.h"
+#include "block-group.h"
 
 #undef DEBUG
 
@@ -376,26 +377,28 @@ static struct reada_extent *reada_find_extent(struct btrfs_fs_info *fs_info,
 		goto error;
 	}
 
+	/* Insert extent in reada tree + all per-device trees, all or nothing */
+	down_read(&fs_info->dev_replace.rwsem);
 	ret = radix_tree_preload(GFP_KERNEL);
-	if (ret)
+	if (ret) {
+		up_read(&fs_info->dev_replace.rwsem);
 		goto error;
+	}
 
-	/* insert extent in reada_tree + all per-device trees, all or nothing */
-	btrfs_dev_replace_read_lock(&fs_info->dev_replace);
 	spin_lock(&fs_info->reada_lock);
 	ret = radix_tree_insert(&fs_info->reada_tree, index, re);
 	if (ret == -EEXIST) {
 		re_exist = radix_tree_lookup(&fs_info->reada_tree, index);
 		re_exist->refcnt++;
 		spin_unlock(&fs_info->reada_lock);
-		btrfs_dev_replace_read_unlock(&fs_info->dev_replace);
 		radix_tree_preload_end();
+		up_read(&fs_info->dev_replace.rwsem);
 		goto error;
 	}
 	if (ret) {
 		spin_unlock(&fs_info->reada_lock);
-		btrfs_dev_replace_read_unlock(&fs_info->dev_replace);
 		radix_tree_preload_end();
+		up_read(&fs_info->dev_replace.rwsem);
 		goto error;
 	}
 	radix_tree_preload_end();
@@ -418,6 +421,9 @@ static struct reada_extent *reada_find_extent(struct btrfs_fs_info *fs_info,
 		if (!dev->bdev)
 			continue;
 
+		if (test_bit(BTRFS_DEV_STATE_NO_READA, &dev->dev_state))
+			continue;
+
 		if (dev_replace_is_ongoing &&
 		    dev == fs_info->dev_replace.tgtdev) {
 			/*
@@ -437,13 +443,15 @@ static struct reada_extent *reada_find_extent(struct btrfs_fs_info *fs_info,
 			}
 			radix_tree_delete(&fs_info->reada_tree, index);
 			spin_unlock(&fs_info->reada_lock);
-			btrfs_dev_replace_read_unlock(&fs_info->dev_replace);
+			up_read(&fs_info->dev_replace.rwsem);
 			goto error;
 		}
 		have_zone = 1;
 	}
+	if (!have_zone)
+		radix_tree_delete(&fs_info->reada_tree, index);
 	spin_unlock(&fs_info->reada_lock);
-	btrfs_dev_replace_read_unlock(&fs_info->dev_replace);
+	up_read(&fs_info->dev_replace.rwsem);
 
 	if (!have_zone)
 		goto error;
@@ -636,6 +644,35 @@ static int reada_pick_zone(struct btrfs_device *dev)
 	return 1;
 }
 
+static int reada_tree_block_flagged(struct btrfs_fs_info *fs_info, u64 bytenr,
+				    int mirror_num, struct extent_buffer **eb)
+{
+	struct extent_buffer *buf = NULL;
+	int ret;
+
+	buf = btrfs_find_create_tree_block(fs_info, bytenr);
+	if (IS_ERR(buf))
+		return 0;
+
+	set_bit(EXTENT_BUFFER_READAHEAD, &buf->bflags);
+
+	ret = read_extent_buffer_pages(buf, WAIT_PAGE_LOCK, mirror_num);
+	if (ret) {
+		free_extent_buffer_stale(buf);
+		return ret;
+	}
+
+	if (test_bit(EXTENT_BUFFER_CORRUPT, &buf->bflags)) {
+		free_extent_buffer_stale(buf);
+		return -EIO;
+	} else if (extent_buffer_uptodate(buf)) {
+		*eb = buf;
+	} else {
+		free_extent_buffer(buf);
+	}
+	return 0;
+}
+
 static int reada_start_machine_dev(struct btrfs_device *dev)
 {
 	struct btrfs_fs_info *fs_info = dev->fs_info;
@@ -787,8 +824,7 @@ static void reada_start_machine(struct btrfs_fs_info *fs_info)
 		/* FIXME we cannot handle this properly right now */
 		BUG();
 	}
-	btrfs_init_work(&rmw->work, btrfs_readahead_helper,
-			reada_start_machine_worker, NULL, NULL);
+	btrfs_init_work(&rmw->work, reada_start_machine_worker, NULL, NULL);
 	rmw->fs_info = fs_info;
 
 	btrfs_queue_work(fs_info->readahead_workers, &rmw->work);
@@ -980,4 +1016,46 @@ void btrfs_reada_detach(void *handle)
 	struct reada_control *rc = handle;
 
 	kref_put(&rc->refcnt, reada_control_release);
+}
+
+/*
+ * Before removing a device (device replace or device remove ioctls), call this
+ * function to wait for all existing readahead requests on the device and to
+ * make sure no one queues more readahead requests for the device.
+ *
+ * Must be called without holding neither the device list mutex nor the device
+ * replace semaphore, otherwise it will deadlock.
+ */
+void btrfs_reada_remove_dev(struct btrfs_device *dev)
+{
+	struct btrfs_fs_info *fs_info = dev->fs_info;
+
+	/* Serialize with readahead extent creation at reada_find_extent(). */
+	spin_lock(&fs_info->reada_lock);
+	set_bit(BTRFS_DEV_STATE_NO_READA, &dev->dev_state);
+	spin_unlock(&fs_info->reada_lock);
+
+	/*
+	 * There might be readahead requests added to the radix trees which
+	 * were not yet added to the readahead work queue. We need to start
+	 * them and wait for their completion, otherwise we can end up with
+	 * use-after-free problems when dropping the last reference on the
+	 * readahead extents and their zones, as they need to access the
+	 * device structure.
+	 */
+	reada_start_machine(fs_info);
+	btrfs_flush_workqueue(fs_info->readahead_workers);
+}
+
+/*
+ * If when removing a device (device replace or device remove ioctls) an error
+ * happens after calling btrfs_reada_remove_dev(), call this to undo what that
+ * function did. This is safe to call even if btrfs_reada_remove_dev() was not
+ * called before.
+ */
+void btrfs_reada_undo_remove_dev(struct btrfs_device *dev)
+{
+	spin_lock(&dev->fs_info->reada_lock);
+	clear_bit(BTRFS_DEV_STATE_NO_READA, &dev->dev_state);
+	spin_unlock(&dev->fs_info->reada_lock);
 }

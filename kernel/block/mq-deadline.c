@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  *  MQ Deadline i/o scheduler - adaptation of the legacy deadline scheduler,
  *  for the blk-mq scheduling framework
@@ -24,7 +25,7 @@
 #include "blk-mq-sched.h"
 
 /*
- * See Documentation/block/deadline-iosched.txt
+ * See Documentation/block/deadline-iosched.rst
  */
 static const int read_expire = HZ / 2;  /* max time before a read is submitted. */
 static const int write_expire = 5 * HZ; /* ditto for writes, these limits are SOFT! */
@@ -458,7 +459,8 @@ static int dd_request_merge(struct request_queue *q, struct request **rq,
 	return ELEVATOR_NO_MERGE;
 }
 
-static bool dd_bio_merge(struct blk_mq_hw_ctx *hctx, struct bio *bio)
+static bool dd_bio_merge(struct blk_mq_hw_ctx *hctx, struct bio *bio,
+		unsigned int nr_segs)
 {
 	struct request_queue *q = hctx->queue;
 	struct deadline_data *dd = q->elevator->elevator_data;
@@ -466,7 +468,7 @@ static bool dd_bio_merge(struct blk_mq_hw_ctx *hctx, struct bio *bio)
 	bool ret;
 
 	spin_lock(&dd->lock);
-	ret = blk_mq_sched_try_merge(q, bio, &free);
+	ret = blk_mq_sched_try_merge(q, bio, nr_segs, &free);
 	spin_unlock(&dd->lock);
 
 	if (free)
@@ -567,12 +569,8 @@ static void dd_finish_request(struct request *rq)
 
 		spin_lock_irqsave(&dd->zone_lock, flags);
 		blk_req_zone_write_unlock(rq);
-		if (!list_empty(&dd->fifo_list[WRITE])) {
-			struct blk_mq_hw_ctx *hctx;
-
-			hctx = blk_mq_map_queue(q, rq->mq_ctx->cpu);
-			blk_mq_sched_mark_restart_hctx(hctx);
-		}
+		if (!list_empty(&dd->fifo_list[WRITE]))
+			blk_mq_sched_mark_restart_hctx(rq->mq_hctx);
 		spin_unlock_irqrestore(&dd->zone_lock, flags);
 	}
 }
@@ -774,7 +772,7 @@ static const struct blk_mq_debugfs_attr deadline_queue_debugfs_attrs[] = {
 #endif
 
 static struct elevator_type mq_deadline = {
-	.ops.mq = {
+	.ops = {
 		.insert_requests	= dd_insert_requests,
 		.dispatch_request	= dd_dispatch_request,
 		.prepare_request	= dd_prepare_request,
@@ -790,13 +788,13 @@ static struct elevator_type mq_deadline = {
 		.exit_sched		= dd_exit_queue,
 	},
 
-	.uses_mq	= true,
 #ifdef CONFIG_BLK_DEBUG_FS
 	.queue_debugfs_attrs = deadline_queue_debugfs_attrs,
 #endif
 	.elevator_attrs = deadline_attrs,
 	.elevator_name = "mq-deadline",
 	.elevator_alias = "deadline",
+	.elevator_features = ELEVATOR_F_ZBD_SEQ_WRITE,
 	.elevator_owner = THIS_MODULE,
 };
 MODULE_ALIAS("mq-deadline-iosched");

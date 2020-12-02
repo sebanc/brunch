@@ -101,9 +101,6 @@ static const struct ctl_path fsverity_sysctl_path[] = {
 	{ }
 };
 
-static int zero;
-static int one = 1;
-
 static struct ctl_table fsverity_sysctl_table[] = {
 	{
 		.procname       = "require_signatures",
@@ -111,8 +108,8 @@ static struct ctl_table fsverity_sysctl_table[] = {
 		.maxlen         = sizeof(int),
 		.mode           = 0644,
 		.proc_handler   = proc_dointvec_minmax,
-		.extra1         = &zero,
-		.extra2         = &one,
+		.extra1         = SYSCTL_ZERO,
+		.extra2         = SYSCTL_ONE,
 	},
 	{ }
 };

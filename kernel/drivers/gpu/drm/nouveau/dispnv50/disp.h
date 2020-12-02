@@ -46,6 +46,8 @@ struct nv50_disp_interlock {
 
 void corec37d_ntfy_init(struct nouveau_bo *, u32);
 
+void head907d_olut_load(struct drm_color_lut *, int size, void __iomem *);
+
 struct nv50_chan {
 	struct nvif_object user;
 	struct nvif_device *device;
@@ -76,14 +78,14 @@ void evo_kick(u32 *, struct nv50_dmac *);
 
 #define evo_mthd(p, m, s) do {						\
 	const u32 _m = (m), _s = (s);					\
-	if (drm_debug & DRM_UT_KMS)					\
+	if (drm_debug_syslog_enabled(DRM_UT_KMS))				\
 		pr_err("%04x %d %s\n", _m, _s, __func__);		\
 	*((p)++) = ((_s << 18) | _m);					\
 } while(0)
 
 #define evo_data(p, d) do {						\
 	const u32 _d = (d);						\
-	if (drm_debug & DRM_UT_KMS)					\
+	if (drm_debug_syslog_enabled(DRM_UT_KMS))				\
 		pr_err("\t%08x\n", _d);					\
 	*((p)++) = _d;							\
 } while(0)

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Real Time Clock interface for StrongARM SA1x00 and XScale PXA2xx
  *
@@ -14,11 +15,6 @@
  *
  * Converted to the RTC subsystem and Driver Model
  *   by Richard Purdie <rpurdie@rpsys.net>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/platform_device.h>
@@ -186,7 +182,6 @@ static const struct rtc_class_ops sa1100_rtc_ops = {
 
 int sa1100_rtc_init(struct platform_device *pdev, struct sa1100_rtc *info)
 {
-	struct rtc_device *rtc;
 	int ret;
 
 	spin_lock_init(&info->lock);
@@ -215,15 +210,14 @@ int sa1100_rtc_init(struct platform_device *pdev, struct sa1100_rtc *info)
 		writel_relaxed(0, info->rcnr);
 	}
 
-	rtc = devm_rtc_device_register(&pdev->dev, pdev->name, &sa1100_rtc_ops,
-					THIS_MODULE);
-	if (IS_ERR(rtc)) {
-		clk_disable_unprepare(info->clk);
-		return PTR_ERR(rtc);
-	}
-	info->rtc = rtc;
+	info->rtc->ops = &sa1100_rtc_ops;
+	info->rtc->max_user_freq = RTC_FREQ;
 
-	rtc->max_user_freq = RTC_FREQ;
+	ret = rtc_register_device(info->rtc);
+	if (ret) {
+		clk_disable_unprepare(info->clk);
+		return ret;
+	}
 
 	/* Fix for a nasty initialization problem the in SA11xx RTSR register.
 	 * See also the comments in sa1100_rtc_interrupt().
@@ -271,6 +265,10 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	info->irq_1hz = irq_1hz;
 	info->irq_alarm = irq_alarm;
+
+	info->rtc = devm_rtc_allocate_device(&pdev->dev);
+	if (IS_ERR(info->rtc))
+		return PTR_ERR(info->rtc);
 
 	ret = devm_request_irq(&pdev->dev, irq_1hz, sa1100_rtc_interrupt, 0,
 			       "rtc 1Hz", &pdev->dev);

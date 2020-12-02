@@ -20,20 +20,20 @@
 #include <linux/of_reserved_mem.h>
 #include <linux/sort.h>
 #include <linux/slab.h>
+#include <linux/memblock.h>
 
 #define MAX_RESERVED_REGIONS	32
 static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
 static int reserved_mem_count;
 
-#if defined(CONFIG_HAVE_MEMBLOCK)
-#include <linux/memblock.h>
-int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
+static int __init early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
 	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
 	phys_addr_t *res_base)
 {
 	phys_addr_t base;
 
 	end = !end ? MEMBLOCK_ALLOC_ANYWHERE : end;
+	align = !align ? SMP_CACHE_BYTES : align;
 	base = memblock_find_in_range(start, end, size, align);
 	if (!base)
 		return -ENOMEM;
@@ -44,16 +44,6 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
 
 	return memblock_reserve(base, size);
 }
-#else
-int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
-	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
-	phys_addr_t *res_base)
-{
-	pr_err("Reserved memory not supported, ignoring region 0x%llx%s\n",
-		  size, nomap ? " (nomap)" : "");
-	return -ENOSYS;
-}
-#endif
 
 /**
  * res_mem_save_node() - save fdt node for second pass initialization
@@ -181,6 +171,7 @@ static int __init __reserved_mem_init_node(struct reserved_mem *rmem)
 {
 	extern const struct of_device_id __reservedmem_of_table[];
 	const struct of_device_id *i;
+	int ret = -ENOENT;
 
 	for (i = __reservedmem_of_table; i < &__rmem_of_table_sentinel; i++) {
 		reservedmem_of_init_fn initfn = i->data;
@@ -189,13 +180,14 @@ static int __init __reserved_mem_init_node(struct reserved_mem *rmem)
 		if (!of_flat_dt_is_compatible(rmem->fdt_node, compat))
 			continue;
 
-		if (initfn(rmem) == 0) {
+		ret = initfn(rmem);
+		if (ret == 0) {
 			pr_info("initialized node %s, compatible id %s\n",
 				rmem->name, compat);
-			return 0;
+			break;
 		}
 	}
-	return -ENOENT;
+	return ret;
 }
 
 static int __init __rmem_cmp(const void *a, const void *b)
@@ -255,7 +247,9 @@ void __init fdt_init_reserved_mem(void)
 		int len;
 		const __be32 *prop;
 		int err = 0;
+		int nomap;
 
+		nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
 		prop = of_get_flat_dt_prop(node, "phandle", &len);
 		if (!prop)
 			prop = of_get_flat_dt_prop(node, "linux,phandle", &len);
@@ -265,8 +259,16 @@ void __init fdt_init_reserved_mem(void)
 		if (rmem->size == 0)
 			err = __reserved_mem_alloc_size(node, rmem->name,
 						 &rmem->base, &rmem->size);
-		if (err == 0)
-			__reserved_mem_init_node(rmem);
+		if (err == 0) {
+			err = __reserved_mem_init_node(rmem);
+			if (err != 0 && err != -ENOENT) {
+				pr_info("node %s compatible matching fail\n",
+					rmem->name);
+				memblock_free(rmem->base, rmem->size);
+				if (nomap)
+					memblock_add(rmem->base, rmem->size);
+			}
+		}
 	}
 }
 
@@ -322,6 +324,11 @@ int of_reserved_mem_device_init_by_idx(struct device *dev,
 	if (!target)
 		return -ENODEV;
 
+	if (!of_device_is_available(target)) {
+		of_node_put(target);
+		return 0;
+	}
+
 	rmem = __find_rmem(target);
 	of_node_put(target);
 
@@ -340,10 +347,6 @@ int of_reserved_mem_device_init_by_idx(struct device *dev,
 		mutex_lock(&of_rmem_assigned_device_mutex);
 		list_add(&rd->list, &of_rmem_assigned_device_list);
 		mutex_unlock(&of_rmem_assigned_device_mutex);
-		/* ensure that dma_ops is set for virtual devices
-		 * using reserved memory
-		 */
-		of_dma_configure(dev, np, true);
 
 		dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
 	} else {

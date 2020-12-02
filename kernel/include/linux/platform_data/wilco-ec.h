@@ -29,7 +29,6 @@
  * @data_size: Size of the data buffer used for EC communication.
  * @debugfs_pdev: The child platform_device used by the debugfs sub-driver.
  * @rtc_pdev: The child platform_device used by the RTC sub-driver.
- * @charger_pdev: Child platform_device used by the charger config sub-driver.
  * @charge_schedule_pdev: Child pdev used by the charge schedule sub-driver.
  * @telem_pdev: The child platform_device used by the telemetry sub-driver.
  */
@@ -43,7 +42,6 @@ struct wilco_ec_device {
 	size_t data_size;
 	struct platform_device *debugfs_pdev;
 	struct platform_device *rtc_pdev;
-	struct platform_device *charger_pdev;
 	struct platform_device *charge_schedule_pdev;
 	struct platform_device *telem_pdev;
 };

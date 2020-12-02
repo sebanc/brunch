@@ -2,7 +2,9 @@
 /*
  * This module exports the functions:
  *
- *     'int set_selection(struct tiocl_selection __user *, struct tty_struct *)'
+ *     'int set_selection_user(struct tiocl_selection __user *,
+ *			       struct tty_struct *)'
+ *     'int set_selection_kernel(struct tiocl_selection *, struct tty_struct *)'
  *     'void clear_selection(void)'
  *     'int paste_selection(struct tty_struct *)'
  *     'int sel_loadlut(char __user *)'
@@ -84,6 +86,7 @@ void clear_selection(void)
 		sel_start = -1;
 	}
 }
+EXPORT_SYMBOL_GPL(clear_selection);
 
 bool vc_is_sel(struct vc_data *vc)
 {
@@ -163,7 +166,7 @@ static int store_utf8(u32 c, char *p)
 }
 
 /**
- *	set_selection		- 	set the current selection.
+ *	set_selection_user	-	set the current selection.
  *	@sel: user selection info
  *	@tty: the console tty
  *
@@ -172,35 +175,44 @@ static int store_utf8(u32 c, char *p)
  *	The entire selection process is managed under the console_lock. It's
  *	 a lot under the lock but its hardly a performance path
  */
-static int __set_selection(const struct tiocl_selection __user *sel, struct tty_struct *tty)
+int set_selection_user(const struct tiocl_selection __user *sel,
+		       struct tty_struct *tty)
+{
+	struct tiocl_selection v;
+
+	if (copy_from_user(&v, sel, sizeof(*sel)))
+		return -EFAULT;
+
+	return set_selection_kernel(&v, tty);
+}
+
+static int __set_selection_kernel(struct tiocl_selection *v, struct tty_struct *tty)
 {
 	struct vc_data *vc = vc_cons[fg_console].d;
 	int new_sel_start, new_sel_end, spc;
-	struct tiocl_selection v;
 	char *bp, *obp;
 	int i, ps, pe, multiplier;
 	u32 c;
 	int mode, ret = 0;
 
 	poke_blanked_console();
-	if (copy_from_user(&v, sel, sizeof(*sel)))
-		return -EFAULT;
 
-	v.xs = min_t(u16, v.xs - 1, vc->vc_cols - 1);
-	v.ys = min_t(u16, v.ys - 1, vc->vc_rows - 1);
-	v.xe = min_t(u16, v.xe - 1, vc->vc_cols - 1);
-	v.ye = min_t(u16, v.ye - 1, vc->vc_rows - 1);
-	ps = v.ys * vc->vc_size_row + (v.xs << 1);
-	pe = v.ye * vc->vc_size_row + (v.xe << 1);
+	v->xs = min_t(u16, v->xs - 1, vc->vc_cols - 1);
+	v->ys = min_t(u16, v->ys - 1, vc->vc_rows - 1);
+	v->xe = min_t(u16, v->xe - 1, vc->vc_cols - 1);
+	v->ye = min_t(u16, v->ye - 1, vc->vc_rows - 1);
+	ps = v->ys * vc->vc_size_row + (v->xs << 1);
+	pe = v->ye * vc->vc_size_row + (v->xe << 1);
 
-	if (v.sel_mode == TIOCL_SELCLEAR) {
+	if (v->sel_mode == TIOCL_SELCLEAR) {
 		/* useful for screendump without selection highlights */
 		clear_selection();
 		return 0;
 	}
 
-	if (mouse_reporting() && (v.sel_mode & TIOCL_SELMOUSEREPORT)) {
-		mouse_report(tty, v.sel_mode & TIOCL_SELBUTTONMASK, v.xs, v.ys);
+	if (mouse_reporting() && (v->sel_mode & TIOCL_SELMOUSEREPORT)) {
+		mouse_report(tty, v->sel_mode & TIOCL_SELBUTTONMASK, v->xs,
+			     v->ys);
 		return 0;
 	}
 
@@ -217,7 +229,7 @@ static int __set_selection(const struct tiocl_selection __user *sel, struct tty_
 	else
 		use_unicode = 0;
 
-	switch (v.sel_mode)
+	switch (v->sel_mode)
 	{
 		case TIOCL_SELCHAR:	/* character-by-character selection */
 			new_sel_start = ps;
@@ -333,18 +345,19 @@ static int __set_selection(const struct tiocl_selection __user *sel, struct tty_
 	return ret;
 }
 
-int set_selection(const struct tiocl_selection __user *v, struct tty_struct *tty)
+int set_selection_kernel(struct tiocl_selection *v, struct tty_struct *tty)
 {
 	int ret;
 
 	mutex_lock(&sel_lock);
 	console_lock();
-	ret = __set_selection(v, tty);
+	ret = __set_selection_kernel(v, tty);
 	console_unlock();
 	mutex_unlock(&sel_lock);
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(set_selection_kernel);
 
 /* Insert the contents of the selection buffer into the
  * queue of the tty associated with the current console.
@@ -399,3 +412,4 @@ int paste_selection(struct tty_struct *tty)
 	tty_ldisc_deref(ld);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(paste_selection);

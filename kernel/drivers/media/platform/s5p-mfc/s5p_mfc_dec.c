@@ -1,14 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * linux/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
  *
  * Copyright (C) 2011 Samsung Electronics Co., Ltd.
  *		http://www.samsung.com/
  * Kamil Debski, <k.debski@samsung.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include <linux/clk.h>
@@ -33,7 +29,6 @@
 
 static struct s5p_mfc_fmt formats[] = {
 	{
-		.name		= "4:2:0 2 Planes 16x16 Tiles",
 		.fourcc		= V4L2_PIX_FMT_NV12MT_16X16,
 		.codec_mode	= S5P_MFC_CODEC_NONE,
 		.type		= MFC_FMT_RAW,
@@ -41,7 +36,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V6_BIT | MFC_V7_BIT,
 	},
 	{
-		.name		= "4:2:0 2 Planes 64x32 Tiles",
 		.fourcc		= V4L2_PIX_FMT_NV12MT,
 		.codec_mode	= S5P_MFC_CODEC_NONE,
 		.type		= MFC_FMT_RAW,
@@ -49,7 +43,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V5_BIT,
 	},
 	{
-		.name		= "4:2:0 2 Planes Y/CbCr",
 		.fourcc		= V4L2_PIX_FMT_NV12M,
 		.codec_mode	= S5P_MFC_CODEC_NONE,
 		.type		= MFC_FMT_RAW,
@@ -57,7 +50,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V6PLUS_BITS,
 	},
 	{
-		.name		= "4:2:0 2 Planes Y/CrCb",
 		.fourcc		= V4L2_PIX_FMT_NV21M,
 		.codec_mode	= S5P_MFC_CODEC_NONE,
 		.type		= MFC_FMT_RAW,
@@ -65,7 +57,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V6PLUS_BITS,
 	},
 	{
-		.name		= "H264 Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_H264,
 		.codec_mode	= S5P_MFC_CODEC_H264_DEC,
 		.type		= MFC_FMT_DEC,
@@ -73,7 +64,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V5PLUS_BITS,
 	},
 	{
-		.name		= "H264/MVC Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_H264_MVC,
 		.codec_mode	= S5P_MFC_CODEC_H264_MVC_DEC,
 		.type		= MFC_FMT_DEC,
@@ -81,7 +71,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V6PLUS_BITS,
 	},
 	{
-		.name		= "H263 Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_H263,
 		.codec_mode	= S5P_MFC_CODEC_H263_DEC,
 		.type		= MFC_FMT_DEC,
@@ -89,7 +78,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V5PLUS_BITS,
 	},
 	{
-		.name		= "MPEG1 Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_MPEG1,
 		.codec_mode	= S5P_MFC_CODEC_MPEG2_DEC,
 		.type		= MFC_FMT_DEC,
@@ -97,7 +85,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V5PLUS_BITS,
 	},
 	{
-		.name		= "MPEG2 Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_MPEG2,
 		.codec_mode	= S5P_MFC_CODEC_MPEG2_DEC,
 		.type		= MFC_FMT_DEC,
@@ -105,7 +92,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V5PLUS_BITS,
 	},
 	{
-		.name		= "MPEG4 Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_MPEG4,
 		.codec_mode	= S5P_MFC_CODEC_MPEG4_DEC,
 		.type		= MFC_FMT_DEC,
@@ -113,7 +99,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V5PLUS_BITS,
 	},
 	{
-		.name		= "XviD Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_XVID,
 		.codec_mode	= S5P_MFC_CODEC_MPEG4_DEC,
 		.type		= MFC_FMT_DEC,
@@ -121,7 +106,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V5PLUS_BITS,
 	},
 	{
-		.name		= "VC1 Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_VC1_ANNEX_G,
 		.codec_mode	= S5P_MFC_CODEC_VC1_DEC,
 		.type		= MFC_FMT_DEC,
@@ -129,7 +113,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V5PLUS_BITS,
 	},
 	{
-		.name		= "VC1 RCV Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_VC1_ANNEX_L,
 		.codec_mode	= S5P_MFC_CODEC_VC1RCV_DEC,
 		.type		= MFC_FMT_DEC,
@@ -137,7 +120,6 @@ static struct s5p_mfc_fmt formats[] = {
 		.versions	= MFC_V5PLUS_BITS,
 	},
 	{
-		.name		= "VP8 Encoded Stream",
 		.fourcc		= V4L2_PIX_FMT_VP8,
 		.codec_mode	= S5P_MFC_CODEC_VP8_DEC,
 		.type		= MFC_FMT_DEC,
@@ -283,7 +265,6 @@ static int vidioc_enum_fmt(struct file *file, struct v4l2_fmtdesc *f,
 							bool out)
 {
 	struct s5p_mfc_dev *dev = video_drvdata(file);
-	struct s5p_mfc_fmt *fmt;
 	int i, j = 0;
 
 	for (i = 0; i < ARRAY_SIZE(formats); ++i) {
@@ -300,9 +281,7 @@ static int vidioc_enum_fmt(struct file *file, struct v4l2_fmtdesc *f,
 	}
 	if (i == ARRAY_SIZE(formats))
 		return -EINVAL;
-	fmt = &formats[i];
-	strscpy(f->description, fmt->name, sizeof(f->description));
-	f->pixelformat = fmt->fourcc;
+	f->pixelformat = formats[i].fourcc;
 	return 0;
 }
 
@@ -766,19 +745,23 @@ static const struct v4l2_ctrl_ops s5p_mfc_dec_ctrl_ops = {
 	.g_volatile_ctrl = s5p_mfc_dec_g_v_ctrl,
 };
 
-/* Get cropping information */
-static int vidioc_g_crop(struct file *file, void *priv,
-		struct v4l2_crop *cr)
+/* Get compose information */
+static int vidioc_g_selection(struct file *file, void *priv,
+			      struct v4l2_selection *s)
 {
 	struct s5p_mfc_ctx *ctx = fh_to_ctx(priv);
 	struct s5p_mfc_dev *dev = ctx->dev;
 	u32 left, right, top, bottom;
+	u32 width, height;
+
+	if (s->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+		return -EINVAL;
 
 	if (ctx->state != MFCINST_HEAD_PARSED &&
 	    ctx->state != MFCINST_RUNNING &&
 	    ctx->state != MFCINST_FINISHING &&
 	    ctx->state != MFCINST_FINISHED) {
-		mfc_err("Can not get crop information\n");
+		mfc_err("Can not get compose information\n");
 		return -EINVAL;
 	}
 	if (ctx->src_fmt->fourcc == V4L2_PIX_FMT_H264) {
@@ -788,21 +771,32 @@ static int vidioc_g_crop(struct file *file, void *priv,
 		top = s5p_mfc_hw_call(dev->mfc_ops, get_crop_info_v, ctx);
 		bottom = top >> S5P_FIMV_SHARED_CROP_BOTTOM_SHIFT;
 		top = top & S5P_FIMV_SHARED_CROP_TOP_MASK;
-		cr->c.left = left;
-		cr->c.top = top;
-		cr->c.width = ctx->img_width - left - right;
-		cr->c.height = ctx->img_height - top - bottom;
-		mfc_debug(2, "Cropping info [h264]: l=%d t=%d w=%d h=%d (r=%d b=%d fw=%d fh=%d\n",
-			  left, top, cr->c.width, cr->c.height, right, bottom,
+		width = ctx->img_width - left - right;
+		height = ctx->img_height - top - bottom;
+		mfc_debug(2, "Composing info [h264]: l=%d t=%d w=%d h=%d (r=%d b=%d fw=%d fh=%d\n",
+			  left, top, s->r.width, s->r.height, right, bottom,
 			  ctx->buf_width, ctx->buf_height);
 	} else {
-		cr->c.left = 0;
-		cr->c.top = 0;
-		cr->c.width = ctx->img_width;
-		cr->c.height = ctx->img_height;
-		mfc_debug(2, "Cropping info: w=%d h=%d fw=%d fh=%d\n",
-			  cr->c.width,	cr->c.height, ctx->buf_width,
+		left = 0;
+		top = 0;
+		width = ctx->img_width;
+		height = ctx->img_height;
+		mfc_debug(2, "Composing info: w=%d h=%d fw=%d fh=%d\n",
+			  s->r.width, s->r.height, ctx->buf_width,
 			  ctx->buf_height);
+	}
+
+	switch (s->target) {
+	case V4L2_SEL_TGT_COMPOSE:
+	case V4L2_SEL_TGT_COMPOSE_DEFAULT:
+	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
+		s->r.left = left;
+		s->r.top = top;
+		s->r.width = width;
+		s->r.height = height;
+		break;
+	default:
+		return -EINVAL;
 	}
 	return 0;
 }
@@ -880,7 +874,7 @@ static const struct v4l2_ioctl_ops s5p_mfc_dec_ioctl_ops = {
 	.vidioc_expbuf = vidioc_expbuf,
 	.vidioc_streamon = vidioc_streamon,
 	.vidioc_streamoff = vidioc_streamoff,
-	.vidioc_g_crop = vidioc_g_crop,
+	.vidioc_g_selection = vidioc_g_selection,
 	.vidioc_decoder_cmd = vidioc_decoder_cmd,
 	.vidioc_subscribe_event = vidioc_subscribe_event,
 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,

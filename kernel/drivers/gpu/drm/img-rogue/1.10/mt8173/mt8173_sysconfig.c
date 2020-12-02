@@ -55,7 +55,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "physheap.h"
 #include "pvrsrv_device.h"
 #include "rgxdevice.h"
-#include "syscommon.h"
+#include "system/syscommon.h"
 
 #include "mt8173_mfgsys.h"
 

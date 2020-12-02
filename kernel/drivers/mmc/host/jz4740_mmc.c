@@ -1,18 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  Copyright (C) 2009-2010, Lars-Peter Clausen <lars@metafoo.de>
  *  Copyright (C) 2013, Imagination Technologies
  *
  *  JZ4740 SD/MMC controller driver
- *
- *  This program is free software; you can redistribute  it and/or modify it
- *  under  the terms of  the GNU General  Public License as published by the
- *  Free Software Foundation;  either version 2 of the  License, or (at your
- *  option) any later version.
- *
- *  You should have received a copy of the  GNU General Public License along
- *  with this program; if not, write  to the Free Software Foundation, Inc.,
- *  675 Mass Ave, Cambridge, MA 02139, USA.
- *
  */
 
 #include <linux/bitops.h>
@@ -21,7 +12,6 @@
 #include <linux/dmaengine.h>
 #include <linux/dma-mapping.h>
 #include <linux/err.h>
-#include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/irq.h>
@@ -34,9 +24,6 @@
 #include <linux/scatterlist.h>
 
 #include <asm/cacheflush.h>
-
-#include <asm/mach-jz4740/dma.h>
-#include <asm/mach-jz4740/jz4740_mmc.h>
 
 #define JZ_REG_MMC_STRPCL	0x00
 #define JZ_REG_MMC_STATUS	0x04
@@ -115,7 +102,7 @@
 
 enum jz4740_mmc_version {
 	JZ_MMC_JZ4740,
-	JZ_MMC_JZ4750,
+	JZ_MMC_JZ4725B,
 	JZ_MMC_JZ4780,
 };
 
@@ -126,15 +113,28 @@ enum jz4740_mmc_state {
 	JZ4740_MMC_STATE_DONE,
 };
 
-struct jz4740_mmc_host_next {
-	int sg_len;
-	s32 cookie;
+/*
+ * The MMC core allows to prepare a mmc_request while another mmc_request
+ * is in-flight. This is used via the pre_req/post_req hooks.
+ * This driver uses the pre_req/post_req hooks to map/unmap the mmc_request.
+ * Following what other drivers do (sdhci, dw_mmc) we use the following cookie
+ * flags to keep track of the mmc_request mapping state.
+ *
+ * COOKIE_UNMAPPED: the request is not mapped.
+ * COOKIE_PREMAPPED: the request was mapped in pre_req,
+ * and should be unmapped in post_req.
+ * COOKIE_MAPPED: the request was mapped in the irq handler,
+ * and should be unmapped before mmc_request_done is called..
+ */
+enum jz4780_cookie {
+	COOKIE_UNMAPPED = 0,
+	COOKIE_PREMAPPED,
+	COOKIE_MAPPED,
 };
 
 struct jz4740_mmc_host {
 	struct mmc_host *mmc;
 	struct platform_device *pdev;
-	struct jz4740_mmc_platform_data *pdata;
 	struct clk *clk;
 
 	enum jz4740_mmc_version version;
@@ -162,9 +162,7 @@ struct jz4740_mmc_host {
 	/* DMA support */
 	struct dma_chan *dma_rx;
 	struct dma_chan *dma_tx;
-	struct jz4740_mmc_host_next next_data;
 	bool use_dma;
-	int sg_len;
 
 /* The DMA trigger level is 8 words, that is to say, the DMA read
  * trigger is when data words in MSC_RXFIFO is >= 8 and the DMA write
@@ -176,7 +174,7 @@ struct jz4740_mmc_host {
 static void jz4740_mmc_write_irq_mask(struct jz4740_mmc_host *host,
 				      uint32_t val)
 {
-	if (host->version >= JZ_MMC_JZ4750)
+	if (host->version >= JZ_MMC_JZ4725B)
 		return writel(val, host->base + JZ_REG_MMC_IMASK);
 	else
 		return writew(val, host->base + JZ_REG_MMC_IMASK);
@@ -186,9 +184,9 @@ static void jz4740_mmc_write_irq_reg(struct jz4740_mmc_host *host,
 				     uint32_t val)
 {
 	if (host->version >= JZ_MMC_JZ4780)
-		return writel(val, host->base + JZ_REG_MMC_IREG);
+		writel(val, host->base + JZ_REG_MMC_IREG);
 	else
-		return writew(val, host->base + JZ_REG_MMC_IREG);
+		writew(val, host->base + JZ_REG_MMC_IREG);
 }
 
 static uint32_t jz4740_mmc_read_irq_reg(struct jz4740_mmc_host *host)
@@ -226,9 +224,6 @@ static int jz4740_mmc_acquire_dma_channels(struct jz4740_mmc_host *host)
 		return PTR_ERR(host->dma_rx);
 	}
 
-	/* Initialize DMA pre request cookie */
-	host->next_data.cookie = 1;
-
 	return 0;
 }
 
@@ -245,60 +240,44 @@ static void jz4740_mmc_dma_unmap(struct jz4740_mmc_host *host,
 	enum dma_data_direction dir = mmc_get_dma_dir(data);
 
 	dma_unmap_sg(chan->device->dev, data->sg, data->sg_len, dir);
+	data->host_cookie = COOKIE_UNMAPPED;
 }
 
-/* Prepares DMA data for current/next transfer, returns non-zero on failure */
+/* Prepares DMA data for current or next transfer.
+ * A request can be in-flight when this is called.
+ */
 static int jz4740_mmc_prepare_dma_data(struct jz4740_mmc_host *host,
 				       struct mmc_data *data,
-				       struct jz4740_mmc_host_next *next,
-				       struct dma_chan *chan)
+				       int cookie)
 {
-	struct jz4740_mmc_host_next *next_data = &host->next_data;
+	struct dma_chan *chan = jz4740_mmc_get_dma_chan(host, data);
 	enum dma_data_direction dir = mmc_get_dma_dir(data);
-	int sg_len;
+	int sg_count;
 
-	if (!next && data->host_cookie &&
-	    data->host_cookie != host->next_data.cookie) {
-		dev_warn(mmc_dev(host->mmc),
-			 "[%s] invalid cookie: data->host_cookie %d host->next_data.cookie %d\n",
-			 __func__,
-			 data->host_cookie,
-			 host->next_data.cookie);
-		data->host_cookie = 0;
-	}
+	if (data->host_cookie == COOKIE_PREMAPPED)
+		return data->sg_count;
 
-	/* Check if next job is already prepared */
-	if (next || data->host_cookie != host->next_data.cookie) {
-		sg_len = dma_map_sg(chan->device->dev,
-				    data->sg,
-				    data->sg_len,
-				    dir);
+	sg_count = dma_map_sg(chan->device->dev,
+			data->sg,
+			data->sg_len,
+			dir);
 
-	} else {
-		sg_len = next_data->sg_len;
-		next_data->sg_len = 0;
-	}
-
-	if (sg_len <= 0) {
+	if (sg_count <= 0) {
 		dev_err(mmc_dev(host->mmc),
 			"Failed to map scatterlist for DMA operation\n");
 		return -EINVAL;
 	}
 
-	if (next) {
-		next->sg_len = sg_len;
-		data->host_cookie = ++next->cookie < 0 ? 1 : next->cookie;
-	} else
-		host->sg_len = sg_len;
+	data->sg_count = sg_count;
+	data->host_cookie = cookie;
 
-	return 0;
+	return data->sg_count;
 }
 
 static int jz4740_mmc_start_dma_transfer(struct jz4740_mmc_host *host,
 					 struct mmc_data *data)
 {
-	int ret;
-	struct dma_chan *chan;
+	struct dma_chan *chan = jz4740_mmc_get_dma_chan(host, data);
 	struct dma_async_tx_descriptor *desc;
 	struct dma_slave_config conf = {
 		.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
@@ -306,29 +285,24 @@ static int jz4740_mmc_start_dma_transfer(struct jz4740_mmc_host *host,
 		.src_maxburst = JZ4740_MMC_FIFO_HALF_SIZE,
 		.dst_maxburst = JZ4740_MMC_FIFO_HALF_SIZE,
 	};
+	int sg_count;
 
 	if (data->flags & MMC_DATA_WRITE) {
 		conf.direction = DMA_MEM_TO_DEV;
 		conf.dst_addr = host->mem_res->start + JZ_REG_MMC_TXFIFO;
-		conf.slave_id = JZ4740_DMA_TYPE_MMC_TRANSMIT;
-		chan = host->dma_tx;
 	} else {
 		conf.direction = DMA_DEV_TO_MEM;
 		conf.src_addr = host->mem_res->start + JZ_REG_MMC_RXFIFO;
-		conf.slave_id = JZ4740_DMA_TYPE_MMC_RECEIVE;
-		chan = host->dma_rx;
 	}
 
-	ret = jz4740_mmc_prepare_dma_data(host, data, NULL, chan);
-	if (ret)
-		return ret;
+	sg_count = jz4740_mmc_prepare_dma_data(host, data, COOKIE_MAPPED);
+	if (sg_count < 0)
+		return sg_count;
 
 	dmaengine_slave_config(chan, &conf);
-	desc = dmaengine_prep_slave_sg(chan,
-				       data->sg,
-				       host->sg_len,
-				       conf.direction,
-				       DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+	desc = dmaengine_prep_slave_sg(chan, data->sg, sg_count,
+			conf.direction,
+			DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
 	if (!desc) {
 		dev_err(mmc_dev(host->mmc),
 			"Failed to allocate DMA %s descriptor",
@@ -342,7 +316,8 @@ static int jz4740_mmc_start_dma_transfer(struct jz4740_mmc_host *host,
 	return 0;
 
 dma_unmap:
-	jz4740_mmc_dma_unmap(host, data);
+	if (data->host_cookie == COOKIE_MAPPED)
+		jz4740_mmc_dma_unmap(host, data);
 	return -ENOMEM;
 }
 
@@ -351,16 +326,13 @@ static void jz4740_mmc_pre_request(struct mmc_host *mmc,
 {
 	struct jz4740_mmc_host *host = mmc_priv(mmc);
 	struct mmc_data *data = mrq->data;
-	struct jz4740_mmc_host_next *next_data = &host->next_data;
 
-	BUG_ON(data->host_cookie);
+	if (!host->use_dma)
+		return;
 
-	if (host->use_dma) {
-		struct dma_chan *chan = jz4740_mmc_get_dma_chan(host, data);
-
-		if (jz4740_mmc_prepare_dma_data(host, data, next_data, chan))
-			data->host_cookie = 0;
-	}
+	data->host_cookie = COOKIE_UNMAPPED;
+	if (jz4740_mmc_prepare_dma_data(host, data, COOKIE_PREMAPPED) < 0)
+		data->host_cookie = COOKIE_UNMAPPED;
 }
 
 static void jz4740_mmc_post_request(struct mmc_host *mmc,
@@ -370,10 +342,8 @@ static void jz4740_mmc_post_request(struct mmc_host *mmc,
 	struct jz4740_mmc_host *host = mmc_priv(mmc);
 	struct mmc_data *data = mrq->data;
 
-	if (host->use_dma && data->host_cookie) {
+	if (data && data->host_cookie != COOKIE_UNMAPPED)
 		jz4740_mmc_dma_unmap(host, data);
-		data->host_cookie = 0;
-	}
 
 	if (err) {
 		struct dma_chan *chan = jz4740_mmc_get_dma_chan(host, data);
@@ -436,10 +406,14 @@ static void jz4740_mmc_reset(struct jz4740_mmc_host *host)
 static void jz4740_mmc_request_done(struct jz4740_mmc_host *host)
 {
 	struct mmc_request *req;
+	struct mmc_data *data;
 
 	req = host->req;
+	data = req->data;
 	host->req = NULL;
 
+	if (data && data->host_cookie == COOKIE_MAPPED)
+		jz4740_mmc_dma_unmap(host, data);
 	mmc_request_done(host->mmc, req);
 }
 
@@ -752,6 +726,7 @@ static irqreturn_t jz_mmc_irq_worker(int irq, void *devid)
 			break;
 
 		jz_mmc_prepare_data_transfer(host);
+		/* fall through */
 
 	case JZ4740_MMC_STATE_TRANSFER_DATA:
 		if (host->use_dma) {
@@ -786,6 +761,7 @@ static irqreturn_t jz_mmc_irq_worker(int irq, void *devid)
 			break;
 		}
 		jz4740_mmc_write_irq_reg(host, JZ_MMC_IRQ_DATA_TRAN_DONE);
+		/* fall through */
 
 	case JZ4740_MMC_STATE_SEND_STOP:
 		if (!req->stop)
@@ -840,14 +816,14 @@ static irqreturn_t jz_mmc_irq(int irq, void *devid)
 			del_timer(&host->timeout_timer);
 
 			if (status & JZ_MMC_STATUS_TIMEOUT_RES) {
-					cmd->error = -ETIMEDOUT;
+				cmd->error = -ETIMEDOUT;
 			} else if (status & JZ_MMC_STATUS_CRC_RES_ERR) {
-					cmd->error = -EIO;
+				cmd->error = -EIO;
 			} else if (status & (JZ_MMC_STATUS_CRC_READ_ERROR |
 				    JZ_MMC_STATUS_CRC_WRITE_ERROR)) {
-					if (cmd->data)
-							cmd->data->error = -EIO;
-					cmd->error = -EIO;
+				if (cmd->data)
+					cmd->data->error = -EIO;
+				cmd->error = -EIO;
 			}
 
 			jz4740_mmc_set_irq_enabled(host, irq_reg, false);
@@ -903,18 +879,16 @@ static void jz4740_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	switch (ios->power_mode) {
 	case MMC_POWER_UP:
 		jz4740_mmc_reset(host);
-		if (host->pdata && gpio_is_valid(host->pdata->gpio_power))
-			gpio_set_value(host->pdata->gpio_power,
-					!host->pdata->power_active_low);
+		if (!IS_ERR(mmc->supply.vmmc))
+			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
 		host->cmdat |= JZ_MMC_CMDAT_INIT;
 		clk_prepare_enable(host->clk);
 		break;
 	case MMC_POWER_ON:
 		break;
 	default:
-		if (host->pdata && gpio_is_valid(host->pdata->gpio_power))
-			gpio_set_value(host->pdata->gpio_power,
-					host->pdata->power_active_low);
+		if (!IS_ERR(mmc->supply.vmmc))
+			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
 		clk_disable_unprepare(host->clk);
 		break;
 	}
@@ -947,71 +921,9 @@ static const struct mmc_host_ops jz4740_mmc_ops = {
 	.enable_sdio_irq = jz4740_mmc_enable_sdio_irq,
 };
 
-static int jz4740_mmc_request_gpio(struct device *dev, int gpio,
-	const char *name, bool output, int value)
-{
-	int ret;
-
-	if (!gpio_is_valid(gpio))
-		return 0;
-
-	ret = gpio_request(gpio, name);
-	if (ret) {
-		dev_err(dev, "Failed to request %s gpio: %d\n", name, ret);
-		return ret;
-	}
-
-	if (output)
-		gpio_direction_output(gpio, value);
-	else
-		gpio_direction_input(gpio);
-
-	return 0;
-}
-
-static int jz4740_mmc_request_gpios(struct mmc_host *mmc,
-	struct platform_device *pdev)
-{
-	struct jz4740_mmc_platform_data *pdata = dev_get_platdata(&pdev->dev);
-	int ret = 0;
-
-	if (!pdata)
-		return 0;
-
-	if (!pdata->card_detect_active_low)
-		mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
-	if (!pdata->read_only_active_low)
-		mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
-
-	/*
-	 * Get optional card detect and write protect GPIOs,
-	 * only back out on probe deferral.
-	 */
-	ret = mmc_gpiod_request_cd(mmc, "cd", 0, false, 0, NULL);
-	if (ret == -EPROBE_DEFER)
-		return ret;
-
-	ret = mmc_gpiod_request_ro(mmc, "wp", 0, false, 0, NULL);
-	if (ret == -EPROBE_DEFER)
-		return ret;
-
-	return jz4740_mmc_request_gpio(&pdev->dev, pdata->gpio_power,
-			"MMC read only", true, pdata->power_active_low);
-}
-
-static void jz4740_mmc_free_gpios(struct platform_device *pdev)
-{
-	struct jz4740_mmc_platform_data *pdata = dev_get_platdata(&pdev->dev);
-
-	if (!pdata)
-		return;
-
-	if (gpio_is_valid(pdata->gpio_power))
-		gpio_free(pdata->gpio_power);
-}
-
 static const struct of_device_id jz4740_mmc_of_match[] = {
 	{ .compatible = "ingenic,jz4740-mmc", .data = (void *) JZ_MMC_JZ4740 },
+	{ .compatible = "ingenic,jz4725b-mmc", .data = (void *)JZ_MMC_JZ4725B },
 	{ .compatible = "ingenic,jz4780-mmc", .data = (void *) JZ_MMC_JZ4780 },
 	{},
 };
@@ -1023,9 +935,6 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 	struct mmc_host *mmc;
 	struct jz4740_mmc_host *host;
 	const struct of_device_id *match;
-	struct jz4740_mmc_platform_data *pdata;
-
-	pdata = dev_get_platdata(&pdev->dev);
 
 	mmc = mmc_alloc_host(sizeof(struct jz4740_mmc_host), &pdev->dev);
 	if (!mmc) {
@@ -1034,33 +943,28 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 	}
 
 	host = mmc_priv(mmc);
-	host->pdata = pdata;
 
 	match = of_match_device(jz4740_mmc_of_match, &pdev->dev);
 	if (match) {
 		host->version = (enum jz4740_mmc_version)match->data;
-		ret = mmc_of_parse(mmc);
-		if (ret) {
-			if (ret != -EPROBE_DEFER)
-				dev_err(&pdev->dev,
-					"could not parse of data: %d\n", ret);
-			goto err_free_host;
-		}
 	} else {
 		/* JZ4740 should be the only one using legacy probe */
 		host->version = JZ_MMC_JZ4740;
-		mmc->caps |= MMC_CAP_SDIO_IRQ;
-		if (!(pdata && pdata->data_1bit))
-			mmc->caps |= MMC_CAP_4_BIT_DATA;
-		ret = jz4740_mmc_request_gpios(mmc, pdev);
-		if (ret)
-			goto err_free_host;
 	}
+
+	ret = mmc_of_parse(mmc);
+	if (ret) {
+		if (ret != -EPROBE_DEFER)
+			dev_err(&pdev->dev,
+				"could not parse device properties: %d\n", ret);
+		goto err_free_host;
+	}
+
+	mmc_regulator_get_supply(mmc);
 
 	host->irq = platform_get_irq(pdev, 0);
 	if (host->irq < 0) {
 		ret = host->irq;
-		dev_err(&pdev->dev, "Failed to get platform irq: %d\n", ret);
 		goto err_free_host;
 	}
 
@@ -1103,7 +1007,7 @@ static int jz4740_mmc_probe(struct platform_device* pdev)
 			dev_name(&pdev->dev), host);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request irq: %d\n", ret);
-		goto err_free_gpios;
+		goto err_free_host;
 	}
 
 	jz4740_mmc_clock_disable(host);
@@ -1134,8 +1038,6 @@ err_release_dma:
 		jz4740_mmc_release_dma_channels(host);
 err_free_irq:
 	free_irq(host->irq, host);
-err_free_gpios:
-	jz4740_mmc_free_gpios(pdev);
 err_free_host:
 	mmc_free_host(mmc);
 
@@ -1153,8 +1055,6 @@ static int jz4740_mmc_remove(struct platform_device *pdev)
 	mmc_remove_host(host->mmc);
 
 	free_irq(host->irq, host);
-
-	jz4740_mmc_free_gpios(pdev);
 
 	if (host->use_dma)
 		jz4740_mmc_release_dma_channels(host);

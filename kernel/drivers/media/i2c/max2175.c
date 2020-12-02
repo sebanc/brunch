@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Maxim Integrated MAX2175 RF to Bits tuner driver
  *
@@ -6,15 +7,6 @@
  *
  * Copyright (C) 2016 Maxim Integrated Products
  * Copyright (C) 2017 Renesas Electronics Corporation
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
  */
 
 #include <linux/clk.h>
@@ -1279,8 +1271,7 @@ static int max2175_refout_load_to_bits(struct i2c_client *client, u32 load,
 	return 0;
 }
 
-static int max2175_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int max2175_probe(struct i2c_client *client)
 {
 	bool master = true, am_hiz = false;
 	u32 refout_load, refout_bits = 0;	/* REFOUT disabled */
@@ -1441,7 +1432,7 @@ static struct i2c_driver max2175_driver = {
 		.name	= DRIVER_NAME,
 		.of_match_table = max2175_of_ids,
 	},
-	.probe		= max2175_probe,
+	.probe_new	= max2175_probe,
 	.remove		= max2175_remove,
 	.id_table	= max2175_id,
 };

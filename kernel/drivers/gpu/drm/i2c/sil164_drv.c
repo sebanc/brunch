@@ -26,9 +26,10 @@
 
 #include <linux/module.h>
 
-#include <drm/drmP.h>
-#include <drm/drm_crtc_helper.h>
+#include <drm/drm_drv.h>
 #include <drm/drm_encoder_slave.h>
+#include <drm/drm_print.h>
+#include <drm/drm_probe_helper.h>
 #include <drm/i2c/sil164.h>
 
 struct sil164_priv {
@@ -42,11 +43,6 @@ struct sil164_priv {
 #define to_sil164_priv(x) \
 	((struct sil164_priv *)to_encoder_slave(x)->slave_priv)
 
-#define sil164_dbg(client, format, ...) do {				\
-		if (drm_debug & DRM_UT_KMS)				\
-			dev_printk(KERN_DEBUG, &client->dev,		\
-				   "%s: " format, __func__, ## __VA_ARGS__); \
-	} while (0)
 #define sil164_info(client, format, ...)		\
 	dev_info(&client->dev, format, __VA_ARGS__)
 #define sil164_err(client, format, ...)			\
@@ -358,8 +354,8 @@ sil164_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	int rev = sil164_read(client, SIL164_REVISION);
 
 	if (vendor != 0x1 || device != 0x6) {
-		sil164_dbg(client, "Unknown device %x:%x.%x\n",
-			   vendor, device, rev);
+		drm_dev_dbg(&client->dev, DRM_UT_KMS,
+			    "Unknown device %x:%x.%x\n", vendor, device, rev);
 		return -ENODEV;
 	}
 
@@ -388,7 +384,8 @@ sil164_detect_slave(struct i2c_client *client)
 	};
 
 	if (i2c_transfer(adap, &msg, 1) != 1) {
-		sil164_dbg(adap, "No dual-link slave found.");
+		drm_dev_dbg(&adap->dev, DRM_UT_KMS,
+			    "No dual-link slave found.");
 		return NULL;
 	}
 

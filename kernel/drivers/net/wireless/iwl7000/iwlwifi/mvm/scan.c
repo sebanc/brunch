@@ -145,7 +145,7 @@ struct iwl_mvm_scan_params {
 	struct cfg80211_match_set *match_sets;
 	int n_scan_plans;
 	struct cfg80211_sched_scan_plan *scan_plans;
-	bool iter_notif;
+	u32 measurement_dwell;
 };
 
 static inline void *iwl_mvm_get_scan_req_umac_data(struct iwl_mvm *mvm)
@@ -334,6 +334,35 @@ iwl_mvm_scan_type iwl_mvm_get_scan_type_band(struct iwl_mvm *mvm,
 
 	return _iwl_mvm_get_scan_type(mvm, vif, load, low_latency);
 }
+
+#if CFG80211_VERSION >= KERNEL_VERSION(4,9,0)
+static int
+iwl_mvm_get_measurement_dwell(struct iwl_mvm *mvm,
+			      struct cfg80211_scan_request *req,
+			      struct iwl_mvm_scan_params *params)
+{
+	u32 duration = scan_timing[params->type].max_out_time;
+
+	if (!req->duration)
+		return 0;
+
+	if (iwl_mvm_is_cdb_supported(mvm)) {
+		u32 hb_time = scan_timing[params->hb_type].max_out_time;
+
+		duration = min_t(u32, duration, hb_time);
+	}
+
+	if (req->duration_mandatory && req->duration > duration) {
+		IWL_DEBUG_SCAN(mvm,
+			       "Measurement scan - too long dwell %hu (max out time %u)\n",
+			       req->duration,
+			       duration);
+		return -EOPNOTSUPP;
+	}
+
+	return min_t(u32, (u32)req->duration, duration);
+}
+#endif
 
 static inline bool iwl_mvm_rrm_scan_needed(struct iwl_mvm *mvm)
 {
@@ -696,28 +725,14 @@ static void iwl_mvm_scan_fill_tx_cmd(struct iwl_mvm *mvm,
 	tx_cmd[0].rate_n_flags = iwl_mvm_scan_rate_n_flags(mvm,
 							   NL80211_BAND_2GHZ,
 							   no_cck);
-
-	if (iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-				  ADD_STA,
-				  0) < 12) {
-		tx_cmd[0].sta_id = mvm->aux_sta.sta_id;
-		tx_cmd[1].sta_id = mvm->aux_sta.sta_id;
-
-	/*
-	 * Fw doesn't use this sta anymore, pending deprecation via HOST API
-	 * change
-	 */
-	} else {
-		tx_cmd[0].sta_id = 0xff;
-		tx_cmd[1].sta_id = 0xff;
-	}
+	tx_cmd[0].sta_id = mvm->aux_sta.sta_id;
 
 	tx_cmd[1].tx_flags = cpu_to_le32(TX_CMD_FLG_SEQ_CTL |
 					 TX_CMD_FLG_BT_DIS);
-
 	tx_cmd[1].rate_n_flags = iwl_mvm_scan_rate_n_flags(mvm,
 							   NL80211_BAND_5GHZ,
 							   no_cck);
+	tx_cmd[1].sta_id = mvm->aux_sta.sta_id;
 }
 
 static void
@@ -1129,10 +1144,6 @@ static void iwl_mvm_fill_scan_config_v1(struct iwl_mvm *mvm, void *config,
 
 	memcpy(&cfg->mac_addr, &mvm->addresses[0].addr, ETH_ALEN);
 
-	/* This function should not be called when using ADD_STA ver >=12 */
-	WARN_ON_ONCE(iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-					   ADD_STA, 0) >= 12);
-
 	cfg->bcast_sta_id = mvm->aux_sta.sta_id;
 	cfg->channel_flags = channel_flags;
 
@@ -1180,10 +1191,6 @@ static void iwl_mvm_fill_scan_config_v2(struct iwl_mvm *mvm, void *config,
 	iwl_mvm_fill_scan_dwell(mvm, &cfg->dwell);
 
 	memcpy(&cfg->mac_addr, &mvm->addresses[0].addr, ETH_ALEN);
-
-	/* This function should not be called when using ADD_STA ver >=12 */
-	WARN_ON_ONCE(iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-					   ADD_STA, 0) >= 12);
 
 	cfg->bcast_sta_id = mvm->aux_sta.sta_id;
 	cfg->channel_flags = channel_flags;
@@ -1298,16 +1305,7 @@ int iwl_mvm_config_scan(struct iwl_mvm *mvm)
 
 	memset(&cfg, 0, sizeof(cfg));
 
-	if (iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-				  ADD_STA, 0) < 12)
-		cfg.bcast_sta_id = mvm->aux_sta.sta_id;
-	/*
-	 * Fw doesn't use this sta anymore, pending deprecation via HOST API
-	 * change.
-	 */
-	else
-		cfg.bcast_sta_id = 0xff;
-
+	cfg.bcast_sta_id = mvm->aux_sta.sta_id;
 	cfg.tx_chains = cpu_to_le32(iwl_mvm_get_valid_tx_ant(mvm));
 	cfg.rx_chains = cpu_to_le32(iwl_mvm_scan_rx_ant(mvm));
 
@@ -1335,8 +1333,10 @@ static void iwl_mvm_scan_umac_dwell(struct iwl_mvm *mvm,
 	u8 active_dwell, passive_dwell;
 
 	timing = &scan_timing[params->type];
-	active_dwell = IWL_SCAN_DWELL_ACTIVE;
-	passive_dwell = IWL_SCAN_DWELL_PASSIVE;
+	active_dwell = params->measurement_dwell ?
+		params->measurement_dwell : IWL_SCAN_DWELL_ACTIVE;
+	passive_dwell = params->measurement_dwell ?
+		params->measurement_dwell : IWL_SCAN_DWELL_PASSIVE;
 
 	if (iwl_mvm_is_adaptive_dwell_supported(mvm)) {
 		cmd->v7.adwell_default_n_aps_social =
@@ -1389,7 +1389,8 @@ static void iwl_mvm_scan_umac_dwell(struct iwl_mvm *mvm,
 			}
 		}
 	} else {
-		cmd->v1.extended_dwell = IWL_SCAN_DWELL_EXTENDED;
+		cmd->v1.extended_dwell = params->measurement_dwell ?
+			params->measurement_dwell : IWL_SCAN_DWELL_EXTENDED;
 		cmd->v1.active_dwell = active_dwell;
 		cmd->v1.passive_dwell = passive_dwell;
 		cmd->v1.fragmented_dwell = IWL_SCAN_DWELL_FRAGMENTED;
@@ -1442,8 +1443,10 @@ iwl_mvm_scan_umac_dwell_v10(struct iwl_mvm *mvm,
 	u8 active_dwell, passive_dwell;
 
 	timing = &scan_timing[params->type];
-	active_dwell = IWL_SCAN_DWELL_ACTIVE;
-	passive_dwell = IWL_SCAN_DWELL_PASSIVE;
+	active_dwell = params->measurement_dwell ?
+		params->measurement_dwell : IWL_SCAN_DWELL_ACTIVE;
+	passive_dwell = params->measurement_dwell ?
+		params->measurement_dwell : IWL_SCAN_DWELL_PASSIVE;
 
 	general_params->adwell_default_social_chn =
 		IWL_SCAN_ADWELL_DEFAULT_N_APS_SOCIAL;
@@ -1682,9 +1685,9 @@ iwl_mvm_umac_scan_cfg_channels_v6(struct iwl_mvm *mvm,
 			iwl_mvm_scan_ch_n_aps_flag(vif_type,
 						   cfg->v2.channel_num);
 
+		cfg->flags = cpu_to_le32(flags | n_aps_flag);
 		cfg->v2.channel_num = channels[i]->hw_value;
 		cfg->v2.band = iwl_mvm_phy_band_from_nl80211(band);
-		cfg->flags = cpu_to_le32(flags | n_aps_flag);
 		cfg->v2.iter_count = 1;
 		cfg->v2.iter_interval = 0;
 	}
@@ -1734,7 +1737,7 @@ static u16 iwl_mvm_scan_umac_flags_v2(struct iwl_mvm *mvm,
 	if (!iwl_mvm_is_regular_scan(params))
 		flags |= IWL_UMAC_SCAN_GEN_FLAGS_V2_PERIODIC;
 
-	if (params->iter_notif ||
+	if (params->measurement_dwell ||
 	    mvm->sched_scan_pass_all == SCHED_SCAN_PASS_ALL_ENABLED)
 		flags |= IWL_UMAC_SCAN_GEN_FLAGS_V2_NTFY_ITER_COMPLETE;
 
@@ -1784,7 +1787,7 @@ static u16 iwl_mvm_scan_umac_flags(struct iwl_mvm *mvm,
 	if (!iwl_mvm_is_regular_scan(params))
 		flags |= IWL_UMAC_SCAN_GEN_FLAGS_PERIODIC;
 
-	if (params->iter_notif)
+	if (params->measurement_dwell)
 		flags |= IWL_UMAC_SCAN_GEN_FLAGS_ITER_COMPLETE;
 
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
@@ -1928,10 +1931,8 @@ static int iwl_mvm_scan_umac(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 	ret = iwl_mvm_fill_scan_sched_params(params, tail_v2->schedule,
 					     &tail_v2->delay);
-	if (ret) {
-		mvm->scan_uid_status[uid] = 0;
+	if (ret)
 		return ret;
-	}
 
 	if (iwl_mvm_is_scan_ext_chan_supported(mvm)) {
 		tail_v2->preq = params->preq;
@@ -2214,7 +2215,7 @@ static int iwl_mvm_build_scan_cmd(struct iwl_mvm *mvm,
 				  struct iwl_mvm_scan_params *params,
 				  int type)
 {
-	int uid, i, err;
+	int uid, i;
 	u8 scan_ver;
 
 	lockdep_assert_held(&mvm->mutex);
@@ -2233,8 +2234,7 @@ static int iwl_mvm_build_scan_cmd(struct iwl_mvm *mvm,
 	hcmd->id = iwl_cmd_id(SCAN_REQ_UMAC, IWL_ALWAYS_LONG_GROUP, 0);
 
 	scan_ver = iwl_fw_lookup_cmd_ver(mvm->fw, IWL_ALWAYS_LONG_GROUP,
-					 SCAN_REQ_UMAC,
-					 IWL_FW_CMD_VER_UNKNOWN);
+					 SCAN_REQ_UMAC);
 
 	for (i = 0; i < ARRAY_SIZE(iwl_scan_umac_handlers); i++) {
 		const struct iwl_scan_umac_handler *ver_handler =
@@ -2246,11 +2246,7 @@ static int iwl_mvm_build_scan_cmd(struct iwl_mvm *mvm,
 		return ver_handler->handler(mvm, vif, params, type, uid);
 	}
 
-	err = iwl_mvm_scan_umac(mvm, vif, params, type, uid);
-	if (err)
-		return err;
-
-	return uid;
+	return iwl_mvm_scan_umac(mvm, vif, params, type, uid);
 }
 
 int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
@@ -2263,7 +2259,7 @@ int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		.dataflags = { IWL_HCMD_DFL_NOCOPY, },
 	};
 	struct iwl_mvm_scan_params params = {};
-	int ret, uid;
+	int ret;
 	struct cfg80211_sched_scan_plan scan_plan = { .iterations = 1 };
 
 	lockdep_assert_held(&mvm->mutex);
@@ -2303,17 +2299,20 @@ int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 	iwl_mvm_fill_scan_type(mvm, &params, vif);
 
 #if CFG80211_VERSION >= KERNEL_VERSION(4,9,0)
-	if (req->duration)
-		params.iter_notif = true;
+	ret = iwl_mvm_get_measurement_dwell(mvm, req, &params);
+	if (ret < 0)
+		return ret;
+
+	params.measurement_dwell = ret;
 #endif
 
 	iwl_mvm_build_scan_probe(mvm, vif, ies, &params);
 
-	uid = iwl_mvm_build_scan_cmd(mvm, vif, &hcmd, &params,
+	ret = iwl_mvm_build_scan_cmd(mvm, vif, &hcmd, &params,
 				     IWL_MVM_SCAN_REGULAR);
 
-	if (uid < 0)
-		return uid;
+	if (ret)
+		return ret;
 
 	iwl_mvm_pause_tcm(mvm, false);
 
@@ -2325,7 +2324,6 @@ int iwl_mvm_reg_scan_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 		 */
 		IWL_ERR(mvm, "Scan failed! ret %d\n", ret);
 		iwl_mvm_resume_tcm(mvm);
-		mvm->scan_uid_status[uid] = 0;
 		return ret;
 	}
 
@@ -2351,7 +2349,7 @@ int iwl_mvm_sched_scan_start(struct iwl_mvm *mvm,
 		.dataflags = { IWL_HCMD_DFL_NOCOPY, },
 	};
 	struct iwl_mvm_scan_params params = {};
-	int ret, uid;
+	int ret;
 #if CFG80211_VERSION < KERNEL_VERSION(4,4,0)
 	struct cfg80211_sched_scan_plan scan_plan = {};
 #endif
@@ -2421,10 +2419,10 @@ int iwl_mvm_sched_scan_start(struct iwl_mvm *mvm,
 
 	iwl_mvm_build_scan_probe(mvm, vif, ies, &params);
 
-	uid = iwl_mvm_build_scan_cmd(mvm, vif, &hcmd, &params, type);
+	ret = iwl_mvm_build_scan_cmd(mvm, vif, &hcmd, &params, type);
 
-	if (uid < 0)
-		return uid;
+	if (ret)
+		return ret;
 
 	ret = iwl_mvm_send_cmd(mvm, &hcmd);
 	if (!ret) {
@@ -2437,8 +2435,6 @@ int iwl_mvm_sched_scan_start(struct iwl_mvm *mvm,
 		 * should try to send the command again with different params.
 		 */
 		IWL_ERR(mvm, "Sched scan failed! ret %d\n", ret);
-		mvm->scan_uid_status[uid] = 0;
-		mvm->sched_scan_pass_all = SCHED_SCAN_PASS_ALL_DISABLED;
 	}
 
 	return ret;
@@ -2592,8 +2588,7 @@ int iwl_mvm_scan_size(struct iwl_mvm *mvm)
 {
 	int base_size, tail_size;
 	u8 scan_ver = iwl_fw_lookup_cmd_ver(mvm->fw, IWL_ALWAYS_LONG_GROUP,
-					    SCAN_REQ_UMAC,
-					    IWL_FW_CMD_VER_UNKNOWN);
+					    SCAN_REQ_UMAC);
 
 	base_size = iwl_scan_req_umac_get_size(scan_ver);
 	if (base_size)

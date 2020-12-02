@@ -1,12 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Support PCI/PCIe on PowerNV platforms
  *
  * Copyright 2011 Benjamin Herrenschmidt, IBM Corp.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/kernel.h>
@@ -38,7 +34,6 @@
 #include "powernv.h"
 #include "pci.h"
 
-static DEFINE_MUTEX(p2p_mutex);
 static DEFINE_MUTEX(tunnel_mutex);
 
 int pnv_pci_get_slot_id(struct device_node *np, uint64_t *id)
@@ -59,7 +54,8 @@ int pnv_pci_get_slot_id(struct device_node *np, uint64_t *id)
 			break;
 		}
 
-		if (!of_device_is_compatible(parent, "ibm,ioda2-phb")) {
+		if (!of_device_is_compatible(parent, "ibm,ioda2-phb") &&
+		    !of_device_is_compatible(parent, "ibm,ioda3-phb")) {
 			of_node_put(parent);
 			continue;
 		}
@@ -160,7 +156,6 @@ exit:
 }
 EXPORT_SYMBOL_GPL(pnv_pci_set_power_state);
 
-#ifdef CONFIG_PCI_MSI
 int pnv_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
 {
 	struct pci_controller *hose = pci_bus_to_host(pdev->bus);
@@ -229,7 +224,6 @@ void pnv_teardown_msi_irqs(struct pci_dev *pdev)
 		msi_bitmap_free_hwirqs(&phb->msi_bmp, hwirq - phb->msi_base, 1);
 	}
 }
-#endif /* CONFIG_PCI_MSI */
 
 /* Nicely print the contents of the PE State Tables (PEST). */
 static void pnv_pci_dump_pest(__be64 pestA[], __be64 pestB[], int pest_size)
@@ -845,79 +839,6 @@ void pnv_pci_dma_bus_setup(struct pci_bus *bus)
 	}
 }
 
-int pnv_pci_set_p2p(struct pci_dev *initiator, struct pci_dev *target, u64 desc)
-{
-	struct pci_controller *hose;
-	struct pnv_phb *phb_init, *phb_target;
-	struct pnv_ioda_pe *pe_init;
-	int rc;
-
-	if (!opal_check_token(OPAL_PCI_SET_P2P))
-		return -ENXIO;
-
-	hose = pci_bus_to_host(initiator->bus);
-	phb_init = hose->private_data;
-
-	hose = pci_bus_to_host(target->bus);
-	phb_target = hose->private_data;
-
-	pe_init = pnv_ioda_get_pe(initiator);
-	if (!pe_init)
-		return -ENODEV;
-
-	/*
-	 * Configuring the initiator's PHB requires to adjust its
-	 * TVE#1 setting. Since the same device can be an initiator
-	 * several times for different target devices, we need to keep
-	 * a reference count to know when we can restore the default
-	 * bypass setting on its TVE#1 when disabling. Opal is not
-	 * tracking PE states, so we add a reference count on the PE
-	 * in linux.
-	 *
-	 * For the target, the configuration is per PHB, so we keep a
-	 * target reference count on the PHB.
-	 */
-	mutex_lock(&p2p_mutex);
-
-	if (desc & OPAL_PCI_P2P_ENABLE) {
-		/* always go to opal to validate the configuration */
-		rc = opal_pci_set_p2p(phb_init->opal_id, phb_target->opal_id,
-				      desc, pe_init->pe_number);
-
-		if (rc != OPAL_SUCCESS) {
-			rc = -EIO;
-			goto out;
-		}
-
-		pe_init->p2p_initiator_count++;
-		phb_target->p2p_target_count++;
-	} else {
-		if (!pe_init->p2p_initiator_count ||
-			!phb_target->p2p_target_count) {
-			rc = -EINVAL;
-			goto out;
-		}
-
-		if (--pe_init->p2p_initiator_count == 0)
-			pnv_pci_ioda2_set_bypass(pe_init, true);
-
-		if (--phb_target->p2p_target_count == 0) {
-			rc = opal_pci_set_p2p(phb_init->opal_id,
-					      phb_target->opal_id, desc,
-					      pe_init->pe_number);
-			if (rc != OPAL_SUCCESS) {
-				rc = -EIO;
-				goto out;
-			}
-		}
-	}
-	rc = 0;
-out:
-	mutex_unlock(&p2p_mutex);
-	return rc;
-}
-EXPORT_SYMBOL_GPL(pnv_pci_set_p2p);
-
 struct device_node *pnv_pci_get_phb_node(struct pci_dev *dev)
 {
 	struct pci_controller *hose = pci_bus_to_host(dev->bus);
@@ -925,54 +846,6 @@ struct device_node *pnv_pci_get_phb_node(struct pci_dev *dev)
 	return of_node_get(hose->dn);
 }
 EXPORT_SYMBOL(pnv_pci_get_phb_node);
-
-int pnv_pci_enable_tunnel(struct pci_dev *dev, u64 *asnind)
-{
-	struct device_node *np;
-	const __be32 *prop;
-	struct pnv_ioda_pe *pe;
-	uint16_t window_id;
-	int rc;
-
-	if (!radix_enabled())
-		return -ENXIO;
-
-	if (!(np = pnv_pci_get_phb_node(dev)))
-		return -ENXIO;
-
-	prop = of_get_property(np, "ibm,phb-indications", NULL);
-	of_node_put(np);
-
-	if (!prop || !prop[1])
-		return -ENXIO;
-
-	*asnind = (u64)be32_to_cpu(prop[1]);
-	pe = pnv_ioda_get_pe(dev);
-	if (!pe)
-		return -ENODEV;
-
-	/* Increase real window size to accept as_notify messages. */
-	window_id = (pe->pe_number << 1 ) + 1;
-	rc = opal_pci_map_pe_dma_window_real(pe->phb->opal_id, pe->pe_number,
-					     window_id, pe->tce_bypass_base,
-					     (uint64_t)1 << 48);
-	return opal_error_code(rc);
-}
-EXPORT_SYMBOL_GPL(pnv_pci_enable_tunnel);
-
-int pnv_pci_disable_tunnel(struct pci_dev *dev)
-{
-	struct pnv_ioda_pe *pe;
-
-	pe = pnv_ioda_get_pe(dev);
-	if (!pe)
-		return -ENODEV;
-
-	/* Restore default real window size. */
-	pnv_pci_ioda2_set_bypass(pe, true);
-	return 0;
-}
-EXPORT_SYMBOL_GPL(pnv_pci_disable_tunnel);
 
 int pnv_pci_set_tunnel_bar(struct pci_dev *dev, u64 addr, int enable)
 {
@@ -1027,29 +900,6 @@ out:
 	return rc;
 }
 EXPORT_SYMBOL_GPL(pnv_pci_set_tunnel_bar);
-
-#ifdef CONFIG_PPC64	/* for thread.tidr */
-int pnv_pci_get_as_notify_info(struct task_struct *task, u32 *lpid, u32 *pid,
-			       u32 *tid)
-{
-	struct mm_struct *mm = NULL;
-
-	if (task == NULL)
-		return -EINVAL;
-
-	mm = get_task_mm(task);
-	if (mm == NULL)
-		return -EINVAL;
-
-	*pid = mm->context.id;
-	mmput(mm);
-
-	*tid = task->thread.tidr;
-	*lpid = mfspr(SPRN_LPID);
-	return 0;
-}
-EXPORT_SYMBOL_GPL(pnv_pci_get_as_notify_info);
-#endif
 
 void pnv_pci_shutdown(void)
 {
@@ -1126,4 +976,47 @@ void __init pnv_pci_init(void)
 	set_pci_dma_ops(&dma_iommu_ops);
 }
 
-machine_subsys_initcall_sync(powernv, tce_iommu_bus_notifier_init);
+static int pnv_tce_iommu_bus_notifier(struct notifier_block *nb,
+		unsigned long action, void *data)
+{
+	struct device *dev = data;
+	struct pci_dev *pdev;
+	struct pci_dn *pdn;
+	struct pnv_ioda_pe *pe;
+	struct pci_controller *hose;
+	struct pnv_phb *phb;
+
+	switch (action) {
+	case BUS_NOTIFY_ADD_DEVICE:
+		pdev = to_pci_dev(dev);
+		pdn = pci_get_pdn(pdev);
+		hose = pci_bus_to_host(pdev->bus);
+		phb = hose->private_data;
+
+		WARN_ON_ONCE(!phb);
+		if (!pdn || pdn->pe_number == IODA_INVALID_PE || !phb)
+			return 0;
+
+		pe = &phb->ioda.pe_array[pdn->pe_number];
+		if (!pe->table_group.group)
+			return 0;
+		iommu_add_device(&pe->table_group, dev);
+		return 0;
+	case BUS_NOTIFY_DEL_DEVICE:
+		iommu_del_device(dev);
+		return 0;
+	default:
+		return 0;
+	}
+}
+
+static struct notifier_block pnv_tce_iommu_bus_nb = {
+	.notifier_call = pnv_tce_iommu_bus_notifier,
+};
+
+static int __init pnv_tce_iommu_bus_notifier_init(void)
+{
+	bus_register_notifier(&pci_bus_type, &pnv_tce_iommu_bus_nb);
+	return 0;
+}
+machine_subsys_initcall_sync(powernv, pnv_tce_iommu_bus_notifier_init);

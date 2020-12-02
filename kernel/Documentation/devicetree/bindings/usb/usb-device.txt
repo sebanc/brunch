@@ -66,9 +66,6 @@ Required properties for host-controller nodes with device nodes:
 - #size-cells: shall be 0
 
 
-Optional properties for hub nodes
-- hub,interval: bInterval of status change endpoint. The range is 1-255.
-
 Example:
 
 &usb1 {	/* host controller */
@@ -78,7 +75,6 @@ Example:
 	hub@1 {		/* hub connected to port 1 */
 		compatible = "usb5e3,608";
 		reg = <1>;
-		hub,interval = <8>;
 	};
 
 	device@2 {	/* device connected to port 2 */

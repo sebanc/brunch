@@ -1,14 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *      uvc_video.c  --  USB Video Class driver - Video handling
  *
  *      Copyright (C) 2005-2010
  *          Laurent Pinchart (laurent.pinchart@ideasonboard.com)
- *
- *      This program is free software; you can redistribute it and/or modify
- *      it under the terms of the GNU General Public License as published by
- *      the Free Software Foundation; either version 2 of the License, or
- *      (at your option) any later version.
- *
  */
 
 #include <linux/kernel.h>
@@ -1544,8 +1539,6 @@ static void uvc_video_complete(struct urb *urb)
 	 * Process the URB headers, and optionally queue expensive memcpy tasks
 	 * to be deferred to a work queue.
 	 */
-	dma_sync_single_for_cpu(urb->dev->bus->controller, urb->transfer_dma,
-				urb->transfer_buffer_length, DMA_FROM_DEVICE);
 	stream->decode(uvc_urb, buf, buf_meta);
 
 	/* If no async work is needed, resubmit the URB immediately. */
@@ -1572,53 +1565,16 @@ static void uvc_free_urb_buffers(struct uvc_streaming *stream)
 		if (!uvc_urb->buffer)
 			continue;
 
-		dma_unmap_single(stream->dev->udev->bus->controller,
-				 uvc_urb->dma, stream->urb_size,
-				 DMA_FROM_DEVICE);
-		free_pages_exact(uvc_urb->buffer, stream->urb_size);
+#ifndef CONFIG_DMA_NONCOHERENT
+		usb_free_coherent(stream->dev->udev, stream->urb_size,
+				  uvc_urb->buffer, uvc_urb->dma);
+#else
+		kfree(uvc_urb->buffer);
+#endif
 		uvc_urb->buffer = NULL;
 	}
 
 	stream->urb_size = 0;
-}
-
-static gfp_t uvc_alloc_gfp_flags(struct device *dev)
-{
-	u64 mask = dma_get_mask(dev);
-
-	if (dev->bus_dma_mask)
-		mask &= dev->bus_dma_mask;
-
-	if (mask < DMA_BIT_MASK(32) && IS_ENABLED(CONFIG_ZONE_DMA))
-		return GFP_DMA;
-
-	if (mask < DMA_BIT_MASK(64)) {
-		if (IS_ENABLED(CONFIG_ZONE_DMA32))
-			return GFP_DMA32;
-		if (IS_ENABLED(CONFIG_ZONE_DMA))
-			return GFP_DMA;
-	}
-
-	return 0;
-}
-
-static char *uvc_alloc_urb_buffer(struct device *dev, size_t size,
-				  gfp_t gfp_flags, dma_addr_t *dma_handle)
-{
-	void *buffer =
-		alloc_pages_exact(size, gfp_flags | uvc_alloc_gfp_flags(dev) |
-						__GFP_NOWARN | __GFP_ZERO);
-
-	if (!buffer)
-		return NULL;
-
-	*dma_handle = dma_map_single(dev, buffer, size, DMA_FROM_DEVICE);
-	if (dma_mapping_error(dev, *dma_handle)) {
-		free_pages_exact(buffer, size);
-		return NULL;
-	}
-
-	return buffer;
 }
 
 /*
@@ -1651,14 +1607,18 @@ static int uvc_alloc_urb_buffers(struct uvc_streaming *stream,
 
 	/* Retry allocations until one succeed. */
 	for (; npackets > 1; npackets /= 2) {
-		stream->urb_size = psize * npackets;
-
 		for (i = 0; i < UVC_URBS; ++i) {
 			struct uvc_urb *uvc_urb = &stream->uvc_urb[i];
 
-			uvc_urb->buffer = uvc_alloc_urb_buffer(
-				stream->dev->udev->bus->controller,
-				stream->urb_size, gfp_flags, &uvc_urb->dma);
+			stream->urb_size = psize * npackets;
+#ifndef CONFIG_DMA_NONCOHERENT
+			uvc_urb->buffer = usb_alloc_coherent(
+				stream->dev->udev, stream->urb_size,
+				gfp_flags | __GFP_NOWARN, &uvc_urb->dma);
+#else
+			uvc_urb->buffer =
+			    kmalloc(stream->urb_size, gfp_flags | __GFP_NOWARN);
+#endif
 			if (!uvc_urb->buffer) {
 				uvc_free_urb_buffers(stream);
 				break;
@@ -1768,8 +1728,12 @@ static int uvc_init_video_isoc(struct uvc_streaming *stream,
 		urb->context = uvc_urb;
 		urb->pipe = usb_rcvisocpipe(stream->dev->udev,
 				ep->desc.bEndpointAddress);
+#ifndef CONFIG_DMA_NONCOHERENT
 		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
 		urb->transfer_dma = uvc_urb->dma;
+#else
+		urb->transfer_flags = URB_ISO_ASAP;
+#endif
 		urb->interval = ep->desc.bInterval;
 		urb->transfer_buffer = uvc_urb->buffer;
 		urb->complete = uvc_video_complete;
@@ -1829,8 +1793,10 @@ static int uvc_init_video_bulk(struct uvc_streaming *stream,
 
 		usb_fill_bulk_urb(urb, stream->dev->udev, pipe,	uvc_urb->buffer,
 				  size, uvc_video_complete, uvc_urb);
+#ifndef CONFIG_DMA_NONCOHERENT
 		urb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
 		urb->transfer_dma = uvc_urb->dma;
+#endif
 
 		uvc_urb->urb = urb;
 	}
@@ -2037,7 +2003,7 @@ int uvc_video_init(struct uvc_streaming *stream)
 	usb_set_interface(stream->dev->udev, stream->intfnum, 0);
 
 	/* Set the streaming probe control with default streaming parameters
-	 * retrieved from the device. Webcams that don't suport GET_DEF
+	 * retrieved from the device. Webcams that don't support GET_DEF
 	 * requests on the probe control will just keep their current streaming
 	 * parameters.
 	 */

@@ -1,11 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * OF helpers for parsing display timings
  *
  * Copyright (c) 2012 Steffen Trumtrar <s.trumtrar@pengutronix.de>, Pengutronix
  *
  * based on of_videomode.c by Sascha Hauer <s.hauer@pengutronix.de>
- *
- * This file is released under the GPLv2
  */
 #include <linux/export.h>
 #include <linux/of.h>
@@ -173,7 +172,7 @@ struct display_timings *of_get_display_timings(const struct device_node *np)
 		goto entryfail;
 	}
 
-	pr_debug("%pOF: using %s as default timing\n", np, entry->name);
+	pr_debug("%pOF: using %pOFn as default timing\n", np, entry);
 
 	native_mode = entry;
 

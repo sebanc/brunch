@@ -5,6 +5,7 @@
  *
  * GPL LICENSE SUMMARY
  *
+ * Copyright(c) 2012 - 2014 Intel Corporation. All rights reserved.
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
  * Copyright(c) 2016 - 2017 Intel Deutschland GmbH
  * Copyright(c) 2018 - 2020 Intel Corporation
@@ -27,6 +28,7 @@
  *
  * BSD LICENSE
  *
+ * Copyright(c) 2012 - 2014 Intel Corporation. All rights reserved.
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
  * Copyright(c) 2016 - 2017 Intel Deutschland GmbH
  * Copyright(c) 2018 - 2020 Intel Corporation
@@ -106,12 +108,11 @@ enum iwl_mvm_command_groups {
  */
 enum iwl_legacy_cmds {
 	/**
-	 * @UCODE_ALIVE_NTFY:
+	 * @MVM_ALIVE:
 	 * Alive data from the firmware, as described in
-	 * &struct iwl_alive_ntf_v3 or &struct iwl_alive_ntf_v4 or
-	 * &struct iwl_alive_ntf_v5.
+	 * &struct mvm_alive_resp_v3 or &struct mvm_alive_resp.
 	 */
-	UCODE_ALIVE_NTFY = 0x1,
+	MVM_ALIVE = 0x1,
 
 	/**
 	 * @REPLY_ERROR: Cause an error in the firmware, for testing purposes.
@@ -678,13 +679,6 @@ enum iwl_system_subcmd_ids {
  * enum iwl_xvt_subcmd_ids - XVT group command IDs
  */
 enum iwl_xvt_subcmd_ids {
-	/**
-	 * @DTS_MEASUREMENT_TRIGGER_NOTIF : Notification about
-	 * DTS measurement
-	 * Handled by user space component
-	 */
-	DTS_MEASUREMENT_TRIGGER_NOTIF = 0xFC,
-
 	/**
 	 * @MPAPD_EXEC_DONE_NOTIF : Notification about
 	 * MPAPD execution command finished

@@ -26,7 +26,9 @@
 #include <linux/pci.h>
 #include <linux/virtio.h>
 #include <linux/virtio_config.h>
-#include <drm/drmP.h>
+
+#include <drm/drm_file.h>
+
 #include "virtgpu_drv.h"
 
 static void virtio_gpu_config_changed_work_func(struct work_struct *work)
@@ -95,8 +97,10 @@ static void virtio_gpu_get_capsets(struct virtio_gpu_device *vgdev,
 					 vgdev->capsets[i].id > 0, 5 * HZ);
 		if (ret == 0) {
 			DRM_ERROR("timed out waiting for cap set %d\n", i);
+			spin_lock(&vgdev->display_info_lock);
 			kfree(vgdev->capsets);
 			vgdev->capsets = NULL;
+			spin_unlock(&vgdev->display_info_lock);
 			return;
 		}
 		DRM_INFO("cap set %d: id %d, max-version %d, max-size %d\n",
@@ -134,6 +138,7 @@ int virtio_gpu_init(struct drm_device *dev)
 
 	spin_lock_init(&vgdev->display_info_lock);
 	spin_lock_init(&vgdev->request_idr_lock);
+	spin_lock_init(&vgdev->resource_export_lock);
 	ida_init(&vgdev->ctx_id_ida);
 	ida_init(&vgdev->resource_ida);
 	idr_init(&vgdev->request_idr);
@@ -148,6 +153,11 @@ int virtio_gpu_init(struct drm_device *dev)
 	INIT_WORK(&vgdev->config_changed_work,
 		  virtio_gpu_config_changed_work_func);
 
+	INIT_WORK(&vgdev->obj_free_work,
+		  virtio_gpu_gem_object_put_free_work);
+	INIT_LIST_HEAD(&vgdev->obj_free_list);
+	spin_lock_init(&vgdev->obj_free_lock);
+
 #ifdef __LITTLE_ENDIAN
 	if (virtio_has_feature(vgdev->vdev, VIRTIO_GPU_F_VIRGL))
 		vgdev->has_virgl_3d = true;
@@ -160,28 +170,29 @@ int virtio_gpu_init(struct drm_device *dev)
 		vgdev->has_edid = true;
 		DRM_INFO("EDID support available.\n");
 	}
+	if (virtio_has_feature(vgdev->vdev, VIRTIO_GPU_F_RESOURCE_UUID)) {
+		vgdev->has_resource_assign_uuid = true;
+		DRM_INFO("Virtio cross device support available.\n");
+	}
 
-	if (virtio_has_feature(vgdev->vdev, VIRTIO_GPU_F_RESOURCE_V2)) {
-		if (virtio_has_feature(vgdev->vdev, VIRTIO_GPU_F_HOST_COHERENT)) {
-			vgdev->cbar = 4;
-			vgdev->caddr = pci_resource_start(dev->pdev, vgdev->cbar);
-			vgdev->csize = pci_resource_len(dev->pdev, vgdev->cbar);
-			ret = pci_request_region(dev->pdev, vgdev->cbar, "virtio-gpu-coherent");
-			if (ret != 0) {
-				DRM_WARN("Cannot request coherent memory bar\n");
-			} else {
-				DRM_INFO("coherent host resources enabled, using %s bar %d,"
-					 "at 0x%lx, size %ld MB", dev_name(&dev->pdev->dev),
-					vgdev->cbar, vgdev->caddr, vgdev->csize >> 20);
+	if (virtio_has_feature(vgdev->vdev, VIRTIO_GPU_F_RESOURCE_BLOB)) {
+		vgdev->cbar = 4;
+		vgdev->caddr = pci_resource_start(dev->pdev, vgdev->cbar);
+		vgdev->csize = pci_resource_len(dev->pdev, vgdev->cbar);
+		ret = pci_request_region(dev->pdev, vgdev->cbar, "virtio-gpu-coherent");
+		if (ret != 0) {
+			DRM_WARN("Cannot request coherent memory bar\n");
+		} else {
+			DRM_INFO("coherent host resources enabled, using %s bar %d,"
+				 "at 0x%lx, size %ld MB", dev_name(&dev->pdev->dev),
+				vgdev->cbar, vgdev->caddr, vgdev->csize >> 20);
 
-				vgdev->has_host_coherent = true;
-			}
+			vgdev->has_host_visible = true;
 		}
 
-		if (virtio_has_feature(vgdev->vdev, VIRTIO_GPU_F_SHARED_GUEST))
-			vgdev->has_shared_guest = true;
-
-		vgdev->has_resource_v2 = true;
+		vgdev->has_resource_blob = true;
+		DRM_INFO("resource_blob: %u, host visible %u\n",
+			  vgdev->has_resource_blob, vgdev->has_host_visible);
 	}
 
 	ret = virtio_find_vqs(vgdev->vdev, 2, vqs, callbacks, names, NULL);
@@ -258,6 +269,7 @@ void virtio_gpu_deinit(struct drm_device *dev)
 {
 	struct virtio_gpu_device *vgdev = dev->dev_private;
 
+	flush_work(&vgdev->obj_free_work);
 	vgdev->vqs_ready = false;
 	flush_work(&vgdev->ctrlq.dequeue_work);
 	flush_work(&vgdev->cursorq.dequeue_work);

@@ -29,8 +29,8 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
+#include <linux/gpio/consumer.h>
 #include <linux/of_device.h>
-#include <linux/of_gpio.h>
 
 /*
  * The codec isn't really big-endian or little-endian, since the I2S
@@ -352,7 +352,7 @@ static int cs4270_hw_params(struct snd_pcm_substream *substream,
 
 	/* Set the sample rate */
 
-	reg = snd_soc_component_read32(component, CS4270_MODE);
+	reg = snd_soc_component_read(component, CS4270_MODE);
 	reg &= ~(CS4270_MODE_SPEED_MASK | CS4270_MODE_DIV_MASK);
 	reg |= cs4270_mode_ratios[i].mclk;
 
@@ -369,7 +369,7 @@ static int cs4270_hw_params(struct snd_pcm_substream *substream,
 
 	/* Set the DAI format */
 
-	reg = snd_soc_component_read32(component, CS4270_FORMAT);
+	reg = snd_soc_component_read(component, CS4270_FORMAT);
 	reg &= ~(CS4270_FORMAT_DAC_MASK | CS4270_FORMAT_ADC_MASK);
 
 	switch (cs4270->mode) {
@@ -403,13 +403,13 @@ static int cs4270_hw_params(struct snd_pcm_substream *substream,
  * board does not have the MUTEA or MUTEB pins connected to such circuitry,
  * then this function will do nothing.
  */
-static int cs4270_dai_mute(struct snd_soc_dai *dai, int mute)
+static int cs4270_dai_mute(struct snd_soc_dai *dai, int mute, int direction)
 {
 	struct snd_soc_component *component = dai->component;
 	struct cs4270_private *cs4270 = snd_soc_component_get_drvdata(component);
 	int reg6;
 
-	reg6 = snd_soc_component_read32(component, CS4270_MUTE);
+	reg6 = snd_soc_component_read(component, CS4270_MUTE);
 
 	if (mute)
 		reg6 |= CS4270_MUTE_DAC_A | CS4270_MUTE_DAC_B;
@@ -468,7 +468,8 @@ static const struct snd_soc_dai_ops cs4270_dai_ops = {
 	.hw_params	= cs4270_hw_params,
 	.set_sysclk	= cs4270_set_dai_sysclk,
 	.set_fmt	= cs4270_set_dai_fmt,
-	.digital_mute	= cs4270_dai_mute,
+	.mute_stream	= cs4270_dai_mute,
+	.no_capture_mute = 1,
 };
 
 static struct snd_soc_dai_driver cs4270_dai = {
@@ -564,7 +565,7 @@ static int cs4270_soc_suspend(struct snd_soc_component *component)
 	struct cs4270_private *cs4270 = snd_soc_component_get_drvdata(component);
 	int reg, ret;
 
-	reg = snd_soc_component_read32(component, CS4270_PWRCTL) | CS4270_PWRCTL_PDN_ALL;
+	reg = snd_soc_component_read(component, CS4270_PWRCTL) | CS4270_PWRCTL_PDN_ALL;
 	if (reg < 0)
 		return reg;
 
@@ -596,7 +597,7 @@ static int cs4270_soc_resume(struct snd_soc_component *component)
 	regcache_sync(cs4270->regmap);
 
 	/* ... then disable the power-down bits */
-	reg = snd_soc_component_read32(component, CS4270_PWRCTL);
+	reg = snd_soc_component_read(component, CS4270_PWRCTL);
 	reg &= ~CS4270_PWRCTL_PDN_ALL;
 
 	return snd_soc_component_write(component, CS4270_PWRCTL, reg);
@@ -659,8 +660,8 @@ static const struct regmap_config cs4270_regmap = {
 static int cs4270_i2c_probe(struct i2c_client *i2c_client,
 	const struct i2c_device_id *id)
 {
-	struct device_node *np = i2c_client->dev.of_node;
 	struct cs4270_private *cs4270;
+	struct gpio_desc *reset_gpiod;
 	unsigned int val;
 	int ret, i;
 
@@ -679,20 +680,11 @@ static int cs4270_i2c_probe(struct i2c_client *i2c_client,
 	if (ret < 0)
 		return ret;
 
-	/* See if we have a way to bring the codec out of reset */
-	if (np) {
-		enum of_gpio_flags flags;
-		int gpio = of_get_named_gpio_flags(np, "reset-gpio", 0, &flags);
-
-		if (gpio_is_valid(gpio)) {
-			ret = devm_gpio_request_one(&i2c_client->dev, gpio,
-				     flags & OF_GPIO_ACTIVE_LOW ?
-					GPIOF_OUT_INIT_LOW : GPIOF_OUT_INIT_HIGH,
-				     "cs4270 reset");
-			if (ret < 0)
-				return ret;
-		}
-	}
+	reset_gpiod = devm_gpiod_get_optional(&i2c_client->dev, "reset",
+					      GPIOD_OUT_HIGH);
+	if (IS_ERR(reset_gpiod) &&
+	    PTR_ERR(reset_gpiod) == -EPROBE_DEFER)
+		return -EPROBE_DEFER;
 
 	cs4270->regmap = devm_regmap_init_i2c(i2c_client, &cs4270_regmap);
 	if (IS_ERR(cs4270->regmap))

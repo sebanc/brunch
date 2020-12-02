@@ -6,6 +6,8 @@
  * Copyright (C) 2016 Intel Corp.
  */
 
+#define dev_fmt(fmt) "DPC: " fmt
+
 #include <linux/aer.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -44,11 +46,62 @@ static const char * const rp_pio_error_string[] = {
 	"Memory Request Completion Timeout",		 /* Bit Position 18 */
 };
 
+static struct dpc_dev *to_dpc_dev(struct pci_dev *dev)
+{
+	struct device *device;
+
+	device = pcie_port_find_device(dev, PCIE_PORT_SERVICE_DPC);
+	if (!device)
+		return NULL;
+	return get_service_data(to_pcie_device(device));
+}
+
+void pci_save_dpc_state(struct pci_dev *dev)
+{
+	struct dpc_dev *dpc;
+	struct pci_cap_saved_state *save_state;
+	u16 *cap;
+
+	if (!pci_is_pcie(dev))
+		return;
+
+	dpc = to_dpc_dev(dev);
+	if (!dpc)
+		return;
+
+	save_state = pci_find_saved_ext_cap(dev, PCI_EXT_CAP_ID_DPC);
+	if (!save_state)
+		return;
+
+	cap = (u16 *)&save_state->cap.data[0];
+	pci_read_config_word(dev, dpc->cap_pos + PCI_EXP_DPC_CTL, cap);
+}
+
+void pci_restore_dpc_state(struct pci_dev *dev)
+{
+	struct dpc_dev *dpc;
+	struct pci_cap_saved_state *save_state;
+	u16 *cap;
+
+	if (!pci_is_pcie(dev))
+		return;
+
+	dpc = to_dpc_dev(dev);
+	if (!dpc)
+		return;
+
+	save_state = pci_find_saved_ext_cap(dev, PCI_EXT_CAP_ID_DPC);
+	if (!save_state)
+		return;
+
+	cap = (u16 *)&save_state->cap.data[0];
+	pci_write_config_word(dev, dpc->cap_pos + PCI_EXP_DPC_CTL, *cap);
+}
+
 static int dpc_wait_rp_inactive(struct dpc_dev *dpc)
 {
 	unsigned long timeout = jiffies + HZ;
 	struct pci_dev *pdev = dpc->dev->port;
-	struct device *dev = &dpc->dev->device;
 	u16 cap = dpc->cap_pos, status;
 
 	pci_read_config_word(pdev, cap + PCI_EXP_DPC_STATUS, &status);
@@ -58,7 +111,7 @@ static int dpc_wait_rp_inactive(struct dpc_dev *dpc)
 		pci_read_config_word(pdev, cap + PCI_EXP_DPC_STATUS, &status);
 	}
 	if (status & PCI_EXP_DPC_RP_BUSY) {
-		dev_warn(dev, "DPC root port still busy\n");
+		pci_warn(pdev, "root port still busy\n");
 		return -EBUSY;
 	}
 	return 0;
@@ -67,18 +120,13 @@ static int dpc_wait_rp_inactive(struct dpc_dev *dpc)
 static pci_ers_result_t dpc_reset_link(struct pci_dev *pdev)
 {
 	struct dpc_dev *dpc;
-	struct pcie_device *pciedev;
-	struct device *devdpc;
-
 	u16 cap;
 
 	/*
 	 * DPC disables the Link automatically in hardware, so it has
 	 * already been reset by the time we get here.
 	 */
-	devdpc = pcie_port_find_device(pdev, PCIE_PORT_SERVICE_DPC);
-	pciedev = to_pcie_device(devdpc);
-	dpc = get_service_data(pciedev);
+	dpc = to_dpc_dev(pdev);
 	cap = dpc->cap_pos;
 
 	/*
@@ -93,13 +141,14 @@ static pci_ers_result_t dpc_reset_link(struct pci_dev *pdev)
 	pci_write_config_word(pdev, cap + PCI_EXP_DPC_STATUS,
 			      PCI_EXP_DPC_STATUS_TRIGGER);
 
+	if (!pcie_wait_for_link(pdev, true))
+		return PCI_ERS_RESULT_DISCONNECT;
+
 	return PCI_ERS_RESULT_RECOVERED;
 }
 
-
 static void dpc_process_rp_pio_error(struct dpc_dev *dpc)
 {
-	struct device *dev = &dpc->dev->device;
 	struct pci_dev *pdev = dpc->dev->port;
 	u16 cap = dpc->cap_pos, dpc_status, first_error;
 	u32 status, mask, sev, syserr, exc, dw0, dw1, dw2, dw3, log, prefix;
@@ -107,13 +156,13 @@ static void dpc_process_rp_pio_error(struct dpc_dev *dpc)
 
 	pci_read_config_dword(pdev, cap + PCI_EXP_DPC_RP_PIO_STATUS, &status);
 	pci_read_config_dword(pdev, cap + PCI_EXP_DPC_RP_PIO_MASK, &mask);
-	dev_err(dev, "rp_pio_status: %#010x, rp_pio_mask: %#010x\n",
+	pci_err(pdev, "rp_pio_status: %#010x, rp_pio_mask: %#010x\n",
 		status, mask);
 
 	pci_read_config_dword(pdev, cap + PCI_EXP_DPC_RP_PIO_SEVERITY, &sev);
 	pci_read_config_dword(pdev, cap + PCI_EXP_DPC_RP_PIO_SYSERROR, &syserr);
 	pci_read_config_dword(pdev, cap + PCI_EXP_DPC_RP_PIO_EXCEPTION, &exc);
-	dev_err(dev, "RP PIO severity=%#010x, syserror=%#010x, exception=%#010x\n",
+	pci_err(pdev, "RP PIO severity=%#010x, syserror=%#010x, exception=%#010x\n",
 		sev, syserr, exc);
 
 	/* Get First Error Pointer */
@@ -122,7 +171,7 @@ static void dpc_process_rp_pio_error(struct dpc_dev *dpc)
 
 	for (i = 0; i < ARRAY_SIZE(rp_pio_error_string); i++) {
 		if ((status & ~mask) & (1 << i))
-			dev_err(dev, "[%2d] %s%s\n", i, rp_pio_error_string[i],
+			pci_err(pdev, "[%2d] %s%s\n", i, rp_pio_error_string[i],
 				first_error == i ? " (First)" : "");
 	}
 
@@ -136,18 +185,18 @@ static void dpc_process_rp_pio_error(struct dpc_dev *dpc)
 			      &dw2);
 	pci_read_config_dword(pdev, cap + PCI_EXP_DPC_RP_PIO_HEADER_LOG + 12,
 			      &dw3);
-	dev_err(dev, "TLP Header: %#010x %#010x %#010x %#010x\n",
+	pci_err(pdev, "TLP Header: %#010x %#010x %#010x %#010x\n",
 		dw0, dw1, dw2, dw3);
 
 	if (dpc->rp_log_size < 5)
 		goto clear_status;
 	pci_read_config_dword(pdev, cap + PCI_EXP_DPC_RP_PIO_IMPSPEC_LOG, &log);
-	dev_err(dev, "RP PIO ImpSpec Log %#010x\n", log);
+	pci_err(pdev, "RP PIO ImpSpec Log %#010x\n", log);
 
 	for (i = 0; i < dpc->rp_log_size - 5; i++) {
 		pci_read_config_dword(pdev,
 			cap + PCI_EXP_DPC_RP_PIO_TLPPREFIX_LOG, &prefix);
-		dev_err(dev, "TLP Prefix Header: dw%d, %#010x\n", i, prefix);
+		pci_err(pdev, "TLP Prefix Header: dw%d, %#010x\n", i, prefix);
 	}
  clear_status:
 	pci_write_config_dword(pdev, cap + PCI_EXP_DPC_RP_PIO_STATUS, status);
@@ -180,18 +229,17 @@ static irqreturn_t dpc_handler(int irq, void *context)
 	struct aer_err_info info;
 	struct dpc_dev *dpc = context;
 	struct pci_dev *pdev = dpc->dev->port;
-	struct device *dev = &dpc->dev->device;
 	u16 cap = dpc->cap_pos, status, source, reason, ext_reason;
 
 	pci_read_config_word(pdev, cap + PCI_EXP_DPC_STATUS, &status);
 	pci_read_config_word(pdev, cap + PCI_EXP_DPC_SOURCE_ID, &source);
 
-	dev_info(dev, "DPC containment event, status:%#06x source:%#06x\n",
+	pci_info(pdev, "containment event, status:%#06x source:%#06x\n",
 		 status, source);
 
 	reason = (status & PCI_EXP_DPC_STATUS_TRIGGER_RSN) >> 1;
 	ext_reason = (status & PCI_EXP_DPC_STATUS_TRIGGER_RSN_EXT) >> 5;
-	dev_warn(dev, "DPC %s detected, remove downstream devices\n",
+	pci_warn(pdev, "%s detected\n",
 		 (reason == 0) ? "unmasked uncorrectable error" :
 		 (reason == 1) ? "ERR_NONFATAL" :
 		 (reason == 2) ? "ERR_FATAL" :
@@ -211,7 +259,7 @@ static irqreturn_t dpc_handler(int irq, void *context)
 	}
 
 	/* We configure DPC so it only triggers on ERR_FATAL */
-	pcie_do_fatal_recovery(pdev, PCIE_PORT_SERVICE_DPC);
+	pcie_do_recovery(pdev, pci_channel_io_frozen, PCIE_PORT_SERVICE_DPC);
 
 	return IRQ_HANDLED;
 }
@@ -258,7 +306,7 @@ static int dpc_probe(struct pcie_device *dev)
 					   dpc_handler, IRQF_SHARED,
 					   "pcie-dpc", dpc);
 	if (status) {
-		dev_warn(device, "request IRQ%d failed: %d\n", dev->irq,
+		pci_warn(pdev, "request IRQ%d failed: %d\n", dev->irq,
 			 status);
 		return status;
 	}
@@ -270,7 +318,7 @@ static int dpc_probe(struct pcie_device *dev)
 	if (dpc->rp_extensions) {
 		dpc->rp_log_size = (cap & PCI_EXP_DPC_RP_PIO_LOG_SIZE) >> 8;
 		if (dpc->rp_log_size < 4 || dpc->rp_log_size > 9) {
-			dev_err(device, "RP PIO log size %u is invalid\n",
+			pci_err(pdev, "RP PIO log size %u is invalid\n",
 				dpc->rp_log_size);
 			dpc->rp_log_size = 0;
 		}
@@ -279,11 +327,13 @@ static int dpc_probe(struct pcie_device *dev)
 	ctl = (ctl & 0xfff4) | PCI_EXP_DPC_CTL_EN_FATAL | PCI_EXP_DPC_CTL_INT_EN;
 	pci_write_config_word(pdev, dpc->cap_pos + PCI_EXP_DPC_CTL, ctl);
 
-	dev_info(device, "DPC error containment capabilities: Int Msg #%d, RPExt%c PoisonedTLP%c SwTrigger%c RP PIO Log %d, DL_ActiveErr%c\n",
-		cap & PCI_EXP_DPC_IRQ, FLAG(cap, PCI_EXP_DPC_CAP_RP_EXT),
-		FLAG(cap, PCI_EXP_DPC_CAP_POISONED_TLP),
-		FLAG(cap, PCI_EXP_DPC_CAP_SW_TRIGGER), dpc->rp_log_size,
-		FLAG(cap, PCI_EXP_DPC_CAP_DL_ACTIVE));
+	pci_info(pdev, "error containment capabilities: Int Msg #%d, RPExt%c PoisonedTLP%c SwTrigger%c RP PIO Log %d, DL_ActiveErr%c\n",
+		 cap & PCI_EXP_DPC_IRQ, FLAG(cap, PCI_EXP_DPC_CAP_RP_EXT),
+		 FLAG(cap, PCI_EXP_DPC_CAP_POISONED_TLP),
+		 FLAG(cap, PCI_EXP_DPC_CAP_SW_TRIGGER), dpc->rp_log_size,
+		 FLAG(cap, PCI_EXP_DPC_CAP_DL_ACTIVE));
+
+	pci_add_ext_cap_save_buffer(pdev, PCI_EXT_CAP_ID_DPC, sizeof(u16));
 	return status;
 }
 

@@ -3,7 +3,6 @@
  * Copyright 2002-2005, Instant802 Networks, Inc.
  * Copyright 2005-2006, Devicescape Software, Inc.
  * Copyright 2006-2007	Jiri Benc <jbenc@suse.cz>
- * Copyright 2008-2010 Johannes Berg <johannes@sipsolutions.net>
  * Copyright 2013-2015  Intel Mobile Communications GmbH
  * Copyright 2018-2019  Intel Corporation
  */
@@ -649,7 +648,8 @@ static void ieee80211_report_ack_skb(struct ieee80211_local *local,
 		rcu_read_lock();
 		sdata = ieee80211_sdata_from_skb(local, skb);
 		if (sdata) {
-			if (ieee80211_is_any_nullfunc(hdr->frame_control)) {
+			if (ieee80211_is_nullfunc(hdr->frame_control) ||
+			    ieee80211_is_qos_nullfunc(hdr->frame_control)) {
 #if CFG80211_VERSION >= KERNEL_VERSION(4,17,0)
 				cfg80211_probe_status(sdata->dev, hdr->addr1,
 						      cookie, acked,
@@ -902,7 +902,6 @@ static void __ieee80211_tx_status(struct ieee80211_hw *hw,
 	int rates_idx;
 	bool send_to_cooked;
 	bool acked;
-	bool noack_success;
 	struct ieee80211_bar *bar;
 	int shift = 0;
 	int tid = IEEE80211_NUM_TIDS;
@@ -921,8 +920,6 @@ static void __ieee80211_tx_status(struct ieee80211_hw *hw,
 			clear_sta_flag(sta, WLAN_STA_SP);
 
 		acked = !!(info->flags & IEEE80211_TX_STAT_ACK);
-		noack_success = !!(info->flags &
-				   IEEE80211_TX_STAT_NOACK_TRANSMITTED);
 
 		/* mesh Peer Service Period support */
 		if (ieee80211_vif_is_mesh(&sta->sdata->vif) &&
@@ -987,12 +984,12 @@ static void __ieee80211_tx_status(struct ieee80211_hw *hw,
 			ieee80211_handle_filtered_frame(local, sta, skb);
 			return;
 		} else {
-			if (!acked && !noack_success)
+			if (!acked)
 				sta->status_stats.retry_failed++;
 			sta->status_stats.retry_count += retry_count;
 
 			if (ieee80211_is_data_present(fc)) {
-				if (!acked && !noack_success)
+				if (!acked)
 					sta->status_stats.msdu_failed[tid]++;
 
 				sta->status_stats.msdu_retries[tid] +=
@@ -1030,7 +1027,8 @@ static void __ieee80211_tx_status(struct ieee80211_hw *hw,
 		}
 
 		if (ieee80211_hw_check(&local->hw, REPORTS_TX_ACK_STATUS)) {
-			if (acked) {
+			if (info->flags & IEEE80211_TX_STAT_ACK) {
+
 				if (sta->status_stats.lost_packets)
 					sta->status_stats.lost_packets = 0;
 
@@ -1038,12 +1036,11 @@ static void __ieee80211_tx_status(struct ieee80211_hw *hw,
 				if (test_sta_flag(sta, WLAN_STA_TDLS_PEER_AUTH))
 					sta->status_stats.last_tdls_pkt_time =
 						jiffies;
-			} else if (noack_success) {
-				/* nothing to do here, do not account as lost */
 			} else {
 				ieee80211_lost_packet(sta, info);
 			}
 		}
+
 	}
 
 	/* SNMP counters
@@ -1075,7 +1072,7 @@ static void __ieee80211_tx_status(struct ieee80211_hw *hw,
 			I802_DEBUG_INC(local->dot11FailedCount);
 	}
 
-	if (ieee80211_is_any_nullfunc(fc) &&
+	if ((ieee80211_is_nullfunc(fc) || ieee80211_is_qos_nullfunc(fc)) &&
 	    ieee80211_has_pm(fc) &&
 	    ieee80211_hw_check(&local->hw, REPORTS_TX_ACK_STATUS) &&
 	    !(info->flags & IEEE80211_TX_CTL_INJECTED) &&
@@ -1160,7 +1157,7 @@ void ieee80211_tx_status_ext(struct ieee80211_hw *hw,
 
 		sta = container_of(pubsta, struct sta_info, sta);
 
-		if (!acked && !noack_success)
+		if (!acked)
 			sta->status_stats.retry_failed++;
 		sta->status_stats.retry_count += retry_count;
 
@@ -1175,8 +1172,6 @@ void ieee80211_tx_status_ext(struct ieee80211_hw *hw,
 				sta->status_stats.last_tdls_pkt_time = jiffies;
 		} else if (test_sta_flag(sta, WLAN_STA_PS_STA)) {
 			return;
-		} else if (noack_success) {
-			/* nothing to do here, do not account as lost */
 		} else {
 			ieee80211_lost_packet(sta, info);
 		}
@@ -1218,77 +1213,6 @@ void ieee80211_tx_rate_update(struct ieee80211_hw *hw,
 		sta->tx_stats.last_rate = info->status.rates[0];
 }
 EXPORT_SYMBOL(ieee80211_tx_rate_update);
-
-void ieee80211_tx_status_8023(struct ieee80211_hw *hw,
-			      struct ieee80211_vif *vif,
-			      struct sk_buff *skb)
-{
-	struct ieee80211_local *local = hw_to_local(hw);
-	struct ieee80211_sub_if_data *sdata;
-	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	struct sta_info *sta;
-	int retry_count;
-	int rates_idx;
-	bool acked;
-
-	sdata = vif_to_sdata(vif);
-
-	acked = info->flags & IEEE80211_TX_STAT_ACK;
-	rates_idx = ieee80211_tx_get_rates(hw, info, &retry_count);
-
-	rcu_read_lock();
-
-	if (ieee80211_lookup_ra_sta(sdata, skb, &sta))
-		goto counters_update;
-
-	if (IS_ERR(sta))
-		goto counters_update;
-
-	if (!acked)
-		sta->status_stats.retry_failed++;
-
-	if (rates_idx != -1)
-		sta->tx_stats.last_rate = info->status.rates[rates_idx];
-
-	sta->status_stats.retry_count += retry_count;
-
-	if (ieee80211_hw_check(hw, REPORTS_TX_ACK_STATUS)) {
-		if (acked && vif->type == NL80211_IFTYPE_STATION)
-			ieee80211_sta_reset_conn_monitor(sdata);
-
-		sta->status_stats.last_ack = jiffies;
-		if (info->flags & IEEE80211_TX_STAT_ACK) {
-			if (sta->status_stats.lost_packets)
-				sta->status_stats.lost_packets = 0;
-
-			if (test_sta_flag(sta, WLAN_STA_TDLS_PEER_AUTH))
-				sta->status_stats.last_tdls_pkt_time = jiffies;
-		} else {
-			ieee80211_lost_packet(sta, info);
-		}
-	}
-
-counters_update:
-	rcu_read_unlock();
-	ieee80211_led_tx(local);
-
-	if (!(info->flags & IEEE80211_TX_STAT_ACK) &&
-	    !(info->flags & IEEE80211_TX_STAT_NOACK_TRANSMITTED))
-		goto skip_stats_update;
-
-	I802_DEBUG_INC(local->dot11TransmittedFrameCount);
-	if (is_multicast_ether_addr(skb->data))
-		I802_DEBUG_INC(local->dot11MulticastTransmittedFrameCount);
-	if (retry_count > 0)
-		I802_DEBUG_INC(local->dot11RetryCount);
-	if (retry_count > 1)
-		I802_DEBUG_INC(local->dot11MultipleRetryCount);
-
-skip_stats_update:
-	ieee80211_report_used_skb(local, skb, false);
-	dev_kfree_skb(skb);
-}
-EXPORT_SYMBOL(ieee80211_tx_status_8023);
 
 void ieee80211_report_low_ack(struct ieee80211_sta *pubsta, u32 num_packets)
 {

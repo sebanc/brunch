@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Qualcomm PM8xxx PMIC XOADC driver
  *
@@ -9,6 +10,7 @@
  * Author: Linus Walleij <linus.walleij@linaro.org>
  */
 
+#include <linux/iio/adc/qcom-vadc-common.h>
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
 #include <linux/module.h>
@@ -19,8 +21,6 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/regulator/consumer.h>
-
-#include "qcom-vadc-common.h"
 
 /*
  * Definitions for the "user processor" registers lifted from the v3.4
@@ -704,8 +704,8 @@ static int pm8xxx_of_xlate(struct iio_dev *indio_dev,
 	 * mux.
 	 */
 	if (iiospec->args_count != 2) {
-		dev_err(&indio_dev->dev, "wrong number of arguments for %s need 2 got %d\n",
-			iiospec->np->name,
+		dev_err(&indio_dev->dev, "wrong number of arguments for %pOFn need 2 got %d\n",
+			iiospec->np,
 			iiospec->args_count);
 		return -EINVAL;
 	}

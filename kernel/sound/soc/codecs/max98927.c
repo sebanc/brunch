@@ -1,18 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * max98927.c  --  MAX98927 ALSA Soc Audio driver
  *
  * Copyright (C) 2016-2017 Maxim Integrated Products
  * Author: Ryan Lee <ryans.lee@maximintegrated.com>
- *
- *  This program is free software; you can redistribute  it and/or modify it
- *  under  the terms of  the GNU General  Public License as published by the
- *  Free Software Foundation;  either version 2 of the  License, or (at your
- *  option) any later version.
  */
 
 #include <linux/acpi.h>
-#include <linux/delay.h>
-#include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
@@ -25,12 +19,6 @@
 #include <linux/of_gpio.h>
 #include <sound/tlv.h>
 #include "max98927.h"
-
-#define MAX98927_RESET_HOLD_US 1
-#define MAX98927_RESET_RELEASE_US 500
-
-static LIST_HEAD(reset_list);
-static DEFINE_MUTEX(reset_list_lock);
 
 static struct reg_default max98927_reg[] = {
 	{MAX98927_R0001_INT_RAW1,  0x00},
@@ -885,59 +873,6 @@ static void max98927_slot_config(struct i2c_client *i2c,
 		max98927->i_l_slot = 1;
 }
 
-/*
- * Must be holding reset_list_lock.
- */
-static void max98927_i2c_toggle_reset(struct device *dev,
-				      struct max98927_priv *max98927)
-{
-	/*
-	 * If we do not have reset gpio, assume platform firmware
-	 * controls the regulator and toggles it for us.
-	 */
-	if (!max98927->reset_gpio)
-		return;
-
-	gpiod_set_value_cansleep(max98927->reset_gpio, 1);
-
-	/*
-	 * We need to wait a bit before we are allowed to release reset GPIO.
-	 */
-	usleep_range(MAX98927_RESET_HOLD_US, MAX98927_RESET_HOLD_US + 5);
-
-	gpiod_set_value_cansleep(max98927->reset_gpio, 0);
-
-	/*
-	 * We need to wait a bit before I2C communication is available.
-	 */
-	usleep_range(MAX98927_RESET_RELEASE_US, MAX98927_RESET_RELEASE_US + 5);
-
-	/*
-	 * Release reset GPIO after reset.
-	 * Note that we need to do so because otherwise the other driver
-	 * requesting the same GPIO will fail with -EBUSY.
-	 */
-	devm_gpiod_put(dev, max98927->reset_gpio);
-}
-
-/*
- * Must be holding reset_list_lock.
- */
-static bool max98927_is_first_to_reset(struct max98927_priv *max98927)
-{
-	struct max98927_priv *p;
-
-	if (!max98927->reset_gpio)
-		return false;
-
-	list_for_each_entry(p, &reset_list, list) {
-		if (max98927->reset_gpio == p->reset_gpio)
-			return false;
-	}
-
-	return true;
-}
-
 static int max98927_i2c_probe(struct i2c_client *i2c,
 	const struct i2c_device_id *id)
 {
@@ -965,44 +900,6 @@ static int max98927_i2c_probe(struct i2c_client *i2c,
 	} else
 		max98927->interleave_mode = false;
 
-	/* Gets optional GPIO for reset line. */
-	max98927->reset_gpio = devm_gpiod_get_optional(
-			&i2c->dev, "reset", GPIOD_OUT_LOW);
-
-	if (IS_ERR(max98927->reset_gpio)) {
-		ret = PTR_ERR(max98927->reset_gpio);
-		/*
-		 * -EBUSY error is expected if the first driver is
-		 *  holding the reset GPIO.
-		 */
-		if (ret == -EBUSY) {
-			dev_warn(&i2c->dev,
-				 "reset gpio is busy. Defer the probe\n");
-			return -EPROBE_DEFER;
-		}
-		dev_err(&i2c->dev, "error getting reset gpio: %d\n", ret);
-		return ret;
-	}
-
-	if (max98927->reset_gpio) {
-		mutex_lock(&reset_list_lock);
-
-		/*
-		 * Only toggle reset line for the first instance when the
-		 * reset line is shared among instances. For example,
-		 * left and right amplifier share the same reset line, and
-		 * we should only toggle the reset line once.
-		 */
-		if (max98927_is_first_to_reset(max98927)) {
-			dev_info(&i2c->dev,
-				 "%s: toggle reset line\n", __func__);
-			max98927_i2c_toggle_reset(&i2c->dev, max98927);
-			list_add(&max98927->list, &reset_list);
-		}
-
-		mutex_unlock(&reset_list_lock);
-	}
-
 	/* regmap initialization */
 	max98927->regmap
 		= devm_regmap_init_i2c(i2c, &max98927_regmap);
@@ -1010,7 +907,7 @@ static int max98927_i2c_probe(struct i2c_client *i2c,
 		ret = PTR_ERR(max98927->regmap);
 		dev_err(&i2c->dev,
 			"Failed to allocate regmap: %d\n", ret);
-		goto err_i2c;
+		return ret;
 	}
 
 	/* Check Revision ID */
@@ -1019,7 +916,7 @@ static int max98927_i2c_probe(struct i2c_client *i2c,
 	if (ret < 0) {
 		dev_err(&i2c->dev,
 			"Failed to read: 0x%02X\n", MAX98927_R01FF_REV_ID);
-		goto err_i2c;
+		return ret;
 	}
 	dev_info(&i2c->dev, "MAX98927 revisionID: 0x%02X\n", reg);
 
@@ -1033,10 +930,6 @@ static int max98927_i2c_probe(struct i2c_client *i2c,
 	if (ret < 0)
 		dev_err(&i2c->dev, "Failed to register component: %d\n", ret);
 
-	return ret;
-
-err_i2c:
-	list_del(&max98927->list);
 	return ret;
 }
 

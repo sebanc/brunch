@@ -1099,7 +1099,7 @@ static const struct mtk_gate apmixed_clks[] = {
 		PLL_B(_id, _name, _reg, _pwr_reg, _en_mask, _flags,	\
 			_rst_bar_mask, _pcwbits, _pcwibits, _pd_reg,	\
 			_pd_shift, _tuner_reg, _tuner_en_reg,		\
-			_tuner_en_bit, _pcw_reg, _pcw_shift, 		\
+			_tuner_en_bit, _pcw_reg, _pcw_shift,		\
 			_pcw_chg_reg, NULL)
 
 static const struct mtk_pll_div_table armpll_div_table[] = {

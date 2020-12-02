@@ -23,8 +23,8 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/debugfs.h>
-#include <drm/drmP.h>
+#include <drm/drm_debugfs.h>
+#include <drm/drm_file.h>
 
 #include "virtgpu_drv.h"
 
@@ -47,9 +47,8 @@ static int virtio_gpu_features(struct seq_file *m, void *data)
 
 	virtio_add_bool(m, "virgl", vgdev->has_virgl_3d);
 	virtio_add_bool(m, "edid", vgdev->has_edid);
-	virtio_add_bool(m, "resource v2", vgdev->has_resource_v2);
-	virtio_add_bool(m, "shared guest", vgdev->has_shared_guest);
-	virtio_add_bool(m, "host coherent", vgdev->has_host_coherent);
+	virtio_add_bool(m, "resource blob", vgdev->has_resource_blob);
+	virtio_add_bool(m, "host visible", vgdev->has_host_visible);
 	virtio_add_int(m, "cap sets", vgdev->num_capsets);
 	virtio_add_int(m, "scanouts", vgdev->num_scanouts);
 	return 0;

@@ -298,22 +298,12 @@ static int fuel_gauge_debug_show(struct seq_file *s, void *data)
 	return 0;
 }
 
-static int debug_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, fuel_gauge_debug_show, inode->i_private);
-}
-
-static const struct file_operations fg_debug_fops = {
-	.open       = debug_open,
-	.read       = seq_read,
-	.llseek     = seq_lseek,
-	.release    = single_release,
-};
+DEFINE_SHOW_ATTRIBUTE(fuel_gauge_debug);
 
 static void fuel_gauge_create_debugfs(struct axp288_fg_info *info)
 {
 	info->debug_file = debugfs_create_file("fuelgauge", 0666, NULL,
-		info, &fg_debug_fops);
+		info, &fuel_gauge_debug_fops);
 }
 
 static void fuel_gauge_remove_debugfs(struct axp288_fg_info *info)
@@ -684,6 +674,7 @@ intr_failed:
 /*
  * Some devices have no battery (HDMI sticks) and the axp288 battery's
  * detection reports one despite it not being there.
+ * Please keep this listed sorted alphabetically.
  */
 static const struct dmi_system_id axp288_fuel_gauge_blacklist[] = {
 	{
@@ -704,6 +695,12 @@ static const struct dmi_system_id axp288_fuel_gauge_blacklist[] = {
 			DMI_EXACT_MATCH(DMI_PRODUCT_SKU, "T11"),
 			/* also match on somewhat unique bios-version */
 			DMI_EXACT_MATCH(DMI_BIOS_VERSION, "1.000"),
+		},
+	},
+	{
+		/* ECS EF20EA */
+		.matches = {
+			DMI_MATCH(DMI_PRODUCT_NAME, "EF20EA"),
 		},
 	},
 	{
@@ -730,10 +727,11 @@ static const struct dmi_system_id axp288_fuel_gauge_blacklist[] = {
 		},
 	},
 	{
-		/* ECS EF20EA */
+		/* Minix Neo Z83-4 mini PC */
 		.matches = {
-			DMI_MATCH(DMI_PRODUCT_NAME, "EF20EA"),
-		},
+			DMI_MATCH(DMI_SYS_VENDOR, "MINIX"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Z83-4"),
+		}
 	},
 	{}
 };

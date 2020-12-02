@@ -12,12 +12,13 @@
 #include <linux/vt_buffer.h>
 
 struct tty_struct;
-
-struct tty_struct;
 struct vc_data;
 
 extern void clear_selection(void);
-extern int set_selection(const struct tiocl_selection __user *sel, struct tty_struct *tty);
+extern int set_selection_user(const struct tiocl_selection __user *sel,
+			      struct tty_struct *tty);
+extern int set_selection_kernel(struct tiocl_selection *v,
+				struct tty_struct *tty);
 extern int paste_selection(struct tty_struct *tty);
 extern int sel_loadlut(char __user *p);
 extern int mouse_reporting(void);

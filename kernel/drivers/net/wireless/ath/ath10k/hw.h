@@ -107,6 +107,7 @@ enum qca9377_chip_id_rev {
 #define QCA9984_HW_1_0_CHIP_ID_REV	0x0
 #define QCA9984_HW_1_0_FW_DIR		ATH10K_FW_DIR "/QCA9984/hw1.0"
 #define QCA9984_HW_1_0_BOARD_DATA_FILE "board.bin"
+#define QCA9984_HW_1_0_EBOARD_DATA_FILE "eboard.bin"
 #define QCA9984_HW_1_0_PATCH_LOAD_ADDR	0x1234
 
 /* QCA9888 2.0 defines */
@@ -221,6 +222,7 @@ enum ath10k_fw_htt_op_version {
 enum ath10k_bd_ie_type {
 	/* contains sub IEs of enum ath10k_bd_ie_board_type */
 	ATH10K_BD_IE_BOARD = 0,
+	ATH10K_BD_IE_BOARD_EXT = 1,
 };
 
 enum ath10k_bd_ie_board_type {
@@ -377,6 +379,9 @@ struct ath10k_hw_values {
 	u8 num_target_ce_config_wlan;
 	u16 ce_desc_meta_data_mask;
 	u8 ce_desc_meta_data_lsb;
+	u32 rfkill_pin;
+	u32 rfkill_cfg;
+	bool rfkill_on_level;
 };
 
 extern const struct ath10k_hw_values qca988x_values;
@@ -547,6 +552,8 @@ struct ath10k_hw_params {
 		const char *dir;
 		const char *board;
 		size_t board_size;
+		const char *eboard;
+		size_t ext_board_size;
 		size_t board_ext_size;
 	} fw;
 
@@ -586,9 +593,6 @@ struct ath10k_hw_params {
 	/* Target rx ring fill level */
 	u32 rx_ring_fill_level;
 
-	/* target supporting per ce IRQ */
-	bool per_ce_irq;
-
 	/* target supporting shadow register for ce write */
 	bool shadow_reg_support;
 
@@ -617,19 +621,21 @@ struct ath10k_hw_params {
 	/* tx stats support over pktlog */
 	bool tx_stats_over_pktlog;
 
-	u32 start_retry;
-
-	/* provides bitrates for sta_statistics using WMI_TLV_PEER_STATS_INFO_EVENTID */
-	bool supports_peer_stats_info;
+	bool dynamic_sar_support;
 };
 
 struct htt_rx_desc;
+struct htt_resp;
+struct htt_data_tx_completion_ext;
 
 /* Defines needed for Rx descriptor abstraction */
 struct ath10k_hw_ops {
 	int (*rx_desc_get_l3_pad_bytes)(struct htt_rx_desc *rxd);
 	void (*set_coverage_class)(struct ath10k *ar, s16 value);
 	int (*enable_pll_clk)(struct ath10k *ar);
+	bool (*rx_desc_get_msdu_limit_error)(struct htt_rx_desc *rxd);
+	int (*tx_data_rssi_pad_bytes)(struct htt_resp *htt);
+	int (*is_rssi_enable)(struct htt_resp *resp);
 };
 
 extern const struct ath10k_hw_ops qca988x_ops;
@@ -646,6 +652,33 @@ ath10k_rx_desc_get_l3_pad_bytes(struct ath10k_hw_params *hw,
 {
 	if (hw->hw_ops->rx_desc_get_l3_pad_bytes)
 		return hw->hw_ops->rx_desc_get_l3_pad_bytes(rxd);
+	return 0;
+}
+
+static inline bool
+ath10k_rx_desc_msdu_limit_error(struct ath10k_hw_params *hw,
+				struct htt_rx_desc *rxd)
+{
+	if (hw->hw_ops->rx_desc_get_msdu_limit_error)
+		return hw->hw_ops->rx_desc_get_msdu_limit_error(rxd);
+	return false;
+}
+
+static inline int
+ath10k_tx_data_rssi_get_pad_bytes(struct ath10k_hw_params *hw,
+				  struct htt_resp *htt)
+{
+	if (hw->hw_ops->tx_data_rssi_pad_bytes)
+		return hw->hw_ops->tx_data_rssi_pad_bytes(htt);
+	return 0;
+}
+
+static inline int
+ath10k_is_rssi_enable(struct ath10k_hw_params *hw,
+		      struct htt_resp *resp)
+{
+	if (hw->hw_ops->is_rssi_enable)
+		return hw->hw_ops->is_rssi_enable(resp);
 	return 0;
 }
 
@@ -731,14 +764,17 @@ ath10k_rx_desc_get_l3_pad_bytes(struct ath10k_hw_params *hw,
 #define TARGET_TLV_NUM_TDLS_VDEVS		1
 #define TARGET_TLV_NUM_TIDS			((TARGET_TLV_NUM_PEERS) * 2)
 #define TARGET_TLV_NUM_MSDU_DESC		(1024 + 32)
-#define TARGET_TLV_NUM_MSDU_DESC_HL		1024
+#define TARGET_TLV_NUM_MSDU_DESC_HL		64
 #define TARGET_TLV_NUM_WOW_PATTERNS		22
 #define TARGET_TLV_MGMT_NUM_MSDU_DESC		(50)
 
 /* Target specific defines for WMI-HL-1.0 firmware */
-#define TARGET_HL_10_TLV_NUM_PEERS		14
-#define TARGET_HL_10_TLV_AST_SKID_LIMIT		6
-#define TARGET_HL_10_TLV_NUM_WDS_ENTRIES	2
+#define TARGET_HL_TLV_NUM_PEERS			33
+#define TARGET_HL_TLV_AST_SKID_LIMIT		16
+#define TARGET_HL_TLV_NUM_WDS_ENTRIES		2
+
+/* Target specific defines for QCA9377 high latency firmware */
+#define TARGET_QCA9377_HL_NUM_PEERS		15
 
 /* Diagnostic Window */
 #define CE_DIAG_PIPE	7

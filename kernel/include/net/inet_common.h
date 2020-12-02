@@ -2,6 +2,8 @@
 #ifndef _INET_COMMON_H
 #define _INET_COMMON_H
 
+#include <linux/indirect_call_wrapper.h>
+
 extern const struct proto_ops inet_stream_ops;
 extern const struct proto_ops inet_dgram_ops;
 
@@ -23,6 +25,7 @@ int inet_dgram_connect(struct socket *sock, struct sockaddr *uaddr,
 		       int addr_len, int flags);
 int inet_accept(struct socket *sock, struct socket *newsock, int flags,
 		bool kern);
+int inet_send_prepare(struct sock *sk);
 int inet_sendmsg(struct socket *sock, struct msghdr *msg, size_t size);
 ssize_t inet_sendpage(struct socket *sock, struct page *page, int offset,
 		      size_t size, int flags);
@@ -53,5 +56,12 @@ static inline void inet_ctl_sock_destroy(struct sock *sk)
 	if (sk)
 		sock_release(sk->sk_socket);
 }
+
+#define indirect_call_gro_receive(f2, f1, cb, head, skb)	\
+({								\
+	unlikely(gro_recursion_inc_test(skb)) ?			\
+		NAPI_GRO_CB(skb)->flush |= 1, NULL :		\
+		INDIRECT_CALL_2(cb, f2, f1, head, skb);		\
+})
 
 #endif

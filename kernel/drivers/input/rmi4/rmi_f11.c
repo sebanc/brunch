@@ -1,10 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2011-2015 Synaptics Incorporated
  * Copyright (c) 2011 Unixphere
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
  */
 
 #include <linux/kernel.h>
@@ -513,7 +510,6 @@ struct f11_data {
 	struct rmi_2d_sensor_platform_data sensor_pdata;
 	unsigned long *abs_mask;
 	unsigned long *rel_mask;
-	unsigned long *result_bits;
 };
 
 enum f11_finger_state {
@@ -1060,7 +1056,7 @@ static int rmi_f11_initialize(struct rmi_function *fn)
 	/*
 	** init instance data, fill in values and create any sysfs files
 	*/
-	f11 = devm_kzalloc(&fn->dev, sizeof(struct f11_data) + mask_size * 3,
+	f11 = devm_kzalloc(&fn->dev, sizeof(struct f11_data) + mask_size * 2,
 			GFP_KERNEL);
 	if (!f11)
 		return -ENOMEM;
@@ -1079,8 +1075,6 @@ static int rmi_f11_initialize(struct rmi_function *fn)
 			+ sizeof(struct f11_data));
 	f11->rel_mask = (unsigned long *)((char *)f11
 			+ sizeof(struct f11_data) + mask_size);
-	f11->result_bits = (unsigned long *)((char *)f11
-			+ sizeof(struct f11_data) + mask_size * 2);
 
 	set_bit(fn->irq_pos, f11->abs_mask);
 	set_bit(fn->irq_pos + 1, f11->rel_mask);

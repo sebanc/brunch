@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Surface Lid driver to enable wakeup from suspend via the lid.
  */
@@ -138,25 +139,29 @@ static int sid_lid_enable_wakeup(const struct sid_lid_device *dev, bool enable)
 
 static int surface_sam_sid_gpelid_suspend(struct device *dev)
 {
-	const struct sid_lid_device *ldev = dev_get_drvdata(dev);
+	const struct sid_lid_device *ldev;
+
+	ldev = dev_get_drvdata(dev);
 	return sid_lid_enable_wakeup(ldev, true);
 }
 
 static int surface_sam_sid_gpelid_resume(struct device *dev)
 {
-	const struct sid_lid_device *ldev = dev_get_drvdata(dev);
+	const struct sid_lid_device *ldev;
+
+	ldev = dev_get_drvdata(dev);
 	return sid_lid_enable_wakeup(ldev, false);
 }
 
 static SIMPLE_DEV_PM_OPS(surface_sam_sid_gpelid_pm,
-                         surface_sam_sid_gpelid_suspend,
-                         surface_sam_sid_gpelid_resume);
+			 surface_sam_sid_gpelid_suspend,
+			 surface_sam_sid_gpelid_resume);
 
 
 static int surface_sam_sid_gpelid_probe(struct platform_device *pdev)
 {
 	const struct dmi_system_id *match;
-        struct sid_lid_device *dev;
+	struct sid_lid_device *dev;
 	acpi_handle lid_handle;
 	int status;
 
@@ -164,9 +169,9 @@ static int surface_sam_sid_gpelid_probe(struct platform_device *pdev)
 	if (!match)
 		return -ENODEV;
 
-        dev = match->driver_data;
-        if (!dev)
-                return -ENODEV;
+	dev = match->driver_data;
+	if (!dev)
+		return -ENODEV;
 
 	status = acpi_get_handle(NULL, (acpi_string)dev->acpi_path, &lid_handle);
 	if (status)
@@ -183,11 +188,11 @@ static int surface_sam_sid_gpelid_probe(struct platform_device *pdev)
 	status = sid_lid_enable_wakeup(dev, false);
 	if (status) {
 		acpi_disable_gpe(NULL, dev->gpe_number);
-                return status;
-        }
+		return status;
+	}
 
-        platform_set_drvdata(pdev, dev);
-        return 0;
+	platform_set_drvdata(pdev, dev);
+	return 0;
 }
 
 static int surface_sam_sid_gpelid_remove(struct platform_device *pdev)
@@ -196,10 +201,10 @@ static int surface_sam_sid_gpelid_remove(struct platform_device *pdev)
 
 	/* restore default behavior without this module */
 	sid_lid_enable_wakeup(dev, false);
-        acpi_disable_gpe(NULL, dev->gpe_number);
+	acpi_disable_gpe(NULL, dev->gpe_number);
 
-        platform_set_drvdata(pdev, NULL);
-        return 0;
+	platform_set_drvdata(pdev, NULL);
+	return 0;
 }
 
 static struct platform_driver surface_sam_sid_gpelid = {

@@ -22,7 +22,7 @@
 #include <linux/vmalloc.h>
 #include <linux/highmem.h>
 #include <linux/printk.h>
-#include <linux/bootmem.h>
+#include <linux/memblock.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
@@ -31,6 +31,7 @@
 #include <linux/ioport.h>
 #include <linux/memory.h>
 #include <linux/sched/task.h>
+#include <linux/security.h>
 #include <asm/sections.h>
 #include "internal.h"
 
@@ -545,8 +546,13 @@ out:
 
 static int open_kcore(struct inode *inode, struct file *filp)
 {
+	int ret = security_locked_down(LOCKDOWN_KCORE);
+
 	if (!capable(CAP_SYS_RAWIO))
 		return -EPERM;
+
+	if (ret)
+		return ret;
 
 	filp->private_data = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!filp->private_data)
@@ -615,7 +621,7 @@ static void __init proc_kcore_text_init(void)
 /*
  * MODULES_VADDR has no intersection with VMALLOC_ADDR.
  */
-struct kcore_list kcore_modules;
+static struct kcore_list kcore_modules;
 static void __init add_modules_range(void)
 {
 	if (MODULES_VADDR != VMALLOC_START && MODULES_END != VMALLOC_END) {

@@ -1,3 +1,4 @@
+#!/bin/sh
 # probe libc's inet_pton & backtrace it with ping
 
 # Installs a probe on libc's inet_pton function, that will use uprobes,
@@ -6,6 +7,7 @@
 # This needs no debuginfo package, all is done using the libc ELF symtab
 # and the CFI info in the binaries.
 
+# SPDX-License-Identifier: GPL-2.0
 # Arnaldo Carvalho de Melo <acme@kernel.org>, 2017
 
 . $(dirname $0)/lib/probe.sh

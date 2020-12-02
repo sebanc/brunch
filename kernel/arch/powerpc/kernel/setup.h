@@ -1,16 +1,18 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * Prototypes for functions that are shared between setup_(32|64|common).c
  *
  * Copyright 2016 Michael Ellerman, IBM Corporation.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  */
 
 #ifndef __ARCH_POWERPC_KERNEL_SETUP_H
 #define __ARCH_POWERPC_KERNEL_SETUP_H
+
+#ifdef CONFIG_CC_IS_CLANG
+#define __nostackprotector
+#else
+#define __nostackprotector __attribute__((__optimize__("no-stack-protector")))
+#endif
 
 void initialize_cache_info(void);
 void irqstack_early_init(void);

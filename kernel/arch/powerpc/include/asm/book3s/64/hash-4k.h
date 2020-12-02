@@ -1,21 +1,31 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _ASM_POWERPC_BOOK3S_64_HASH_4K_H
 #define _ASM_POWERPC_BOOK3S_64_HASH_4K_H
-/*
- * Entries per page directory level.  The PTE level must use a 64b record
- * for each page table entry.  The PMD and PGD level use a 32b record for
- * each entry by assuming that each entry is page aligned.
- */
-#define H_PTE_INDEX_SIZE  9
-#define H_PMD_INDEX_SIZE  7
-#define H_PUD_INDEX_SIZE  9
-#define H_PGD_INDEX_SIZE  9
+
+#define H_PTE_INDEX_SIZE  9  // size: 8B << 9 = 4KB, maps: 2^9 x   4KB =   2MB
+#define H_PMD_INDEX_SIZE  7  // size: 8B << 7 = 1KB, maps: 2^7 x   2MB = 256MB
+#define H_PUD_INDEX_SIZE  9  // size: 8B << 9 = 4KB, maps: 2^9 x 256MB = 128GB
+#define H_PGD_INDEX_SIZE  9  // size: 8B << 9 = 4KB, maps: 2^9 x 128GB =  64TB
 
 /*
  * Each context is 512TB. But on 4k we restrict our max TASK size to 64TB
  * Hence also limit max EA bits to 64TB.
  */
 #define MAX_EA_BITS_PER_CONTEXT		46
+
+
+/*
+ * Our page table limit us to 64TB. For 64TB physical memory, we only need 64GB
+ * of vmemmap space. To better support sparse memory layout, we use 61TB
+ * linear map range, 1TB of vmalloc, 1TB of I/O and 1TB of vmememmap.
+ */
+#define REGION_SHIFT		(40)
+#define H_KERN_MAP_SIZE		(ASM_CONST(1) << REGION_SHIFT)
+
+/*
+ * Define the address range of the kernel non-linear virtual area (61TB)
+ */
+#define H_KERN_VIRT_START	ASM_CONST(0xc0003d0000000000)
 
 #ifndef __ASSEMBLY__
 #define H_PTE_TABLE_SIZE	(sizeof(pte_t) << H_PTE_INDEX_SIZE)
@@ -66,7 +76,7 @@ static inline int hash__hugepd_ok(hugepd_t hpd)
 	 * if it is not a pte and have hugepd shift mask
 	 * set, then it is a hugepd directory pointer
 	 */
-	if (!(hpdval & _PAGE_PTE) &&
+	if (!(hpdval & _PAGE_PTE) && (hpdval & _PAGE_PRESENT) &&
 	    ((hpdval & HUGEPD_SHIFT_MASK) != 0))
 		return true;
 	return false;

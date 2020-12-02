@@ -1,17 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
- *
+ * Copyright (c) 2003-2018, Intel Corporation. All rights reserved.
  * Intel Management Engine Interface (Intel MEI) Linux driver
- * Copyright (c) 2003-2012, Intel Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
  */
 
 #include <linux/pci.h>
@@ -183,6 +173,27 @@ static inline void mei_me_d0i3c_write(struct mei_device *dev, u32 reg)
 }
 
 /**
+ * mei_me_trc_status - read trc status register
+ *
+ * @dev: mei device
+ * @trc: trc status register value
+ *
+ * Return: 0 on success, error otherwise
+ */
+static int mei_me_trc_status(struct mei_device *dev, u32 *trc)
+{
+	struct mei_me_hw *hw = to_me_hw(dev);
+
+	if (!hw->cfg->hw_trc_supported)
+		return -EOPNOTSUPP;
+
+	*trc = mei_me_reg_read(hw, ME_TRC);
+	trace_mei_reg_read(dev->dev, "ME_TRC", ME_TRC, *trc);
+
+	return 0;
+}
+
+/**
  * mei_me_fw_status - read fw status register from pci config space
  *
  * @dev: mei device
@@ -350,9 +361,6 @@ static void mei_me_hw_reset_release(struct mei_device *dev)
 	hcsr |= H_IG;
 	hcsr &= ~H_RST;
 	mei_hcsr_set(dev, hcsr);
-
-	/* complete this write before we set host ready on another CPU */
-	mmiowb();
 }
 
 /**
@@ -1307,6 +1315,7 @@ end:
 
 static const struct mei_hw_ops mei_me_hw_ops = {
 
+	.trc_status = mei_me_trc_status,
 	.fw_status = mei_me_fw_status,
 	.pg_state  = mei_me_pg_state,
 
@@ -1397,6 +1406,9 @@ static bool mei_me_fw_type_sps(struct pci_dev *pdev)
 	.dma_size[DMA_DSCR_DEVICE] = SZ_128K, \
 	.dma_size[DMA_DSCR_CTRL] = PAGE_SIZE
 
+#define MEI_CFG_TRC \
+	.hw_trc_supported = 1
+
 /* ICH Legacy devices */
 static const struct mei_cfg mei_me_ich_cfg = {
 	MEI_CFG_ICH_HFS,
@@ -1445,6 +1457,14 @@ static const struct mei_cfg mei_me_pch12_cfg = {
 	MEI_CFG_DMA_128,
 };
 
+/* Tiger Lake and newer devices */
+static const struct mei_cfg mei_me_pch15_cfg = {
+	MEI_CFG_PCH8_HFS,
+	MEI_CFG_FW_VER_SUPP,
+	MEI_CFG_DMA_128,
+	MEI_CFG_TRC,
+};
+
 /*
  * mei_cfg_list - A list of platform platform specific configurations.
  * Note: has to be synchronized with  enum mei_cfg_idx.
@@ -1459,6 +1479,7 @@ static const struct mei_cfg *const mei_cfg_list[] = {
 	[MEI_ME_PCH8_CFG] = &mei_me_pch8_cfg,
 	[MEI_ME_PCH8_SPS_CFG] = &mei_me_pch8_sps_cfg,
 	[MEI_ME_PCH12_CFG] = &mei_me_pch12_cfg,
+	[MEI_ME_PCH15_CFG] = &mei_me_pch15_cfg,
 };
 
 const struct mei_cfg *mei_me_get_cfg(kernel_ulong_t idx)
@@ -1484,15 +1505,21 @@ struct mei_device *mei_me_dev_init(struct pci_dev *pdev,
 {
 	struct mei_device *dev;
 	struct mei_me_hw *hw;
+	int i;
 
 	dev = devm_kzalloc(&pdev->dev, sizeof(struct mei_device) +
 			   sizeof(struct mei_me_hw), GFP_KERNEL);
 	if (!dev)
 		return NULL;
+
 	hw = to_me_hw(dev);
+
+	for (i = 0; i < DMA_DSCR_NUM; i++)
+		dev->dr_dscr[i].size = cfg->dma_size[i];
 
 	mei_device_init(dev, &pdev->dev, &mei_me_hw_ops);
 	hw->cfg = cfg;
+
 	dev->fw_f_fw_ver_supported = cfg->fw_ver_supported;
 
 	return dev;

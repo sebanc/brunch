@@ -301,7 +301,6 @@ struct iwl_fw_ini_hcmd_tlv {
  * @IWL_FW_INI_ALLOCATION_ID_DBGC1: allocation meant for DBGC1 configuration
  * @IWL_FW_INI_ALLOCATION_ID_DBGC2: allocation meant for DBGC2 configuration
  * @IWL_FW_INI_ALLOCATION_ID_DBGC3: allocation meant for DBGC3 configuration
- * @IWL_FW_INI_ALLOCATION_ID_INTERNAL: allocation meant for Intreanl SMEM in D3
  * @IWL_FW_INI_ALLOCATION_NUM: number of allocation ids
 */
 enum iwl_fw_ini_allocation_id {
@@ -309,7 +308,6 @@ enum iwl_fw_ini_allocation_id {
 	IWL_FW_INI_ALLOCATION_ID_DBGC1,
 	IWL_FW_INI_ALLOCATION_ID_DBGC2,
 	IWL_FW_INI_ALLOCATION_ID_DBGC3,
-	IWL_FW_INI_ALLOCATION_ID_INTERNAL,
 	IWL_FW_INI_ALLOCATION_NUM,
 }; /* FW_DEBUG_TLV_ALLOCATION_ID_E_VER_1 */
 
@@ -349,7 +347,7 @@ enum iwl_fw_ini_buffer_location {
  * @IWL_FW_INI_REGION_CSR: CSR registers
  * @IWL_FW_INI_REGION_DRAM_IMR: IMR memory
  * @IWL_FW_INI_REGION_PCI_IOSF_CONFIG: PCI/IOSF config
- * @IWL_FW_INI_REGION_SPECIAL_DEVICE_MEMORY: special device memory
+ * @IWL_FW_INI_REGION_SPECIAL_DEVICE_MEMORY: special device memroy
  * @IWL_FW_INI_REGION_NUM: number of region types
  */
 enum iwl_fw_ini_region_type {
@@ -386,7 +384,7 @@ enum iwl_fw_ini_region_type {
  * @IWL_FW_INI_TIME_POINT_FW_ASSERT: FW assert
  * @IWL_FW_INI_TIME_POINT_FW_HW_ERROR: FW HW error
  * @IWL_FW_INI_TIME_POINT_FW_TFD_Q_HANG: TFD queue hang
- * @IWL_FW_INI_TIME_POINT_FW_DHC_NOTIFICATION: DHC cmd response and notif
+ * @IWL_FW_INI_TIME_POINT_FW_DHC_NOTIFOCATION: DHC cmd response and notif
  * @IWL_FW_INI_TIME_POINT_FW_RSP_OR_NOTIF: FW response or notification.
  *	data field holds id and group
  * @IWL_FW_INI_TIME_POINT_USER_TRIGGER: user trigger time point
@@ -419,7 +417,7 @@ enum iwl_fw_ini_time_point {
 	IWL_FW_INI_TIME_POINT_FW_ASSERT,
 	IWL_FW_INI_TIME_POINT_FW_HW_ERROR,
 	IWL_FW_INI_TIME_POINT_FW_TFD_Q_HANG,
-	IWL_FW_INI_TIME_POINT_FW_DHC_NOTIFICATION,
+	IWL_FW_INI_TIME_POINT_FW_DHC_NOTIFOCATION,
 	IWL_FW_INI_TIME_POINT_FW_RSP_OR_NOTIF,
 	IWL_FW_INI_TIME_POINT_USER_TRIGGER,
 	IWL_FW_INI_TIME_POINT_PERIODIC,

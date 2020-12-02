@@ -1,16 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Thunderbolt bus support
  *
  * Copyright (C) 2017, Intel Corporation
- * Author:  Mika Westerberg <mika.westerberg@linux.intel.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * Author: Mika Westerberg <mika.westerberg@linux.intel.com>
  */
 
 #include <linux/device.h>
+#include <linux/dmar.h>
 #include <linux/idr.h>
+#include <linux/iommu.h>
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
@@ -148,10 +147,10 @@ static ssize_t boot_acl_show(struct device *dev, struct device_attribute *attr,
 
 	for (ret = 0, i = 0; i < tb->nboot_acl; i++) {
 		if (!uuid_is_null(&uuids[i]))
-			ret += snprintf(buf + ret, PAGE_SIZE - ret, "%pUb",
+			ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%pUb",
 					&uuids[i]);
 
-		ret += snprintf(buf + ret, PAGE_SIZE - ret, "%s",
+		ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%s",
 			       i < tb->nboot_acl - 1 ? "," : "\n");
 	}
 
@@ -239,6 +238,20 @@ err_free_str:
 }
 static DEVICE_ATTR_RW(boot_acl);
 
+static ssize_t iommu_dma_protection_show(struct device *dev,
+					 struct device_attribute *attr,
+					 char *buf)
+{
+	/*
+	 * Kernel DMA protection is a feature where Thunderbolt security is
+	 * handled natively using IOMMU. It is enabled when IOMMU is
+	 * enabled and ACPI DMAR table has DMAR_PLATFORM_OPT_IN set.
+	 */
+	return sprintf(buf, "%d\n",
+		       iommu_present(&pci_bus_type) && dmar_platform_optin());
+}
+static DEVICE_ATTR_RO(iommu_dma_protection);
+
 static ssize_t security_show(struct device *dev, struct device_attribute *attr,
 			     char *buf)
 {
@@ -254,6 +267,7 @@ static DEVICE_ATTR_RO(security);
 
 static struct attribute *domain_attrs[] = {
 	&dev_attr_boot_acl.attr,
+	&dev_attr_iommu_dma_protection.attr,
 	&dev_attr_security.attr,
 	NULL,
 };
@@ -440,6 +454,8 @@ int tb_domain_add(struct tb *tb)
 
 	/* This starts event processing */
 	mutex_unlock(&tb->lock);
+
+	device_init_wakeup(&tb->dev, true);
 
 	pm_runtime_no_callbacks(&tb->dev);
 	pm_runtime_set_active(&tb->dev);
@@ -664,7 +680,6 @@ int tb_domain_challenge_switch_key(struct tb *tb, struct tb_switch *sw)
 	}
 
 	shash->tfm = tfm;
-	shash->flags = CRYPTO_TFM_REQ_MAY_SLEEP;
 
 	memset(hmac, 0, sizeof(hmac));
 	ret = crypto_shash_digest(shash, challenge, sizeof(hmac), hmac);
@@ -785,12 +800,20 @@ int tb_domain_init(void)
 {
 	int ret;
 
+	tb_debugfs_init();
 	ret = tb_xdomain_init();
 	if (ret)
-		return ret;
+		goto err_debugfs;
 	ret = bus_register(&tb_bus_type);
 	if (ret)
-		tb_xdomain_exit();
+		goto err_xdomain;
+
+	return 0;
+
+err_xdomain:
+	tb_xdomain_exit();
+err_debugfs:
+	tb_debugfs_exit();
 
 	return ret;
 }
@@ -799,6 +822,7 @@ void tb_domain_exit(void)
 {
 	bus_unregister(&tb_bus_type);
 	ida_destroy(&tb_domain_ida);
-	tb_switch_exit();
+	tb_nvm_exit();
 	tb_xdomain_exit();
+	tb_debugfs_exit();
 }

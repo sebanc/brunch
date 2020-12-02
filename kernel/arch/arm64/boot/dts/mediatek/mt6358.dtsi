@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (GPL-2.0 OR MIT)
 /*
- * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (c) 2020 MediaTek Inc.
  */
 
 &pwrap {
@@ -13,14 +13,10 @@
 
 		mt6358codec: mt6358codec {
 			compatible = "mediatek,mt6358-sound";
-			mediatek,dmic-mode = <0>; /* two-wires */
 		};
 
 		mt6358regulator: mt6358regulator {
-			compatible = "mediatek,mt6358-regulator";
-
 			mt6358_vdram1_reg: buck_vdram1 {
-				regulator-compatible = "buck_vdram1";
 				regulator-name = "vdram1";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <2087500>;
@@ -157,14 +153,14 @@
 				regulator-name = "vcamio";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <1800000>;
-				regulator-enable-ramp-delay = <270>;
+				regulator-enable-ramp-delay = <325>;
 			};
 
 			mt6358_vcamd_reg: ldo_vcamd {
 				regulator-name = "vcamd";
 				regulator-min-microvolt = <900000>;
 				regulator-max-microvolt = <1800000>;
-				regulator-enable-ramp-delay = <270>;
+				regulator-enable-ramp-delay = <325>;
 			};
 
 			mt6358_vcn18_reg: ldo_vcn18 {
@@ -269,7 +265,7 @@
 				regulator-name = "vcama1";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3000000>;
-				regulator-enable-ramp-delay = <270>;
+				regulator-enable-ramp-delay = <325>;
 			};
 
 			mt6358_vemc_reg: ldo_vemc {
@@ -322,7 +318,7 @@
 				regulator-name = "vcama2";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3000000>;
-				regulator-enable-ramp-delay = <270>;
+				regulator-enable-ramp-delay = <325>;
 			};
 
 			mt6358_vmc_reg: ldo_vmc {

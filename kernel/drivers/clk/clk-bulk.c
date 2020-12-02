@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright 2017 NXP
  *
  * Dong Aisheng <aisheng.dong@nxp.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/clk.h>
@@ -89,8 +78,8 @@ void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
 }
 EXPORT_SYMBOL_GPL(clk_bulk_put);
 
-int __must_check clk_bulk_get(struct device *dev, int num_clks,
-			      struct clk_bulk_data *clks)
+static int __clk_bulk_get(struct device *dev, int num_clks,
+			  struct clk_bulk_data *clks, bool optional)
 {
 	int ret;
 	int i;
@@ -102,10 +91,14 @@ int __must_check clk_bulk_get(struct device *dev, int num_clks,
 		clks[i].clk = clk_get(dev, clks[i].id);
 		if (IS_ERR(clks[i].clk)) {
 			ret = PTR_ERR(clks[i].clk);
+			clks[i].clk = NULL;
+
+			if (ret == -ENOENT && optional)
+				continue;
+
 			if (ret != -EPROBE_DEFER)
 				dev_err(dev, "Failed to get clk '%s': %d\n",
 					clks[i].id, ret);
-			clks[i].clk = NULL;
 			goto err;
 		}
 	}
@@ -117,7 +110,20 @@ err:
 
 	return ret;
 }
+
+int __must_check clk_bulk_get(struct device *dev, int num_clks,
+			      struct clk_bulk_data *clks)
+{
+	return __clk_bulk_get(dev, num_clks, clks, false);
+}
 EXPORT_SYMBOL(clk_bulk_get);
+
+int __must_check clk_bulk_get_optional(struct device *dev, int num_clks,
+				       struct clk_bulk_data *clks)
+{
+	return __clk_bulk_get(dev, num_clks, clks, true);
+}
+EXPORT_SYMBOL_GPL(clk_bulk_get_optional);
 
 void clk_bulk_put_all(int num_clks, struct clk_bulk_data *clks)
 {

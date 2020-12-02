@@ -119,7 +119,7 @@ enum { SDI0, SDI1, SDI2, SDI3, SDO0, SDO1, SDO2, SDO3 };
 #define AZX_REG_VS_EM3U			0x103C
 #define AZX_REG_VS_EM4L			0x1040
 #define AZX_REG_VS_EM4U			0x1044
-#define AZX_REG_VS_LTRC			0x1048
+#define AZX_REG_VS_LTRP			0x1048
 #define AZX_REG_VS_D0I3C		0x104A
 #define AZX_REG_VS_PCE			0x104B
 #define AZX_REG_VS_L2MAGC		0x1050
@@ -263,6 +263,9 @@ enum { SDI0, SDI1, SDI2, SDI3, SDO0, SDO1, SDO2, SDO3 };
 #define AZX_REG_ML_LWALFC		0x18
 #define AZX_REG_ML_LOUTPAY		0x20
 #define AZX_REG_ML_LINPAY		0x30
+
+/* bit0 is reserved, with BIT(1) mapping to stream1 */
+#define ML_LOSIDV_STREAM_MASK		0xFFFE
 
 #define ML_LCTL_SCF_MASK			0xF
 #define AZX_MLCTL_SPA				(0x1 << 16)

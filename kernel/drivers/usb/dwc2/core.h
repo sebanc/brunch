@@ -393,6 +393,20 @@ enum dwc2_ep0_state {
  *			0 - No
  *			1 - Yes
  * @hird_threshold:	Value of BESL or HIRD Threshold.
+ * @ref_clk_per:        Indicates in terms of pico seconds the period
+ *                      of ref_clk.
+ *			62500 - 16MHz
+ *                      58823 - 17MHz
+ *                      52083 - 19.2MHz
+ *			50000 - 20MHz
+ *			41666 - 24MHz
+ *			33333 - 30MHz (default)
+ *			25000 - 40MHz
+ * @sof_cnt_wkup_alert: Indicates in term of number of SOF's after which
+ *                      the controller should generate an interrupt if the
+ *                      device had been in L1 state until that period.
+ *                      This is used by SW to initiate Remote WakeUp in the
+ *                      controller so as to sync to the uF number from the host.
  * @activate_stm_fs_transceiver: Activate internal transceiver using GGPIO
  *			register.
  *			0 - Deactivate the transceiver (default)
@@ -416,6 +430,9 @@ enum dwc2_ep0_state {
  *                      back to DWC2_SPEED_PARAM_HIGH while device is gone.
  *			0 - No (default)
  *			1 - Yes
+ * @service_interval:   Enable service interval based scheduling.
+ *                      0 - No
+ *                      1 - Yes
  *
  * The following parameters may be specified when starting the module. These
  * parameters define how the DWC_otg controller should be configured. A
@@ -461,12 +478,17 @@ struct dwc2_core_params {
 	bool lpm_clock_gating;
 	bool besl;
 	bool hird_threshold_en;
+	bool service_interval;
 	u8 hird_threshold;
 	bool activate_stm_fs_transceiver;
 	bool ipg_isoc_en;
 	u16 max_packet_count;
 	u32 max_transfer_size;
 	u32 ahbcfg;
+
+	/* GREFCLK parameters */
+	u32 ref_clk_per;
+	u16 sof_cnt_wkup_alert;
 
 	/* Host parameters */
 	bool host_dma;
@@ -605,6 +627,10 @@ struct dwc2_core_params {
  *			FIFO sizing is enabled 16 to 32768
  *			Actual maximum value is autodetected and also
  *			the default.
+ * @service_interval_mode: For enabling service interval based scheduling in the
+ *                         controller.
+ *                           0 - Disable
+ *                           1 - Enable
  */
 struct dwc2_hw_params {
 	unsigned op_mode:3;
@@ -635,6 +661,7 @@ struct dwc2_hw_params {
 	unsigned utmi_phy_data_width:2;
 	unsigned lpm_mode:1;
 	unsigned ipg_isoc_en:1;
+	unsigned service_interval_mode:1;
 	u32 snpsid;
 	u32 dev_ep_dirs;
 	u32 g_tx_fifo_size[MAX_EPS_CHANNELS];
@@ -847,7 +874,6 @@ struct dwc2_hregs_backup {
  *                      removed once all SoCs support usb transceiver.
  * @supplies:           Definition of USB power supplies
  * @vbus_supply:        Regulator supplying vbus.
- * @phyif:              PHY interface width
  * @lock:		Spinlock that protects all the driver data structures
  * @priv:		Stores a pointer to the struct usb_hcd
  * @queuing_high_bandwidth: True if multiple packets of a high-bandwidth
@@ -970,6 +996,7 @@ struct dwc2_hregs_backup {
  * @ctrl_buff:          Buffer for EP0 control requests.
  * @ctrl_req:           Request for EP0 control packets.
  * @ep0_state:          EP0 control transfers state
+ * @delayed_status:		true when gadget driver asks for delayed status
  * @test_mode:          USB test mode requested by the host
  * @remote_wakeup_allowed: True if device is allowed to wake-up host by
  *                      remote-wakeup signalling
@@ -1034,7 +1061,6 @@ struct dwc2_hsotg {
 	struct dwc2_hsotg_plat *plat;
 	struct regulator_bulk_data supplies[DWC2_NUM_SUPPLIES];
 	struct regulator *vbus_supply;
-	u32 phyif;
 
 	spinlock_t lock;
 	void *priv;
@@ -1155,6 +1181,7 @@ struct dwc2_hsotg {
 	void *ep0_buff;
 	void *ctrl_buff;
 	enum dwc2_ep0_state ep0_state;
+	unsigned delayed_status : 1;
 	u8 test_mode;
 
 	dma_addr_t setup_desc_dma[2];
@@ -1266,6 +1293,8 @@ int dwc2_exit_partial_power_down(struct dwc2_hsotg *hsotg, bool restore);
 int dwc2_enter_hibernation(struct dwc2_hsotg *hsotg, int is_host);
 int dwc2_exit_hibernation(struct dwc2_hsotg *hsotg, int rem_wakeup,
 		int reset, int is_host);
+void dwc2_init_fs_ls_pclk_sel(struct dwc2_hsotg *hsotg);
+int dwc2_phy_init(struct dwc2_hsotg *hsotg, bool select_phy);
 
 void dwc2_force_mode(struct dwc2_hsotg *hsotg, bool host);
 void dwc2_force_dr_mode(struct dwc2_hsotg *hsotg);
@@ -1364,6 +1393,7 @@ int dwc2_hsotg_tx_fifo_count(struct dwc2_hsotg *hsotg);
 int dwc2_hsotg_tx_fifo_total_depth(struct dwc2_hsotg *hsotg);
 int dwc2_hsotg_tx_fifo_average_depth(struct dwc2_hsotg *hsotg);
 void dwc2_gadget_init_lpm(struct dwc2_hsotg *hsotg);
+void dwc2_gadget_program_ref_clk(struct dwc2_hsotg *hsotg);
 #else
 static inline int dwc2_hsotg_remove(struct dwc2_hsotg *dwc2)
 { return 0; }
@@ -1398,6 +1428,7 @@ static inline int dwc2_hsotg_tx_fifo_total_depth(struct dwc2_hsotg *hsotg)
 static inline int dwc2_hsotg_tx_fifo_average_depth(struct dwc2_hsotg *hsotg)
 { return 0; }
 static inline void dwc2_gadget_init_lpm(struct dwc2_hsotg *hsotg) {}
+static inline void dwc2_gadget_program_ref_clk(struct dwc2_hsotg *hsotg) {}
 #endif
 
 #if IS_ENABLED(CONFIG_USB_DWC2_HOST) || IS_ENABLED(CONFIG_USB_DWC2_DUAL_ROLE)

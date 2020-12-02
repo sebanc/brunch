@@ -1,12 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  linux/arch/arm/boot/compressed/head.S
  *
  *  Copyright (C) 1996-2002 Russell King
  *  Copyright (C) 2004 Hyok S. Choi (MPU support)
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
@@ -114,6 +111,35 @@
 #endif
 		.endm
 
+		/*
+		 * Debug kernel copy by printing the memory addresses involved
+		 */
+		.macro dbgkc, begin, end, cbegin, cend
+#ifdef DEBUG
+		kputc   #'\n'
+		kputc   #'C'
+		kputc   #':'
+		kputc   #'0'
+		kputc   #'x'
+		kphex   \begin, 8	/* Start of compressed kernel */
+		kputc	#'-'
+		kputc	#'0'
+		kputc	#'x'
+		kphex	\end, 8		/* End of compressed kernel */
+		kputc	#'-'
+		kputc	#'>'
+		kputc   #'0'
+		kputc   #'x'
+		kphex   \cbegin, 8	/* Start of kernel copy */
+		kputc	#'-'
+		kputc	#'0'
+		kputc	#'x'
+		kphex	\cend, 8	/* End of kernel copy */
+		kputc	#'\n'
+		kputc	#'\r'
+#endif
+		.endm
+
 		.section ".start", #alloc, #execinstr
 /*
  * sort out different calling conventions
@@ -127,11 +153,23 @@
  AR_CLASS(	.arm	)
 start:
 		.type	start,#function
+		/*
+		 * These 7 nops along with the 1 nop immediately below for
+		 * !THUMB2 form 8 nops that make the compressed kernel bootable
+		 * on legacy ARM systems that were assuming the kernel in a.out
+		 * binary format. The boot loaders on these systems would
+		 * jump 32 bytes into the image to skip the a.out header.
+		 * with these 8 nops filling exactly 32 bytes, things still
+		 * work as expected on these legacy systems. Thumb2 mode keeps
+		 * 7 of the nops as it turns out that some boot loaders
+		 * were patching the initial instructions of the kernel, i.e
+		 * had started to exploit this "patch area".
+		 */
 		.rept	7
 		__nop
 		.endr
 #ifndef CONFIG_THUMB2_KERNEL
-		mov	r0, r0
+		__nop
 #else
  AR_CLASS(	sub	pc, pc, #3	)	@ A/R: switch to Thumb2 mode
   M_CLASS(	nop.w			)	@ M: already in Thumb2 mode
@@ -449,6 +487,20 @@ dtb_check_done:
 		bic	r9, r9, #31		@ ... of 32 bytes
 		add	r6, r9, r5
 		add	r9, r9, r10
+
+#ifdef DEBUG
+		sub     r10, r6, r5
+		sub     r10, r9, r10
+		/*
+		 * We are about to copy the kernel to a new memory area.
+		 * The boundaries of the new memory area can be found in
+		 * r10 and r9, whilst r5 and r6 contain the boundaries
+		 * of the memory we are going to copy.
+		 * Calling dbgkc will help with the printing of this
+		 * information.
+		 */
+		dbgkc	r5, r6, r10, r9
+#endif
 
 1:		ldmdb	r6!, {r0 - r3, r10 - r12, lr}
 		cmp	r6, r5

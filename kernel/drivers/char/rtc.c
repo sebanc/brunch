@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *	Real Time Clock interface for Linux
  *
@@ -19,11 +20,6 @@
  *	contains the interrupt status in the low byte and the number of
  *	interrupts since the last read in the remaining high bytes. The
  *	/dev/rtc interface can also be used with the select(2) call.
- *
- *	This program is free software; you can redistribute it and/or
- *	modify it under the terms of the GNU General Public License
- *	as published by the Free Software Foundation; either version
- *	2 of the License, or (at your option) any later version.
  *
  *	Based on other minimal char device drivers, like Alan's
  *	watchdog, Ted's random, etc. etc.
@@ -866,8 +862,8 @@ static int __init rtc_init(void)
 #ifdef CONFIG_SPARC32
 	for_each_node_by_name(ebus_dp, "ebus") {
 		struct device_node *dp;
-		for (dp = ebus_dp; dp; dp = dp->sibling) {
-			if (!strcmp(dp->name, "rtc")) {
+		for_each_child_of_node(ebus_dp, dp) {
+			if (of_node_name_eq(dp, "rtc")) {
 				op = of_find_device_by_node(dp);
 				if (op) {
 					rtc_port = op->resource[0].start;
@@ -1125,11 +1121,10 @@ static int rtc_proc_show(struct seq_file *seq, void *v)
 	 * time or for Universal Standard Time (GMT). Probably local though.
 	 */
 	seq_printf(seq,
-		   "rtc_time\t: %02d:%02d:%02d\n"
-		   "rtc_date\t: %04d-%02d-%02d\n"
+		   "rtc_time\t: %ptRt\n"
+		   "rtc_date\t: %ptRd\n"
 		   "rtc_epoch\t: %04lu\n",
-		   tm.tm_hour, tm.tm_min, tm.tm_sec,
-		   tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, epoch);
+		   &tm, &tm, epoch);
 
 	get_rtc_alm_time(&tm);
 

@@ -11,6 +11,7 @@
 #include <drm/drmP.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_probe_helper.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 
@@ -78,8 +79,7 @@ static void evdi_disable_vblank(__always_unused struct drm_device *dev,
 }
 
 static struct drm_driver driver = {
-	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME |
-	DRIVER_ATOMIC,
+	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_ATOMIC,
 	.load = evdi_driver_load,
 	.unload = evdi_driver_unload,
 	.preclose = evdi_driver_preclose,
@@ -218,7 +218,7 @@ static int evdi_platform_probe(struct platform_device *pdev)
 	return 0;
 
 err_free:
-	drm_dev_unref(dev);
+	drm_dev_put(dev);
 	return ret;
 }
 

@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * oxfw.c - a part of driver for OXFW970/971 based devices
  *
  * Copyright (c) Clemens Ladisch <clemens@ladisch.de>
- * Licensed under the terms of the GNU General Public License, version 2.
  */
 
 #include "oxfw.h"
@@ -114,35 +114,11 @@ end:
 	return err;
 }
 
-static void oxfw_free(struct snd_oxfw *oxfw)
-{
-	unsigned int i;
-
-	snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->rx_stream);
-	if (oxfw->has_output)
-		snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->tx_stream);
-
-	fw_unit_put(oxfw->unit);
-
-	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		kfree(oxfw->tx_stream_formats[i]);
-		kfree(oxfw->rx_stream_formats[i]);
-	}
-
-	kfree(oxfw->spec);
-	mutex_destroy(&oxfw->mutex);
-	kfree(oxfw);
-}
-
-/*
- * This module releases the FireWire unit data after all ALSA character devices
- * are released by applications. This is for releasing stream data or finishing
- * transactions safely. Thus at returning from .remove(), this module still keep
- * references for the unit.
- */
 static void oxfw_card_free(struct snd_card *card)
 {
-	oxfw_free(card->private_data);
+	struct snd_oxfw *oxfw = card->private_data;
+
+	snd_oxfw_stream_destroy_duplex(oxfw);
 }
 
 static int detect_quirks(struct snd_oxfw *oxfw)
@@ -206,7 +182,6 @@ static int detect_quirks(struct snd_oxfw *oxfw)
 static void do_registration(struct work_struct *work)
 {
 	struct snd_oxfw *oxfw = container_of(work, struct snd_oxfw, dwork.work);
-	int i;
 	int err;
 
 	if (oxfw->registered)
@@ -216,6 +191,8 @@ static void do_registration(struct work_struct *work)
 			   &oxfw->card);
 	if (err < 0)
 		return;
+	oxfw->card->private_free = oxfw_card_free;
+	oxfw->card->private_data = oxfw;
 
 	err = name_card(oxfw);
 	if (err < 0)
@@ -229,14 +206,9 @@ static void do_registration(struct work_struct *work)
 	if (err < 0)
 		goto error;
 
-	err = snd_oxfw_stream_init_simplex(oxfw, &oxfw->rx_stream);
+	err = snd_oxfw_stream_init_duplex(oxfw);
 	if (err < 0)
 		goto error;
-	if (oxfw->has_output) {
-		err = snd_oxfw_stream_init_simplex(oxfw, &oxfw->tx_stream);
-		if (err < 0)
-			goto error;
-	}
 
 	err = snd_oxfw_create_pcm(oxfw);
 	if (err < 0)
@@ -256,28 +228,11 @@ static void do_registration(struct work_struct *work)
 	if (err < 0)
 		goto error;
 
-	/*
-	 * After registered, oxfw instance can be released corresponding to
-	 * releasing the sound card instance.
-	 */
-	oxfw->card->private_free = oxfw_card_free;
-	oxfw->card->private_data = oxfw;
 	oxfw->registered = true;
 
 	return;
 error:
-	snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->rx_stream);
-	if (oxfw->has_output)
-		snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->tx_stream);
-	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; ++i) {
-		kfree(oxfw->tx_stream_formats[i]);
-		oxfw->tx_stream_formats[i] = NULL;
-		kfree(oxfw->rx_stream_formats[i]);
-		oxfw->rx_stream_formats[i] = NULL;
-	}
 	snd_card_free(oxfw->card);
-	kfree(oxfw->spec);
-	oxfw->spec = NULL;
 	dev_info(&oxfw->unit->device,
 		 "Sound card registration failed: %d\n", err);
 }
@@ -291,14 +246,13 @@ static int oxfw_probe(struct fw_unit *unit,
 		return -ENODEV;
 
 	/* Allocate this independent of sound card instance. */
-	oxfw = kzalloc(sizeof(struct snd_oxfw), GFP_KERNEL);
-	if (oxfw == NULL)
+	oxfw = devm_kzalloc(&unit->device, sizeof(struct snd_oxfw), GFP_KERNEL);
+	if (!oxfw)
 		return -ENOMEM;
-
-	oxfw->entry = entry;
 	oxfw->unit = fw_unit_get(unit);
 	dev_set_drvdata(&unit->device, oxfw);
 
+	oxfw->entry = entry;
 	mutex_init(&oxfw->mutex);
 	spin_lock_init(&oxfw->lock);
 	init_waitqueue_head(&oxfw->hwdep_wait);
@@ -321,11 +275,7 @@ static void oxfw_bus_reset(struct fw_unit *unit)
 
 	if (oxfw->registered) {
 		mutex_lock(&oxfw->mutex);
-
-		snd_oxfw_stream_update_simplex(oxfw, &oxfw->rx_stream);
-		if (oxfw->has_output)
-			snd_oxfw_stream_update_simplex(oxfw, &oxfw->tx_stream);
-
+		snd_oxfw_stream_update_duplex(oxfw);
 		mutex_unlock(&oxfw->mutex);
 
 		if (oxfw->entry->vendor_id == OUI_STANTON)
@@ -345,12 +295,12 @@ static void oxfw_remove(struct fw_unit *unit)
 	cancel_delayed_work_sync(&oxfw->dwork);
 
 	if (oxfw->registered) {
-		/* No need to wait for releasing card object in this context. */
-		snd_card_free_when_closed(oxfw->card);
-	} else {
-		/* Don't forget this case. */
-		oxfw_free(oxfw);
+		// Block till all of ALSA character devices are released.
+		snd_card_free(oxfw->card);
 	}
+
+	mutex_destroy(&oxfw->mutex);
+	fw_unit_put(oxfw->unit);
 }
 
 static const struct compat_info griffin_firewave = {

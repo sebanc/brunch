@@ -145,7 +145,7 @@ static int safesetid_task_fix_setuid(struct cred *new,
 	 * that could arise from a missing whitelist entry preventing a
 	 * privileged process from dropping to a lesser-privileged one.
 	 */
-	force_sig(SIGKILL, current);
+	force_sig(SIGKILL);
 	return -EACCES;
 }
 
@@ -164,4 +164,8 @@ static int __init safesetid_security_init(void)
 
 	return 0;
 }
-security_initcall(safesetid_security_init);
+
+DEFINE_LSM(safesetid_security_init) = {
+	.init = safesetid_security_init,
+	.name = "safesetid",
+};

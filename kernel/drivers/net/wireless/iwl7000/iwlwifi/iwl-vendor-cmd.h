@@ -151,9 +151,9 @@
  *	&IWL_MVM_VENDOR_ATTR_FMAC_CONFIG_STR specifies the configuration string.
  * @IWL_MVM_VENDOR_CMD_CSI_EVENT: CSI event, use as a command to enable unicast
  *	reporting to the calling socket
- * @IWL_MVM_VENDOR_CMD_ADD_PASN_STA: add a PASN station for and initiator or
- *	responder based on the interface type. &IWL_MVM_VENDOR_ATTR_ADDR
- *	specifies the station's mac address. &IWL_MVM_VENDOR_ATTR_STA_TK and
+ * @IWL_MVM_VENDOR_CMD_ADD_PASN_STA: add a PASN station. Only valid when a
+ *	responder is active. &IWL_MVM_VENDOR_ATTR_ADDR specifies the station's
+ *	mac address. &IWL_MVM_VENDOR_ATTR_STA_TK and
  *	&IWL_MVM_VENDOR_ATTR_STA_CIPHER specify the cipher suite and key to use
  *	for PMF for this station. &IWL_MVM_VENDOR_ATTR_STA_HLTK specifies the
  *	HLTK for secure LTF bits generation.

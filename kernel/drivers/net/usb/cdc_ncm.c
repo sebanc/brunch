@@ -783,8 +783,7 @@ int cdc_ncm_bind_common(struct usbnet *dev, struct usb_interface *intf, u8 data_
 
 	hrtimer_init(&ctx->tx_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	ctx->tx_timer.function = &cdc_ncm_tx_timer_cb;
-	ctx->bh.data = (unsigned long)dev;
-	ctx->bh.func = cdc_ncm_txpath_bh;
+	tasklet_init(&ctx->bh, cdc_ncm_txpath_bh, (unsigned long)dev);
 	atomic_set(&ctx->stop, 0);
 	spin_lock_init(&ctx->mtx);
 
@@ -1605,10 +1604,7 @@ cdc_ncm_speed_change(struct usbnet *dev,
 
 static void cdc_ncm_status(struct usbnet *dev, struct urb *urb)
 {
-	struct cdc_ncm_ctx *ctx;
 	struct usb_cdc_notification *event;
-
-	ctx = (struct cdc_ncm_ctx *)dev->data[0];
 
 	if (urb->actual_length < sizeof(*event))
 		return;
@@ -1746,13 +1742,6 @@ static const struct usb_device_id cdc_devs[] = {
 	  .driver_info = (unsigned long) &wwan_info,
 	},
 
-	/* Temporarily prevent the cdc_ncm driver from being associated with
-	 * Huawei modems. See crosbug.com/p/20334 for details.
-	 *
-	 * TODO(benchan): Revert this change once shill can identify and ignore
-	 * a Huawei PPP dongle that is associated with the cdc_ncm driver.
-	 */
-#if 0
 	/* tag Huawei devices as wwan */
 	{ USB_VENDOR_AND_INTERFACE_INFO(0x12d1,
 					USB_CLASS_COMM,
@@ -1760,7 +1749,6 @@ static const struct usb_device_id cdc_devs[] = {
 					USB_CDC_PROTO_NONE),
 	  .driver_info = (unsigned long)&wwan_info,
 	},
-#endif
 
 	/* Infineon(now Intel) HSPA Modem platform */
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x1519, 0x0443,

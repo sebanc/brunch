@@ -46,10 +46,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvrsrv_device.h"
 #include "rgxfwutils.h"
 
-#include "dma_support.h"
-#include "vz_support.h"
+#include "system/dma_support.h"
+#include "system/vz_support.h"
 #include "vz_vmm_pvz.h"
-#include "vz_physheap.h"
+#include "system/vz_physheap.h"
 
 #if defined(CONFIG_L4)
 static IMG_HANDLE gahPhysHeapIoRemap[PVRSRV_DEVICE_PHYS_HEAP_LAST];

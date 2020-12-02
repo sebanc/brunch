@@ -26,11 +26,13 @@
 #ifndef _OS_TYPES_H_
 #define _OS_TYPES_H_
 
-#include <asm/byteorder.h>
-#include <linux/types.h>
-#include <drm/drmP.h>
-
+#include <linux/kgdb.h>
 #include <linux/kref.h>
+#include <linux/types.h>
+
+#include <asm/byteorder.h>
+
+#include <drm/drm_print.h>
 
 #include "cgs_common.h"
 
@@ -40,8 +42,6 @@
 #define LITTLEENDIAN_CPU
 #endif
 
-#undef READ
-#undef WRITE
 #undef FRAME_SIZE
 
 #define dm_output_to_console(fmt, ...) DRM_DEBUG_KMS(fmt, ##__VA_ARGS__)
@@ -57,7 +57,7 @@
  * general debug capabilities
  *
  */
-#if defined(CONFIG_HAVE_KGDB) || defined(CONFIG_KGDB)
+#if defined(CONFIG_DEBUG_KERNEL_DC) && (defined(CONFIG_HAVE_KGDB) || defined(CONFIG_KGDB))
 #define ASSERT_CRITICAL(expr) do {	\
 	if (WARN_ON(!(expr))) { \
 		kgdb_breakpoint(); \

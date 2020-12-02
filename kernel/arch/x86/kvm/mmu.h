@@ -43,11 +43,6 @@
 #define PT32_ROOT_LEVEL 2
 #define PT32E_ROOT_LEVEL 3
 
-#define PT_PDPE_LEVEL 3
-#define PT_DIRECTORY_LEVEL 2
-#define PT_PAGE_TABLE_LEVEL 1
-#define PT_MAX_HUGEPAGE_LEVEL (PT_PAGE_TABLE_LEVEL + KVM_NR_PAGE_SIZES - 1)
-
 static inline u64 rsvd_bits(int s, int e)
 {
 	if (e < s)
@@ -56,7 +51,7 @@ static inline u64 rsvd_bits(int s, int e)
 	return ((1ULL << (e - s + 1)) - 1) << s;
 }
 
-void kvm_mmu_set_mmio_spte_mask(u64 mmio_mask, u64 mmio_value);
+void kvm_mmu_set_mmio_spte_mask(u64 mmio_mask, u64 mmio_value, u64 access_mask);
 
 void
 reset_shadow_zero_bits_mask(struct kvm_vcpu *vcpu, struct kvm_mmu *context);
@@ -80,7 +75,7 @@ static inline unsigned long kvm_mmu_available_pages(struct kvm *kvm)
 
 static inline int kvm_mmu_reload(struct kvm_vcpu *vcpu)
 {
-	if (likely(vcpu->arch.mmu.root_hpa != INVALID_PAGE))
+	if (likely(vcpu->arch.mmu->root_hpa != INVALID_PAGE))
 		return 0;
 
 	return kvm_mmu_load(vcpu);
@@ -102,9 +97,9 @@ static inline unsigned long kvm_get_active_pcid(struct kvm_vcpu *vcpu)
 
 static inline void kvm_mmu_load_cr3(struct kvm_vcpu *vcpu)
 {
-	if (VALID_PAGE(vcpu->arch.mmu.root_hpa))
-		vcpu->arch.mmu.set_cr3(vcpu, vcpu->arch.mmu.root_hpa |
-					     kvm_get_active_pcid(vcpu));
+	if (VALID_PAGE(vcpu->arch.mmu->root_hpa))
+		vcpu->arch.mmu->set_cr3(vcpu, vcpu->arch.mmu->root_hpa |
+					      kvm_get_active_pcid(vcpu));
 }
 
 /*
@@ -208,7 +203,6 @@ static inline u8 permission_fault(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu,
 	return -(u32)fault & errcode;
 }
 
-void kvm_mmu_invalidate_zap_all_pages(struct kvm *kvm);
 void kvm_zap_gfn_range(struct kvm *kvm, gfn_t gfn_start, gfn_t gfn_end);
 
 void kvm_mmu_gfn_disallow_lpage(struct kvm_memory_slot *slot, gfn_t gfn);

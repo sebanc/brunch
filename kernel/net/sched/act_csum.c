@@ -1,13 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Checksum updating actions
  *
  * Copyright (c) 2010 Gregoire Baron <baronchon@n7mm.org>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
- *
  */
 
 #include <linux/types.h>
@@ -33,6 +28,7 @@
 #include <net/sctp/checksum.h>
 
 #include <net/act_api.h>
+#include <net/pkt_cls.h>
 
 #include <linux/tc_act/tc_csum.h>
 #include <net/tc_act/tc_csum.h>
@@ -46,12 +42,13 @@ static struct tc_action_ops act_csum_ops;
 
 static int tcf_csum_init(struct net *net, struct nlattr *nla,
 			 struct nlattr *est, struct tc_action **a, int ovr,
-			 int bind, bool rtnl_held,
+			 int bind, bool rtnl_held, struct tcf_proto *tp,
 			 struct netlink_ext_ack *extack)
 {
 	struct tc_action_net *tn = net_generic(net, csum_net_id);
 	struct tcf_csum_params *params_new;
 	struct nlattr *tb[TCA_CSUM_MAX + 1];
+	struct tcf_chain *goto_ch = NULL;
 	struct tc_csum *parm;
 	struct tcf_csum *p;
 	int ret = 0, err;
@@ -60,7 +57,8 @@ static int tcf_csum_init(struct net *net, struct nlattr *nla,
 	if (nla == NULL)
 		return -EINVAL;
 
-	err = nla_parse_nested(tb, TCA_CSUM_MAX, nla, csum_policy, NULL);
+	err = nla_parse_nested_deprecated(tb, TCA_CSUM_MAX, nla, csum_policy,
+					  NULL);
 	if (err < 0)
 		return err;
 
@@ -88,28 +86,37 @@ static int tcf_csum_init(struct net *net, struct nlattr *nla,
 		return err;
 	}
 
+	err = tcf_action_check_ctrlact(parm->action, tp, &goto_ch, extack);
+	if (err < 0)
+		goto release_idr;
+
 	p = to_tcf_csum(*a);
 
 	params_new = kzalloc(sizeof(*params_new), GFP_KERNEL);
 	if (unlikely(!params_new)) {
-		tcf_idr_release(*a, bind);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto put_chain;
 	}
 	params_new->update_flags = parm->update_flags;
 
 	spin_lock_bh(&p->tcf_lock);
-	p->tcf_action = parm->action;
+	goto_ch = tcf_action_set_ctrlact(*a, parm->action, goto_ch);
 	rcu_swap_protected(p->params, params_new,
 			   lockdep_is_held(&p->tcf_lock));
 	spin_unlock_bh(&p->tcf_lock);
 
+	if (goto_ch)
+		tcf_chain_put_by_act(goto_ch);
 	if (params_new)
 		kfree_rcu(params_new, rcu);
 
-	if (ret == ACT_P_CREATED)
-		tcf_idr_insert(tn, *a);
-
 	return ret;
+put_chain:
+	if (goto_ch)
+		tcf_chain_put_by_act(goto_ch);
+release_idr:
+	tcf_idr_release(*a, bind);
+	return err;
 }
 
 /**
@@ -674,8 +681,7 @@ static int tcf_csum_walker(struct net *net, struct sk_buff *skb,
 	return tcf_generic_walker(tn, skb, cb, type, ops, extack);
 }
 
-static int tcf_csum_search(struct net *net, struct tc_action **a, u32 index,
-			   struct netlink_ext_ack *extack)
+static int tcf_csum_search(struct net *net, struct tc_action **a, u32 index)
 {
 	struct tc_action_net *tn = net_generic(net, csum_net_id);
 
@@ -689,7 +695,7 @@ static size_t tcf_csum_get_fill_size(const struct tc_action *act)
 
 static struct tc_action_ops act_csum_ops = {
 	.kind		= "csum",
-	.type		= TCA_ACT_CSUM,
+	.id		= TCA_ID_CSUM,
 	.owner		= THIS_MODULE,
 	.act		= tcf_csum_act,
 	.dump		= tcf_csum_dump,

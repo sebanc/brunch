@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * ALSA SoC TLV320AIC3X codec driver
  *
@@ -5,10 +6,6 @@
  * Copyright:   (C) 2007 MontaVista Software, Inc., <source@mvista.com>
  *
  * Based on sound/soc/codecs/wm8753.c by Liam Girdwood
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  *
  * Notes:
  *  The AIC3X is a driver for a low power stereo audio
@@ -324,6 +321,9 @@ static DECLARE_TLV_DB_SCALE(adc_tlv, 0, 50, 0);
  */
 static DECLARE_TLV_DB_SCALE(output_stage_tlv, -5900, 50, 1);
 
+/* Output volumes. From 0 to 9 dB in 1 dB steps */
+static const DECLARE_TLV_DB_SCALE(out_tlv, 0, 100, 0);
+
 static const struct snd_kcontrol_new aic3x_snd_controls[] = {
 	/* Output */
 	SOC_DOUBLE_R_TLV("PCM Playback Volume",
@@ -386,11 +386,17 @@ static const struct snd_kcontrol_new aic3x_snd_controls[] = {
 			 DACL1_2_HPLCOM_VOL, DACR1_2_HPRCOM_VOL,
 			 0, 118, 1, output_stage_tlv),
 
-	/* Output pin mute controls */
+	/* Output pin controls */
+	SOC_DOUBLE_R_TLV("Line Playback Volume", LLOPM_CTRL, RLOPM_CTRL, 4,
+			 9, 0, out_tlv),
 	SOC_DOUBLE_R("Line Playback Switch", LLOPM_CTRL, RLOPM_CTRL, 3,
 		     0x01, 0),
+	SOC_DOUBLE_R_TLV("HP Playback Volume", HPLOUT_CTRL, HPROUT_CTRL, 4,
+			 9, 0, out_tlv),
 	SOC_DOUBLE_R("HP Playback Switch", HPLOUT_CTRL, HPROUT_CTRL, 3,
 		     0x01, 0),
+	SOC_DOUBLE_R_TLV("HPCOM Playback Volume", HPLCOM_CTRL, HPRCOM_CTRL,
+			 4, 9, 0, out_tlv),
 	SOC_DOUBLE_R("HPCOM Playback Switch", HPLCOM_CTRL, HPRCOM_CTRL, 3,
 		     0x01, 0),
 
@@ -472,6 +478,9 @@ static const struct snd_kcontrol_new aic3x_mono_controls[] = {
 			 0, 118, 1, output_stage_tlv),
 
 	SOC_SINGLE("Mono Playback Switch", MONOLOPM_CTRL, 3, 0x01, 0),
+	SOC_SINGLE_TLV("Mono Playback Volume", MONOLOPM_CTRL, 4, 9, 0,
+			out_tlv),
+
 };
 
 /*
@@ -1047,7 +1056,7 @@ static int aic3x_hw_params(struct snd_pcm_substream *substream,
 		width = params_width(params);
 
 	/* select data word length */
-	data = snd_soc_component_read32(component, AIC3X_ASD_INTF_CTRLB) & (~(0x3 << 4));
+	data = snd_soc_component_read(component, AIC3X_ASD_INTF_CTRLB) & (~(0x3 << 4));
 	switch (width) {
 	case 16:
 		break;
@@ -1207,11 +1216,11 @@ static int aic3x_prepare(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int aic3x_mute(struct snd_soc_dai *dai, int mute)
+static int aic3x_mute(struct snd_soc_dai *dai, int mute, int direction)
 {
 	struct snd_soc_component *component = dai->component;
-	u8 ldac_reg = snd_soc_component_read32(component, LDAC_VOL) & ~MUTE_ON;
-	u8 rdac_reg = snd_soc_component_read32(component, RDAC_VOL) & ~MUTE_ON;
+	u8 ldac_reg = snd_soc_component_read(component, LDAC_VOL) & ~MUTE_ON;
+	u8 rdac_reg = snd_soc_component_read(component, RDAC_VOL) & ~MUTE_ON;
 
 	if (mute) {
 		snd_soc_component_write(component, LDAC_VOL, ldac_reg | MUTE_ON);
@@ -1247,8 +1256,8 @@ static int aic3x_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	struct aic3x_priv *aic3x = snd_soc_component_get_drvdata(component);
 	u8 iface_areg, iface_breg;
 
-	iface_areg = snd_soc_component_read32(component, AIC3X_ASD_INTF_CTRLA) & 0x3f;
-	iface_breg = snd_soc_component_read32(component, AIC3X_ASD_INTF_CTRLB) & 0x3f;
+	iface_areg = snd_soc_component_read(component, AIC3X_ASD_INTF_CTRLA) & 0x3f;
+	iface_breg = snd_soc_component_read(component, AIC3X_ASD_INTF_CTRLB) & 0x3f;
 
 	/* set master/slave audio interface */
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
@@ -1259,6 +1268,16 @@ static int aic3x_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	case SND_SOC_DAIFMT_CBS_CFS:
 		aic3x->master = 0;
 		iface_areg &= ~(BIT_CLK_MASTER | WORD_CLK_MASTER);
+		break;
+	case SND_SOC_DAIFMT_CBM_CFS:
+		aic3x->master = 1;
+		iface_areg |= BIT_CLK_MASTER;
+		iface_areg &= ~WORD_CLK_MASTER;
+		break;
+	case SND_SOC_DAIFMT_CBS_CFM:
+		aic3x->master = 1;
+		iface_areg |= WORD_CLK_MASTER;
+		iface_areg &= ~BIT_CLK_MASTER;
 		break;
 	default:
 		return -EINVAL;
@@ -1388,8 +1407,8 @@ static int aic3x_set_power(struct snd_soc_component *component, int power)
 		 * writing one of them and thus caused other one also not
 		 * being written
 		 */
-		pll_c = snd_soc_component_read32(component, AIC3X_PLL_PROGC_REG);
-		pll_d = snd_soc_component_read32(component, AIC3X_PLL_PROGD_REG);
+		pll_c = snd_soc_component_read(component, AIC3X_PLL_PROGC_REG);
+		pll_d = snd_soc_component_read(component, AIC3X_PLL_PROGD_REG);
 		if (pll_c == aic3x_reg[AIC3X_PLL_PROGC_REG].def ||
 			pll_d == aic3x_reg[AIC3X_PLL_PROGD_REG].def) {
 			snd_soc_component_write(component, AIC3X_PLL_PROGC_REG, pll_c);
@@ -1462,10 +1481,11 @@ static int aic3x_set_bias_level(struct snd_soc_component *component,
 static const struct snd_soc_dai_ops aic3x_dai_ops = {
 	.hw_params	= aic3x_hw_params,
 	.prepare	= aic3x_prepare,
-	.digital_mute	= aic3x_mute,
+	.mute_stream	= aic3x_mute,
 	.set_sysclk	= aic3x_set_dai_sysclk,
 	.set_fmt	= aic3x_set_dai_fmt,
 	.set_tdm_slot	= aic3x_set_dai_tdm_slot,
+	.no_capture_mute = 1,
 };
 
 static struct snd_soc_dai_driver aic3x_dai = {

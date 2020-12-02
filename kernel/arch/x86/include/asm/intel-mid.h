@@ -1,12 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * intel-mid.h: Intel MID specific setup code
  *
  * (C) Copyright 2009 Intel Corporation
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; version 2
- * of the License.
  */
 #ifndef _ASM_X86_INTEL_MID_H
 #define _ASM_X86_INTEL_MID_H
@@ -92,10 +88,16 @@ static inline bool intel_mid_has_msic(void)
 	return (intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_PENWELL);
 }
 
+extern void intel_scu_devices_create(void);
+extern void intel_scu_devices_destroy(void);
+
 #else /* !CONFIG_X86_INTEL_MID */
 
 #define intel_mid_identify_cpu()	0
 #define intel_mid_has_msic()		0
+
+static inline void intel_scu_devices_create(void) { }
+static inline void intel_scu_devices_destroy(void) { }
 
 #endif /* !CONFIG_X86_INTEL_MID */
 
@@ -118,9 +120,6 @@ extern enum intel_mid_timer_options intel_mid_timer_options;
 
 #define SFI_MTMR_MAX_NUM		8
 #define SFI_MRTC_MAX			8
-
-extern void intel_scu_devices_create(void);
-extern void intel_scu_devices_destroy(void);
 
 /* VRTC timer */
 #define MRST_VRTC_MAP_SZ		1024

@@ -1,29 +1,89 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2019 MediaTek Inc.
+// Copyright (c) 2020 MediaTek Inc.
 
 #include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
-#include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
+#include <linux/regulator/consumer.h>
+#include <media/v4l2-async.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-device.h>
+#include <media/v4l2-fwnode.h>
 #include <media/v4l2-subdev.h>
 
 #define DW9768_NAME				"dw9768"
-#define DW9768_MAX_FOCUS_POS			1023
+#define DW9768_MAX_FOCUS_POS			(1024 - 1)
 /*
  * This sets the minimum granularity for the focus positions.
  * A value of 1 gives maximum accuracy for a desired focus position
  */
 #define DW9768_FOCUS_STEPS			1
-#define DW9768_CONTROL_REG			0x02
-#define DW9768_SET_POSITION_ADDR		0x03
-#define DW9768_CONTOL_POWER_DOWN		BIT(0)
+
+/*
+ * Ring control and Power control register
+ * Bit[1] RING_EN
+ * 0: Direct mode
+ * 1: AAC mode (ringing control mode)
+ * Bit[0] PD
+ * 0: Normal operation mode
+ * 1: Power down mode
+ * DW9768 requires waiting time of Topr after PD reset takes place.
+ */
+#define DW9768_RING_PD_CONTROL_REG		0x02
+#define DW9768_PD_MODE_OFF			0x00
+#define DW9768_PD_MODE_EN			BIT(0)
 #define DW9768_AAC_MODE_EN			BIT(1)
 
-#define DW9768_CMD_DELAY			0xff
-#define DW9768_CTRL_DELAY_US			5000
+/*
+ * DW9768 separates two registers to control the VCM position.
+ * One for MSB value, another is LSB value.
+ * DAC_MSB: D[9:8] (ADD: 0x03)
+ * DAC_LSB: D[7:0] (ADD: 0x04)
+ * D[9:0] DAC data input: positive output current = D[9:0] / 1023 * 100[mA]
+ */
+#define DW9768_MSB_ADDR				0x03
+#define DW9768_LSB_ADDR				0x04
+#define DW9768_STATUS_ADDR			0x05
+
+/*
+ * AAC mode control & prescale register
+ * Bit[7:5] Namely AC[2:0], decide the VCM mode and operation time.
+ * 001 AAC2 0.48 x Tvib
+ * 010 AAC3 0.70 x Tvib
+ * 011 AAC4 0.75 x Tvib
+ * 101 AAC8 1.13 x Tvib
+ * Bit[2:0] Namely PRESC[2:0], set the internal clock dividing rate as follow.
+ * 000 2
+ * 001 1
+ * 010 1/2
+ * 011 1/4
+ * 100 8
+ * 101 4
+ */
+#define DW9768_AAC_PRESC_REG			0x06
+#define DW9768_AAC_MODE_SEL_MASK		GENMASK(7, 5)
+#define DW9768_CLOCK_PRE_SCALE_SEL_MASK		GENMASK(2, 0)
+
+/*
+ * VCM period of vibration register
+ * Bit[5:0] Defined as VCM rising periodic time (Tvib) together with PRESC[2:0]
+ * Tvib = (6.3ms + AACT[5:0] * 0.1ms) * Dividing Rate
+ * Dividing Rate is the internal clock dividing rate that is defined at
+ * PRESCALE register (ADD: 0x06)
+ */
+#define DW9768_AAC_TIME_REG			0x07
+
+/*
+ * DW9768 requires waiting time (delay time) of t_OPR after power-up,
+ * or in the case of PD reset taking place.
+ */
+#define DW9768_T_OPR_US				1000
+#define DW9768_TVIB_MS_BASE10			(64 - 1)
+#define DW9768_AAC_MODE_DEFAULT			2
+#define DW9768_AAC_TIME_DEFAULT			0x20
+#define DW9768_CLOCK_PRE_SCALE_DEFAULT		1
+
 /*
  * This acts as the minimum granularity of lens movement.
  * Keep this value power of 2, so the control steps can be
@@ -31,110 +91,134 @@
  * number of control steps.
  */
 #define DW9768_MOVE_STEPS			16
-#define DW9768_MOVE_DELAY_US			8400
-#define DW9768_STABLE_TIME_US			20000
+
+static const char * const dw9768_supply_names[] = {
+	"vin",	/* Digital I/O power */
+	"vdd",	/* Digital core power */
+};
 
 /* dw9768 device structure */
 struct dw9768 {
+	struct regulator_bulk_data supplies[ARRAY_SIZE(dw9768_supply_names)];
 	struct v4l2_ctrl_handler ctrls;
-	struct v4l2_subdev sd;
 	struct v4l2_ctrl *focus;
-	struct regulator *vin;
-	struct regulator *vdd;
+	struct v4l2_subdev sd;
+
+	u32 aac_mode;
+	u32 aac_timing;
+	u32 clock_presc;
+	u32 move_delay_us;
 };
 
-static inline struct dw9768 *to_dw9768_vcm(struct v4l2_ctrl *ctrl)
-{
-	return container_of(ctrl->handler, struct dw9768, ctrls);
-}
-
-static inline struct dw9768 *sd_to_dw9768_vcm(struct v4l2_subdev *subdev)
+static inline struct dw9768 *sd_to_dw9768(struct v4l2_subdev *subdev)
 {
 	return container_of(subdev, struct dw9768, sd);
 }
 
 struct regval_list {
-	unsigned char reg_num;
-	unsigned char value;
+	u8 reg_num;
+	u8 value;
 };
 
-static struct regval_list dw9768_init_regs[] = {
-	{DW9768_CONTROL_REG, DW9768_AAC_MODE_EN},
-	{DW9768_CMD_DELAY, DW9768_CMD_DELAY},
-	{0x06, 0x41},
-	{0x07, 0x39},
-	{DW9768_CMD_DELAY, DW9768_CMD_DELAY},
+struct dw9768_aac_mode_ot_multi {
+	u32 aac_mode_enum;
+	u32 ot_multi_base100;
 };
 
-static int dw9768_write_smbus(struct dw9768 *dw9768, unsigned char reg,
-			      unsigned char value)
+struct dw9768_clk_presc_dividing_rate {
+	u32 clk_presc_enum;
+	u32 dividing_rate_base100;
+};
+
+static const struct dw9768_aac_mode_ot_multi aac_mode_ot_multi[] = {
+	{1,  48},
+	{2,  70},
+	{3,  75},
+	{5, 113},
+};
+
+static const struct dw9768_clk_presc_dividing_rate presc_dividing_rate[] = {
+	{0, 200},
+	{1, 100},
+	{2,  50},
+	{3,  25},
+	{4, 800},
+	{5, 400},
+};
+
+static u32 dw9768_find_ot_multi(u32 aac_mode_param)
 {
-	struct i2c_client *client = v4l2_get_subdevdata(&dw9768->sd);
-	int ret = 0;
+	u32 cur_ot_multi_base100 = 70;
+	unsigned int i;
 
-	if (reg == DW9768_CMD_DELAY  && value == DW9768_CMD_DELAY)
-		usleep_range(DW9768_CTRL_DELAY_US,
-			     DW9768_CTRL_DELAY_US + 100);
-	else
-		ret = i2c_smbus_write_byte_data(client, reg, value);
-	return ret;
+	for (i = 0; i < ARRAY_SIZE(aac_mode_ot_multi); i++) {
+		if (aac_mode_ot_multi[i].aac_mode_enum == aac_mode_param) {
+			cur_ot_multi_base100 =
+				aac_mode_ot_multi[i].ot_multi_base100;
+		}
+	}
+
+	return cur_ot_multi_base100;
 }
 
-static int dw9768_write_array(struct dw9768 *dw9768, struct regval_list *vals,
-			      u32 len)
+static u32 dw9768_find_dividing_rate(u32 presc_param)
 {
+	u32 cur_clk_dividing_rate_base100 = 100;
 	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(presc_dividing_rate); i++) {
+		if (presc_dividing_rate[i].clk_presc_enum == presc_param) {
+			cur_clk_dividing_rate_base100 =
+				presc_dividing_rate[i].dividing_rate_base100;
+		}
+	}
+
+	return cur_clk_dividing_rate_base100;
+}
+
+/*
+ * DW9768_AAC_PRESC_REG & DW9768_AAC_TIME_REG determine VCM operation time.
+ * For current VCM mode: AAC3, Operation Time would be 0.70 x Tvib.
+ * Tvib = (6.3ms + AACT[5:0] * 0.1MS) * Dividing Rate.
+ * Below is calculation of the operation delay for each step.
+ */
+static inline u32 dw9768_cal_move_delay(u32 aac_mode_param, u32 presc_param,
+					u32 aac_timing_param)
+{
+	u32 Tvib_us;
+	u32 ot_multi_base100;
+	u32 clk_dividing_rate_base100;
+
+	ot_multi_base100 = dw9768_find_ot_multi(aac_mode_param);
+
+	clk_dividing_rate_base100 = dw9768_find_dividing_rate(presc_param);
+
+	Tvib_us = (DW9768_TVIB_MS_BASE10 + aac_timing_param) *
+		  clk_dividing_rate_base100;
+
+	return Tvib_us * ot_multi_base100 / 100;
+}
+
+static int dw9768_mod_reg(struct dw9768 *dw9768, u8 reg, u8 mask, u8 val)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(&dw9768->sd);
 	int ret;
 
-	for (i = 0; i < len; i++) {
-		ret = dw9768_write_smbus(dw9768, vals[i].reg_num,
-					 vals[i].value);
-		if (ret < 0)
-			return ret;
-	}
-	return 0;
-}
-
-static int dw9768_set_position(struct dw9768 *dw9768, u16 val)
-{
-	struct i2c_client *client = v4l2_get_subdevdata(&dw9768->sd);
-
-	return i2c_smbus_write_word_data(client, DW9768_SET_POSITION_ADDR,
-					 swab16(val));
-}
-
-static int dw9768_release(struct dw9768 *dw9768)
-{
-	struct i2c_client *client = v4l2_get_subdevdata(&dw9768->sd);
-	int ret, val;
-
-	for (val = round_down(dw9768->focus->val, DW9768_MOVE_STEPS);
-	     val >= 0; val -= DW9768_MOVE_STEPS) {
-		ret = dw9768_set_position(dw9768, val);
-		if (ret) {
-			dev_err(&client->dev, "%s I2C failure: %d",
-				__func__, ret);
-			return ret;
-		}
-		usleep_range(DW9768_MOVE_DELAY_US,
-			     DW9768_MOVE_DELAY_US + 1000);
-	}
-
-	/*
-	 * Wait for the motor to stabilize after the last movement
-	 * to prevent the motor from shaking.
-	 */
-	usleep_range(DW9768_STABLE_TIME_US - DW9768_MOVE_DELAY_US,
-		     DW9768_STABLE_TIME_US - DW9768_MOVE_DELAY_US + 1000);
-
-	ret = i2c_smbus_write_byte_data(client, DW9768_CONTROL_REG,
-					DW9768_CONTOL_POWER_DOWN);
-	if (ret)
+	ret = i2c_smbus_read_byte_data(client, reg);
+	if (ret < 0)
 		return ret;
 
-	usleep_range(DW9768_CTRL_DELAY_US, DW9768_CTRL_DELAY_US + 100);
+	val = ((unsigned char)ret & ~mask) | (val & mask);
 
-	return 0;
+	return i2c_smbus_write_byte_data(client, reg, val);
+}
+
+static int dw9768_set_dac(struct dw9768 *dw9768, u16 val)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(&dw9768->sd);
+
+	/* Write VCM position to registers */
+	return i2c_smbus_write_word_swapped(client, DW9768_MSB_ADDR, val);
 }
 
 static int dw9768_init(struct dw9768 *dw9768)
@@ -142,86 +226,151 @@ static int dw9768_init(struct dw9768 *dw9768)
 	struct i2c_client *client = v4l2_get_subdevdata(&dw9768->sd);
 	int ret, val;
 
-	ret = dw9768_write_array(dw9768, dw9768_init_regs,
-				 ARRAY_SIZE(dw9768_init_regs));
-	if (ret)
+	/* Reset DW9768_RING_PD_CONTROL_REG to default status 0x00 */
+	ret = i2c_smbus_write_byte_data(client, DW9768_RING_PD_CONTROL_REG,
+					DW9768_PD_MODE_OFF);
+	if (ret < 0)
 		return ret;
+
+	/*
+	 * DW9769 requires waiting delay time of t_OPR
+	 * after PD reset takes place.
+	 */
+	usleep_range(DW9768_T_OPR_US, DW9768_T_OPR_US + 100);
+
+	/* Set DW9768_RING_PD_CONTROL_REG to DW9768_AAC_MODE_EN(0x01) */
+	ret = i2c_smbus_write_byte_data(client, DW9768_RING_PD_CONTROL_REG,
+					DW9768_AAC_MODE_EN);
+	if (ret < 0)
+		return ret;
+
+	/* Set AAC mode */
+	ret = dw9768_mod_reg(dw9768, DW9768_AAC_PRESC_REG,
+			     DW9768_AAC_MODE_SEL_MASK,
+			     dw9768->aac_mode << 5);
+	if (ret < 0)
+		return ret;
+
+	/* Set clock presc */
+	if (dw9768->clock_presc != DW9768_CLOCK_PRE_SCALE_DEFAULT) {
+		ret = dw9768_mod_reg(dw9768, DW9768_AAC_PRESC_REG,
+				     DW9768_CLOCK_PRE_SCALE_SEL_MASK,
+				     dw9768->clock_presc);
+		if (ret < 0)
+			return ret;
+	}
+
+	/* Set AAC Timing */
+	if (dw9768->aac_timing != DW9768_AAC_TIME_DEFAULT) {
+		ret = i2c_smbus_write_byte_data(client, DW9768_AAC_TIME_REG,
+						dw9768->aac_timing);
+		if (ret < 0)
+			return ret;
+	}
 
 	for (val = dw9768->focus->val % DW9768_MOVE_STEPS;
 	     val <= dw9768->focus->val;
 	     val += DW9768_MOVE_STEPS) {
-		ret = dw9768_set_position(dw9768, val);
+		ret = dw9768_set_dac(dw9768, val);
 		if (ret) {
-			dev_err(&client->dev, "%s I2C failure: %d",
-				__func__, ret);
+			dev_err(&client->dev, "I2C failure: %d", ret);
 			return ret;
 		}
-		usleep_range(DW9768_MOVE_DELAY_US,
-			     DW9768_MOVE_DELAY_US + 1000);
+		usleep_range(dw9768->move_delay_us,
+			     dw9768->move_delay_us + 1000);
 	}
 
 	return 0;
 }
 
-/* Power handling */
-static int dw9768_power_off(struct dw9768 *dw9768)
+static int dw9768_release(struct dw9768 *dw9768)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&dw9768->sd);
-	int ret;
+	int ret, val;
 
-	ret = dw9768_release(dw9768);
-	if (ret)
-		dev_err(&client->dev, "dw9768 release failed!\n");
+	val = round_down(dw9768->focus->val, DW9768_MOVE_STEPS);
+	for ( ; val >= 0; val -= DW9768_MOVE_STEPS) {
+		ret = dw9768_set_dac(dw9768, val);
+		if (ret) {
+			dev_err(&client->dev, "I2C write fail: %d", ret);
+			return ret;
+		}
+		usleep_range(dw9768->move_delay_us,
+			     dw9768->move_delay_us + 1000);
+	}
 
-	ret = regulator_disable(dw9768->vin);
-	if (ret)
-		return ret;
-
-	return regulator_disable(dw9768->vdd);
-}
-
-static int dw9768_power_on(struct dw9768 *dw9768)
-{
-	int ret;
-
-	ret = regulator_enable(dw9768->vin);
-	if (ret < 0)
-		return ret;
-
-	ret = regulator_enable(dw9768->vdd);
+	ret = i2c_smbus_write_byte_data(client, DW9768_RING_PD_CONTROL_REG,
+					DW9768_PD_MODE_EN);
 	if (ret < 0)
 		return ret;
 
 	/*
-	 * TODO(b/139784289): Confirm hardware requirements and adjust/remove
-	 * the delay.
+	 * DW9769 requires waiting delay time of t_OPR
+	 * after PD reset takes place.
 	 */
-	usleep_range(DW9768_CTRL_DELAY_US, DW9768_CTRL_DELAY_US + 100);
+	usleep_range(DW9768_T_OPR_US, DW9768_T_OPR_US + 100);
+
+	return 0;
+}
+
+static int dw9768_runtime_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct dw9768 *dw9768 = sd_to_dw9768(sd);
+
+	dw9768_release(dw9768);
+	regulator_bulk_disable(ARRAY_SIZE(dw9768_supply_names),
+			       dw9768->supplies);
+
+	return 0;
+}
+
+static int dw9768_runtime_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+	struct dw9768 *dw9768 = sd_to_dw9768(sd);
+	int ret;
+
+	ret = regulator_bulk_enable(ARRAY_SIZE(dw9768_supply_names),
+				    dw9768->supplies);
+	if (ret < 0) {
+		dev_err(dev, "failed to enable regulators\n");
+		return ret;
+	}
+
+	/*
+	 * The datasheet refers to t_OPR that needs to be waited before sending
+	 * I2C commands after power-up.
+	 */
+	usleep_range(DW9768_T_OPR_US, DW9768_T_OPR_US + 100);
 
 	ret = dw9768_init(dw9768);
 	if (ret < 0)
-		goto fail;
+		goto disable_regulator;
 
 	return 0;
 
-fail:
-	regulator_disable(dw9768->vin);
-	regulator_disable(dw9768->vdd);
+disable_regulator:
+	regulator_bulk_disable(ARRAY_SIZE(dw9768_supply_names),
+			       dw9768->supplies);
 
 	return ret;
 }
 
 static int dw9768_set_ctrl(struct v4l2_ctrl *ctrl)
 {
-	struct dw9768 *dw9768 = to_dw9768_vcm(ctrl);
+	struct dw9768 *dw9768 = container_of(ctrl->handler,
+					     struct dw9768, ctrls);
 
 	if (ctrl->id == V4L2_CID_FOCUS_ABSOLUTE)
-		return dw9768_set_position(dw9768, ctrl->val);
+		return dw9768_set_dac(dw9768, ctrl->val);
 
 	return 0;
 }
 
-static const struct v4l2_ctrl_ops dw9768_vcm_ctrl_ops = {
+static const struct v4l2_ctrl_ops dw9768_ctrl_ops = {
 	.s_ctrl = dw9768_set_ctrl,
 };
 
@@ -252,22 +401,16 @@ static const struct v4l2_subdev_internal_ops dw9768_int_ops = {
 
 static const struct v4l2_subdev_ops dw9768_ops = { };
 
-static void dw9768_subdev_cleanup(struct dw9768 *dw9768)
-{
-	v4l2_async_unregister_subdev(&dw9768->sd);
-	v4l2_ctrl_handler_free(&dw9768->ctrls);
-	media_entity_cleanup(&dw9768->sd.entity);
-}
-
 static int dw9768_init_controls(struct dw9768 *dw9768)
 {
 	struct v4l2_ctrl_handler *hdl = &dw9768->ctrls;
-	const struct v4l2_ctrl_ops *ops = &dw9768_vcm_ctrl_ops;
+	const struct v4l2_ctrl_ops *ops = &dw9768_ctrl_ops;
 
 	v4l2_ctrl_handler_init(hdl, 1);
 
-	dw9768->focus = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_FOCUS_ABSOLUTE,
-			  0, DW9768_MAX_FOCUS_POS, DW9768_FOCUS_STEPS, 0);
+	dw9768->focus = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_FOCUS_ABSOLUTE, 0,
+					  DW9768_MAX_FOCUS_POS,
+					  DW9768_FOCUS_STEPS, 0);
 
 	if (hdl->error)
 		return hdl->error;
@@ -281,103 +424,118 @@ static int dw9768_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
 	struct dw9768 *dw9768;
+	unsigned int i;
 	int ret;
 
 	dw9768 = devm_kzalloc(dev, sizeof(*dw9768), GFP_KERNEL);
 	if (!dw9768)
 		return -ENOMEM;
 
-	dw9768->vin = devm_regulator_get(dev, "vin");
-	if (IS_ERR(dw9768->vin)) {
-		ret = PTR_ERR(dw9768->vin);
-		if (ret != -EPROBE_DEFER)
-			dev_err(dev, "cannot get vin regulator\n");
-		return ret;
-	}
-
-	dw9768->vdd = devm_regulator_get(dev, "vdd");
-	if (IS_ERR(dw9768->vdd)) {
-		ret = PTR_ERR(dw9768->vdd);
-		if (ret != -EPROBE_DEFER)
-			dev_err(dev, "cannot get vdd regulator\n");
-		return ret;
-	}
-
+	/* Initialize subdev */
 	v4l2_i2c_subdev_init(&dw9768->sd, client, &dw9768_ops);
+
+	dw9768->aac_mode = DW9768_AAC_MODE_DEFAULT;
+	dw9768->aac_timing = DW9768_AAC_TIME_DEFAULT;
+	dw9768->clock_presc = DW9768_CLOCK_PRE_SCALE_DEFAULT;
+
+	/* Optional indication of AAC mode select */
+	fwnode_property_read_u32(dev_fwnode(dev), "dongwoon,aac-mode",
+				 &dw9768->aac_mode);
+
+	/* Optional indication of clock pre-scale select */
+	fwnode_property_read_u32(dev_fwnode(dev), "dongwoon,clock-presc",
+				 &dw9768->clock_presc);
+
+	/* Optional indication of AAC Timing */
+	fwnode_property_read_u32(dev_fwnode(dev), "dongwoon,aac-timing",
+				 &dw9768->aac_timing);
+
+	dw9768->move_delay_us = dw9768_cal_move_delay(dw9768->aac_mode,
+						      dw9768->clock_presc,
+						      dw9768->aac_timing);
+
+	for (i = 0; i < ARRAY_SIZE(dw9768_supply_names); i++)
+		dw9768->supplies[i].supply = dw9768_supply_names[i];
+
+	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(dw9768_supply_names),
+				      dw9768->supplies);
+	if (ret) {
+		dev_err(dev, "failed to get regulators\n");
+		return ret;
+	}
+
+	/* Initialize controls */
+	ret = dw9768_init_controls(dw9768);
+	if (ret)
+		goto err_free_handler;
+
+	/* Initialize subdev */
 	dw9768->sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	dw9768->sd.internal_ops = &dw9768_int_ops;
 
-	ret = dw9768_init_controls(dw9768);
-	if (ret)
-		goto err_cleanup;
-
 	ret = media_entity_pads_init(&dw9768->sd.entity, 0, NULL);
 	if (ret < 0)
-		goto err_cleanup;
+		goto err_free_handler;
 
 	dw9768->sd.entity.function = MEDIA_ENT_F_LENS;
 
-	ret = v4l2_async_register_subdev(&dw9768->sd);
-	if (ret < 0)
-		goto err_cleanup;
-
 	pm_runtime_enable(dev);
+	if (!pm_runtime_enabled(dev)) {
+		ret = dw9768_runtime_resume(dev);
+		if (ret < 0) {
+			dev_err(dev, "failed to power on: %d\n", ret);
+			goto err_clean_entity;
+		}
+	}
+
+	ret = v4l2_async_register_subdev(&dw9768->sd);
+	if (ret < 0) {
+		dev_err(dev, "failed to register V4L2 subdev: %d", ret);
+		goto err_power_off;
+	}
 
 	return 0;
 
-err_cleanup:
-	dw9768_subdev_cleanup(dw9768);
+err_power_off:
+	if (pm_runtime_enabled(dev))
+		pm_runtime_disable(dev);
+	else
+		dw9768_runtime_suspend(dev);
+err_clean_entity:
+	media_entity_cleanup(&dw9768->sd.entity);
+err_free_handler:
+	v4l2_ctrl_handler_free(&dw9768->ctrls);
+
 	return ret;
 }
 
 static int dw9768_remove(struct i2c_client *client)
 {
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
-	struct dw9768 *dw9768 = sd_to_dw9768_vcm(sd);
+	struct dw9768 *dw9768 = sd_to_dw9768(sd);
 
-	dw9768_subdev_cleanup(dw9768);
+	v4l2_async_unregister_subdev(&dw9768->sd);
+	v4l2_ctrl_handler_free(&dw9768->ctrls);
+	media_entity_cleanup(&dw9768->sd.entity);
 	pm_runtime_disable(&client->dev);
 	if (!pm_runtime_status_suspended(&client->dev))
-		dw9768_power_off(dw9768);
+		dw9768_runtime_suspend(&client->dev);
 	pm_runtime_set_suspended(&client->dev);
 
 	return 0;
 }
 
-static int __maybe_unused dw9768_vcm_suspend(struct device *dev)
-{
-	struct i2c_client *client = to_i2c_client(dev);
-	struct v4l2_subdev *sd = i2c_get_clientdata(client);
-	struct dw9768 *dw9768 = sd_to_dw9768_vcm(sd);
-
-	return dw9768_power_off(dw9768);
-}
-
-static int __maybe_unused dw9768_vcm_resume(struct device *dev)
-{
-	struct i2c_client *client = to_i2c_client(dev);
-	struct v4l2_subdev *sd = i2c_get_clientdata(client);
-	struct dw9768 *dw9768 = sd_to_dw9768_vcm(sd);
-
-	return dw9768_power_on(dw9768);
-}
-
-static const struct i2c_device_id dw9768_id_table[] = {
-	{ DW9768_NAME, 0 },
-	{ },
-};
-MODULE_DEVICE_TABLE(i2c, dw9768_id_table);
-
 static const struct of_device_id dw9768_of_table[] = {
 	{ .compatible = "dongwoon,dw9768" },
-	{ },
+	{ .compatible = "giantec,gt9769" },
+	{}
 };
 MODULE_DEVICE_TABLE(of, dw9768_of_table);
 
 static const struct dev_pm_ops dw9768_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
 				pm_runtime_force_resume)
-	SET_RUNTIME_PM_OPS(dw9768_vcm_suspend, dw9768_vcm_resume, NULL)
+	SET_RUNTIME_PM_OPS(dw9768_runtime_suspend, dw9768_runtime_resume, NULL)
 };
 
 static struct i2c_driver dw9768_i2c_driver = {
@@ -388,9 +546,7 @@ static struct i2c_driver dw9768_i2c_driver = {
 	},
 	.probe_new  = dw9768_probe,
 	.remove = dw9768_remove,
-	.id_table = dw9768_id_table,
 };
-
 module_i2c_driver(dw9768_i2c_driver);
 
 MODULE_AUTHOR("Dongchun Zhu <dongchun.zhu@mediatek.com>");

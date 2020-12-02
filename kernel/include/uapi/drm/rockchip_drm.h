@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 
 /*
  * Copyright (c) Fuzhou Rockchip Electronics Co.Ltd
@@ -11,7 +11,12 @@
 #ifndef _UAPI_ROCKCHIP_DRM_H
 #define _UAPI_ROCKCHIP_DRM_H
 
+#ifndef __KERNEL__
+#include <stdint.h>
+#endif
+
 #include <drm/drm.h>
+#include <linux/types.h>
 
 /**
  * User-desired buffer creation information structure.

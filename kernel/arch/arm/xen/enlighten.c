@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 #include <xen/xen.h>
 #include <xen/events.h>
 #include <xen/grant_table.h>
@@ -14,7 +15,6 @@
 #include <xen/xen-ops.h>
 #include <asm/xen/hypervisor.h>
 #include <asm/xen/hypercall.h>
-#include <asm/xen/xen-ops.h>
 #include <asm/system_misc.h>
 #include <asm/efi.h>
 #include <linux/interrupt.h>
@@ -62,46 +62,12 @@ static __read_mostly unsigned int xen_events_irq;
 uint32_t xen_start_flags;
 EXPORT_SYMBOL(xen_start_flags);
 
-int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
-			       unsigned long addr,
-			       xen_pfn_t *gfn, int nr,
-			       int *err_ptr, pgprot_t prot,
-			       unsigned domid,
-			       struct page **pages)
-{
-	return xen_xlate_remap_gfn_array(vma, addr, gfn, nr, err_ptr,
-					 prot, domid, pages);
-}
-EXPORT_SYMBOL_GPL(xen_remap_domain_gfn_array);
-
-/* Not used by XENFEAT_auto_translated guests. */
-int xen_remap_domain_gfn_range(struct vm_area_struct *vma,
-                              unsigned long addr,
-                              xen_pfn_t gfn, int nr,
-                              pgprot_t prot, unsigned domid,
-                              struct page **pages)
-{
-	return -ENOSYS;
-}
-EXPORT_SYMBOL_GPL(xen_remap_domain_gfn_range);
-
 int xen_unmap_domain_gfn_range(struct vm_area_struct *vma,
 			       int nr, struct page **pages)
 {
 	return xen_xlate_unmap_gfn_range(vma, nr, pages);
 }
 EXPORT_SYMBOL_GPL(xen_unmap_domain_gfn_range);
-
-/* Not used by XENFEAT_auto_translated guests. */
-int xen_remap_domain_mfn_array(struct vm_area_struct *vma,
-			       unsigned long addr,
-			       xen_pfn_t *mfn, int nr,
-			       int *err_ptr, pgprot_t prot,
-			       unsigned int domid, struct page **pages)
-{
-	return -ENOSYS;
-}
-EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_array);
 
 static void xen_read_wallclock(struct timespec64 *ts)
 {
@@ -470,7 +436,7 @@ EXPORT_SYMBOL_GPL(HYPERVISOR_memory_op);
 EXPORT_SYMBOL_GPL(HYPERVISOR_physdev_op);
 EXPORT_SYMBOL_GPL(HYPERVISOR_vcpu_op);
 EXPORT_SYMBOL_GPL(HYPERVISOR_tmem_op);
-EXPORT_SYMBOL_GPL(HYPERVISOR_platform_op);
+EXPORT_SYMBOL_GPL(HYPERVISOR_platform_op_raw);
 EXPORT_SYMBOL_GPL(HYPERVISOR_multicall);
 EXPORT_SYMBOL_GPL(HYPERVISOR_vm_assist);
 EXPORT_SYMBOL_GPL(HYPERVISOR_dm_op);

@@ -378,35 +378,24 @@
 
 	.macro	invoke_syscall, table, nr, tmp, ret, reload=0
 #ifdef CONFIG_CPU_SPECTRE
-#ifdef CONFIG_ALT_SYSCALL
-	ldr	\tmp, [tsk, #TI_NR_SYSCALLS]
-	cmp	\nr, \tmp			@ check per-thread upper syscall limit
-	movlo	\tmp, \nr
-#else
 	mov	\tmp, \nr
 	cmp	\tmp, #NR_syscalls		@ check upper syscall limit
-#endif
 	movcs	\tmp, #0
 	csdb
 	badr	lr, \ret			@ return address
 	.if	\reload
 	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
-	ldmccia	r1, {r0 - r6}			@ reload r0-r6
-	stmccia	sp, {r4, r5}			@ update stack arguments
+	ldmiacc	r1, {r0 - r6}			@ reload r0-r6
+	stmiacc	sp, {r4, r5}			@ update stack arguments
 	.endif
 	ldrcc	pc, [\table, \tmp, lsl #2]	@ call sys_* routine
 #else
-#ifdef CONFIG_ALT_SYSCALL
-	ldr     \tmp, [tsk, #TI_NR_SYSCALLS]
-	cmp     \nr, \tmp			@ check per-thread upper syscall limit
-#else
 	cmp	\nr, #NR_syscalls		@ check upper syscall limit
-#endif
 	badr	lr, \ret			@ return address
 	.if	\reload
 	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
-	ldmccia	r1, {r0 - r6}			@ reload r0-r6
-	stmccia	sp, {r4, r5}			@ update stack arguments
+	ldmiacc	r1, {r0 - r6}			@ reload r0-r6
+	stmiacc	sp, {r4, r5}			@ update stack arguments
 	.endif
 	ldrcc	pc, [\table, \nr, lsl #2]	@ call sys_* routine
 #endif

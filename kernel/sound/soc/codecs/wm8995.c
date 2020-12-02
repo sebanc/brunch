@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * wm8995.c  --  WM8995 ALSA SoC Audio driver
  *
@@ -6,10 +7,6 @@
  * Author: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
  *
  * Based on wm8994.c and wm_hubs.c by Mark Brown
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/module.h>
@@ -492,7 +489,7 @@ static void wm8995_update_class_w(struct snd_soc_component *component)
 	int reg, reg_r;
 
 	/* We also need the same setting for L/R and only one path */
-	reg = snd_soc_component_read32(component, WM8995_DAC1_LEFT_MIXER_ROUTING);
+	reg = snd_soc_component_read(component, WM8995_DAC1_LEFT_MIXER_ROUTING);
 	switch (reg) {
 	case WM8995_AIF2DACL_TO_DAC1L:
 		dev_dbg(component->dev, "Class W source AIF2DAC\n");
@@ -512,7 +509,7 @@ static void wm8995_update_class_w(struct snd_soc_component *component)
 		break;
 	}
 
-	reg_r = snd_soc_component_read32(component, WM8995_DAC1_RIGHT_MIXER_ROUTING);
+	reg_r = snd_soc_component_read(component, WM8995_DAC1_RIGHT_MIXER_ROUTING);
 	if (reg_r != reg) {
 		dev_dbg(component->dev, "Left and right DAC mixers different\n");
 		enable = 0;
@@ -538,7 +535,7 @@ static int check_clk_sys(struct snd_soc_dapm_widget *source,
 	unsigned int reg;
 	const char *clk;
 
-	reg = snd_soc_component_read32(component, WM8995_CLOCKING_1);
+	reg = snd_soc_component_read(component, WM8995_CLOCKING_1);
 	/* Check what we're currently using for CLK_SYS */
 	if (reg & WM8995_SYSCLK_SRC)
 		clk = "AIF2CLK";
@@ -599,7 +596,7 @@ static void dc_servo_cmd(struct snd_soc_component *component,
 	snd_soc_component_write(component, reg, val);
 	while (timeout--) {
 		msleep(10);
-		val = snd_soc_component_read32(component, WM8995_DC_SERVO_READBACK_0);
+		val = snd_soc_component_read(component, WM8995_DC_SERVO_READBACK_0);
 		if ((val & mask) == mask)
 			return;
 	}
@@ -613,7 +610,7 @@ static int hp_event(struct snd_soc_dapm_widget *w,
 	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
 	unsigned int reg;
 
-	reg = snd_soc_component_read32(component, WM8995_ANALOGUE_HP_1);
+	reg = snd_soc_component_read(component, WM8995_ANALOGUE_HP_1);
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
@@ -1420,7 +1417,7 @@ static bool wm8995_volatile(struct device *dev, unsigned int reg)
 	}
 }
 
-static int wm8995_aif_mute(struct snd_soc_dai *dai, int mute)
+static int wm8995_aif_mute(struct snd_soc_dai *dai, int mute, int direction)
 {
 	struct snd_soc_component *component = dai->component;
 	int mute_reg;
@@ -1807,10 +1804,10 @@ static int wm8995_set_fll(struct snd_soc_dai *dai, int id,
 	component = dai->component;
 	wm8995 = snd_soc_component_get_drvdata(component);
 
-	aif1 = snd_soc_component_read32(component, WM8995_AIF1_CLOCKING_1)
+	aif1 = snd_soc_component_read(component, WM8995_AIF1_CLOCKING_1)
 	       & WM8995_AIF1CLK_ENA;
 
-	aif2 = snd_soc_component_read32(component, WM8995_AIF2_CLOCKING_1)
+	aif2 = snd_soc_component_read(component, WM8995_AIF2_CLOCKING_1)
 	       & WM8995_AIF2CLK_ENA;
 
 	switch (id) {
@@ -2043,7 +2040,7 @@ static int wm8995_probe(struct snd_soc_component *component)
 		return ret;
 	}
 
-	ret = snd_soc_component_read32(component, WM8995_SOFTWARE_RESET);
+	ret = snd_soc_component_read(component, WM8995_SOFTWARE_RESET);
 	if (ret < 0) {
 		dev_err(component->dev, "Failed to read device ID: %d\n", ret);
 		goto err_reg_enable;
@@ -2097,18 +2094,20 @@ static const struct snd_soc_dai_ops wm8995_aif1_dai_ops = {
 	.set_sysclk = wm8995_set_dai_sysclk,
 	.set_fmt = wm8995_set_dai_fmt,
 	.hw_params = wm8995_hw_params,
-	.digital_mute = wm8995_aif_mute,
+	.mute_stream = wm8995_aif_mute,
 	.set_pll = wm8995_set_fll,
 	.set_tristate = wm8995_set_tristate,
+	.no_capture_mute = 1,
 };
 
 static const struct snd_soc_dai_ops wm8995_aif2_dai_ops = {
 	.set_sysclk = wm8995_set_dai_sysclk,
 	.set_fmt = wm8995_set_dai_fmt,
 	.hw_params = wm8995_hw_params,
-	.digital_mute = wm8995_aif_mute,
+	.mute_stream = wm8995_aif_mute,
 	.set_pll = wm8995_set_fll,
 	.set_tristate = wm8995_set_tristate,
+	.no_capture_mute = 1,
 };
 
 static const struct snd_soc_dai_ops wm8995_aif3_dai_ops = {

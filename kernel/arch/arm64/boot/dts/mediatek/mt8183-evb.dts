@@ -6,7 +6,6 @@
  */
 
 /dts-v1/;
-#include <dt-bindings/gpio/gpio.h>
 #include "mt8183.dtsi"
 #include "mt6358.dtsi"
 
@@ -26,92 +25,10 @@
 	chosen {
 		stdout-path = "serial0:921600n8";
 	};
-
-	reserved-memory {
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
-		reserve-memory-vpu_share {
-			compatible = "mediatek,reserve-memory-vpu_share";
-			no-map;
-			size = <0 0x01400000>; /* 20 MB share mem size */
-			alignment = <0 0x1000000>;
-			alloc-ranges = <0 0x50000000 0 0x10000000>;
-		};
-		scp_mem_reserved: scp_mem_region {
-			compatible = "shared-dma-pool";
-			reg = <0 0x50000000 0 0x2900000>;
-			no-map;
-		};
-	};
-
-	usb_vbus: regulator@0 {
-		compatible = "regulator-fixed";
-		regulator-name = "p0_vbus";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		gpio = <&pio 42 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-		regulator-always-on;
-	};
 };
 
 &auxadc {
 	status = "okay";
-};
-
-&cci {
-	proc-supply = <&mt6358_vproc12_reg>;
-};
-
-&cpu0 {
-	proc-supply = <&mt6358_vproc12_reg>;
-};
-
-&cpu1 {
-	proc-supply = <&mt6358_vproc12_reg>;
-};
-
-&cpu2 {
-	proc-supply = <&mt6358_vproc12_reg>;
-};
-
-&cpu3 {
-	proc-supply = <&mt6358_vproc12_reg>;
-};
-
-&cpu4 {
-	proc-supply = <&mt6358_vproc11_reg>;
-};
-
-&cpu5 {
-	proc-supply = <&mt6358_vproc11_reg>;
-};
-
-&cpu6 {
-	proc-supply = <&mt6358_vproc11_reg>;
-};
-
-&cpu7 {
-	proc-supply = <&mt6358_vproc11_reg>;
-};
-
-&gpu {
-	supply-names = "mali","mali_sram";
-	mali-supply = <&mt6358_vgpu_reg>;
-	mali_sram-supply = <&mt6358_vsram_gpu_reg>;
-	operating-points-v2 = <&gpu_opp_table>;
-	power_model@0 {
-		compatible = "arm,mali-simple-power-model";
-		static-coefficient = <2427750>;
-		dynamic-coefficient = <4687>;
-		ts = <20000 2000 (-20) 2>;
-		thermal-zone = "cpu_thermal";
-	};
-	power_model@1 {
-		compatible = "arm,mali-g72-power-model";
-		scale = <15000>;
-	};
 };
 
 &i2c0 {
@@ -252,6 +169,16 @@
 		};
 	};
 
+	spi_pins_0: spi0{
+		pins_spi{
+			pinmux = <PINMUX_GPIO85__FUNC_SPI0_MI>,
+				 <PINMUX_GPIO86__FUNC_SPI0_CSB>,
+				 <PINMUX_GPIO87__FUNC_SPI0_MO>,
+				 <PINMUX_GPIO88__FUNC_SPI0_CLK>;
+			bias-disable;
+		};
+	};
+
 	mmc0_pins_default: mmc0default {
 		pins_cmd_dat {
 			pinmux = <PINMUX_GPIO123__FUNC_MSDC0_DAT0>,
@@ -357,16 +284,6 @@
 		};
 	};
 
-	spi_pins_0: spi0{
-		pins_spi{
-			pinmux = <PINMUX_GPIO85__FUNC_SPI0_MI>,
-				 <PINMUX_GPIO86__FUNC_SPI0_CSB>,
-				 <PINMUX_GPIO87__FUNC_SPI0_MO>,
-				 <PINMUX_GPIO88__FUNC_SPI0_CLK>;
-			bias-disable;
-		};
-	};
-
 	spi_pins_1: spi1{
 		pins_spi{
 			pinmux = <PINMUX_GPIO161__FUNC_SPI1_A_MI>,
@@ -459,33 +376,6 @@
 	mediatek,pad-select = <0>;
 	status = "okay";
 
-};
-
-&ssusb {
-	vusb33-supply = <&mt6358_vusb_reg>;
-	dr_mode = "host";
-	wakeup-source;
-	status = "okay";
-};
-
-&svs_cpu_little {
-	vcpu-little-supply = <&mt6358_vproc12_reg>;
-};
-
-&svs_cpu_big {
-	vcpu-big-supply = <&mt6358_vproc11_reg>;
-};
-
-&svs_cci {
-	vcci-supply = <&mt6358_vproc12_reg>;
-};
-
-&svs_gpu {
-	vgpu-spply = <&mt6358_vgpu_reg>;
-};
-
-&usb_host {
-	status = "okay";
 };
 
 &uart0 {

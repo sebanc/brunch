@@ -76,7 +76,6 @@ struct bus_format {
 
 /*
  * struct vpfe_fmt - VPFE media bus format information
- * @name: V4L2 format description
  * @code: V4L2 media bus format code
  * @shifted: V4L2 media bus format code for the same pixel layout but
  *	shifted to be 8 bits per pixel. =0 if format is not shiftable.
@@ -86,7 +85,6 @@ struct bus_format {
  * @supported: Indicates format supported by subdev
  */
 struct vpfe_fmt {
-	const char *name;
 	u32 fourcc;
 	u32 code;
 	struct bus_format l;
@@ -97,7 +95,6 @@ struct vpfe_fmt {
 
 static struct vpfe_fmt formats[] = {
 	{
-		.name		= "YUV 4:2:2 packed, YCbYCr",
 		.fourcc		= V4L2_PIX_FMT_YUYV,
 		.code		= MEDIA_BUS_FMT_YUYV8_2X8,
 		.l.width	= 10,
@@ -106,7 +103,6 @@ static struct vpfe_fmt formats[] = {
 		.s.bpp		= 2,
 		.supported	= false,
 	}, {
-		.name		= "YUV 4:2:2 packed, CbYCrY",
 		.fourcc		= V4L2_PIX_FMT_UYVY,
 		.code		= MEDIA_BUS_FMT_UYVY8_2X8,
 		.l.width	= 10,
@@ -115,7 +111,6 @@ static struct vpfe_fmt formats[] = {
 		.s.bpp		= 2,
 		.supported	= false,
 	}, {
-		.name		= "YUV 4:2:2 packed, YCrYCb",
 		.fourcc		= V4L2_PIX_FMT_YVYU,
 		.code		= MEDIA_BUS_FMT_YVYU8_2X8,
 		.l.width	= 10,
@@ -124,7 +119,6 @@ static struct vpfe_fmt formats[] = {
 		.s.bpp		= 2,
 		.supported	= false,
 	}, {
-		.name		= "YUV 4:2:2 packed, CrYCbY",
 		.fourcc		= V4L2_PIX_FMT_VYUY,
 		.code		= MEDIA_BUS_FMT_VYUY8_2X8,
 		.l.width	= 10,
@@ -133,7 +127,6 @@ static struct vpfe_fmt formats[] = {
 		.s.bpp		= 2,
 		.supported	= false,
 	}, {
-		.name		= "RAW8 BGGR",
 		.fourcc		= V4L2_PIX_FMT_SBGGR8,
 		.code		= MEDIA_BUS_FMT_SBGGR8_1X8,
 		.l.width	= 10,
@@ -142,7 +135,6 @@ static struct vpfe_fmt formats[] = {
 		.s.bpp		= 1,
 		.supported	= false,
 	}, {
-		.name		= "RAW8 GBRG",
 		.fourcc		= V4L2_PIX_FMT_SGBRG8,
 		.code		= MEDIA_BUS_FMT_SGBRG8_1X8,
 		.l.width	= 10,
@@ -151,7 +143,6 @@ static struct vpfe_fmt formats[] = {
 		.s.bpp		= 1,
 		.supported	= false,
 	}, {
-		.name		= "RAW8 GRBG",
 		.fourcc		= V4L2_PIX_FMT_SGRBG8,
 		.code		= MEDIA_BUS_FMT_SGRBG8_1X8,
 		.l.width	= 10,
@@ -160,7 +151,6 @@ static struct vpfe_fmt formats[] = {
 		.s.bpp		= 1,
 		.supported	= false,
 	}, {
-		.name		= "RAW8 RGGB",
 		.fourcc		= V4L2_PIX_FMT_SRGGB8,
 		.code		= MEDIA_BUS_FMT_SRGGB8_1X8,
 		.l.width	= 10,
@@ -169,7 +159,6 @@ static struct vpfe_fmt formats[] = {
 		.s.bpp		= 1,
 		.supported	= false,
 	}, {
-		.name		= "RGB565 (LE)",
 		.fourcc		= V4L2_PIX_FMT_RGB565,
 		.code		= MEDIA_BUS_FMT_RGB565_2X8_LE,
 		.l.width	= 10,
@@ -178,7 +167,6 @@ static struct vpfe_fmt formats[] = {
 		.s.bpp		= 2,
 		.supported	= false,
 	}, {
-		.name		= "RGB565 (BE)",
 		.fourcc		= V4L2_PIX_FMT_RGB565X,
 		.code		= MEDIA_BUS_FMT_RGB565_2X8_BE,
 		.l.width	= 10,
@@ -1412,10 +1400,6 @@ static int vpfe_querycap(struct file *file, void  *priv,
 	strscpy(cap->card, "TI AM437x VPFE", sizeof(cap->card));
 	snprintf(cap->bus_info, sizeof(cap->bus_info),
 			"platform:%s", vpfe->v4l2_dev.name);
-	cap->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING |
-			    V4L2_CAP_READWRITE;
-	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
-
 	return 0;
 }
 
@@ -1540,12 +1524,10 @@ static int vpfe_enum_fmt(struct file *file, void  *priv,
 	if (!fmt)
 		return -EINVAL;
 
-	strncpy(f->description, fmt->name, sizeof(f->description) - 1);
 	f->pixelformat = fmt->fourcc;
-	f->type = vpfe->fmt.type;
 
-	vpfe_dbg(1, vpfe, "vpfe_enum_format: mbus index: %d code: %x pixelformat: %s [%s]\n",
-		f->index, fmt->code, print_fourcc(fmt->fourcc), fmt->name);
+	vpfe_dbg(1, vpfe, "vpfe_enum_format: mbus index: %d code: %x pixelformat: %s\n",
+		 f->index, fmt->code, print_fourcc(fmt->fourcc));
 
 	return 0;
 }
@@ -2085,24 +2067,18 @@ static void vpfe_stop_streaming(struct vb2_queue *vq)
 	spin_unlock_irqrestore(&vpfe->dma_queue_lock, flags);
 }
 
-static int vpfe_cropcap(struct file *file, void *priv,
-			struct v4l2_cropcap *crop)
+static int vpfe_g_pixelaspect(struct file *file, void *priv,
+			      int type, struct v4l2_fract *f)
 {
 	struct vpfe_device *vpfe = video_drvdata(file);
 
-	vpfe_dbg(2, vpfe, "vpfe_cropcap\n");
+	vpfe_dbg(2, vpfe, "vpfe_g_pixelaspect\n");
 
-	if (vpfe->std_index >= ARRAY_SIZE(vpfe_standards))
+	if (type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
+	    vpfe->std_index >= ARRAY_SIZE(vpfe_standards))
 		return -EINVAL;
 
-	memset(crop, 0, sizeof(struct v4l2_cropcap));
-
-	crop->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	crop->defrect.width = vpfe_standards[vpfe->std_index].width;
-	crop->bounds.width = crop->defrect.width;
-	crop->defrect.height = vpfe_standards[vpfe->std_index].height;
-	crop->bounds.height = crop->defrect.height;
-	crop->pixelaspect = vpfe_standards[vpfe->std_index].pixelaspect;
+	*f = vpfe_standards[vpfe->std_index].pixelaspect;
 
 	return 0;
 }
@@ -2112,12 +2088,17 @@ vpfe_g_selection(struct file *file, void *fh, struct v4l2_selection *s)
 {
 	struct vpfe_device *vpfe = video_drvdata(file);
 
+	if (s->type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
+	    vpfe->std_index >= ARRAY_SIZE(vpfe_standards))
+		return -EINVAL;
+
 	switch (s->target) {
 	case V4L2_SEL_TGT_CROP_BOUNDS:
 	case V4L2_SEL_TGT_CROP_DEFAULT:
-		s->r.left = s->r.top = 0;
-		s->r.width = vpfe->crop.width;
-		s->r.height = vpfe->crop.height;
+		s->r.left = 0;
+		s->r.top = 0;
+		s->r.width = vpfe_standards[vpfe->std_index].width;
+		s->r.height = vpfe_standards[vpfe->std_index].height;
 		break;
 
 	case V4L2_SEL_TGT_CROP:
@@ -2286,7 +2267,7 @@ static const struct v4l2_ioctl_ops vpfe_ioctl_ops = {
 	.vidioc_subscribe_event		= v4l2_ctrl_subscribe_event,
 	.vidioc_unsubscribe_event	= v4l2_event_unsubscribe,
 
-	.vidioc_cropcap			= vpfe_cropcap,
+	.vidioc_g_pixelaspect		= vpfe_g_pixelaspect,
 	.vidioc_g_selection		= vpfe_g_selection,
 	.vidioc_s_selection		= vpfe_s_selection,
 
@@ -2398,6 +2379,8 @@ static int vpfe_probe_complete(struct vpfe_device *vpfe)
 	vdev->vfl_dir = VFL_DIR_RX;
 	vdev->queue = q;
 	vdev->lock = &vpfe->lock;
+	vdev->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING |
+			    V4L2_CAP_READWRITE;
 	video_set_drvdata(vdev, vpfe);
 	err = video_register_device(&vpfe->video_dev, VFL_TYPE_GRABBER, -1);
 	if (err) {
@@ -2510,10 +2493,9 @@ vpfe_get_pdata(struct vpfe_device *vpfe)
 		pdata->asd[i] = v4l2_async_notifier_add_fwnode_subdev(
 			&vpfe->notifier, of_fwnode_handle(rem),
 			sizeof(struct v4l2_async_subdev));
-		if (IS_ERR(pdata->asd[i])) {
-			of_node_put(rem);
+		of_node_put(rem);
+		if (IS_ERR(pdata->asd[i]))
 			goto cleanup;
-		}
 	}
 
 	of_node_put(endpoint);
@@ -2562,7 +2544,6 @@ static int vpfe_probe(struct platform_device *pdev)
 
 	ret = platform_get_irq(pdev, 0);
 	if (ret <= 0) {
-		dev_err(&pdev->dev, "No IRQ resource\n");
 		ret = -ENODEV;
 		goto probe_out_cleanup;
 	}

@@ -16,14 +16,16 @@
  * page_pool_alloc_pages() call.  Drivers should likely use
  * page_pool_dev_alloc_pages() replacing dev_alloc_pages().
  *
- * If page_pool handles DMA mapping (use page->private), then API user
- * is responsible for invoking page_pool_put_page() once.  In-case of
- * elevated refcnt, the DMA state is released, assuming other users of
- * the page will eventually call put_page().
+ * API keeps track of in-flight pages, in-order to let API user know
+ * when it is safe to dealloactor page_pool object.  Thus, API users
+ * must make sure to call page_pool_release_page() when a page is
+ * "leaving" the page_pool.  Or call page_pool_put_page() where
+ * appropiate.  For maintaining correct accounting.
  *
- * If no DMA mapping is done, then it can act as shim-layer that
- * fall-through to alloc_page.  As no state is kept on the page, the
- * regular put_page() call is sufficient.
+ * API user must only call page_pool_put_page() once on a page, as it
+ * will either recycle the page, or in case of elevated refcnt, it
+ * will release the DMA mapping and in-flight state accounting.  We
+ * hope to lift this requirement in the future.
  */
 #ifndef _NET_PAGE_POOL_H
 #define _NET_PAGE_POOL_H
@@ -66,8 +68,14 @@ struct page_pool_params {
 };
 
 struct page_pool {
-	struct rcu_head rcu;
 	struct page_pool_params p;
+
+	struct delayed_work release_dw;
+	void (*disconnect)(void *);
+	unsigned long defer_start;
+	unsigned long defer_warn;
+
+	u32 pages_state_hold_cnt;
 
 	/*
 	 * Data structure for allocation side
@@ -96,6 +104,14 @@ struct page_pool {
 	 * TODO: Implement bulk return pages into this structure.
 	 */
 	struct ptr_ring ring;
+
+	atomic_t pages_state_release_cnt;
+
+	/* A page_pool is strictly tied to a single RX-queue being
+	 * protected by NAPI, due to above pp_alloc_cache. This
+	 * refcnt serves purpose is to simplify drivers error handling.
+	 */
+	refcount_t user_cnt;
 };
 
 struct page *page_pool_alloc_pages(struct page_pool *pool, gfp_t gfp);
@@ -107,9 +123,30 @@ static inline struct page *page_pool_dev_alloc_pages(struct page_pool *pool)
 	return page_pool_alloc_pages(pool, gfp);
 }
 
+/* get the stored dma direction. A driver might decide to treat this locally and
+ * avoid the extra cache line from page_pool to determine the direction
+ */
+static
+inline enum dma_data_direction page_pool_get_dma_dir(struct page_pool *pool)
+{
+	return pool->p.dma_dir;
+}
+
 struct page_pool *page_pool_create(const struct page_pool_params *params);
 
+#ifdef CONFIG_PAGE_POOL
 void page_pool_destroy(struct page_pool *pool);
+void page_pool_use_xdp_mem(struct page_pool *pool, void (*disconnect)(void *));
+#else
+static inline void page_pool_destroy(struct page_pool *pool)
+{
+}
+
+static inline void page_pool_use_xdp_mem(struct page_pool *pool,
+					 void (*disconnect)(void *))
+{
+}
+#endif
 
 /* Never call this directly, use helpers below */
 void __page_pool_put_page(struct page_pool *pool,
@@ -132,6 +169,25 @@ static inline void page_pool_recycle_direct(struct page_pool *pool,
 	__page_pool_put_page(pool, page, true);
 }
 
+/* Disconnects a page (from a page_pool).  API users can have a need
+ * to disconnect a page (from a page_pool), to allow it to be used as
+ * a regular page (that will eventually be returned to the normal
+ * page-allocator via put_page).
+ */
+void page_pool_unmap_page(struct page_pool *pool, struct page *page);
+static inline void page_pool_release_page(struct page_pool *pool,
+					  struct page *page)
+{
+#ifdef CONFIG_PAGE_POOL
+	page_pool_unmap_page(pool, page);
+#endif
+}
+
+static inline dma_addr_t page_pool_get_dma_addr(struct page *page)
+{
+	return page->dma_addr;
+}
+
 static inline bool is_page_pool_compiled_in(void)
 {
 #ifdef CONFIG_PAGE_POOL
@@ -139,6 +195,11 @@ static inline bool is_page_pool_compiled_in(void)
 #else
 	return false;
 #endif
+}
+
+static inline bool page_pool_put(struct page_pool *pool)
+{
+	return refcount_dec_and_test(&pool->user_cnt);
 }
 
 #endif /* _NET_PAGE_POOL_H */

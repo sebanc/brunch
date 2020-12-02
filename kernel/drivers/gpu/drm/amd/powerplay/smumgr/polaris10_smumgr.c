@@ -21,6 +21,8 @@
  *
  */
 
+#include <linux/pci.h>
+
 #include "pp_debug.h"
 #include "smumgr.h"
 #include "smu74.h"
@@ -44,7 +46,6 @@
 
 #include "smu7_hwmgr.h"
 #include "hardwaremanager.h"
-#include "ppatomctrl.h"
 #include "atombios.h"
 #include "pppcielanes.h"
 
@@ -654,7 +655,7 @@ static int polaris10_populate_smc_mvdd_table(struct pp_hwmgr *hwmgr,
 			count = SMU_MAX_SMIO_LEVELS;
 		for (level = 0; level < count; level++) {
 			table->SmioTable2.Pattern[level].Voltage =
-				PP_HOST_TO_SMC_US(data->mvdd_voltage_table.entries[count].value * VOLTAGE_SCALE);
+				PP_HOST_TO_SMC_US(data->mvdd_voltage_table.entries[level].value * VOLTAGE_SCALE);
 			/* Index into DpmTable.Smio. Drive bits from Smio entry to get this voltage level.*/
 			table->SmioTable2.Pattern[level].Smio =
 				(uint8_t) level;
@@ -1640,6 +1641,7 @@ static int polaris10_populate_avfs_parameters(struct pp_hwmgr *hwmgr)
 {
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
 	struct polaris10_smumgr *smu_data = (struct polaris10_smumgr *)(hwmgr->smu_backend);
+	struct amdgpu_device *adev = hwmgr->adev;
 
 	SMU74_Discrete_DpmTable  *table = &(smu_data->smc_state_table);
 	int result = 0;
@@ -1658,6 +1660,59 @@ static int polaris10_populate_avfs_parameters(struct pp_hwmgr *hwmgr)
 		return 0;
 
 	result = atomctrl_get_avfs_information(hwmgr, &avfs_params);
+
+	if (0 == result) {
+		if (((adev->pdev->device == 0x67ef) &&
+		     ((adev->pdev->revision == 0xe0) ||
+		      (adev->pdev->revision == 0xe5))) ||
+		    ((adev->pdev->device == 0x67ff) &&
+		     ((adev->pdev->revision == 0xcf) ||
+		      (adev->pdev->revision == 0xef) ||
+		      (adev->pdev->revision == 0xff)))) {
+			avfs_params.ucEnableApplyAVFS_CKS_OFF_Voltage = 1;
+			if ((adev->pdev->device == 0x67ef && adev->pdev->revision == 0xe5) ||
+			    (adev->pdev->device == 0x67ff && adev->pdev->revision == 0xef)) {
+				if ((avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a0 == 0xEA522DD3) &&
+				    (avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a1 == 0x5645A) &&
+				    (avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a2 == 0x33F9E) &&
+				    (avfs_params.ulAVFSGB_FUSE_TABLE_CKSOFF_m1 == 0xFFFFC5CC) &&
+				    (avfs_params.usAVFSGB_FUSE_TABLE_CKSOFF_m2 == 0x1B1A) &&
+				    (avfs_params.ulAVFSGB_FUSE_TABLE_CKSOFF_b == 0xFFFFFCED)) {
+					avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a0   = 0xF718F1D4;
+					avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a1   = 0x323FD;
+					avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a2   = 0x1E455;
+					avfs_params.ulAVFSGB_FUSE_TABLE_CKSOFF_m1 = 0;
+					avfs_params.usAVFSGB_FUSE_TABLE_CKSOFF_m2 = 0;
+					avfs_params.ulAVFSGB_FUSE_TABLE_CKSOFF_b  = 0x23;
+				}
+			}
+		} else if (hwmgr->chip_id == CHIP_POLARIS12 && !hwmgr->is_kicker) {
+			avfs_params.ucEnableApplyAVFS_CKS_OFF_Voltage = 1;
+			avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a0   = 0xF6B024DD;
+			avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a1   = 0x3005E;
+			avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a2   = 0x18A5F;
+			avfs_params.ulAVFSGB_FUSE_TABLE_CKSOFF_m1 = 0x315;
+			avfs_params.usAVFSGB_FUSE_TABLE_CKSOFF_m2 = 0xFED1;
+			avfs_params.ulAVFSGB_FUSE_TABLE_CKSOFF_b  = 0x3B;
+		} else if (((adev->pdev->device == 0x67df) &&
+			    ((adev->pdev->revision == 0xe0) ||
+			     (adev->pdev->revision == 0xe3) ||
+			     (adev->pdev->revision == 0xe4) ||
+			     (adev->pdev->revision == 0xe5) ||
+			     (adev->pdev->revision == 0xe7) ||
+			     (adev->pdev->revision == 0xef))) ||
+			   ((adev->pdev->device == 0x6fdf) &&
+			    ((adev->pdev->revision == 0xef) ||
+			     (adev->pdev->revision == 0xff)))) {
+			avfs_params.ucEnableApplyAVFS_CKS_OFF_Voltage = 1;
+			avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a0   = 0xF843B66B;
+			avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a1   = 0x59CB5;
+			avfs_params.ulGB_VDROOP_TABLE_CKSOFF_a2   = 0xFFFF287F;
+			avfs_params.ulAVFSGB_FUSE_TABLE_CKSOFF_m1 = 0;
+			avfs_params.usAVFSGB_FUSE_TABLE_CKSOFF_m2 = 0xFF23;
+			avfs_params.ulAVFSGB_FUSE_TABLE_CKSOFF_b  = 0x58;
+		}
+	}
 
 	if (0 == result) {
 		table->BTCGB_VDROOP_TABLE[0].a0  = PP_HOST_TO_SMC_UL(avfs_params.ulGB_VDROOP_TABLE_CKSON_a0);
@@ -2264,6 +2319,8 @@ static uint32_t polaris10_get_offsetof(uint32_t type, uint32_t member)
 			return offsetof(SMU74_SoftRegisters, VoltageChangeTimeout);
 		case AverageGraphicsActivity:
 			return offsetof(SMU74_SoftRegisters, AverageGraphicsActivity);
+		case AverageMemoryActivity:
+			return offsetof(SMU74_SoftRegisters, AverageMemoryActivity);
 		case PreVBlankGap:
 			return offsetof(SMU74_SoftRegisters, PreVBlankGap);
 		case VBlankTimeout:
@@ -2281,6 +2338,7 @@ static uint32_t polaris10_get_offsetof(uint32_t type, uint32_t member)
 		case DRAM_LOG_BUFF_SIZE:
 			return offsetof(SMU74_SoftRegisters, DRAM_LOG_BUFF_SIZE);
 		}
+		break;
 	case SMU_Discrete_DpmTable:
 		switch (member) {
 		case UvdBootLevel:
@@ -2290,6 +2348,7 @@ static uint32_t polaris10_get_offsetof(uint32_t type, uint32_t member)
 		case LowSclkInterruptThreshold:
 			return offsetof(SMU74_Discrete_DpmTable, LowSclkInterruptThreshold);
 		}
+		break;
 	}
 	pr_warn("can't get the offset of type %x member %x\n", type, member);
 	return 0;
@@ -2497,6 +2556,7 @@ static int polaris10_update_dpm_settings(struct pp_hwmgr *hwmgr,
 }
 
 const struct pp_smumgr_func polaris10_smu_funcs = {
+	.name = "polaris10_smu",
 	.smu_init = polaris10_smu_init,
 	.smu_fini = smu7_smu_fini,
 	.start_smu = polaris10_start_smu,

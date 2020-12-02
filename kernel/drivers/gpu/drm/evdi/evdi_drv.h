@@ -17,10 +17,11 @@
 #include <drm/drmP.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_probe_helper.h>
 #include <drm/drm_rect.h>
 # include <drm/drm_gem.h>
 #include <drm/drm_cache.h>
-#include <linux/reservation.h>
+#include <linux/dma-resv.h>
 #include "evdi_debug.h"
 
 #define DRIVER_NAME   "evdi"
@@ -56,8 +57,8 @@ struct evdi_gem_object {
 	struct page **pages;
 	void *vmapping;
 	struct sg_table *sg;
-	struct reservation_object *resv;
-	struct reservation_object _resv;
+	struct dma_resv *resv;
+	struct dma_resv _resv;
 };
 
 #define to_evdi_bo(x) container_of(x, struct evdi_gem_object, base)
@@ -108,13 +109,12 @@ uint32_t evdi_gem_object_handle_lookup(struct drm_file *filp,
 
 struct drm_gem_object *evdi_gem_prime_import(struct drm_device *dev,
 					     struct dma_buf *dma_buf);
-struct dma_buf *evdi_gem_prime_export(struct drm_device *dev,
-				      struct drm_gem_object *obj, int flags);
+struct dma_buf *evdi_gem_prime_export(struct drm_gem_object *obj, int flags);
 
 int evdi_gem_vmap(struct evdi_gem_object *obj);
 void evdi_gem_vunmap(struct evdi_gem_object *obj);
 int evdi_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma);
-int evdi_gem_fault(struct vm_fault *vmf);
+vm_fault_t evdi_gem_fault(struct vm_fault *vmf);
 void evdi_stats_init(struct evdi_device *evdi);
 void evdi_stats_cleanup(struct evdi_device *evdi);
 

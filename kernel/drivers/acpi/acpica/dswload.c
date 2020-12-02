@@ -3,7 +3,7 @@
  *
  * Module Name: dswload - Dispatcher first pass namespace load callbacks
  *
- * Copyright (C) 2000 - 2018, Intel Corp.
+ * Copyright (C) 2000 - 2019, Intel Corp.
  *
  *****************************************************************************/
 
@@ -14,7 +14,6 @@
 #include "acdispat.h"
 #include "acinterp.h"
 #include "acnamesp.h"
-
 #ifdef ACPI_ASL_COMPILER
 #include "acdisasm.h"
 #endif
@@ -73,12 +72,10 @@ acpi_ds_init_callbacks(struct acpi_walk_state *walk_state, u32 pass_number)
 
 		/* Execution pass */
 
-#ifndef ACPI_NO_METHOD_EXECUTION
 		walk_state->parse_flags |= ACPI_PARSE_EXECUTE |
 		    ACPI_PARSE_DELETE_TREE;
 		walk_state->descending_callback = acpi_ds_exec_begin_op;
 		walk_state->ascending_callback = acpi_ds_exec_end_op;
-#endif
 		break;
 
 	default:
@@ -364,7 +361,7 @@ acpi_ds_load1_begin_op(struct acpi_walk_state *walk_state,
 
 	/* Initialize the op */
 
-#if (defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY))
+#ifdef ACPI_CONSTANT_EVAL_ONLY
 	op->named.path = path;
 #endif
 
@@ -401,7 +398,6 @@ acpi_status acpi_ds_load1_end_op(struct acpi_walk_state *walk_state)
 	union acpi_parse_object *op;
 	acpi_object_type object_type;
 	acpi_status status = AE_OK;
-
 #ifdef ACPI_ASL_COMPILER
 	u8 param_count;
 #endif
@@ -443,7 +439,6 @@ acpi_status acpi_ds_load1_end_op(struct acpi_walk_state *walk_state)
 
 	object_type = walk_state->op_info->object_type;
 
-#ifndef ACPI_NO_METHOD_EXECUTION
 	if (walk_state->op_info->flags & AML_FIELD) {
 		/*
 		 * If we are executing a method, do not create any namespace objects
@@ -487,7 +482,6 @@ acpi_status acpi_ds_load1_end_op(struct acpi_walk_state *walk_state)
 			}
 		}
 	}
-#endif
 
 	if (op->common.aml_opcode == AML_NAME_OP) {
 

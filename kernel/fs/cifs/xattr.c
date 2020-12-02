@@ -96,7 +96,6 @@ static int cifs_xattr_set(const struct xattr_handler *handler,
 		break;
 
 	case XATTR_CIFS_ACL: {
-#ifdef CONFIG_CIFS_ACL
 		struct cifs_ntsd *pacl;
 
 		if (!value)
@@ -117,7 +116,6 @@ static int cifs_xattr_set(const struct xattr_handler *handler,
 				CIFS_I(inode)->time = 0;
 			kfree(pacl);
 		}
-#endif /* CONFIG_CIFS_ACL */
 		break;
 	}
 
@@ -201,7 +199,7 @@ static int cifs_creation_time_get(struct dentry *dentry, struct inode *inode,
 
 static int cifs_xattr_get(const struct xattr_handler *handler,
 			  struct dentry *dentry, struct inode *inode,
-			  const char *name, void *value, size_t size)
+			  const char *name, void *value, size_t size, int flags)
 {
 	ssize_t rc = -EOPNOTSUPP;
 	unsigned int xid;
@@ -247,7 +245,6 @@ static int cifs_xattr_get(const struct xattr_handler *handler,
 		break;
 
 	case XATTR_CIFS_ACL: {
-#ifdef CONFIG_CIFS_ACL
 		u32 acllen;
 		struct cifs_ntsd *pacl;
 
@@ -270,7 +267,6 @@ static int cifs_xattr_get(const struct xattr_handler *handler,
 			rc = acllen;
 			kfree(pacl);
 		}
-#endif  /* CONFIG_CIFS_ACL */
 		break;
 	}
 

@@ -327,77 +327,12 @@ static void iwl_mvm_get_signal_strength(struct iwl_mvm *mvm,
 	rx_status->chain_signal[2] = S8_MIN;
 }
 
-static int iwl_mvm_rx_mgmt_crypto(struct ieee80211_sta *sta,
-				  struct ieee80211_hdr *hdr,
-				  struct iwl_rx_mpdu_desc *desc,
-				  u32 status)
-{
-	struct iwl_mvm_sta *mvmsta;
-	struct iwl_mvm_vif *mvmvif;
-	u8 fwkeyid = u32_get_bits(status, IWL_RX_MPDU_STATUS_KEY);
-	u8 keyid;
-	struct ieee80211_key_conf *key;
-	u32 len = le16_to_cpu(desc->mpdu_len);
-	const u8 *frame = (void *)hdr;
-
-	/*
-	 * For non-beacon, we don't really care. But beacons may
-	 * be filtered out, and we thus need the firmware's replay
-	 * detection, otherwise beacons the firmware previously
-	 * filtered could be replayed, or something like that, and
-	 * it can filter a lot - though usually only if nothing has
-	 * changed.
-	 */
-	if (!ieee80211_is_beacon(hdr->frame_control))
-		return 0;
-
-	/* good cases */
-	if (likely(status & IWL_RX_MPDU_STATUS_MIC_OK &&
-		   !(status & IWL_RX_MPDU_STATUS_REPLAY_ERROR)))
-		return 0;
-
-	if (!sta)
-		return -1;
-
-	mvmsta = iwl_mvm_sta_from_mac80211(sta);
-
-	/* what? */
-	if (fwkeyid != 6 && fwkeyid != 7)
-		return -1;
-
-	mvmvif = iwl_mvm_vif_from_mac80211(mvmsta->vif);
-
-	key = rcu_dereference(mvmvif->bcn_prot.keys[fwkeyid - 6]);
-	if (!key)
-		return -1;
-
-	if (len < key->icv_len + IEEE80211_GMAC_PN_LEN + 2)
-		return -1;
-
-	/*
-	 * See if the key ID matches - if not this may be due to a
-	 * switch and the firmware may erroneously report !MIC_OK.
-	 */
-	keyid = frame[len - key->icv_len - IEEE80211_GMAC_PN_LEN - 2];
-	if (keyid != fwkeyid)
-		return -1;
-
-	/* Report status to mac80211 */
-	if (!(status & IWL_RX_MPDU_STATUS_MIC_OK))
-		ieee80211_key_mic_failure(key);
-	else if (status & IWL_RX_MPDU_STATUS_REPLAY_ERROR)
-		ieee80211_key_replay(key);
-
-	return -1;
-}
-
-static int iwl_mvm_rx_crypto(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
-			     struct ieee80211_hdr *hdr,
+static int iwl_mvm_rx_crypto(struct iwl_mvm *mvm, struct ieee80211_hdr *hdr,
 			     struct ieee80211_rx_status *stats, u16 phy_info,
 			     struct iwl_rx_mpdu_desc *desc,
 			     u32 pkt_flags, int queue, u8 *crypt_len)
 {
-	u32 status = le32_to_cpu(desc->status);
+	u16 status = le16_to_cpu(desc->status);
 
 	/*
 	 * Drop UNKNOWN frames in aggregation, unless in monitor mode
@@ -465,8 +400,6 @@ static int iwl_mvm_rx_crypto(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
 			return -1;
 		stats->flag |= RX_FLAG_DECRYPTED;
 		return 0;
-	case RX_MPDU_RES_STATUS_SEC_CMAC_GMAC_ENC:
-		return iwl_mvm_rx_mgmt_crypto(sta, hdr, desc, status);
 	default:
 		/*
 		 * Sometimes we can get frames that were not decrypted
@@ -1668,7 +1601,6 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 	struct iwl_rx_mpdu_desc *desc = (void *)pkt->data;
 	struct ieee80211_hdr *hdr;
 	u32 len = le16_to_cpu(desc->mpdu_len);
-	u32 pkt_len = iwl_rx_packet_payload_len(pkt);
 	u32 rate_n_flags, gp2_on_air_rise;
 	u16 phy_info = le16_to_cpu(desc->phy_info);
 	struct ieee80211_sta *sta = NULL;
@@ -1714,11 +1646,6 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 			le32_get_bits(phy_data.d1,
 				      IWL_RX_PHY_DATA1_INFO_TYPE_MASK);
 
-	if (len + desc_size > pkt_len) {
-		IWL_DEBUG_DROP(mvm, "FW lied about packet len\n");
-		return;
-	}
-
 	hdr = (void *)(pkt->data + desc_size);
 	/* Dont use dev_alloc_skb(), we'll have enough headroom once
 	 * ieee80211_hdr pulled.
@@ -1762,14 +1689,21 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 
 	iwl_mvm_decode_lsig(skb, &phy_data);
 
+	if (iwl_mvm_rx_crypto(mvm, hdr, rx_status, phy_info, desc,
+			      le32_to_cpu(pkt->len_n_flags), queue,
+			      &crypt_len)) {
+		kfree_skb(skb);
+		return;
+	}
+
 	/*
 	 * Keep packets with CRC errors (and with overrun) for monitor mode
 	 * (otherwise the firmware discards them) but mark them as bad.
 	 */
-	if (!(desc->status & cpu_to_le32(IWL_RX_MPDU_STATUS_CRC_OK)) ||
-	    !(desc->status & cpu_to_le32(IWL_RX_MPDU_STATUS_OVERRUN_OK))) {
+	if (!(desc->status & cpu_to_le16(IWL_RX_MPDU_STATUS_CRC_OK)) ||
+	    !(desc->status & cpu_to_le16(IWL_RX_MPDU_STATUS_OVERRUN_OK))) {
 		IWL_DEBUG_RX(mvm, "Bad CRC or FIFO: 0x%08X.\n",
-			     le32_to_cpu(desc->status));
+			     le16_to_cpu(desc->status));
 		rx_status->flag |= RX_FLAG_FAILED_FCS_CRC;
 	}
 	/* set the preamble flag if appropriate */
@@ -1829,10 +1763,10 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 
 	rcu_read_lock();
 
-	if (desc->status & cpu_to_le32(IWL_RX_MPDU_STATUS_SRC_STA_FOUND)) {
-		u8 id = le32_get_bits(desc->status, IWL_RX_MPDU_STATUS_STA_ID);
+	if (desc->status & cpu_to_le16(IWL_RX_MPDU_STATUS_SRC_STA_FOUND)) {
+		u8 id = desc->sta_id_flags & IWL_RX_MPDU_SIF_STA_ID_MASK;
 
-		if (!WARN_ON_ONCE(id >= mvm->fw->ucode_capa.num_stations)) {
+		if (!WARN_ON_ONCE(id >= ARRAY_SIZE(mvm->fw_id_to_mac_id))) {
 			sta = rcu_dereference(mvm->fw_id_to_mac_id[id]);
 			if (IS_ERR(sta))
 				sta = NULL;
@@ -1843,13 +1777,6 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm *mvm, struct napi_struct *napi,
 		 * address from being added.
 		 */
 		sta = ieee80211_find_sta_by_ifaddr(mvm->hw, hdr->addr2, NULL);
-	}
-
-	if (iwl_mvm_rx_crypto(mvm, sta, hdr, rx_status, phy_info, desc,
-			      le32_to_cpu(pkt->len_n_flags), queue,
-			      &crypt_len)) {
-		kfree_skb(skb);
-		goto out;
 	}
 
 	if (sta) {

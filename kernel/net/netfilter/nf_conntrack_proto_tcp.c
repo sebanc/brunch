@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /* (C) 1999-2001 Paul `Rusty' Russell
  * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
- * (C) 2002-2013 Jozsef Kadlecsik <kadlec@blackhole.kfki.hu>
+ * (C) 2002-2013 Jozsef Kadlecsik <kadlec@netfilter.org>
  * (C) 2006-2012 Patrick McHardy <kaber@trash.net>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/types.h>
@@ -272,11 +269,6 @@ static const u8 tcp_conntracks[2][6][TCP_CONNTRACK_MAX] = {
 	}
 };
 
-static inline struct nf_tcp_net *tcp_pernet(struct net *net)
-{
-	return &net->ct.nf_ct_proto.tcp;
-}
-
 #ifdef CONFIG_NF_CONNTRACK_PROCFS
 /* Print out the private part of the conntrack. */
 static void tcp_print_conntrack(struct seq_file *s, struct nf_conn *ct)
@@ -475,7 +467,7 @@ static bool tcp_in_window(const struct nf_conn *ct,
 			  const struct tcphdr *tcph)
 {
 	struct net *net = nf_ct_net(ct);
-	struct nf_tcp_net *tn = tcp_pernet(net);
+	struct nf_tcp_net *tn = nf_tcp_pernet(net);
 	struct ip_ct_tcp_state *sender = &state->seen[dir];
 	struct ip_ct_tcp_state *receiver = &state->seen[!dir];
 	const struct nf_conntrack_tuple *tuple = &ct->tuplehash[dir].tuple;
@@ -549,13 +541,20 @@ static bool tcp_in_window(const struct nf_conn *ct,
 			swin = win << sender->td_scale;
 			sender->td_maxwin = (swin == 0 ? 1 : swin);
 			sender->td_maxend = end + sender->td_maxwin;
-			/*
-			 * We haven't seen traffic in the other direction yet
-			 * but we have to tweak window tracking to pass III
-			 * and IV until that happens.
-			 */
-			if (receiver->td_maxwin == 0)
+			if (receiver->td_maxwin == 0) {
+				/* We haven't seen traffic in the other
+				 * direction yet but we have to tweak window
+				 * tracking to pass III and IV until that
+				 * happens.
+				 */
 				receiver->td_end = receiver->td_maxend = sack;
+			} else if (sack == receiver->td_end + 1) {
+				/* Likely a reply to a keepalive.
+				 * Needed for III.
+				 */
+				receiver->td_end++;
+			}
+
 		}
 	} else if (((state->state == TCP_CONNTRACK_SYN_SENT
 		     && dir == IP_CT_DIR_ORIGINAL)
@@ -719,35 +718,26 @@ static const u8 tcp_valid_flags[(TCPHDR_FIN|TCPHDR_SYN|TCPHDR_RST|TCPHDR_ACK|
 	[TCPHDR_ACK|TCPHDR_URG]			= 1,
 };
 
-static void tcp_error_log(const struct sk_buff *skb, struct net *net,
-			  u8 pf, const char *msg)
+static void tcp_error_log(const struct sk_buff *skb,
+			  const struct nf_hook_state *state,
+			  const char *msg)
 {
-	nf_l4proto_log_invalid(skb, net, pf, IPPROTO_TCP, "%s", msg);
+	nf_l4proto_log_invalid(skb, state->net, state->pf, IPPROTO_TCP, "%s", msg);
 }
 
 /* Protect conntrack agaist broken packets. Code taken from ipt_unclean.c.  */
-static int tcp_error(struct net *net, struct nf_conn *tmpl,
-		     struct sk_buff *skb,
-		     unsigned int dataoff,
-		     u_int8_t pf,
-		     unsigned int hooknum)
+static bool tcp_error(const struct tcphdr *th,
+		      struct sk_buff *skb,
+		      unsigned int dataoff,
+		      const struct nf_hook_state *state)
 {
-	const struct tcphdr *th;
-	struct tcphdr _tcph;
 	unsigned int tcplen = skb->len - dataoff;
-	u_int8_t tcpflags;
-
-	/* Smaller that minimal TCP header? */
-	th = skb_header_pointer(skb, dataoff, sizeof(_tcph), &_tcph);
-	if (th == NULL) {
-		tcp_error_log(skb, net, pf, "short packet");
-		return -NF_ACCEPT;
-	}
+	u8 tcpflags;
 
 	/* Not whole TCP header or malformed packet */
 	if (th->doff*4 < sizeof(struct tcphdr) || tcplen < th->doff*4) {
-		tcp_error_log(skb, net, pf, "truncated packet");
-		return -NF_ACCEPT;
+		tcp_error_log(skb, state, "truncated packet");
+		return true;
 	}
 
 	/* Checksum invalid? Ignore.
@@ -755,20 +745,93 @@ static int tcp_error(struct net *net, struct nf_conn *tmpl,
 	 * because the checksum is assumed to be correct.
 	 */
 	/* FIXME: Source route IP option packets --RR */
-	if (net->ct.sysctl_checksum && hooknum == NF_INET_PRE_ROUTING &&
-	    nf_checksum(skb, hooknum, dataoff, IPPROTO_TCP, pf)) {
-		tcp_error_log(skb, net, pf, "bad checksum");
-		return -NF_ACCEPT;
+	if (state->net->ct.sysctl_checksum &&
+	    state->hook == NF_INET_PRE_ROUTING &&
+	    nf_checksum(skb, state->hook, dataoff, IPPROTO_TCP, state->pf)) {
+		tcp_error_log(skb, state, "bad checksum");
+		return true;
 	}
 
 	/* Check TCP flags. */
 	tcpflags = (tcp_flag_byte(th) & ~(TCPHDR_ECE|TCPHDR_CWR|TCPHDR_PSH));
 	if (!tcp_valid_flags[tcpflags]) {
-		tcp_error_log(skb, net, pf, "invalid tcp flag combination");
-		return -NF_ACCEPT;
+		tcp_error_log(skb, state, "invalid tcp flag combination");
+		return true;
 	}
 
-	return NF_ACCEPT;
+	return false;
+}
+
+static noinline bool tcp_new(struct nf_conn *ct, const struct sk_buff *skb,
+			     unsigned int dataoff,
+			     const struct tcphdr *th)
+{
+	enum tcp_conntrack new_state;
+	struct net *net = nf_ct_net(ct);
+	const struct nf_tcp_net *tn = nf_tcp_pernet(net);
+	const struct ip_ct_tcp_state *sender = &ct->proto.tcp.seen[0];
+	const struct ip_ct_tcp_state *receiver = &ct->proto.tcp.seen[1];
+
+	/* Don't need lock here: this conntrack not in circulation yet */
+	new_state = tcp_conntracks[0][get_conntrack_index(th)][TCP_CONNTRACK_NONE];
+
+	/* Invalid: delete conntrack */
+	if (new_state >= TCP_CONNTRACK_MAX) {
+		pr_debug("nf_ct_tcp: invalid new deleting.\n");
+		return false;
+	}
+
+	if (new_state == TCP_CONNTRACK_SYN_SENT) {
+		memset(&ct->proto.tcp, 0, sizeof(ct->proto.tcp));
+		/* SYN packet */
+		ct->proto.tcp.seen[0].td_end =
+			segment_seq_plus_len(ntohl(th->seq), skb->len,
+					     dataoff, th);
+		ct->proto.tcp.seen[0].td_maxwin = ntohs(th->window);
+		if (ct->proto.tcp.seen[0].td_maxwin == 0)
+			ct->proto.tcp.seen[0].td_maxwin = 1;
+		ct->proto.tcp.seen[0].td_maxend =
+			ct->proto.tcp.seen[0].td_end;
+
+		tcp_options(skb, dataoff, th, &ct->proto.tcp.seen[0]);
+	} else if (tn->tcp_loose == 0) {
+		/* Don't try to pick up connections. */
+		return false;
+	} else {
+		memset(&ct->proto.tcp, 0, sizeof(ct->proto.tcp));
+		/*
+		 * We are in the middle of a connection,
+		 * its history is lost for us.
+		 * Let's try to use the data from the packet.
+		 */
+		ct->proto.tcp.seen[0].td_end =
+			segment_seq_plus_len(ntohl(th->seq), skb->len,
+					     dataoff, th);
+		ct->proto.tcp.seen[0].td_maxwin = ntohs(th->window);
+		if (ct->proto.tcp.seen[0].td_maxwin == 0)
+			ct->proto.tcp.seen[0].td_maxwin = 1;
+		ct->proto.tcp.seen[0].td_maxend =
+			ct->proto.tcp.seen[0].td_end +
+			ct->proto.tcp.seen[0].td_maxwin;
+
+		/* We assume SACK and liberal window checking to handle
+		 * window scaling */
+		ct->proto.tcp.seen[0].flags =
+		ct->proto.tcp.seen[1].flags = IP_CT_TCP_FLAG_SACK_PERM |
+					      IP_CT_TCP_FLAG_BE_LIBERAL;
+	}
+
+	/* tcp_packet will set them */
+	ct->proto.tcp.last_index = TCP_NONE_SET;
+
+	pr_debug("%s: sender end=%u maxend=%u maxwin=%u scale=%i "
+		 "receiver end=%u maxend=%u maxwin=%u scale=%i\n",
+		 __func__,
+		 sender->td_end, sender->td_maxend, sender->td_maxwin,
+		 sender->td_scale,
+		 receiver->td_end, receiver->td_maxend, receiver->td_maxwin,
+		 receiver->td_scale);
+	return true;
 }
 
 static bool nf_conntrack_tcp_established(const struct nf_conn *ct)
@@ -778,13 +841,14 @@ static bool nf_conntrack_tcp_established(const struct nf_conn *ct)
 }
 
 /* Returns verdict for packet, or -1 for invalid. */
-static int tcp_packet(struct nf_conn *ct,
-		      const struct sk_buff *skb,
-		      unsigned int dataoff,
-		      enum ip_conntrack_info ctinfo)
+int nf_conntrack_tcp_packet(struct nf_conn *ct,
+			    struct sk_buff *skb,
+			    unsigned int dataoff,
+			    enum ip_conntrack_info ctinfo,
+			    const struct nf_hook_state *state)
 {
 	struct net *net = nf_ct_net(ct);
-	struct nf_tcp_net *tn = tcp_pernet(net);
+	struct nf_tcp_net *tn = nf_tcp_pernet(net);
 	struct nf_conntrack_tuple *tuple;
 	enum tcp_conntrack new_state, old_state;
 	unsigned int index, *timeouts;
@@ -794,7 +858,14 @@ static int tcp_packet(struct nf_conn *ct,
 	unsigned long timeout;
 
 	th = skb_header_pointer(skb, dataoff, sizeof(_tcph), &_tcph);
-	BUG_ON(th == NULL);
+	if (th == NULL)
+		return -NF_ACCEPT;
+
+	if (tcp_error(th, skb, dataoff, state))
+		return -NF_ACCEPT;
+
+	if (!nf_ct_is_confirmed(ct) && !tcp_new(ct, skb, dataoff, th))
+		return -NF_ACCEPT;
 
 	spin_lock_bh(&ct->lock);
 	old_state = ct->proto.tcp.state;
@@ -1099,82 +1170,6 @@ static int tcp_packet(struct nf_conn *ct,
 	return NF_ACCEPT;
 }
 
-/* Called when a new connection for this protocol found. */
-static bool tcp_new(struct nf_conn *ct, const struct sk_buff *skb,
-		    unsigned int dataoff)
-{
-	enum tcp_conntrack new_state;
-	const struct tcphdr *th;
-	struct tcphdr _tcph;
-	struct net *net = nf_ct_net(ct);
-	struct nf_tcp_net *tn = tcp_pernet(net);
-	const struct ip_ct_tcp_state *sender = &ct->proto.tcp.seen[0];
-	const struct ip_ct_tcp_state *receiver = &ct->proto.tcp.seen[1];
-
-	th = skb_header_pointer(skb, dataoff, sizeof(_tcph), &_tcph);
-	BUG_ON(th == NULL);
-
-	/* Don't need lock here: this conntrack not in circulation yet */
-	new_state = tcp_conntracks[0][get_conntrack_index(th)][TCP_CONNTRACK_NONE];
-
-	/* Invalid: delete conntrack */
-	if (new_state >= TCP_CONNTRACK_MAX) {
-		pr_debug("nf_ct_tcp: invalid new deleting.\n");
-		return false;
-	}
-
-	if (new_state == TCP_CONNTRACK_SYN_SENT) {
-		memset(&ct->proto.tcp, 0, sizeof(ct->proto.tcp));
-		/* SYN packet */
-		ct->proto.tcp.seen[0].td_end =
-			segment_seq_plus_len(ntohl(th->seq), skb->len,
-					     dataoff, th);
-		ct->proto.tcp.seen[0].td_maxwin = ntohs(th->window);
-		if (ct->proto.tcp.seen[0].td_maxwin == 0)
-			ct->proto.tcp.seen[0].td_maxwin = 1;
-		ct->proto.tcp.seen[0].td_maxend =
-			ct->proto.tcp.seen[0].td_end;
-
-		tcp_options(skb, dataoff, th, &ct->proto.tcp.seen[0]);
-	} else if (tn->tcp_loose == 0) {
-		/* Don't try to pick up connections. */
-		return false;
-	} else {
-		memset(&ct->proto.tcp, 0, sizeof(ct->proto.tcp));
-		/*
-		 * We are in the middle of a connection,
-		 * its history is lost for us.
-		 * Let's try to use the data from the packet.
-		 */
-		ct->proto.tcp.seen[0].td_end =
-			segment_seq_plus_len(ntohl(th->seq), skb->len,
-					     dataoff, th);
-		ct->proto.tcp.seen[0].td_maxwin = ntohs(th->window);
-		if (ct->proto.tcp.seen[0].td_maxwin == 0)
-			ct->proto.tcp.seen[0].td_maxwin = 1;
-		ct->proto.tcp.seen[0].td_maxend =
-			ct->proto.tcp.seen[0].td_end +
-			ct->proto.tcp.seen[0].td_maxwin;
-
-		/* We assume SACK and liberal window checking to handle
-		 * window scaling */
-		ct->proto.tcp.seen[0].flags =
-		ct->proto.tcp.seen[1].flags = IP_CT_TCP_FLAG_SACK_PERM |
-					      IP_CT_TCP_FLAG_BE_LIBERAL;
-	}
-
-	/* tcp_packet will set them */
-	ct->proto.tcp.last_index = TCP_NONE_SET;
-
-	pr_debug("tcp_new: sender end=%u maxend=%u maxwin=%u scale=%i "
-		 "receiver end=%u maxend=%u maxwin=%u scale=%i\n",
-		 sender->td_end, sender->td_maxend, sender->td_maxwin,
-		 sender->td_scale,
-		 receiver->td_end, receiver->td_maxend, receiver->td_maxwin,
-		 receiver->td_scale);
-	return true;
-}
-
 static bool tcp_can_early_drop(const struct nf_conn *ct)
 {
 	switch (ct->proto.tcp.state) {
@@ -1203,7 +1198,7 @@ static int tcp_to_nlattr(struct sk_buff *skb, struct nlattr *nla,
 	struct nf_ct_tcp_flags tmp = {};
 
 	spin_lock_bh(&ct->lock);
-	nest_parms = nla_nest_start(skb, CTA_PROTOINFO_TCP | NLA_F_NESTED);
+	nest_parms = nla_nest_start(skb, CTA_PROTOINFO_TCP);
 	if (!nest_parms)
 		goto nla_put_failure;
 
@@ -1239,7 +1234,7 @@ static const struct nla_policy tcp_nla_policy[CTA_PROTOINFO_TCP_MAX+1] = {
 	[CTA_PROTOINFO_TCP_WSCALE_ORIGINAL] = { .type = NLA_U8 },
 	[CTA_PROTOINFO_TCP_WSCALE_REPLY]    = { .type = NLA_U8 },
 	[CTA_PROTOINFO_TCP_FLAGS_ORIGINAL]  = { .len = sizeof(struct nf_ct_tcp_flags) },
-	[CTA_PROTOINFO_TCP_FLAGS_REPLY]	    = { .len =  sizeof(struct nf_ct_tcp_flags) },
+	[CTA_PROTOINFO_TCP_FLAGS_REPLY]	    = { .len = sizeof(struct nf_ct_tcp_flags) },
 };
 
 #define TCP_NLATTR_SIZE	( \
@@ -1259,8 +1254,8 @@ static int nlattr_to_tcp(struct nlattr *cda[], struct nf_conn *ct)
 	if (!pattr)
 		return 0;
 
-	err = nla_parse_nested(tb, CTA_PROTOINFO_TCP_MAX, pattr,
-			       tcp_nla_policy, NULL);
+	err = nla_parse_nested_deprecated(tb, CTA_PROTOINFO_TCP_MAX, pattr,
+					  tcp_nla_policy, NULL);
 	if (err < 0)
 		return err;
 
@@ -1319,7 +1314,7 @@ static unsigned int tcp_nlattr_tuple_size(void)
 static int tcp_timeout_nlattr_to_obj(struct nlattr *tb[],
 				     struct net *net, void *data)
 {
-	struct nf_tcp_net *tn = tcp_pernet(net);
+	struct nf_tcp_net *tn = nf_tcp_pernet(net);
 	unsigned int *timeouts = data;
 	int i;
 
@@ -1428,158 +1423,29 @@ static const struct nla_policy tcp_timeout_nla_policy[CTA_TIMEOUT_TCP_MAX+1] = {
 };
 #endif /* CONFIG_NF_CONNTRACK_TIMEOUT */
 
-#ifdef CONFIG_SYSCTL
-static struct ctl_table tcp_sysctl_table[] = {
-	{
-		.procname	= "nf_conntrack_tcp_timeout_syn_sent",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_timeout_syn_recv",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_timeout_established",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_timeout_fin_wait",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_timeout_close_wait",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_timeout_last_ack",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_timeout_time_wait",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_timeout_close",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_timeout_max_retrans",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_timeout_unacknowledged",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_jiffies,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_loose",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-	{
-		.procname       = "nf_conntrack_tcp_be_liberal",
-		.maxlen         = sizeof(unsigned int),
-		.mode           = 0644,
-		.proc_handler   = proc_dointvec,
-	},
-	{
-		.procname	= "nf_conntrack_tcp_max_retrans",
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-	{ }
-};
-#endif /* CONFIG_SYSCTL */
-
-static int tcp_kmemdup_sysctl_table(struct nf_proto_net *pn,
-				    struct nf_tcp_net *tn)
+void nf_conntrack_tcp_init_net(struct net *net)
 {
-#ifdef CONFIG_SYSCTL
-	if (pn->ctl_table)
-		return 0;
+	struct nf_tcp_net *tn = nf_tcp_pernet(net);
+	int i;
 
-	pn->ctl_table = kmemdup(tcp_sysctl_table,
-				sizeof(tcp_sysctl_table),
-				GFP_KERNEL);
-	if (!pn->ctl_table)
-		return -ENOMEM;
+	for (i = 0; i < TCP_CONNTRACK_TIMEOUT_MAX; i++)
+		tn->timeouts[i] = tcp_timeouts[i];
 
-	pn->ctl_table[0].data = &tn->timeouts[TCP_CONNTRACK_SYN_SENT];
-	pn->ctl_table[1].data = &tn->timeouts[TCP_CONNTRACK_SYN_RECV];
-	pn->ctl_table[2].data = &tn->timeouts[TCP_CONNTRACK_ESTABLISHED];
-	pn->ctl_table[3].data = &tn->timeouts[TCP_CONNTRACK_FIN_WAIT];
-	pn->ctl_table[4].data = &tn->timeouts[TCP_CONNTRACK_CLOSE_WAIT];
-	pn->ctl_table[5].data = &tn->timeouts[TCP_CONNTRACK_LAST_ACK];
-	pn->ctl_table[6].data = &tn->timeouts[TCP_CONNTRACK_TIME_WAIT];
-	pn->ctl_table[7].data = &tn->timeouts[TCP_CONNTRACK_CLOSE];
-	pn->ctl_table[8].data = &tn->timeouts[TCP_CONNTRACK_RETRANS];
-	pn->ctl_table[9].data = &tn->timeouts[TCP_CONNTRACK_UNACK];
-	pn->ctl_table[10].data = &tn->tcp_loose;
-	pn->ctl_table[11].data = &tn->tcp_be_liberal;
-	pn->ctl_table[12].data = &tn->tcp_max_retrans;
-#endif
-	return 0;
+	/* timeouts[0] is unused, make it same as SYN_SENT so
+	 * ->timeouts[0] contains 'new' timeout, like udp or icmp.
+	 */
+	tn->timeouts[0] = tcp_timeouts[TCP_CONNTRACK_SYN_SENT];
+	tn->tcp_loose = nf_ct_tcp_loose;
+	tn->tcp_be_liberal = nf_ct_tcp_be_liberal;
+	tn->tcp_max_retrans = nf_ct_tcp_max_retrans;
 }
 
-static int tcp_init_net(struct net *net, u_int16_t proto)
+const struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp =
 {
-	struct nf_tcp_net *tn = tcp_pernet(net);
-	struct nf_proto_net *pn = &tn->pn;
-
-	if (!pn->users) {
-		int i;
-
-		for (i = 0; i < TCP_CONNTRACK_TIMEOUT_MAX; i++)
-			tn->timeouts[i] = tcp_timeouts[i];
-
-		/* timeouts[0] is unused, make it same as SYN_SENT so
-		 * ->timeouts[0] contains 'new' timeout, like udp or icmp.
-		 */
-		tn->timeouts[0] = tcp_timeouts[TCP_CONNTRACK_SYN_SENT];
-		tn->tcp_loose = nf_ct_tcp_loose;
-		tn->tcp_be_liberal = nf_ct_tcp_be_liberal;
-		tn->tcp_max_retrans = nf_ct_tcp_max_retrans;
-	}
-
-	return tcp_kmemdup_sysctl_table(pn, tn);
-}
-
-static struct nf_proto_net *tcp_get_net_proto(struct net *net)
-{
-	return &net->ct.nf_ct_proto.tcp.pn;
-}
-
-const struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp4 =
-{
-	.l3proto		= PF_INET,
 	.l4proto 		= IPPROTO_TCP,
 #ifdef CONFIG_NF_CONNTRACK_PROCFS
 	.print_conntrack 	= tcp_print_conntrack,
 #endif
-	.packet 		= tcp_packet,
-	.new 			= tcp_new,
-	.error			= tcp_error,
 	.can_early_drop		= tcp_can_early_drop,
 #if IS_ENABLED(CONFIG_NF_CT_NETLINK)
 	.to_nlattr		= tcp_to_nlattr,
@@ -1600,42 +1466,4 @@ const struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp4 =
 		.nla_policy	= tcp_timeout_nla_policy,
 	},
 #endif /* CONFIG_NF_CONNTRACK_TIMEOUT */
-	.init_net		= tcp_init_net,
-	.get_net_proto		= tcp_get_net_proto,
 };
-EXPORT_SYMBOL_GPL(nf_conntrack_l4proto_tcp4);
-
-const struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp6 =
-{
-	.l3proto		= PF_INET6,
-	.l4proto 		= IPPROTO_TCP,
-#ifdef CONFIG_NF_CONNTRACK_PROCFS
-	.print_conntrack 	= tcp_print_conntrack,
-#endif
-	.packet 		= tcp_packet,
-	.new 			= tcp_new,
-	.error			= tcp_error,
-	.can_early_drop		= tcp_can_early_drop,
-#if IS_ENABLED(CONFIG_NF_CT_NETLINK)
-	.nlattr_size		= TCP_NLATTR_SIZE,
-	.to_nlattr		= tcp_to_nlattr,
-	.from_nlattr		= nlattr_to_tcp,
-	.tuple_to_nlattr	= nf_ct_port_tuple_to_nlattr,
-	.nlattr_to_tuple	= nf_ct_port_nlattr_to_tuple,
-	.nlattr_tuple_size	= tcp_nlattr_tuple_size,
-	.nla_policy		= nf_ct_port_nla_policy,
-#endif
-#ifdef CONFIG_NF_CONNTRACK_TIMEOUT
-	.ctnl_timeout		= {
-		.nlattr_to_obj	= tcp_timeout_nlattr_to_obj,
-		.obj_to_nlattr	= tcp_timeout_obj_to_nlattr,
-		.nlattr_max	= CTA_TIMEOUT_TCP_MAX,
-		.obj_size	= sizeof(unsigned int) *
-					TCP_CONNTRACK_TIMEOUT_MAX,
-		.nla_policy	= tcp_timeout_nla_policy,
-	},
-#endif /* CONFIG_NF_CONNTRACK_TIMEOUT */
-	.init_net		= tcp_init_net,
-	.get_net_proto		= tcp_get_net_proto,
-};
-EXPORT_SYMBOL_GPL(nf_conntrack_l4proto_tcp6);

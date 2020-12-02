@@ -42,12 +42,12 @@ static void cros_ec_light_channel_common(struct iio_chan_spec *channel)
 {
 	channel->info_mask_shared_by_all =
 		BIT(IIO_CHAN_INFO_SAMP_FREQ);
-	channel->info_mask_shared_by_all_available =
-		BIT(IIO_CHAN_INFO_SAMP_FREQ);
 	channel->info_mask_separate =
 		BIT(IIO_CHAN_INFO_RAW) |
 		BIT(IIO_CHAN_INFO_CALIBBIAS) |
 		BIT(IIO_CHAN_INFO_CALIBSCALE);
+	channel->info_mask_shared_by_all_available =
+		BIT(IIO_CHAN_INFO_SAMP_FREQ);
 	channel->scan_type.realbits = CROS_EC_SENSOR_BITS;
 	channel->scan_type.storagebits = CROS_EC_SENSOR_BITS;
 	channel->scan_type.shift = 0;
@@ -93,7 +93,7 @@ static int cros_ec_light_prox_read_data(
 				&st->core, sizeof(st->core.resp->data));
 		if (ret)
 			return ret;
-		*val = st->core.resp->data.data[0];
+		*val = (u16)st->core.resp->data.data[0];
 	} else {
 		ret = cros_ec_light_extra_send_host_cmd(
 				&st->core, 1, sizeof(st->core.resp->data));
@@ -277,8 +277,11 @@ static int cros_ec_light_prox_write(struct iio_dev *indio_dev,
 		/* Fall through */
 	case IIO_CHAN_INFO_SCALE:
 		st->core.param.cmd = MOTIONSENSE_CMD_SENSOR_RANGE;
-		st->core.param.sensor_range.data = (val << 16) | (val2 / 100);
+		st->core.curr_range = (val << 16) | (val2 / 100);
+		st->core.param.sensor_range.data = st->core.curr_range;
 		ret = cros_ec_motion_send_host_cmd(&st->core, 0);
+		if (ret == 0)
+			st->core.range_updated = true;
 		break;
 	default:
 		ret = cros_ec_sensors_core_write(&st->core, chan, val, val2,
@@ -327,11 +330,13 @@ static int cros_ec_light_push_data_rgb(
 {
 	struct cros_ec_sensors_core_state *st = iio_priv(indio_dev);
 	s16 *out;
+	unsigned long scan_mask;
 	unsigned int i;
 
 	if (!st || !indio_dev->active_scan_mask)
 		return 0;
 
+	scan_mask = *(indio_dev->active_scan_mask);
 	/*
 	 * Send all data needed.
 	 */
@@ -515,6 +520,7 @@ MODULE_DEVICE_TABLE(platform, cros_ec_light_prox_ids);
 static struct platform_driver cros_ec_light_prox_platform_driver = {
 	.driver = {
 		.name	= "cros-ec-light-prox",
+		.pm	= &cros_ec_sensors_pm_ops,
 	},
 	.probe		= cros_ec_light_prox_probe,
 	.id_table	= cros_ec_light_prox_ids,

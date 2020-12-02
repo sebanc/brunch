@@ -94,7 +94,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "process_stats.h"
 #endif
 #include "physmem_osmem_linux.h"
-#include "dma_support.h"
+#include "system/dma_support.h"
 #include "kernel_compatibility.h"
 
 #if defined(VIRTUAL_PLATFORM)
@@ -1814,9 +1814,9 @@ PVRSRV_ERROR OSChangeSparseMemCPUAddrMap(void **psPageArray,
 			if (bMixedMap)
 			{
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0))
-				err = vm_insert_mixed(psVMA, uiCPUVirtAddr, sPFN);
+				err = vmf_insert_mixed(psVMA, uiCPUVirtAddr, sPFN);
 #else
-				err = vm_insert_mixed(psVMA, uiCPUVirtAddr, uiPFN);
+				err = vmf_insert_mixed(psVMA, uiCPUVirtAddr, uiPFN);
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) */
 			}
 			else

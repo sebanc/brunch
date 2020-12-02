@@ -1,21 +1,19 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* AFS server record management
  *
  * Copyright (C) 2002, 2007 Red Hat, Inc. All Rights Reserved.
  * Written by David Howells (dhowells@redhat.com)
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include "afs_fs.h"
 #include "internal.h"
+#include "protocol_yfs.h"
 
 static unsigned afs_server_gc_delay = 10;	/* Server record timeout in seconds */
 static unsigned afs_server_update_delay = 30;	/* Time till VLDB recheck in secs */
+static atomic_t afs_server_debug_id;
 
 static void afs_inc_servers_outstanding(struct afs_net *net)
 {
@@ -43,7 +41,7 @@ struct afs_server *afs_find_server(struct afs_net *net,
 
 	do {
 		if (server)
-			afs_put_server(net, server);
+			afs_put_server(net, server, afs_server_trace_put_find_rsq);
 		server = NULL;
 		read_seqbegin_or_lock(&net->fs_addr_lock, &seq);
 
@@ -110,7 +108,7 @@ struct afs_server *afs_find_server_by_uuid(struct afs_net *net, const uuid_t *uu
 		 * changes.
 		 */
 		if (server)
-			afs_put_server(net, server);
+			afs_put_server(net, server, afs_server_trace_put_uuid_rsq);
 		server = NULL;
 
 		read_seqbegin_or_lock(&net->fs_lock, &seq);
@@ -125,7 +123,7 @@ struct afs_server *afs_find_server_by_uuid(struct afs_net *net, const uuid_t *uu
 			} else if (diff > 0) {
 				p = p->rb_right;
 			} else {
-				afs_get_server(server);
+				afs_get_server(server, afs_server_trace_get_by_uuid);
 				break;
 			}
 
@@ -196,7 +194,7 @@ static struct afs_server *afs_install_server(struct afs_net *net,
 	ret = 0;
 
 exists:
-	afs_get_server(server);
+	afs_get_server(server, afs_server_trace_get_install);
 	write_sequnlock(&net->fs_lock);
 	return server;
 }
@@ -217,16 +215,19 @@ static struct afs_server *afs_alloc_server(struct afs_net *net,
 		goto enomem;
 
 	atomic_set(&server->usage, 1);
+	server->debug_id = atomic_inc_return(&afs_server_debug_id);
 	RCU_INIT_POINTER(server->addresses, alist);
 	server->addr_version = alist->version;
 	server->uuid = *uuid;
-	server->flags = (1UL << AFS_SERVER_FL_NEW);
 	server->update_at = ktime_get_real_seconds() + afs_server_update_delay;
 	rwlock_init(&server->fs_lock);
 	INIT_HLIST_HEAD(&server->cb_volumes);
 	rwlock_init(&server->cb_break_lock);
+	init_waitqueue_head(&server->probe_wq);
+	spin_lock_init(&server->probe_lock);
 
 	afs_inc_servers_outstanding(net);
+	trace_afs_server(server, 1, afs_server_trace_alloc);
 	_leave(" = %p", server);
 	return server;
 
@@ -241,41 +242,23 @@ enomem:
 static struct afs_addr_list *afs_vl_lookup_addrs(struct afs_cell *cell,
 						 struct key *key, const uuid_t *uuid)
 {
-	struct afs_addr_cursor ac;
-	struct afs_addr_list *alist;
+	struct afs_vl_cursor vc;
+	struct afs_addr_list *alist = NULL;
 	int ret;
 
-	ret = afs_set_vl_cursor(&ac, cell);
-	if (ret < 0)
-		return ERR_PTR(ret);
-
-	while (afs_iterate_addresses(&ac)) {
-		if (test_bit(ac.index, &ac.alist->yfs))
-			alist = afs_yfsvl_get_endpoints(cell->net, &ac, key, uuid);
-		else
-			alist = afs_vl_get_addrs_u(cell->net, &ac, key, uuid);
-		switch (ac.error) {
-		case 0:
-			afs_end_cursor(&ac);
-			return alist;
-		case -ECONNABORTED:
-			ac.error = afs_abort_to_error(ac.abort_code);
-			goto error;
-		case -ENOMEM:
-		case -ENONET:
-			goto error;
-		case -ENETUNREACH:
-		case -EHOSTUNREACH:
-		case -ECONNREFUSED:
-			break;
-		default:
-			ac.error = -EIO;
-			goto error;
+	ret = -ERESTARTSYS;
+	if (afs_begin_vlserver_operation(&vc, cell, key)) {
+		while (afs_select_vlserver(&vc)) {
+			if (test_bit(AFS_VLSERVER_FL_IS_YFS, &vc.server->flags))
+				alist = afs_yfsvl_get_endpoints(&vc, uuid);
+			else
+				alist = afs_vl_get_addrs_u(&vc, uuid);
 		}
+
+		ret = afs_end_vlserver_operation(&vc);
 	}
 
-error:
-	return ERR_PTR(afs_end_cursor(&ac));
+	return ret < 0 ? ERR_PTR(ret) : alist;
 }
 
 /*
@@ -340,9 +323,22 @@ void afs_servers_timer(struct timer_list *timer)
 }
 
 /*
+ * Get a reference on a server object.
+ */
+struct afs_server *afs_get_server(struct afs_server *server,
+				  enum afs_server_trace reason)
+{
+	unsigned int u = atomic_inc_return(&server->usage);
+
+	trace_afs_server(server, u, reason);
+	return server;
+}
+
+/*
  * Release a reference on a server record.
  */
-void afs_put_server(struct afs_net *net, struct afs_server *server)
+void afs_put_server(struct afs_net *net, struct afs_server *server,
+		    enum afs_server_trace reason)
 {
 	unsigned int usage;
 
@@ -353,7 +349,7 @@ void afs_put_server(struct afs_net *net, struct afs_server *server)
 
 	usage = atomic_dec_return(&server->usage);
 
-	_enter("{%u}", usage);
+	trace_afs_server(server, usage, reason);
 
 	if (likely(usage > 0))
 		return;
@@ -365,6 +361,8 @@ static void afs_server_rcu(struct rcu_head *rcu)
 {
 	struct afs_server *server = container_of(rcu, struct afs_server, rcu);
 
+	trace_afs_server(server, atomic_read(&server->usage),
+			 afs_server_trace_free);
 	afs_put_addrlist(rcu_access_pointer(server->addresses));
 	kfree(server);
 }
@@ -377,16 +375,21 @@ static void afs_destroy_server(struct afs_net *net, struct afs_server *server)
 	struct afs_addr_list *alist = rcu_access_pointer(server->addresses);
 	struct afs_addr_cursor ac = {
 		.alist	= alist,
-		.start	= alist->index,
-		.index	= 0,
-		.addr	= &alist->addrs[alist->index],
+		.index	= alist->preferred,
 		.error	= 0,
 	};
-	_enter("%p", server);
+
+	trace_afs_server(server, atomic_read(&server->usage),
+			 afs_server_trace_give_up_cb);
 
 	if (test_bit(AFS_SERVER_FL_MAY_HAVE_CB, &server->flags))
 		afs_fs_give_up_all_callbacks(net, server, &ac, NULL);
 
+	wait_var_event(&server->probe_outstanding,
+		       atomic_read(&server->probe_outstanding) == 0);
+
+	trace_afs_server(server, atomic_read(&server->usage),
+			 afs_server_trace_destroy);
 	call_rcu(&server->rcu, afs_server_rcu);
 	afs_dec_servers_outstanding(net);
 }
@@ -406,6 +409,7 @@ static void afs_gc_servers(struct afs_net *net, struct afs_server *gc_list)
 		write_seqlock(&net->fs_lock);
 		usage = 1;
 		deleted = atomic_try_cmpxchg(&server->usage, &usage, 0);
+		trace_afs_server(server, usage, afs_server_trace_gc);
 		if (deleted) {
 			rb_erase(&server->uuid_rb, &net->fs_servers);
 			hlist_del_rcu(&server->proc_link);
@@ -520,99 +524,6 @@ void afs_purge_servers(struct afs_net *net)
 }
 
 /*
- * Probe a fileserver to find its capabilities.
- *
- * TODO: Try service upgrade.
- */
-static bool afs_do_probe_fileserver(struct afs_fs_cursor *fc)
-{
-	_enter("");
-
-	fc->ac.addr = NULL;
-	fc->ac.start = READ_ONCE(fc->ac.alist->index);
-	fc->ac.index = fc->ac.start;
-	fc->ac.error = 0;
-	fc->ac.begun = false;
-
-	while (afs_iterate_addresses(&fc->ac)) {
-		afs_fs_get_capabilities(afs_v2net(fc->vnode), fc->cbi->server,
-					&fc->ac, fc->key);
-		switch (fc->ac.error) {
-		case 0:
-			afs_end_cursor(&fc->ac);
-			set_bit(AFS_SERVER_FL_PROBED, &fc->cbi->server->flags);
-			return true;
-		case -ECONNABORTED:
-			fc->ac.error = afs_abort_to_error(fc->ac.abort_code);
-			goto error;
-		case -ENOMEM:
-		case -ENONET:
-			goto error;
-		case -ENETUNREACH:
-		case -EHOSTUNREACH:
-		case -ECONNREFUSED:
-		case -ETIMEDOUT:
-		case -ETIME:
-			break;
-		default:
-			fc->ac.error = -EIO;
-			goto error;
-		}
-	}
-
-error:
-	afs_end_cursor(&fc->ac);
-	return false;
-}
-
-/*
- * If we haven't already, try probing the fileserver to get its capabilities.
- * We try not to instigate parallel probes, but it's possible that the parallel
- * probes will fail due to authentication failure when ours would succeed.
- *
- * TODO: Try sending an anonymous probe if an authenticated probe fails.
- */
-bool afs_probe_fileserver(struct afs_fs_cursor *fc)
-{
-	bool success;
-	int ret, retries = 0;
-
-	_enter("");
-
-retry:
-	if (test_bit(AFS_SERVER_FL_PROBED, &fc->cbi->server->flags)) {
-		_leave(" = t");
-		return true;
-	}
-
-	if (!test_and_set_bit_lock(AFS_SERVER_FL_PROBING, &fc->cbi->server->flags)) {
-		success = afs_do_probe_fileserver(fc);
-		clear_bit_unlock(AFS_SERVER_FL_PROBING, &fc->cbi->server->flags);
-		wake_up_bit(&fc->cbi->server->flags, AFS_SERVER_FL_PROBING);
-		_leave(" = t");
-		return success;
-	}
-
-	_debug("wait");
-	ret = wait_on_bit(&fc->cbi->server->flags, AFS_SERVER_FL_PROBING,
-			  TASK_INTERRUPTIBLE);
-	if (ret == -ERESTARTSYS) {
-		fc->ac.error = ret;
-		_leave(" = f [%d]", ret);
-		return false;
-	}
-
-	retries++;
-	if (retries == 4) {
-		fc->ac.error = -ESTALE;
-		_leave(" = f [stale]");
-		return false;
-	}
-	_debug("retry");
-	goto retry;
-}
-
-/*
  * Get an update for a server's address list.
  */
 static noinline bool afs_update_server_record(struct afs_fs_cursor *fc, struct afs_server *server)
@@ -621,11 +532,20 @@ static noinline bool afs_update_server_record(struct afs_fs_cursor *fc, struct a
 
 	_enter("");
 
+	trace_afs_server(server, atomic_read(&server->usage), afs_server_trace_update);
+
 	alist = afs_vl_lookup_addrs(fc->vnode->volume->cell, fc->key,
 				    &server->uuid);
 	if (IS_ERR(alist)) {
-		fc->ac.error = PTR_ERR(alist);
-		_leave(" = f [%d]", fc->ac.error);
+		if ((PTR_ERR(alist) == -ERESTARTSYS ||
+		     PTR_ERR(alist) == -EINTR) &&
+		    !(fc->flags & AFS_FS_CURSOR_INTR) &&
+		    server->addresses) {
+			_leave(" = t [intr]");
+			return true;
+		}
+		fc->error = PTR_ERR(alist);
+		_leave(" = f [%d]", fc->error);
 		return false;
 	}
 
@@ -675,9 +595,10 @@ retry:
 	}
 
 	ret = wait_on_bit(&server->flags, AFS_SERVER_FL_UPDATING,
-			  TASK_INTERRUPTIBLE);
+			  (fc->flags & AFS_FS_CURSOR_INTR) ?
+			  TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE);
 	if (ret == -ERESTARTSYS) {
-		fc->ac.error = ret;
+		fc->error = ret;
 		_leave(" = f [intr]");
 		return false;
 	}

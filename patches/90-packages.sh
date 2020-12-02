@@ -11,13 +11,13 @@ ret=0
 tar zxf /firmware/packages/binaries.tar.gz -C /system
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
 
-tar zxf /firmware/packages/nano.tar.gz -C /system
+tar zxf /firmware/packages/efibootmgr.tar.gz -C /system
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 
-tar zxf /firmware/packages/ncurses.tar.gz -C /system
+tar zxf /firmware/packages/nano.tar.gz -C /system
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 
-tar zxf /firmware/packages/qemu.tar.gz -C /system
+tar zxf /firmware/packages/ncurses.tar.gz -C /system
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
 
 tar zxf /firmware/packages/swtpm.tar.gz -C /system
@@ -34,8 +34,14 @@ done
 
 for i in $(echo "$1" | sed 's#,# #g')
 do
-	if [ "$i" == "rtbth" ]; then tar zxf /firmware/packages/rtbth.tar.gz -C /system; fi
+	if [ "$i" == "ipts" ]; then tar zxf /firmware/packages/ipts.tar.gz -C /system; fi
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 7))); fi
+done
+
+for i in $(echo "$1" | sed 's#,# #g')
+do
+	if [ "$i" == "rtbth" ]; then tar zxf /firmware/packages/rtbth.tar.gz -C /system; fi
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 8))); fi
 done
 
 exit $ret

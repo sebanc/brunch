@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-#include <drm/drmP.h>
+#include <drm/drm_debugfs.h>
 #include <drm/drm_dp_mst_helper.h>
 #include <drm/drm_fb_helper.h>
+#include <drm/drm_file.h>
+#include <drm/drm_probe_helper.h>
 
-#include "radeon.h"
 #include "atom.h"
 #include "ni_reg.h"
+#include "radeon.h"
 
 static struct radeon_encoder *radeon_dp_create_fake_mst_encoder(struct radeon_connector *connector);
 
@@ -489,7 +491,7 @@ static bool radeon_mst_mode_fixup(struct drm_encoder *encoder,
 
 	mst_enc = radeon_encoder->enc_priv;
 
-	mst_enc->pbn = drm_dp_calc_pbn_mode(adjusted_mode->clock, bpp);
+	mst_enc->pbn = drm_dp_calc_pbn_mode(adjusted_mode->clock, bpp, false);
 
 	mst_enc->primary->active_device = mst_enc->primary->devices & mst_enc->connector->devices;
 	DRM_DEBUG_KMS("setting active device to %08x from %08x %08x for encoder %d\n",

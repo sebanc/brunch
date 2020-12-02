@@ -35,7 +35,7 @@
  * struct drm_crtc_commit - track modeset commits on a CRTC
  *
  * This structure is used to track pending modeset changes and atomic commit on
- * a per-CRTC basis. Since updating the list should never block this structure
+ * a per-CRTC basis. Since updating the list should never block, this structure
  * is reference counted to allow waiters to safely wait on an event to complete,
  * without holding any locks.
  *
@@ -60,8 +60,8 @@
  * 	wait for flip_done		<----
  * 	clean up atomic state
  *
- * The important bit to know is that cleanup_done is the terminal event, but the
- * ordering between flip_done and hw_done is entirely up to the specific driver
+ * The important bit to know is that &cleanup_done is the terminal event, but the
+ * ordering between &flip_done and &hw_done is entirely up to the specific driver
  * and modeset state change.
  *
  * For an implementation of how to use this look at
@@ -92,6 +92,9 @@ struct drm_crtc_commit {
 	 * commit is sent to userspace, or when an out-fence is singalled. Note
 	 * that for most hardware, in most cases this happens after @hw_done is
 	 * signalled.
+	 *
+	 * Completion of this stage is signalled implicitly by calling
+	 * drm_crtc_send_vblank_event() on &drm_crtc_state.event.
 	 */
 	struct completion flip_done;
 
@@ -107,6 +110,9 @@ struct drm_crtc_commit {
 	 * Note that this does not need to include separately reference-counted
 	 * resources like backing storage buffer pinning, or runtime pm
 	 * management.
+	 *
+	 * Drivers should call drm_atomic_helper_commit_hw_done() to signal
+	 * completion of this stage.
 	 */
 	struct completion hw_done;
 
@@ -118,6 +124,9 @@ struct drm_crtc_commit {
 	 * a vblank wait completed it might be a bit later. This completion is
 	 * useful to throttle updates and avoid hardware updates getting ahead
 	 * of the buffer cleanup too much.
+	 *
+	 * Drivers should call drm_atomic_helper_commit_cleanup_done() to signal
+	 * completion of this stage.
 	 */
 	struct completion cleanup_done;
 
@@ -139,9 +148,9 @@ struct drm_crtc_commit {
 	/**
 	 * @abort_completion:
 	 *
-	 * A flag that's set after drm_atomic_helper_setup_commit takes a second
-	 * reference for the completion of $drm_crtc_state.event. It's used by
-	 * the free code to remove the second reference if commit fails.
+	 * A flag that's set after drm_atomic_helper_setup_commit() takes a
+	 * second reference for the completion of $drm_crtc_state.event. It's
+	 * used by the free code to remove the second reference if commit fails.
 	 */
 	bool abort_completion;
 };
@@ -192,7 +201,7 @@ struct drm_private_state;
  * private objects. The structure itself is used as a vtable to identify the
  * associated private object type. Each private object type that needs to be
  * added to the atomic states is expected to have an implementation of these
- * hooks and pass a pointer to it's drm_private_state_funcs struct to
+ * hooks and pass a pointer to its drm_private_state_funcs struct to
  * drm_atomic_get_private_obj_state().
  */
 struct drm_private_state_funcs {
@@ -299,7 +308,6 @@ struct __drm_private_objs_state {
  * struct drm_atomic_state - the global state object for atomic updates
  * @ref: count of all references to this state (will not be freed until zero)
  * @dev: parent DRM device
- * @allow_modeset: allow full modeset
  * @legacy_cursor_update: hint to enforce legacy cursor IOCTL semantics
  * @async_update: hint for asynchronous plane update
  * @planes: pointer to array of structures with per-plane data
@@ -318,9 +326,27 @@ struct drm_atomic_state {
 	struct kref ref;
 
 	struct drm_device *dev;
+
+	/**
+	 * @allow_modeset:
+	 *
+	 * Allow full modeset. This is used by the ATOMIC IOCTL handler to
+	 * implement the DRM_MODE_ATOMIC_ALLOW_MODESET flag. Drivers should
+	 * never consult this flag, instead looking at the output of
+	 * drm_atomic_crtc_needs_modeset().
+	 */
 	bool allow_modeset : 1;
 	bool legacy_cursor_update : 1;
 	bool async_update : 1;
+	/**
+	 * @duplicated:
+	 *
+	 * Indicates whether or not this atomic state was duplicated using
+	 * drm_atomic_helper_duplicate_state(). Drivers and atomic helpers
+	 * should use this to fixup normal  inconsistencies in duplicated
+	 * states.
+	 */
+	bool duplicated : 1;
 	struct __drm_planes_state *planes;
 	struct __drm_crtcs_state *crtcs;
 	int num_connector;
@@ -337,7 +363,7 @@ struct drm_atomic_state {
 	 * When a connector or plane is not bound to any CRTC, it's still important
 	 * to preserve linearity to prevent the atomic states from being freed to early.
 	 *
-	 * This commit (if set) is not bound to any crtc, but will be completed when
+	 * This commit (if set) is not bound to any CRTC, but will be completed when
 	 * drm_atomic_helper_commit_hw_done() is called.
 	 */
 	struct drm_crtc_commit *fake_commit;
@@ -435,14 +461,27 @@ void drm_atomic_private_obj_fini(struct drm_private_obj *obj);
 struct drm_private_state * __must_check
 drm_atomic_get_private_obj_state(struct drm_atomic_state *state,
 				 struct drm_private_obj *obj);
+struct drm_private_state *
+drm_atomic_get_old_private_obj_state(struct drm_atomic_state *state,
+				     struct drm_private_obj *obj);
+struct drm_private_state *
+drm_atomic_get_new_private_obj_state(struct drm_atomic_state *state,
+				     struct drm_private_obj *obj);
+
+struct drm_connector *
+drm_atomic_get_old_connector_for_encoder(struct drm_atomic_state *state,
+					 struct drm_encoder *encoder);
+struct drm_connector *
+drm_atomic_get_new_connector_for_encoder(struct drm_atomic_state *state,
+					 struct drm_encoder *encoder);
 
 /**
- * drm_atomic_get_existing_crtc_state - get crtc state, if it exists
+ * drm_atomic_get_existing_crtc_state - get CRTC state, if it exists
  * @state: global atomic state object
- * @crtc: crtc to grab
+ * @crtc: CRTC to grab
  *
- * This function returns the crtc state for the given crtc, or NULL
- * if the crtc is not part of the global atomic state.
+ * This function returns the CRTC state for the given CRTC, or NULL
+ * if the CRTC is not part of the global atomic state.
  *
  * This function is deprecated, @drm_atomic_get_old_crtc_state or
  * @drm_atomic_get_new_crtc_state should be used instead.
@@ -455,12 +494,12 @@ drm_atomic_get_existing_crtc_state(struct drm_atomic_state *state,
 }
 
 /**
- * drm_atomic_get_old_crtc_state - get old crtc state, if it exists
+ * drm_atomic_get_old_crtc_state - get old CRTC state, if it exists
  * @state: global atomic state object
- * @crtc: crtc to grab
+ * @crtc: CRTC to grab
  *
- * This function returns the old crtc state for the given crtc, or
- * NULL if the crtc is not part of the global atomic state.
+ * This function returns the old CRTC state for the given CRTC, or
+ * NULL if the CRTC is not part of the global atomic state.
  */
 static inline struct drm_crtc_state *
 drm_atomic_get_old_crtc_state(struct drm_atomic_state *state,
@@ -469,12 +508,12 @@ drm_atomic_get_old_crtc_state(struct drm_atomic_state *state,
 	return state->crtcs[drm_crtc_index(crtc)].old_state;
 }
 /**
- * drm_atomic_get_new_crtc_state - get new crtc state, if it exists
+ * drm_atomic_get_new_crtc_state - get new CRTC state, if it exists
  * @state: global atomic state object
- * @crtc: crtc to grab
+ * @crtc: CRTC to grab
  *
- * This function returns the new crtc state for the given crtc, or
- * NULL if the crtc is not part of the global atomic state.
+ * This function returns the new CRTC state for the given CRTC, or
+ * NULL if the CRTC is not part of the global atomic state.
  */
 static inline struct drm_crtc_state *
 drm_atomic_get_new_crtc_state(struct drm_atomic_state *state,
@@ -630,6 +669,9 @@ __drm_atomic_get_current_plane_state(struct drm_atomic_state *state,
 	return plane->state;
 }
 
+int __must_check
+drm_atomic_add_encoder_bridges(struct drm_atomic_state *state,
+			       struct drm_encoder *encoder);
 int __must_check
 drm_atomic_add_affected_connectors(struct drm_atomic_state *state,
 				   struct drm_crtc *crtc);
@@ -926,5 +968,93 @@ drm_atomic_crtc_needs_modeset(const struct drm_crtc_state *state)
 	return state->mode_changed || state->active_changed ||
 	       state->connectors_changed;
 }
+
+/**
+ * drm_atomic_crtc_effectively_active - compute whether CRTC is actually active
+ * @state: &drm_crtc_state for the CRTC
+ *
+ * When in self refresh mode, the crtc_state->active value will be false, since
+ * the CRTC is off. However in some cases we're interested in whether the CRTC
+ * is active, or effectively active (ie: it's connected to an active display).
+ * In these cases, use this function instead of just checking active.
+ */
+static inline bool
+drm_atomic_crtc_effectively_active(const struct drm_crtc_state *state)
+{
+	return state->active || state->self_refresh_active;
+}
+
+/**
+ * struct drm_bus_cfg - bus configuration
+ *
+ * This structure stores the configuration of a physical bus between two
+ * components in an output pipeline, usually between two bridges, an encoder
+ * and a bridge, or a bridge and a connector.
+ *
+ * The bus configuration is stored in &drm_bridge_state separately for the
+ * input and output buses, as seen from the point of view of each bridge. The
+ * bus configuration of a bridge output is usually identical to the
+ * configuration of the next bridge's input, but may differ if the signals are
+ * modified between the two bridges, for instance by an inverter on the board.
+ * The input and output configurations of a bridge may differ if the bridge
+ * modifies the signals internally, for instance by performing format
+ * conversion, or modifying signals polarities.
+ */
+struct drm_bus_cfg {
+	/**
+	 * @format: format used on this bus (one of the MEDIA_BUS_FMT_* format)
+	 *
+	 * This field should not be directly modified by drivers
+	 * (drm_atomic_bridge_chain_select_bus_fmts() takes care of the bus
+	 * format negotiation).
+	 */
+	u32 format;
+
+	/**
+	 * @flags: DRM_BUS_* flags used on this bus
+	 */
+	u32 flags;
+};
+
+/**
+ * struct drm_bridge_state - Atomic bridge state object
+ */
+struct drm_bridge_state {
+	/**
+	 * @base: inherit from &drm_private_state
+	 */
+	struct drm_private_state base;
+
+	/**
+	 * @bridge: the bridge this state refers to
+	 */
+	struct drm_bridge *bridge;
+
+	/**
+	 * @input_bus_cfg: input bus configuration
+	 */
+	struct drm_bus_cfg input_bus_cfg;
+
+	/**
+	 * @output_bus_cfg: input bus configuration
+	 */
+	struct drm_bus_cfg output_bus_cfg;
+};
+
+static inline struct drm_bridge_state *
+drm_priv_to_bridge_state(struct drm_private_state *priv)
+{
+	return container_of(priv, struct drm_bridge_state, base);
+}
+
+struct drm_bridge_state *
+drm_atomic_get_bridge_state(struct drm_atomic_state *state,
+			    struct drm_bridge *bridge);
+struct drm_bridge_state *
+drm_atomic_get_old_bridge_state(struct drm_atomic_state *state,
+				struct drm_bridge *bridge);
+struct drm_bridge_state *
+drm_atomic_get_new_bridge_state(struct drm_atomic_state *state,
+				struct drm_bridge *bridge);
 
 #endif /* DRM_ATOMIC_H_ */

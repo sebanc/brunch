@@ -38,19 +38,18 @@ static int ism_cmd(struct ism_dev *ism, void *cmd)
 	struct ism_req_hdr *req = cmd;
 	struct ism_resp_hdr *resp = cmd;
 
-	memcpy_toio(ism->ctl + sizeof(*req), req + 1, req->len - sizeof(*req));
-	memcpy_toio(ism->ctl, req, sizeof(*req));
+	__ism_write_cmd(ism, req + 1, sizeof(*req), req->len - sizeof(*req));
+	__ism_write_cmd(ism, req, 0, sizeof(*req));
 
 	WRITE_ONCE(resp->ret, ISM_ERROR);
 
-	memcpy_fromio(resp, ism->ctl, sizeof(*resp));
+	__ism_read_cmd(ism, resp, 0, sizeof(*resp));
 	if (resp->ret) {
 		debug_text_event(ism_debug_info, 0, "cmd failure");
 		debug_event(ism_debug_info, 0, resp, sizeof(*resp));
 		goto out;
 	}
-	memcpy_fromio(resp + 1, ism->ctl + sizeof(*resp),
-		      resp->len - sizeof(*resp));
+	__ism_read_cmd(ism, resp + 1, sizeof(*resp), resp->len - sizeof(*resp));
 out:
 	return resp->ret;
 }
@@ -89,8 +88,8 @@ static int register_sba(struct ism_dev *ism)
 	dma_addr_t dma_handle;
 	struct ism_sba *sba;
 
-	sba = dma_zalloc_coherent(&ism->pdev->dev, PAGE_SIZE,
-				  &dma_handle, GFP_KERNEL);
+	sba = dma_alloc_coherent(&ism->pdev->dev, PAGE_SIZE, &dma_handle,
+				 GFP_KERNEL);
 	if (!sba)
 		return -ENOMEM;
 
@@ -116,8 +115,8 @@ static int register_ieq(struct ism_dev *ism)
 	dma_addr_t dma_handle;
 	struct ism_eq *ieq;
 
-	ieq = dma_zalloc_coherent(&ism->pdev->dev, PAGE_SIZE,
-				  &dma_handle, GFP_KERNEL);
+	ieq = dma_alloc_coherent(&ism->pdev->dev, PAGE_SIZE, &dma_handle,
+				 GFP_KERNEL);
 	if (!ieq)
 		return -ENOMEM;
 
@@ -240,10 +239,9 @@ static int ism_alloc_dmb(struct ism_dev *ism, struct smcd_dmb *dmb)
 	    test_and_set_bit(dmb->sba_idx, ism->sba_bitmap))
 		return -EINVAL;
 
-	dmb->cpu_addr = dma_zalloc_coherent(&ism->pdev->dev, dmb->dmb_len,
-					    &dmb->dma_addr, GFP_KERNEL |
-					    __GFP_NOWARN | __GFP_NOMEMALLOC |
-					    __GFP_COMP | __GFP_NORETRY);
+	dmb->cpu_addr = dma_alloc_coherent(&ism->pdev->dev, dmb->dmb_len,
+					   &dmb->dma_addr,
+					   GFP_KERNEL | __GFP_NOWARN | __GFP_NOMEMALLOC | __GFP_COMP | __GFP_NORETRY);
 	if (!dmb->cpu_addr)
 		clear_bit(dmb->sba_idx, ism->sba_bitmap);
 
@@ -513,22 +511,20 @@ static int ism_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ret)
 		goto err_disable;
 
-	ism->ctl = pci_iomap(pdev, 2, 0);
-	if (!ism->ctl)
-		goto err_resource;
-
 	ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
 	if (ret)
-		goto err_unmap;
+		goto err_resource;
 
-	pci_set_dma_seg_boundary(pdev, SZ_1M - 1);
-	pci_set_dma_max_seg_size(pdev, SZ_1M);
+	dma_set_seg_boundary(&pdev->dev, SZ_1M - 1);
+	dma_set_max_seg_size(&pdev->dev, SZ_1M);
 	pci_set_master(pdev);
 
 	ism->smcd = smcd_alloc_dev(&pdev->dev, dev_name(&pdev->dev), &ism_ops,
 				   ISM_NR_DMBS);
-	if (!ism->smcd)
-		goto err_unmap;
+	if (!ism->smcd) {
+		ret = -ENOMEM;
+		goto err_resource;
+	}
 
 	ism->smcd->priv = ism;
 	ret = ism_dev_init(ism);
@@ -539,8 +535,6 @@ static int ism_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 err_free:
 	smcd_free_dev(ism->smcd);
-err_unmap:
-	pci_iounmap(pdev, ism->ctl);
 err_resource:
 	pci_release_mem_regions(pdev);
 err_disable:
@@ -569,7 +563,6 @@ static void ism_remove(struct pci_dev *pdev)
 	ism_dev_exit(ism);
 
 	smcd_free_dev(ism->smcd);
-	pci_iounmap(pdev, ism->ctl);
 	pci_release_mem_regions(pdev);
 	pci_disable_device(pdev);
 	dev_set_drvdata(&pdev->dev, NULL);

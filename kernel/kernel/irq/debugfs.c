@@ -56,6 +56,8 @@ static const struct irq_bit_descr irqchip_flags[] = {
 	BIT_MASK_DESCR(IRQCHIP_ONESHOT_SAFE),
 	BIT_MASK_DESCR(IRQCHIP_EOI_THREADED),
 	BIT_MASK_DESCR(IRQCHIP_SUPPORTS_LEVEL_MSI),
+	BIT_MASK_DESCR(IRQCHIP_SUPPORTS_NMI),
+	BIT_MASK_DESCR(IRQCHIP_ENABLE_WAKEUP_ON_SUSPEND),
 };
 
 static void
@@ -111,6 +113,7 @@ static const struct irq_bit_descr irqdata_states[] = {
 	BIT_MASK_DESCR(IRQD_AFFINITY_SET),
 	BIT_MASK_DESCR(IRQD_SETAFFINITY_PENDING),
 	BIT_MASK_DESCR(IRQD_AFFINITY_MANAGED),
+	BIT_MASK_DESCR(IRQD_AFFINITY_ON_ACTIVATE),
 	BIT_MASK_DESCR(IRQD_MANAGED_SHUTDOWN),
 	BIT_MASK_DESCR(IRQD_CAN_RESERVE),
 	BIT_MASK_DESCR(IRQD_MSI_NOMASK_QUIRK),
@@ -119,6 +122,12 @@ static const struct irq_bit_descr irqdata_states[] = {
 
 	BIT_MASK_DESCR(IRQD_WAKEUP_STATE),
 	BIT_MASK_DESCR(IRQD_WAKEUP_ARMED),
+
+	BIT_MASK_DESCR(IRQD_DEFAULT_TRIGGER_SET),
+
+	BIT_MASK_DESCR(IRQD_HANDLE_ENFORCE_IRQCTX),
+
+	BIT_MASK_DESCR(IRQD_IRQ_ENABLED_ON_SUSPEND),
 };
 
 static const struct irq_bit_descr irqdesc_states[] = {
@@ -141,6 +150,7 @@ static const struct irq_bit_descr irqdesc_istates[] = {
 	BIT_MASK_DESCR(IRQS_WAITING),
 	BIT_MASK_DESCR(IRQS_PENDING),
 	BIT_MASK_DESCR(IRQS_SUSPENDED),
+	BIT_MASK_DESCR(IRQS_NMI),
 };
 
 
@@ -151,7 +161,7 @@ static int irq_debug_show(struct seq_file *m, void *p)
 
 	raw_spin_lock_irq(&desc->lock);
 	data = irq_desc_get_irq_data(desc);
-	seq_printf(m, "handler:  %pf\n", desc->handle_irq);
+	seq_printf(m, "handler:  %ps\n", desc->handle_irq);
 	seq_printf(m, "device:   %s\n", desc->dev_name);
 	seq_printf(m, "status:   0x%08x\n", desc->status_use_accessors);
 	irq_debug_show_bits(m, 0, desc->status_use_accessors, irqdesc_states,
@@ -204,8 +214,15 @@ static ssize_t irq_debug_write(struct file *file, const char __user *user_buf,
 		chip_bus_lock(desc);
 		raw_spin_lock_irqsave(&desc->lock, flags);
 
-		if (irq_settings_is_level(desc)) {
-			/* Can't do level, sorry */
+		/*
+		 * Don't allow injection when the interrupt is:
+		 *  - Level or NMI type
+		 *  - not activated
+		 *  - replaying already
+		 */
+		if (irq_settings_is_level(desc) ||
+		    !irqd_is_activated(&desc->irq_data) ||
+		    (desc->istate & (IRQS_NMI | IRQS_REPLAY))) {
 			err = -EINVAL;
 		} else {
 			desc->istate |= IRQS_PENDING;
@@ -257,8 +274,6 @@ static int __init irq_debugfs_init(void)
 	int irq;
 
 	root_dir = debugfs_create_dir("irq", NULL);
-	if (!root_dir)
-		return -ENOMEM;
 
 	irq_domain_debugfs_init(root_dir);
 

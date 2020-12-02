@@ -1,9 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018 Chelsio Communications, Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #ifndef __CHTLS_H__
@@ -220,6 +217,8 @@ struct chtls_sock {
 	u16 resv2;
 	u32 delack_mode;
 	u32 delack_seq;
+	u32 snd_win;
+	u32 rcv_win;
 
 	void *passive_reap_next;        /* placeholder for passive */
 	struct chtls_hws tlshws;

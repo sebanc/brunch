@@ -28,7 +28,6 @@
 #include "hardwaremanager.h"
 #include "hwmgr_ppt.h"
 #include "ppatomctrl.h"
-#include "hwmgr_ppt.h"
 #include "power_state.h"
 #include "smu_helper.h"
 
@@ -47,6 +46,11 @@ enum DISPLAY_GAP {
 	DISPLAY_GAP_IGNORE       = 3    /* Do not wait. */
 };
 typedef enum DISPLAY_GAP DISPLAY_GAP;
+
+enum BACO_STATE {
+	BACO_STATE_OUT = 0,
+	BACO_STATE_IN,
+};
 
 struct vi_dpm_level {
 	bool enabled;
@@ -185,7 +189,16 @@ struct phm_vce_clock_voltage_dependency_table {
 	struct phm_vce_clock_voltage_dependency_record entries[1];
 };
 
+
+enum SMU_ASIC_RESET_MODE
+{
+    SMU_ASIC_RESET_MODE_0,
+    SMU_ASIC_RESET_MODE_1,
+    SMU_ASIC_RESET_MODE_2,
+};
+
 struct pp_smumgr_func {
+	char *name;
 	int (*smu_init)(struct pp_hwmgr  *hwmgr);
 	int (*smu_fini)(struct pp_hwmgr  *hwmgr);
 	int (*start_smu)(struct pp_hwmgr  *hwmgr);
@@ -252,7 +265,6 @@ struct pp_hwmgr_func {
 	uint32_t (*get_sclk)(struct pp_hwmgr *hwmgr, bool low);
 	int (*power_state_set)(struct pp_hwmgr *hwmgr,
 						const void *state);
-	int (*enable_clock_power_gating)(struct pp_hwmgr *hwmgr);
 	int (*notify_smc_display_config_after_ps_adjustment)(struct pp_hwmgr *hwmgr);
 	int (*pre_display_config_changed)(struct pp_hwmgr *hwmgr);
 	int (*display_config_changed)(struct pp_hwmgr *hwmgr);
@@ -310,7 +322,7 @@ struct pp_hwmgr_func {
 	int (*avfs_control)(struct pp_hwmgr *hwmgr, bool enable);
 	int (*disable_smc_firmware_ctf)(struct pp_hwmgr *hwmgr);
 	int (*set_active_display_count)(struct pp_hwmgr *hwmgr, uint32_t count);
-	int (*set_deep_sleep_dcefclk)(struct pp_hwmgr *hwmgr, uint32_t clock);
+	int (*set_min_deep_sleep_dcefclk)(struct pp_hwmgr *hwmgr, uint32_t clock);
 	int (*start_thermal_controller)(struct pp_hwmgr *hwmgr, struct PP_TemperatureRange *range);
 	int (*notify_cac_buffer_info)(struct pp_hwmgr *hwmgr,
 					uint32_t virtual_addr_low,
@@ -318,6 +330,9 @@ struct pp_hwmgr_func {
 					uint32_t mc_addr_low,
 					uint32_t mc_addr_hi,
 					uint32_t size);
+	int (*update_nbdpm_pstate)(struct pp_hwmgr *hwmgr,
+					bool enable,
+					bool lock);
 	int (*get_thermal_temperature_range)(struct pp_hwmgr *hwmgr,
 					struct PP_TemperatureRange *range);
 	int (*get_power_profile_mode)(struct pp_hwmgr *hwmgr, char *buf);
@@ -330,6 +345,16 @@ struct pp_hwmgr_func {
 	int (*smus_notify_pwe)(struct pp_hwmgr *hwmgr);
 	int (*powergate_sdma)(struct pp_hwmgr *hwmgr, bool bgate);
 	int (*enable_mgpu_fan_boost)(struct pp_hwmgr *hwmgr);
+	int (*set_hard_min_dcefclk_by_freq)(struct pp_hwmgr *hwmgr, uint32_t clock);
+	int (*set_hard_min_fclk_by_freq)(struct pp_hwmgr *hwmgr, uint32_t clock);
+	int (*get_asic_baco_capability)(struct pp_hwmgr *hwmgr, bool *cap);
+	int (*get_asic_baco_state)(struct pp_hwmgr *hwmgr, enum BACO_STATE *state);
+	int (*set_asic_baco_state)(struct pp_hwmgr *hwmgr, enum BACO_STATE state);
+	int (*get_ppfeature_status)(struct pp_hwmgr *hwmgr, char *buf);
+	int (*set_ppfeature_status)(struct pp_hwmgr *hwmgr, uint64_t ppfeature_masks);
+	int (*set_mp1_state)(struct pp_hwmgr *hwmgr, enum pp_mp1_state mp1_state);
+	int (*asic_reset)(struct pp_hwmgr *hwmgr, enum SMU_ASIC_RESET_MODE mode);
+	int (*smu_i2c_bus_access)(struct pp_hwmgr *hwmgr, bool aquire);
 };
 
 struct pp_table_func {
@@ -674,6 +699,7 @@ struct pp_advance_fan_control_parameters {
 	uint32_t  ulTargetGfxClk;
 	uint16_t  usZeroRPMStartTemperature;
 	uint16_t  usZeroRPMStopTemperature;
+	uint16_t  usMGpuThrottlingRPMLimit;
 };
 
 struct pp_thermal_controller_info {
@@ -702,7 +728,7 @@ enum PP_TABLE_VERSION {
 /**
  * The main hardware manager structure.
  */
-#define Workload_Policy_Max 5
+#define Workload_Policy_Max 6
 
 struct pp_hwmgr {
 	void *adev;
@@ -769,6 +795,7 @@ struct pp_hwmgr {
 	uint32_t workload_mask;
 	uint32_t workload_prority[Workload_Policy_Max];
 	uint32_t workload_setting[Workload_Policy_Max];
+	bool gfxoff_state_changed_by_workload;
 };
 
 int hwmgr_early_init(struct pp_hwmgr *hwmgr);

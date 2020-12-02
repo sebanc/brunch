@@ -21,7 +21,6 @@
  *
  */
 
-#include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_pm.h"
 #include "cikd.h"
@@ -508,19 +507,19 @@ static int kv_enable_didt(struct amdgpu_device *adev, bool enable)
 	    pi->caps_db_ramping ||
 	    pi->caps_td_ramping ||
 	    pi->caps_tcp_ramping) {
-		adev->gfx.rlc.funcs->enter_safe_mode(adev);
+		amdgpu_gfx_rlc_enter_safe_mode(adev);
 
 		if (enable) {
 			ret = kv_program_pt_config_registers(adev, didt_config_kv);
 			if (ret) {
-				adev->gfx.rlc.funcs->exit_safe_mode(adev);
+				amdgpu_gfx_rlc_exit_safe_mode(adev);
 				return ret;
 			}
 		}
 
 		kv_do_enable_didt(adev, enable);
 
-		adev->gfx.rlc.funcs->exit_safe_mode(adev);
+		amdgpu_gfx_rlc_exit_safe_mode(adev);
 	}
 
 	return 0;
@@ -2824,7 +2823,7 @@ static int kv_dpm_init(struct amdgpu_device *adev)
 		pi->caps_tcp_ramping = true;
 	}
 
-	if (adev->powerplay.pp_feature & PP_SCLK_DEEP_SLEEP_MASK)
+	if (adev->pm.pp_feature & PP_SCLK_DEEP_SLEEP_MASK)
 		pi->caps_sclk_ds = true;
 	else
 		pi->caps_sclk_ds = false;

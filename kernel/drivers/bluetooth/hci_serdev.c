@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  Bluetooth HCI serdev driver lib
  *
@@ -8,17 +9,6 @@
  *  Copyright (C) 2000-2001  Qualcomm Incorporated
  *  Copyright (C) 2002-2003  Maxim Krasnyansky <maxk@qualcomm.com>
  *  Copyright (C) 2004-2005  Marcel Holtmann <marcel@holtmann.org>
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
  */
 
 #include <linux/kernel.h>
@@ -95,7 +85,7 @@ static void hci_uart_write_work(struct work_struct *work)
 			hci_uart_tx_complete(hu, hci_skb_pkt_type(skb));
 			kfree_skb(skb);
 		}
-	} while(test_bit(HCI_UART_TX_WAKEUP, &hu->tx_state));
+	} while (test_bit(HCI_UART_TX_WAKEUP, &hu->tx_state));
 
 	clear_bit(HCI_UART_SENDING, &hu->tx_state);
 }
@@ -125,7 +115,21 @@ static int hci_uart_flush(struct hci_dev *hdev)
 /* Initialize device */
 static int hci_uart_open(struct hci_dev *hdev)
 {
+	struct hci_uart *hu = hci_get_drvdata(hdev);
+	int err;
+
 	BT_DBG("%s %p", hdev->name, hdev);
+
+	/* When Quirk HCI_QUIRK_NON_PERSISTENT_SETUP is set by
+	 * driver, BT SoC is completely turned OFF during
+	 * BT OFF. Upon next BT ON UART port should be opened.
+	 */
+	if (!test_bit(HCI_UART_PROTO_READY, &hu->flags)) {
+		err = serdev_device_open(hu->serdev);
+		if (err)
+			return err;
+		set_bit(HCI_UART_PROTO_READY, &hu->flags);
+	}
 
 	/* Undo clearing this from hci_uart_close() */
 	hdev->flush = hci_uart_flush;
@@ -136,10 +140,24 @@ static int hci_uart_open(struct hci_dev *hdev)
 /* Close device */
 static int hci_uart_close(struct hci_dev *hdev)
 {
+	struct hci_uart *hu = hci_get_drvdata(hdev);
+
 	BT_DBG("hdev %p", hdev);
+
+	if (!test_bit(HCI_UART_PROTO_READY, &hu->flags))
+		return 0;
 
 	hci_uart_flush(hdev);
 	hdev->flush = NULL;
+
+	/* When QUIRK HCI_QUIRK_NON_PERSISTENT_SETUP is set by driver,
+	 * BT SOC is completely powered OFF during BT OFF, holding port
+	 * open may drain the battery.
+	 */
+	if (test_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks)) {
+		clear_bit(HCI_UART_PROTO_READY, &hu->flags);
+		serdev_device_close(hu->serdev);
+	}
 
 	return 0;
 }
@@ -366,7 +384,7 @@ void hci_uart_unregister_device(struct hci_uart *hu)
 {
 	struct hci_dev *hdev = hu->hdev;
 
-	clear_bit(HCI_UART_PROTO_READY, &hu->flags);
+	cancel_work_sync(&hu->init_ready);
 	if (test_bit(HCI_UART_REGISTERED, &hu->flags))
 		hci_unregister_dev(hdev);
 	hci_free_dev(hdev);
@@ -374,6 +392,10 @@ void hci_uart_unregister_device(struct hci_uart *hu)
 	cancel_work_sync(&hu->write_work);
 
 	hu->proto->close(hu);
-	serdev_device_close(hu->serdev);
+
+	if (test_bit(HCI_UART_PROTO_READY, &hu->flags)) {
+		clear_bit(HCI_UART_PROTO_READY, &hu->flags);
+		serdev_device_close(hu->serdev);
+	}
 }
 EXPORT_SYMBOL_GPL(hci_uart_unregister_device);

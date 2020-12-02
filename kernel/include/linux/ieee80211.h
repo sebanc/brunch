@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * IEEE 802.11 defines
  *
@@ -8,11 +9,7 @@
  * Copyright (c) 2006, Michael Wu <flamingice@sourmilk.net>
  * Copyright (c) 2013 - 2014 Intel Mobile Communications GmbH
  * Copyright (c) 2016 - 2017 Intel Deutschland GmbH
- * Copyright (c) 2018        Intel Corporation
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * Copyright (c) 2018 - 2019 Intel Corporation
  */
 
 #ifndef LINUX_IEEE80211_H
@@ -821,6 +818,8 @@ enum mesh_config_capab_flags {
 	IEEE80211_MESHCONF_CAPAB_POWER_SAVE_LEVEL	= 0x40,
 };
 
+#define IEEE80211_MESHCONF_FORM_CONNECTED_TO_GATE 0x1
+
 /**
  * mesh channel switch parameters element's flag indicator
  *
@@ -889,6 +888,14 @@ enum ieee80211_vht_opmode_bits {
 struct ieee80211_tpc_report_ie {
 	u8 tx_power;
 	u8 link_margin;
+} __packed;
+
+#define IEEE80211_ADDBA_EXT_FRAG_LEVEL_MASK	GENMASK(2, 1)
+#define IEEE80211_ADDBA_EXT_FRAG_LEVEL_SHIFT	1
+#define IEEE80211_ADDBA_EXT_NO_FRAG		BIT(0)
+
+struct ieee80211_addba_ext_ie {
+	u8 data;
 } __packed;
 
 struct ieee80211_mgmt {
@@ -983,6 +990,8 @@ struct ieee80211_mgmt {
 					__le16 capab;
 					__le16 timeout;
 					__le16 start_seq_num;
+					/* followed by BA Extension */
+					u8 variable[0];
 				} __packed addba_req;
 				struct{
 					u8 action_code;
@@ -1469,13 +1478,16 @@ struct ieee80211_ht_operation {
  *	STA can receive. Rate expressed in units of 1 Mbps.
  *	If this field is 0 this value should not be used to
  *	consider the highest RX data rate supported.
- *	The top 3 bits of this field are reserved.
+ *	The top 3 bits of this field indicate the Maximum NSTS,total
+ *	(a beamformee capability.)
  * @tx_mcs_map: TX MCS map 2 bits for each stream, total 8 streams
  * @tx_highest: Indicates highest long GI VHT PPDU data rate
  *	STA can transmit. Rate expressed in units of 1 Mbps.
  *	If this field is 0 this value should not be used to
  *	consider the highest TX data rate supported.
- *	The top 3 bits of this field are reserved.
+ *	The top 2 bits of this field are reserved, the
+ *	3rd bit from the top indiciates VHT Extended NSS BW
+ *	Capability.
  */
 struct ieee80211_vht_mcs_info {
 	__le16 rx_mcs_map;
@@ -1483,6 +1495,13 @@ struct ieee80211_vht_mcs_info {
 	__le16 tx_mcs_map;
 	__le16 tx_highest;
 } __packed;
+
+/* for rx_highest */
+#define IEEE80211_VHT_MAX_NSTS_TOTAL_SHIFT	13
+#define IEEE80211_VHT_MAX_NSTS_TOTAL_MASK	(7 << IEEE80211_VHT_MAX_NSTS_TOTAL_SHIFT)
+
+/* for tx_highest */
+#define IEEE80211_VHT_EXT_NSS_BW_CAPABLE	(1 << 13)
 
 /**
  * enum ieee80211_vht_mcs_support - VHT MCS support definitions
@@ -1554,7 +1573,7 @@ struct ieee80211_vht_operation {
  * struct ieee80211_he_cap_elem - HE capabilities element
  *
  * This structure is the "HE capabilities element" fixed fields as
- * described in P802.11ax_D3.0 section 9.4.2.237.2 and 9.4.2.237.3
+ * described in P802.11ax_D4.0 section 9.4.2.242.2 and 9.4.2.242.3
  */
 struct ieee80211_he_cap_elem {
 	u8 mac_cap_info[6];
@@ -1616,12 +1635,24 @@ struct ieee80211_he_mcs_nss_supp {
  * struct ieee80211_he_operation - HE capabilities element
  *
  * This structure is the "HE operation element" fields as
- * described in P802.11ax_D2.0 section 9.4.2.238
+ * described in P802.11ax_D4.0 section 9.4.2.243
  */
 struct ieee80211_he_operation {
 	__le32 he_oper_params;
 	__le16 he_mcs_nss_set;
-	/* Optional 0,1,3 or 4 bytes: depends on @he_oper_params */
+	/* Optional 0,1,3,4,5,7 or 8 bytes: depends on @he_oper_params */
+	u8 optional[0];
+} __packed;
+
+/**
+ * struct ieee80211_he_spr - HE spatial reuse element
+ *
+ * This structure is the "HE spatial reuse element" element as
+ * described in P802.11ax_D4.0 section 9.4.2.241
+ */
+struct ieee80211_he_spr {
+	u8 he_sr_control;
+	/* Optional 0 to 19 bytes: depends on @he_sr_control */
 	u8 optional[0];
 } __packed;
 
@@ -1629,7 +1660,7 @@ struct ieee80211_he_operation {
  * struct ieee80211_he_mu_edca_param_ac_rec - MU AC Parameter Record field
  *
  * This structure is the "MU AC Parameter Record" fields as
- * described in P802.11ax_D2.0 section 9.4.2.240
+ * described in P802.11ax_D4.0 section 9.4.2.245
  */
 struct ieee80211_he_mu_edca_param_ac_rec {
 	u8 aifsn;
@@ -1641,7 +1672,7 @@ struct ieee80211_he_mu_edca_param_ac_rec {
  * struct ieee80211_mu_edca_param_set - MU EDCA Parameter Set element
  *
  * This structure is the "MU EDCA Parameter Set element" fields as
- * described in P802.11ax_D2.0 section 9.4.2.240
+ * described in P802.11ax_D4.0 section 9.4.2.245
  */
 struct ieee80211_mu_edca_param_set {
 	u8 mu_qos_info;
@@ -1659,6 +1690,7 @@ struct ieee80211_mu_edca_param_set {
 #define IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160MHZ		0x00000004
 #define IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160_80PLUS80MHZ	0x00000008
 #define IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_MASK			0x0000000C
+#define IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_SHIFT			2
 #define IEEE80211_VHT_CAP_RXLDPC				0x00000010
 #define IEEE80211_VHT_CAP_SHORT_GI_80				0x00000020
 #define IEEE80211_VHT_CAP_SHORT_GI_160				0x00000040
@@ -1668,6 +1700,7 @@ struct ieee80211_mu_edca_param_set {
 #define IEEE80211_VHT_CAP_RXSTBC_3				0x00000300
 #define IEEE80211_VHT_CAP_RXSTBC_4				0x00000400
 #define IEEE80211_VHT_CAP_RXSTBC_MASK				0x00000700
+#define IEEE80211_VHT_CAP_RXSTBC_SHIFT				8
 #define IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE			0x00000800
 #define IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE			0x00001000
 #define IEEE80211_VHT_CAP_BEAMFORMEE_STS_SHIFT                  13
@@ -1687,6 +1720,26 @@ struct ieee80211_mu_edca_param_set {
 #define IEEE80211_VHT_CAP_VHT_LINK_ADAPTATION_VHT_MRQ_MFB	0x0c000000
 #define IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN			0x10000000
 #define IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN			0x20000000
+#define IEEE80211_VHT_CAP_EXT_NSS_BW_SHIFT			30
+#define IEEE80211_VHT_CAP_EXT_NSS_BW_MASK			0xc0000000
+
+/**
+ * ieee80211_get_vht_max_nss - return max NSS for a given bandwidth/MCS
+ * @cap: VHT capabilities of the peer
+ * @bw: bandwidth to use
+ * @mcs: MCS index to use
+ * @ext_nss_bw_capable: indicates whether or not the local transmitter
+ *	(rate scaling algorithm) can deal with the new logic
+ *	(dot11VHTExtendedNSSBWCapable)
+ *
+ * Due to the VHT Extended NSS Bandwidth Support, the maximum NSS can
+ * vary for a given BW/MCS. This function parses the data.
+ *
+ * Note: This function is exported by cfg80211.
+ */
+int ieee80211_get_vht_max_nss(struct ieee80211_vht_cap *cap,
+			      enum ieee80211_vht_chanwidth bw,
+			      int mcs, bool ext_nss_bw_capable);
 
 /* 802.11ax HE MAC capabilities */
 #define IEEE80211_HE_MAC_CAP0_HTC_HE				0x01
@@ -1778,6 +1831,9 @@ struct ieee80211_mu_edca_param_set {
 #define IEEE80211_HE_MAC_CAP5_SUBCHAN_SELECVITE_TRANSMISSION	0x04
 #define IEEE80211_HE_MAC_CAP5_UL_2x996_TONE_RU			0x08
 #define IEEE80211_HE_MAC_CAP5_OM_CTRL_UL_MU_DATA_DIS_RX		0x10
+#define IEEE80211_HE_MAC_CAP5_HE_DYNAMIC_SM_PS			0x20
+#define IEEE80211_HE_MAC_CAP5_PUNCTURED_SOUNDING		0x40
+#define IEEE80211_HE_MAC_CAP5_HT_VHT_TRIG_FRAME_RX		0x80
 
 /* 802.11ax HE PHY capabilities */
 #define IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G		0x02
@@ -1901,11 +1957,11 @@ struct ieee80211_mu_edca_param_set {
 #define IEEE80211_HE_PHY_CAP8_80MHZ_IN_160MHZ_HE_PPDU			0x08
 #define IEEE80211_HE_PHY_CAP8_HE_ER_SU_1XLTF_AND_08_US_GI		0x10
 #define IEEE80211_HE_PHY_CAP8_MIDAMBLE_RX_TX_2X_AND_1XLTF		0x20
-#define IEEE80211_HE_PHY_CAP8_DCM_MAX_BW_20MHZ				0x00
-#define IEEE80211_HE_PHY_CAP8_DCM_MAX_BW_40MHZ				0x40
-#define IEEE80211_HE_PHY_CAP8_DCM_MAX_BW_80MHZ				0x80
-#define IEEE80211_HE_PHY_CAP8_DCM_MAX_BW_160_OR_80P80_MHZ		0xc0
-#define IEEE80211_HE_PHY_CAP8_DCM_MAX_BW_MASK				0xc0
+#define IEEE80211_HE_PHY_CAP8_DCM_MAX_RU_242				0x00
+#define IEEE80211_HE_PHY_CAP8_DCM_MAX_RU_484				0x40
+#define IEEE80211_HE_PHY_CAP8_DCM_MAX_RU_996				0x80
+#define IEEE80211_HE_PHY_CAP8_DCM_MAX_RU_2x996				0xc0
+#define IEEE80211_HE_PHY_CAP8_DCM_MAX_RU_MASK				0xc0
 
 #define IEEE80211_HE_PHY_CAP9_LONGER_THAN_16_SIGB_OFDM_SYM		0x01
 #define IEEE80211_HE_PHY_CAP9_NON_TRIGGERED_CQI_FEEDBACK		0x02
@@ -1913,6 +1969,11 @@ struct ieee80211_mu_edca_param_set {
 #define IEEE80211_HE_PHY_CAP9_RX_1024_QAM_LESS_THAN_242_TONE_RU		0x08
 #define IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_COMP_SIGB	0x10
 #define IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_NON_COMP_SIGB	0x20
+#define IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_0US			0x00
+#define IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_8US			0x40
+#define IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_16US			0x80
+#define IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_RESERVED		0xc0
+#define IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_MASK			0xc0
 
 /* 802.11ax HE TX/RX MCS NSS Support  */
 #define IEEE80211_TX_RX_MCS_NSS_SUPP_HIGHEST_MCS_POS			(3)
@@ -1986,24 +2047,25 @@ ieee80211_he_ppe_size(u8 ppe_thres_hdr, const u8 *phy_cap_info)
 }
 
 /* HE Operation defines */
-#define IEEE80211_HE_OPERATION_BSS_COLOR_MASK			0x0000003f
-#define IEEE80211_HE_OPERATION_DFLT_PE_DURATION_MASK		0x000001c0
-#define IEEE80211_HE_OPERATION_DFLT_PE_DURATION_OFFSET		6
-#define IEEE80211_HE_OPERATION_TWT_REQUIRED			0x00000200
-#define IEEE80211_HE_OPERATION_RTS_THRESHOLD_MASK		0x000ffc00
-#define IEEE80211_HE_OPERATION_RTS_THRESHOLD_OFFSET		10
-#define IEEE80211_HE_OPERATION_PARTIAL_BSS_COLOR		0x000100000
-#define IEEE80211_HE_OPERATION_VHT_OPER_INFO			0x000200000
-#define IEEE80211_HE_OPERATION_MULTI_BSSID_AP			0x10000000
-#define IEEE80211_HE_OPERATION_TX_BSSID_INDICATOR		0x20000000
-#define IEEE80211_HE_OPERATION_BSS_COLOR_DISABLED		0x40000000
+#define IEEE80211_HE_OPERATION_DFLT_PE_DURATION_MASK		0x00000007
+#define IEEE80211_HE_OPERATION_TWT_REQUIRED			0x00000008
+#define IEEE80211_HE_OPERATION_RTS_THRESHOLD_MASK		0x00003ff0
+#define IEEE80211_HE_OPERATION_RTS_THRESHOLD_OFFSET		4
+#define IEEE80211_HE_OPERATION_VHT_OPER_INFO			0x00004000
+#define IEEE80211_HE_OPERATION_CO_HOSTED_BSS			0x00008000
+#define IEEE80211_HE_OPERATION_ER_SU_DISABLE			0x00010000
+#define IEEE80211_HE_OPERATION_6GHZ_OP_INFO			0x00020000
+#define IEEE80211_HE_OPERATION_BSS_COLOR_MASK			0x3f000000
+#define IEEE80211_HE_OPERATION_BSS_COLOR_OFFSET		24
+#define IEEE80211_HE_OPERATION_PARTIAL_BSS_COLOR		0x40000000
+#define IEEE80211_HE_OPERATION_BSS_COLOR_DISABLED		0x80000000
 
 /*
  * ieee80211_he_oper_size - calculate 802.11ax HE Operations IE size
  * @he_oper_ie: byte data of the He Operations IE, stating from the the byte
  *	after the ext ID byte. It is assumed that he_oper_ie has at least
- *	sizeof(struct ieee80211_he_operation) bytes, checked already in
- *	ieee802_11_parse_elems_crc()
+ *	sizeof(struct ieee80211_he_operation) bytes, the caller must have
+ *	validated this.
  * @return the actual size of the IE data (not including header), or 0 on error
  */
 static inline u8
@@ -2021,13 +2083,51 @@ ieee80211_he_oper_size(const u8 *he_oper_ie)
 	he_oper_params = le32_to_cpu(he_oper->he_oper_params);
 	if (he_oper_params & IEEE80211_HE_OPERATION_VHT_OPER_INFO)
 		oper_len += 3;
-	if (he_oper_params & IEEE80211_HE_OPERATION_MULTI_BSSID_AP)
+	if (he_oper_params & IEEE80211_HE_OPERATION_CO_HOSTED_BSS)
 		oper_len++;
+	if (he_oper_params & IEEE80211_HE_OPERATION_6GHZ_OP_INFO)
+		oper_len += 4;
 
 	/* Add the first byte (extension ID) to the total length */
 	oper_len++;
 
 	return oper_len;
+}
+
+/* HE Spatial Reuse defines */
+#define IEEE80211_HE_SPR_NON_SRG_OFFSET_PRESENT			0x4
+#define IEEE80211_HE_SPR_SRG_INFORMATION_PRESENT		0x8
+
+/*
+ * ieee80211_he_spr_size - calculate 802.11ax HE Spatial Reuse IE size
+ * @he_spr_ie: byte data of the He Spatial Reuse IE, stating from the the byte
+ *	after the ext ID byte. It is assumed that he_spr_ie has at least
+ *	sizeof(struct ieee80211_he_spr) bytes, the caller must have validated
+ *	this
+ * @return the actual size of the IE data (not including header), or 0 on error
+ */
+static inline u8
+ieee80211_he_spr_size(const u8 *he_spr_ie)
+{
+	struct ieee80211_he_spr *he_spr = (void *)he_spr_ie;
+	u8 spr_len = sizeof(struct ieee80211_he_spr);
+	u8 he_spr_params;
+
+	/* Make sure the input is not NULL */
+	if (!he_spr_ie)
+		return 0;
+
+	/* Calc required length */
+	he_spr_params = he_spr->he_sr_control;
+	if (he_spr_params & IEEE80211_HE_SPR_NON_SRG_OFFSET_PRESENT)
+		spr_len++;
+	if (he_spr_params & IEEE80211_HE_SPR_SRG_INFORMATION_PRESENT)
+		spr_len += 18;
+
+	/* Add the first byte (extension ID) to the total length */
+	spr_len++;
+
+	return spr_len;
 }
 
 /* Authentication algorithms */
@@ -2093,6 +2193,8 @@ ieee80211_he_oper_size(const u8 *he_oper_ie)
 #define IEEE80211_SPCT_MSR_RPRT_TYPE_BASIC	0
 #define IEEE80211_SPCT_MSR_RPRT_TYPE_CCA	1
 #define IEEE80211_SPCT_MSR_RPRT_TYPE_RPI	2
+#define IEEE80211_SPCT_MSR_RPRT_TYPE_LCI	8
+#define IEEE80211_SPCT_MSR_RPRT_TYPE_CIVIC	11
 
 /* 802.11g ERP information element */
 #define WLAN_ERP_NON_ERP_PRESENT (1<<0)
@@ -2450,6 +2552,10 @@ enum ieee80211_eid_ext {
 	WLAN_EID_EXT_HE_OPERATION = 36,
 	WLAN_EID_EXT_UORA = 37,
 	WLAN_EID_EXT_HE_MU_EDCA = 38,
+	WLAN_EID_EXT_HE_SPR = 39,
+	WLAN_EID_EXT_MAX_CHANNEL_SWITCH_TIME = 52,
+	WLAN_EID_EXT_MULTIPLE_BSSID_CONFIGURATION = 55,
+	WLAN_EID_EXT_NON_INHERITANCE = 56,
 };
 
 /* Action category code */
@@ -2571,6 +2677,7 @@ enum ieee80211_key_len {
 #define FILS_ERP_MAX_RRK_LEN		64
 
 #define PMK_MAX_LEN			64
+#define SAE_PASSWORD_MAX_LEN		128
 
 /* Public action codes (IEEE Std 802.11-2016, 9.6.8.1, Table 9-307) */
 enum ieee80211_pub_actioncode {
@@ -2631,6 +2738,11 @@ enum ieee80211_tdls_actioncode {
  */
 #define WLAN_EXT_CAPA1_EXT_CHANNEL_SWITCHING	BIT(2)
 
+/* Multiple BSSID capability is set in the 6th bit of 3rd byte of the
+ * @WLAN_EID_EXT_CAPABILITY information element
+ */
+#define WLAN_EXT_CAPA3_MULTI_BSSID_SUPPORT	BIT(6)
+
 /* TDLS capabilities in the the 4th byte of @WLAN_EID_EXT_CAPABILITY */
 #define WLAN_EXT_CAPA4_TDLS_BUFFER_STA		BIT(4)
 #define WLAN_EXT_CAPA4_TDLS_PEER_PSM		BIT(5)
@@ -2661,6 +2773,20 @@ enum ieee80211_tdls_actioncode {
  * information element
  */
 #define WLAN_EXT_CAPA9_FTM_INITIATOR	BIT(7)
+
+/* Defines support for TWT Requester and TWT Responder */
+#define WLAN_EXT_CAPA10_TWT_REQUESTER_SUPPORT	BIT(5)
+#define WLAN_EXT_CAPA10_TWT_RESPONDER_SUPPORT	BIT(6)
+
+/*
+ * When set, indicates that the AP is able to tolerate 26-tone RU UL
+ * OFDMA transmissions using HE TB PPDU from OBSS (not falsely classify the
+ * 26-tone RU UL OFDMA transmissions as radar pulses).
+ */
+#define WLAN_EXT_CAPA10_OBSS_NARROW_BW_RU_TOLERANCE_SUPPORT BIT(7)
+
+/* Defines support for enhanced multi-bssid advertisement*/
+#define WLAN_EXT_CAPA11_EMA_SUPPORT	BIT(1)
 
 /* TDLS specific payload type in the LLC/SNAP header */
 #define WLAN_TDLS_SNAP_RFTYPE	0x2
@@ -2853,6 +2979,34 @@ enum ieee80211_sa_query_action {
 	WLAN_ACTION_SA_QUERY_RESPONSE = 1,
 };
 
+/**
+ * struct ieee80211_bssid_index
+ *
+ * This structure refers to "Multiple BSSID-index element"
+ *
+ * @bssid_index: BSSID index
+ * @dtim_period: optional, overrides transmitted BSS dtim period
+ * @dtim_count: optional, overrides transmitted BSS dtim count
+ */
+struct ieee80211_bssid_index {
+	u8 bssid_index;
+	u8 dtim_period;
+	u8 dtim_count;
+};
+
+/**
+ * struct ieee80211_multiple_bssid_configuration
+ *
+ * This structure refers to "Multiple BSSID Configuration element"
+ *
+ * @bssid_count: total number of active BSSIDs in the set
+ * @profile_periodicity: the least number of beacon frames need to be received
+ *	in order to discover all the nontransmitted BSSIDs in the set.
+ */
+struct ieee80211_multiple_bssid_configuration {
+	u8 bssid_count;
+	u8 profile_periodicity;
+};
 
 #define SUITE(oui, id)	(((oui) << 8) | (id))
 
@@ -3233,8 +3387,8 @@ struct element {
 	for_each_element(element, data, datalen)			\
 		if (element->id == (_id))
 
-#define for_each_element_extid(element, extid, data, datalen)		\
-	for_each_element(element, data, datalen)			\
+#define for_each_element_extid(element, extid, _data, _datalen)		\
+	for_each_element(element, _data, _datalen)			\
 		if (element->id == WLAN_EID_EXTENSION &&		\
 		    element->datalen > 0 &&				\
 		    element->data[0] == (extid))

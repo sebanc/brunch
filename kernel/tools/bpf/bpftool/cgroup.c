@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
 // Copyright (C) 2017 Facebook
 // Author: Roman Gushchin <guro@fb.com>
 
@@ -25,7 +25,11 @@
 	"       ATTACH_TYPE := { ingress | egress | sock_create |\n"	       \
 	"                        sock_ops | device | bind4 | bind6 |\n"	       \
 	"                        post_bind4 | post_bind6 | connect4 |\n"       \
-	"                        connect6 | sendmsg4 | sendmsg6 }"
+	"                        connect6 | sendmsg4 | sendmsg6 |\n"           \
+	"                        recvmsg4 | recvmsg6 | sysctl |\n"	       \
+	"                        getsockopt | setsockopt }"
+
+static unsigned int query_flags;
 
 static const char * const attach_type_strings[] = {
 	[BPF_CGROUP_INET_INGRESS] = "ingress",
@@ -41,6 +45,11 @@ static const char * const attach_type_strings[] = {
 	[BPF_CGROUP_INET6_POST_BIND] = "post_bind6",
 	[BPF_CGROUP_UDP4_SENDMSG] = "sendmsg4",
 	[BPF_CGROUP_UDP6_SENDMSG] = "sendmsg6",
+	[BPF_CGROUP_SYSCTL] = "sysctl",
+	[BPF_CGROUP_UDP4_RECVMSG] = "recvmsg4",
+	[BPF_CGROUP_UDP6_RECVMSG] = "recvmsg6",
+	[BPF_CGROUP_GETSOCKOPT] = "getsockopt",
+	[BPF_CGROUP_SETSOCKOPT] = "setsockopt",
 	[__MAX_BPF_ATTACH_TYPE] = NULL,
 };
 
@@ -100,26 +109,46 @@ static int count_attached_bpf_progs(int cgroup_fd, enum bpf_attach_type type)
 	__u32 prog_cnt = 0;
 	int ret;
 
-	ret = bpf_prog_query(cgroup_fd, type, 0, NULL, NULL, &prog_cnt);
+	ret = bpf_prog_query(cgroup_fd, type, query_flags, NULL,
+			     NULL, &prog_cnt);
 	if (ret)
 		return -1;
 
 	return prog_cnt;
 }
 
+static int cgroup_has_attached_progs(int cgroup_fd)
+{
+	enum bpf_attach_type type;
+	bool no_prog = true;
+
+	for (type = 0; type < __MAX_BPF_ATTACH_TYPE; type++) {
+		int count = count_attached_bpf_progs(cgroup_fd, type);
+
+		if (count < 0 && errno != EINVAL)
+			return -1;
+
+		if (count > 0) {
+			no_prog = false;
+			break;
+		}
+	}
+
+	return no_prog ? 0 : 1;
+}
 static int show_attached_bpf_progs(int cgroup_fd, enum bpf_attach_type type,
 				   int level)
 {
+	const char *attach_flags_str;
 	__u32 prog_ids[1024] = {0};
-	char *attach_flags_str;
 	__u32 prog_cnt, iter;
 	__u32 attach_flags;
 	char buf[32];
 	int ret;
 
 	prog_cnt = ARRAY_SIZE(prog_ids);
-	ret = bpf_prog_query(cgroup_fd, type, 0, &attach_flags, prog_ids,
-			     &prog_cnt);
+	ret = bpf_prog_query(cgroup_fd, type, query_flags, &attach_flags,
+			     prog_ids, &prog_cnt);
 	if (ret)
 		return ret;
 
@@ -151,21 +180,46 @@ static int show_attached_bpf_progs(int cgroup_fd, enum bpf_attach_type type,
 static int do_show(int argc, char **argv)
 {
 	enum bpf_attach_type type;
+	int has_attached_progs;
+	const char *path;
 	int cgroup_fd;
 	int ret = -1;
 
-	if (argc < 1) {
-		p_err("too few parameters for cgroup show");
-		goto exit;
-	} else if (argc > 1) {
-		p_err("too many parameters for cgroup show");
+	query_flags = 0;
+
+	if (!REQ_ARGS(1))
+		return -1;
+	path = GET_ARG();
+
+	while (argc) {
+		if (is_prefix(*argv, "effective")) {
+			if (query_flags & BPF_F_QUERY_EFFECTIVE) {
+				p_err("duplicated argument: %s", *argv);
+				return -1;
+			}
+			query_flags |= BPF_F_QUERY_EFFECTIVE;
+			NEXT_ARG();
+		} else {
+			p_err("expected no more arguments, 'effective', got: '%s'?",
+			      *argv);
+			return -1;
+		}
+	}
+
+	cgroup_fd = open(path, O_RDONLY);
+	if (cgroup_fd < 0) {
+		p_err("can't open cgroup %s", path);
 		goto exit;
 	}
 
-	cgroup_fd = open(argv[0], O_RDONLY);
-	if (cgroup_fd < 0) {
-		p_err("can't open cgroup %s", argv[0]);
-		goto exit;
+	has_attached_progs = cgroup_has_attached_progs(cgroup_fd);
+	if (has_attached_progs < 0) {
+		p_err("can't query bpf programs attached to %s: %s",
+		      path, strerror(errno));
+		goto exit_cgroup;
+	} else if (!has_attached_progs) {
+		ret = 0;
+		goto exit_cgroup;
 	}
 
 	if (json_output)
@@ -188,6 +242,7 @@ static int do_show(int argc, char **argv)
 	if (json_output)
 		jsonw_end_array(json_wtr);
 
+exit_cgroup:
 	close(cgroup_fd);
 exit:
 	return ret;
@@ -204,7 +259,7 @@ static int do_show_tree_fn(const char *fpath, const struct stat *sb,
 			   int typeflag, struct FTW *ftw)
 {
 	enum bpf_attach_type type;
-	bool skip = true;
+	int has_attached_progs;
 	int cgroup_fd;
 
 	if (typeflag != FTW_D)
@@ -216,22 +271,13 @@ static int do_show_tree_fn(const char *fpath, const struct stat *sb,
 		return SHOW_TREE_FN_ERR;
 	}
 
-	for (type = 0; type < __MAX_BPF_ATTACH_TYPE; type++) {
-		int count = count_attached_bpf_progs(cgroup_fd, type);
-
-		if (count < 0 && errno != EINVAL) {
-			p_err("can't query bpf programs attached to %s: %s",
-			      fpath, strerror(errno));
-			close(cgroup_fd);
-			return SHOW_TREE_FN_ERR;
-		}
-		if (count > 0) {
-			skip = false;
-			break;
-		}
-	}
-
-	if (skip) {
+	has_attached_progs = cgroup_has_attached_progs(cgroup_fd);
+	if (has_attached_progs < 0) {
+		p_err("can't query bpf programs attached to %s: %s",
+		      fpath, strerror(errno));
+		close(cgroup_fd);
+		return SHOW_TREE_FN_ERR;
+	} else if (!has_attached_progs) {
 		close(cgroup_fd);
 		return 0;
 	}
@@ -247,6 +293,13 @@ static int do_show_tree_fn(const char *fpath, const struct stat *sb,
 
 	for (type = 0; type < __MAX_BPF_ATTACH_TYPE; type++)
 		show_attached_bpf_progs(cgroup_fd, type, ftw->level);
+
+	if (errno == EINVAL)
+		/* Last attach type does not support query.
+		 * Do not report an error for this, especially because batch
+		 * mode would stop processing commands.
+		 */
+		errno = 0;
 
 	if (json_output) {
 		jsonw_end_array(json_wtr);
@@ -280,25 +333,36 @@ static char *find_cgroup_root(void)
 
 static int do_show_tree(int argc, char **argv)
 {
-	char *cgroup_root;
+	char *cgroup_root, *cgroup_alloced = NULL;
 	int ret;
 
-	switch (argc) {
-	case 0:
-		cgroup_root = find_cgroup_root();
-		if (!cgroup_root) {
+	query_flags = 0;
+
+	if (!argc) {
+		cgroup_alloced = find_cgroup_root();
+		if (!cgroup_alloced) {
 			p_err("cgroup v2 isn't mounted");
 			return -1;
 		}
-		break;
-	case 1:
-		cgroup_root = argv[0];
-		break;
-	default:
-		p_err("too many parameters for cgroup tree");
-		return -1;
-	}
+		cgroup_root = cgroup_alloced;
+	} else {
+		cgroup_root = GET_ARG();
 
+		while (argc) {
+			if (is_prefix(*argv, "effective")) {
+				if (query_flags & BPF_F_QUERY_EFFECTIVE) {
+					p_err("duplicated argument: %s", *argv);
+					return -1;
+				}
+				query_flags |= BPF_F_QUERY_EFFECTIVE;
+				NEXT_ARG();
+			} else {
+				p_err("expected no more arguments, 'effective', got: '%s'?",
+				      *argv);
+				return -1;
+			}
+		}
+	}
 
 	if (json_output)
 		jsonw_start_array(json_wtr);
@@ -324,8 +388,7 @@ static int do_show_tree(int argc, char **argv)
 	if (json_output)
 		jsonw_end_array(json_wtr);
 
-	if (argc == 0)
-		free(cgroup_root);
+	free(cgroup_alloced);
 
 	return ret;
 }
@@ -445,8 +508,8 @@ static int do_help(int argc, char **argv)
 	}
 
 	fprintf(stderr,
-		"Usage: %s %s { show | list } CGROUP\n"
-		"       %s %s tree [CGROUP_ROOT]\n"
+		"Usage: %s %s { show | list } CGROUP [**effective**]\n"
+		"       %s %s tree [CGROUP_ROOT] [**effective**]\n"
 		"       %s %s attach CGROUP ATTACH_TYPE PROG [ATTACH_FLAGS]\n"
 		"       %s %s detach CGROUP ATTACH_TYPE PROG\n"
 		"       %s %s help\n"

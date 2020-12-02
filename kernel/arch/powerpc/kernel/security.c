@@ -16,7 +16,7 @@
 #include <asm/setup.h>
 
 
-unsigned long powerpc_security_features __read_mostly = SEC_FTR_DEFAULT;
+u64 powerpc_security_features __read_mostly = SEC_FTR_DEFAULT;
 
 enum count_cache_flush_type {
 	COUNT_CACHE_FLUSH_NONE	= 0x1,
@@ -105,6 +105,14 @@ static __init int barrier_nospec_debugfs_init(void)
 	return 0;
 }
 device_initcall(barrier_nospec_debugfs_init);
+
+static __init int security_feature_debugfs_init(void)
+{
+	debugfs_create_x64("security_features", 0400, powerpc_debugfs_root,
+			   &powerpc_security_features);
+	return 0;
+}
+device_initcall(security_feature_debugfs_init);
 #endif /* CONFIG_DEBUG_FS */
 
 #if defined(CONFIG_PPC_FSL_BOOK3E) || defined(CONFIG_PPC_BOOK3S_64)

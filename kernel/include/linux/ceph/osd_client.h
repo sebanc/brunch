@@ -136,6 +136,13 @@ struct ceph_osd_req_op {
 			u64 expected_object_size;
 			u64 expected_write_size;
 		} alloc_hint;
+		struct {
+			u64 snapid;
+			u64 src_version;
+			u8 flags;
+			u32 src_fadvise_flags;
+			struct ceph_osd_data osd_data;
+		} copy_from;
 	};
 };
 
@@ -191,9 +198,9 @@ struct ceph_osd_request {
 	bool              r_mempool;
 	struct completion r_completion;       /* private to osd_client.c */
 	ceph_osdc_callback_t r_callback;
-	struct list_head  r_unsafe_item;
 
 	struct inode *r_inode;         	      /* for use by callbacks */
+	struct list_head r_private_item;      /* ditto */
 	void *r_priv;			      /* ditto */
 
 	/* set by submitter */
@@ -347,7 +354,6 @@ struct ceph_osd_client {
 	struct rb_root         linger_map_checks;
 	atomic_t               num_requests;
 	atomic_t               num_homeless;
-	bool                   abort_on_full; /* abort w/ ENOSPC when full */
 	int                    abort_err;
 	struct delayed_work    timeout_work;
 	struct delayed_work    osds_timeout_work;
@@ -375,6 +381,7 @@ extern void ceph_osdc_cleanup(void);
 extern int ceph_osdc_init(struct ceph_osd_client *osdc,
 			  struct ceph_client *client);
 extern void ceph_osdc_stop(struct ceph_osd_client *osdc);
+extern void ceph_osdc_reopen_osds(struct ceph_osd_client *osdc);
 
 extern void ceph_osdc_handle_reply(struct ceph_osd_client *osdc,
 				   struct ceph_msg *msg);
@@ -382,6 +389,15 @@ extern void ceph_osdc_handle_map(struct ceph_osd_client *osdc,
 				 struct ceph_msg *msg);
 void ceph_osdc_update_epoch_barrier(struct ceph_osd_client *osdc, u32 eb);
 void ceph_osdc_abort_requests(struct ceph_osd_client *osdc, int err);
+void ceph_osdc_clear_abort_err(struct ceph_osd_client *osdc);
+
+#define osd_req_op_data(oreq, whch, typ, fld)				\
+({									\
+	struct ceph_osd_request *__oreq = (oreq);			\
+	unsigned int __whch = (whch);					\
+	BUG_ON(__whch >= __oreq->r_num_ops);				\
+	&__oreq->r_ops[__whch].typ.fld;					\
+})
 
 extern void osd_req_op_init(struct ceph_osd_request *osd_req,
 			    unsigned int which, u16 opcode, u32 flags);
@@ -444,9 +460,8 @@ extern void osd_req_op_cls_response_data_pages(struct ceph_osd_request *,
 					struct page **pages, u64 length,
 					u32 alignment, bool pages_from_pool,
 					bool own_pages);
-extern int osd_req_op_cls_init(struct ceph_osd_request *osd_req,
-					unsigned int which, u16 opcode,
-					const char *class, const char *method);
+int osd_req_op_cls_init(struct ceph_osd_request *osd_req, unsigned int which,
+			const char *class, const char *method);
 extern int osd_req_op_xattr_init(struct ceph_osd_request *osd_req, unsigned int which,
 				 u16 opcode, const char *name, const void *value,
 				 size_t size, u8 cmp_op, u8 cmp_mode);
@@ -492,7 +507,7 @@ int ceph_osdc_call(struct ceph_osd_client *osdc,
 		   const char *class, const char *method,
 		   unsigned int flags,
 		   struct page *req_page, size_t req_len,
-		   struct page *resp_page, size_t *resp_len);
+		   struct page **resp_pages, size_t *resp_len);
 
 extern int ceph_osdc_readpages(struct ceph_osd_client *osdc,
 			       struct ceph_vino vino,
@@ -510,6 +525,16 @@ extern int ceph_osdc_writepages(struct ceph_osd_client *osdc,
 				u32 truncate_seq, u64 truncate_size,
 				struct timespec64 *mtime,
 				struct page **pages, int nr_pages);
+
+int ceph_osdc_copy_from(struct ceph_osd_client *osdc,
+			u64 src_snapid, u64 src_version,
+			struct ceph_object_id *src_oid,
+			struct ceph_object_locator *src_oloc,
+			u32 src_fadvise_flags,
+			struct ceph_object_id *dst_oid,
+			struct ceph_object_locator *dst_oloc,
+			u32 dst_fadvise_flags,
+			u8 copy_from_flags);
 
 /* watch/notify */
 struct ceph_osd_linger_request *

@@ -11,6 +11,7 @@
 #include <linux/device.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
+#include <linux/power_supply.h>
 
 #include <linux/platform_data/cros_ec_commands.h>
 
@@ -252,7 +253,7 @@ bool cros_ec_handle_event(struct cros_ec_device *ec_dev);
  */
 static inline ktime_t cros_ec_get_time_ns(void)
 {
-	return ktime_get_boot_ns();
+	return ktime_get_boottime_ns();
 }
 
 #endif /* __LINUX_CROS_EC_PROTO_H */

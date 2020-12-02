@@ -1,18 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2009, Microsoft Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place - Suite 330, Boston, MA 02111-1307 USA.
  *
  * Authors:
  *   Haiyang Zhang <haiyangz@microsoft.com>
@@ -79,84 +67,96 @@ void vmbus_setevent(struct vmbus_channel *channel)
 }
 EXPORT_SYMBOL_GPL(vmbus_setevent);
 
-/*
- * vmbus_open - Open the specified channel.
- */
-int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
-		     u32 recv_ringbuffer_size, void *userdata, u32 userdatalen,
-		     void (*onchannelcallback)(void *context), void *context)
+/* vmbus_free_ring - drop mapping of ring buffer */
+void vmbus_free_ring(struct vmbus_channel *channel)
 {
-	struct vmbus_channel_open_channel *open_msg;
-	struct vmbus_channel_msginfo *open_info = NULL;
-	unsigned long flags;
-	int ret, err = 0;
-	struct page *page;
-	unsigned int order;
+	hv_ringbuffer_cleanup(&channel->outbound);
+	hv_ringbuffer_cleanup(&channel->inbound);
 
-	if (send_ringbuffer_size % PAGE_SIZE ||
-	    recv_ringbuffer_size % PAGE_SIZE)
-		return -EINVAL;
-
-	order = get_order(send_ringbuffer_size + recv_ringbuffer_size);
-
-	spin_lock_irqsave(&newchannel->lock, flags);
-	if (newchannel->state == CHANNEL_OPEN_STATE) {
-		newchannel->state = CHANNEL_OPENING_STATE;
-	} else {
-		spin_unlock_irqrestore(&newchannel->lock, flags);
-		return -EINVAL;
+	if (channel->ringbuffer_page) {
+		__free_pages(channel->ringbuffer_page,
+			     get_order(channel->ringbuffer_pagecount
+				       << PAGE_SHIFT));
+		channel->ringbuffer_page = NULL;
 	}
-	spin_unlock_irqrestore(&newchannel->lock, flags);
+}
+EXPORT_SYMBOL_GPL(vmbus_free_ring);
 
-	newchannel->onchannel_callback = onchannelcallback;
-	newchannel->channel_callback_context = context;
+/* vmbus_alloc_ring - allocate and map pages for ring buffer */
+int vmbus_alloc_ring(struct vmbus_channel *newchannel,
+		     u32 send_size, u32 recv_size)
+{
+	struct page *page;
+	int order;
+
+	if (send_size % PAGE_SIZE || recv_size % PAGE_SIZE)
+		return -EINVAL;
 
 	/* Allocate the ring buffer */
+	order = get_order(send_size + recv_size);
 	page = alloc_pages_node(cpu_to_node(newchannel->target_cpu),
 				GFP_KERNEL|__GFP_ZERO, order);
 
 	if (!page)
 		page = alloc_pages(GFP_KERNEL|__GFP_ZERO, order);
 
-	if (!page) {
-		err = -ENOMEM;
-		goto error_set_chnstate;
-	}
+	if (!page)
+		return -ENOMEM;
 
 	newchannel->ringbuffer_page = page;
-	newchannel->ringbuffer_pagecount = (send_ringbuffer_size +
-					   recv_ringbuffer_size) >> PAGE_SHIFT;
+	newchannel->ringbuffer_pagecount = (send_size + recv_size) >> PAGE_SHIFT;
+	newchannel->ringbuffer_send_offset = send_size >> PAGE_SHIFT;
 
-	ret = hv_ringbuffer_init(&newchannel->outbound, page,
-				 send_ringbuffer_size >> PAGE_SHIFT);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(vmbus_alloc_ring);
 
-	if (ret != 0) {
-		err = ret;
-		goto error_free_pages;
+static int __vmbus_open(struct vmbus_channel *newchannel,
+		       void *userdata, u32 userdatalen,
+		       void (*onchannelcallback)(void *context), void *context)
+{
+	struct vmbus_channel_open_channel *open_msg;
+	struct vmbus_channel_msginfo *open_info = NULL;
+	struct page *page = newchannel->ringbuffer_page;
+	u32 send_pages, recv_pages;
+	unsigned long flags;
+	int err;
+
+	if (userdatalen > MAX_USER_DEFINED_BYTES)
+		return -EINVAL;
+
+	send_pages = newchannel->ringbuffer_send_offset;
+	recv_pages = newchannel->ringbuffer_pagecount - send_pages;
+
+	spin_lock_irqsave(&newchannel->lock, flags);
+	if (newchannel->state != CHANNEL_OPEN_STATE) {
+		spin_unlock_irqrestore(&newchannel->lock, flags);
+		return -EINVAL;
 	}
+	spin_unlock_irqrestore(&newchannel->lock, flags);
 
-	ret = hv_ringbuffer_init(&newchannel->inbound,
-				 &page[send_ringbuffer_size >> PAGE_SHIFT],
-				 recv_ringbuffer_size >> PAGE_SHIFT);
-	if (ret != 0) {
-		err = ret;
-		goto error_free_pages;
-	}
+	newchannel->state = CHANNEL_OPENING_STATE;
+	newchannel->onchannel_callback = onchannelcallback;
+	newchannel->channel_callback_context = context;
 
+	err = hv_ringbuffer_init(&newchannel->outbound, page, send_pages);
+	if (err)
+		goto error_clean_ring;
+
+	err = hv_ringbuffer_init(&newchannel->inbound,
+				 &page[send_pages], recv_pages);
+	if (err)
+		goto error_clean_ring;
 
 	/* Establish the gpadl for the ring buffer */
 	newchannel->ringbuffer_gpadlhandle = 0;
 
-	ret = vmbus_establish_gpadl(newchannel,
-				    page_address(page),
-				    send_ringbuffer_size +
-				    recv_ringbuffer_size,
+	err = vmbus_establish_gpadl(newchannel,
+				    page_address(newchannel->ringbuffer_page),
+				    (send_pages + recv_pages) << PAGE_SHIFT,
 				    &newchannel->ringbuffer_gpadlhandle);
-
-	if (ret != 0) {
-		err = ret;
-		goto error_free_pages;
-	}
+	if (err)
+		goto error_clean_ring;
 
 	/* Create and init the channel open message */
 	open_info = kmalloc(sizeof(*open_info) +
@@ -175,14 +175,8 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 	open_msg->openid = newchannel->offermsg.child_relid;
 	open_msg->child_relid = newchannel->offermsg.child_relid;
 	open_msg->ringbuffer_gpadlhandle = newchannel->ringbuffer_gpadlhandle;
-	open_msg->downstream_ringbuffer_pageoffset = send_ringbuffer_size >>
-						  PAGE_SHIFT;
+	open_msg->downstream_ringbuffer_pageoffset = newchannel->ringbuffer_send_offset;
 	open_msg->target_vp = newchannel->target_vp;
-
-	if (userdatalen > MAX_USER_DEFINED_BYTES) {
-		err = -EINVAL;
-		goto error_free_gpadl;
-	}
 
 	if (userdatalen)
 		memcpy(open_msg->userdata, userdata, userdatalen);
@@ -194,18 +188,16 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 
 	if (newchannel->rescind) {
 		err = -ENODEV;
-		goto error_free_gpadl;
+		goto error_free_info;
 	}
 
-	ret = vmbus_post_msg(open_msg,
+	err = vmbus_post_msg(open_msg,
 			     sizeof(struct vmbus_channel_open_channel), true);
 
-	trace_vmbus_open(open_msg, ret);
+	trace_vmbus_open(open_msg, err);
 
-	if (ret != 0) {
-		err = ret;
+	if (err != 0)
 		goto error_clean_msglist;
-	}
 
 	wait_for_completion(&open_info->waitevent);
 
@@ -215,12 +207,12 @@ int vmbus_open(struct vmbus_channel *newchannel, u32 send_ringbuffer_size,
 
 	if (newchannel->rescind) {
 		err = -ENODEV;
-		goto error_free_gpadl;
+		goto error_free_info;
 	}
 
 	if (open_info->response.open_result.status) {
 		err = -EAGAIN;
-		goto error_free_gpadl;
+		goto error_free_info;
 	}
 
 	newchannel->state = CHANNEL_OPENED_STATE;
@@ -231,23 +223,55 @@ error_clean_msglist:
 	spin_lock_irqsave(&vmbus_connection.channelmsg_lock, flags);
 	list_del(&open_info->msglistentry);
 	spin_unlock_irqrestore(&vmbus_connection.channelmsg_lock, flags);
-
+error_free_info:
+	kfree(open_info);
 error_free_gpadl:
 	vmbus_teardown_gpadl(newchannel, newchannel->ringbuffer_gpadlhandle);
-	kfree(open_info);
-error_free_pages:
+	newchannel->ringbuffer_gpadlhandle = 0;
+error_clean_ring:
 	hv_ringbuffer_cleanup(&newchannel->outbound);
 	hv_ringbuffer_cleanup(&newchannel->inbound);
-	__free_pages(page, order);
-error_set_chnstate:
 	newchannel->state = CHANNEL_OPEN_STATE;
+	return err;
+}
+
+/*
+ * vmbus_connect_ring - Open the channel but reuse ring buffer
+ */
+int vmbus_connect_ring(struct vmbus_channel *newchannel,
+		       void (*onchannelcallback)(void *context), void *context)
+{
+	return  __vmbus_open(newchannel, NULL, 0, onchannelcallback, context);
+}
+EXPORT_SYMBOL_GPL(vmbus_connect_ring);
+
+/*
+ * vmbus_open - Open the specified channel.
+ */
+int vmbus_open(struct vmbus_channel *newchannel,
+	       u32 send_ringbuffer_size, u32 recv_ringbuffer_size,
+	       void *userdata, u32 userdatalen,
+	       void (*onchannelcallback)(void *context), void *context)
+{
+	int err;
+
+	err = vmbus_alloc_ring(newchannel, send_ringbuffer_size,
+			       recv_ringbuffer_size);
+	if (err)
+		return err;
+
+	err = __vmbus_open(newchannel, userdata, userdatalen,
+			   onchannelcallback, context);
+	if (err)
+		vmbus_free_ring(newchannel);
+
 	return err;
 }
 EXPORT_SYMBOL_GPL(vmbus_open);
 
 /* Used for Hyper-V Socket: a guest client's connect() to the host */
-int vmbus_send_tl_connect_request(const uuid_le *shv_guest_servie_id,
-				  const uuid_le *shv_host_servie_id)
+int vmbus_send_tl_connect_request(const guid_t *shv_guest_servie_id,
+				  const guid_t *shv_host_servie_id)
 {
 	struct vmbus_channel_tl_connect_request conn_msg;
 	int ret;
@@ -618,10 +642,8 @@ static int vmbus_close_internal(struct vmbus_channel *channel)
 	 * in Hyper-V Manager), the driver's remove() invokes vmbus_close():
 	 * here we should skip most of the below cleanup work.
 	 */
-	if (channel->state != CHANNEL_OPENED_STATE) {
-		ret = -EINVAL;
-		goto out;
-	}
+	if (channel->state != CHANNEL_OPENED_STATE)
+		return -EINVAL;
 
 	channel->state = CHANNEL_OPEN_STATE;
 
@@ -643,11 +665,10 @@ static int vmbus_close_internal(struct vmbus_channel *channel)
 		 * If we failed to post the close msg,
 		 * it is perhaps better to leak memory.
 		 */
-		goto out;
 	}
 
 	/* Tear down the gpadl for the channel's ring buffer */
-	if (channel->ringbuffer_gpadlhandle) {
+	else if (channel->ringbuffer_gpadlhandle) {
 		ret = vmbus_teardown_gpadl(channel,
 					   channel->ringbuffer_gpadlhandle);
 		if (ret) {
@@ -656,74 +677,70 @@ static int vmbus_close_internal(struct vmbus_channel *channel)
 			 * If we failed to teardown gpadl,
 			 * it is perhaps better to leak memory.
 			 */
-			goto out;
 		}
+
+		channel->ringbuffer_gpadlhandle = 0;
 	}
 
-	/* Cleanup the ring buffers for this channel */
-	hv_ringbuffer_cleanup(&channel->outbound);
-	hv_ringbuffer_cleanup(&channel->inbound);
-
-	__free_pages(channel->ringbuffer_page,
-		     get_order(channel->ringbuffer_pagecount << PAGE_SHIFT));
-
-out:
 	return ret;
 }
+
+/* disconnect ring - close all channels */
+int vmbus_disconnect_ring(struct vmbus_channel *channel)
+{
+	struct vmbus_channel *cur_channel, *tmp;
+	int ret;
+
+	if (channel->primary_channel != NULL)
+		return -EINVAL;
+
+	list_for_each_entry_safe(cur_channel, tmp, &channel->sc_list, sc_list) {
+		if (cur_channel->rescind)
+			wait_for_completion(&cur_channel->rescind_event);
+
+		mutex_lock(&vmbus_connection.channel_mutex);
+		if (vmbus_close_internal(cur_channel) == 0) {
+			vmbus_free_ring(cur_channel);
+
+			if (cur_channel->rescind)
+				hv_process_channel_removal(cur_channel);
+		}
+		mutex_unlock(&vmbus_connection.channel_mutex);
+	}
+
+	/*
+	 * Now close the primary.
+	 */
+	mutex_lock(&vmbus_connection.channel_mutex);
+	ret = vmbus_close_internal(channel);
+	mutex_unlock(&vmbus_connection.channel_mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(vmbus_disconnect_ring);
 
 /*
  * vmbus_close - Close the specified channel
  */
 void vmbus_close(struct vmbus_channel *channel)
 {
-	struct list_head *cur, *tmp;
-	struct vmbus_channel *cur_channel;
-
-	if (channel->primary_channel != NULL) {
-		/*
-		 * We will only close sub-channels when
-		 * the primary is closed.
-		 */
-		return;
-	}
-	/*
-	 * Close all the sub-channels first and then close the
-	 * primary channel.
-	 */
-	list_for_each_safe(cur, tmp, &channel->sc_list) {
-		cur_channel = list_entry(cur, struct vmbus_channel, sc_list);
-		if (cur_channel->rescind) {
-			wait_for_completion(&cur_channel->rescind_event);
-			mutex_lock(&vmbus_connection.channel_mutex);
-			vmbus_close_internal(cur_channel);
-			hv_process_channel_removal(
-					   cur_channel->offermsg.child_relid);
-		} else {
-			mutex_lock(&vmbus_connection.channel_mutex);
-			vmbus_close_internal(cur_channel);
-		}
-		mutex_unlock(&vmbus_connection.channel_mutex);
-	}
-	/*
-	 * Now close the primary.
-	 */
-	mutex_lock(&vmbus_connection.channel_mutex);
-	vmbus_close_internal(channel);
-	mutex_unlock(&vmbus_connection.channel_mutex);
+	if (vmbus_disconnect_ring(channel) == 0)
+		vmbus_free_ring(channel);
 }
 EXPORT_SYMBOL_GPL(vmbus_close);
 
 /**
  * vmbus_sendpacket() - Send the specified buffer on the given channel
- * @channel: Pointer to vmbus_channel structure.
- * @buffer: Pointer to the buffer you want to receive the data into.
- * @bufferlen: Maximum size of what the the buffer will hold
+ * @channel: Pointer to vmbus_channel structure
+ * @buffer: Pointer to the buffer you want to send the data from.
+ * @bufferlen: Maximum size of what the buffer holds.
  * @requestid: Identifier of the request
- * @type: Type of packet that is being send e.g. negotiate, time
- * packet etc.
+ * @type: Type of packet that is being sent e.g. negotiate, time
+ *	  packet etc.
+ * @flags: 0 or VMBUS_DATA_PACKET_FLAG_COMPLETION_REQUESTED
  *
- * Sends data in @buffer directly to hyper-v via the vmbus
- * This will send the data unparsed to hyper-v.
+ * Sends data in @buffer directly to Hyper-V via the vmbus.
+ * This will send the data unparsed to Hyper-V.
  *
  * Mainly used by Hyper-V drivers.
  */
@@ -856,12 +873,13 @@ int vmbus_sendpacket_mpb_desc(struct vmbus_channel *channel,
 EXPORT_SYMBOL_GPL(vmbus_sendpacket_mpb_desc);
 
 /**
- * vmbus_recvpacket() - Retrieve the user packet on the specified channel
- * @channel: Pointer to vmbus_channel structure.
+ * __vmbus_recvpacket() - Retrieve the user packet on the specified channel
+ * @channel: Pointer to vmbus_channel structure
  * @buffer: Pointer to the buffer you want to receive the data into.
- * @bufferlen: Maximum size of what the the buffer will hold
- * @buffer_actual_len: The actual size of the data after it was received
+ * @bufferlen: Maximum size of what the buffer can hold.
+ * @buffer_actual_len: The actual size of the data after it was received.
  * @requestid: Identifier of the request
+ * @raw: true means keep the vmpacket_descriptor header in the received data.
  *
  * Receives directly from the hyper-v vmbus and puts the data it received
  * into Buffer. This will receive the data unparsed from hyper-v.

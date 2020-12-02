@@ -107,7 +107,7 @@ struct mgmt_rp_read_index_list {
 #define MGMT_SETTING_PRIVACY		0x00002000
 #define MGMT_SETTING_CONFIGURATION	0x00004000
 #define MGMT_SETTING_STATIC_ADDRESS	0x00008000
-#define MGMT_SETTING_PHY_CONFIGURATION 	0x00010000
+#define MGMT_SETTING_PHY_CONFIGURATION	0x00010000
 #define MGMT_SETTING_WIDEBAND_SPEECH	0x00020000
 
 #define MGMT_OP_READ_INFO		0x0004
@@ -682,17 +682,11 @@ struct mgmt_cp_set_blocked_keys {
 
 #define MGMT_OP_SET_WIDEBAND_SPEECH	0x0047
 
-#define MGMT_CAP_SEC_FLAGS		0x01
-#define MGMT_CAP_MAX_ENC_KEY_SIZE	0x02
-#define MGMT_CAP_SMP_MAX_ENC_KEY_SIZE	0x03
-#define MGMT_CAP_LE_TX_PWR_MIN		0x04
-#define MGMT_CAP_LE_TX_PWR_MAX		0x05
-
-#define MGMT_OP_READ_CONTROLLER_CAP	0x0048
-#define MGMT_READ_CONTROLLER_CAP_SIZE	0
-struct mgmt_rp_read_controller_cap {
-	__le16   cap_len;
-	__u8     cap[0];
+#define MGMT_OP_READ_SECURITY_INFO	0x0048
+#define MGMT_READ_SECURITY_INFO_SIZE	0
+struct mgmt_rp_read_security_info {
+	__le16   sec_len;
+	__u8     sec[0];
 } __packed;
 
 #define MGMT_OP_READ_EXP_FEATURES_INFO	0x0049

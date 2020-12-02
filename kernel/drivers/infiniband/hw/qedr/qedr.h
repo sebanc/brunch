@@ -33,17 +33,18 @@
 #define __QEDR_H__
 
 #include <linux/pci.h>
-#include <linux/idr.h>
+#include <linux/xarray.h>
 #include <rdma/ib_addr.h>
 #include <linux/qed/qed_if.h>
 #include <linux/qed/qed_chain.h>
 #include <linux/qed/qed_rdma_if.h>
 #include <linux/qed/qede_rdma.h>
 #include <linux/qed/roce_common.h>
+#include <linux/completion.h>
 #include "qedr_hsi_rdma.h"
 
 #define QEDR_NODE_DESC "QLogic 579xx RoCE HCA"
-#define DP_NAME(dev) ((dev)->ibdev.name)
+#define DP_NAME(_dev) dev_name(&(_dev)->ibdev.dev)
 #define IS_IWARP(_dev) ((_dev)->rdma_type == QED_RDMA_TYPE_IWARP)
 #define IS_ROCE(_dev) ((_dev)->rdma_type == QED_RDMA_TYPE_ROCE)
 
@@ -123,11 +124,6 @@ struct qedr_device_attr {
 
 #define QEDR_ENET_STATE_BIT	(0)
 
-struct qedr_idr {
-	spinlock_t idr_lock; /* Protect idr data-structure */
-	struct idr idr;
-};
-
 struct qedr_dev {
 	struct ib_device	ibdev;
 	struct qed_dev		*cdev;
@@ -162,6 +158,8 @@ struct qedr_dev {
 	u32			dp_module;
 	u8			dp_level;
 	u8			num_hwfns;
+#define QEDR_IS_CMT(dev)        ((dev)->num_hwfns > 1)
+	u8			affin_hwfn_idx;
 	u8			gsi_ll2_handle;
 
 	uint			wq_multiplier;
@@ -171,8 +169,8 @@ struct qedr_dev {
 	struct qedr_cq		*gsi_rqcq;
 	struct qedr_qp		*gsi_qp;
 	enum qed_rdma_type	rdma_type;
-	struct qedr_idr		qpidr;
-	struct qedr_idr		srqidr;
+	struct xarray		qps;
+	struct xarray		srqs;
 	struct workqueue_struct *iwarp_wq;
 	u16			iwarp_max_mtu;
 
@@ -232,7 +230,7 @@ struct qedr_ucontext {
 	struct ib_ucontext ibucontext;
 	struct qedr_dev *dev;
 	struct qedr_pd *pd;
-	u64 dpi_addr;
+	void __iomem *dpi_addr;
 	u64 dpi_phys_addr;
 	u32 dpi_size;
 	u16 dpi;
@@ -380,10 +378,20 @@ enum qedr_qp_err_bitmap {
 	QEDR_QP_ERR_RQ_PBL_FULL = 32,
 };
 
+enum qedr_qp_create_type {
+	QEDR_QP_CREATE_NONE,
+	QEDR_QP_CREATE_USER,
+	QEDR_QP_CREATE_KERNEL,
+};
+
+enum qedr_iwarp_cm_flags {
+	QEDR_IWARP_CM_WAIT_FOR_CONNECT    = BIT(0),
+	QEDR_IWARP_CM_WAIT_FOR_DISCONNECT = BIT(1),
+};
+
 struct qedr_qp {
 	struct ib_qp ibqp;	/* must be first */
 	struct qedr_dev *dev;
-	struct qedr_iw_ep *ep;
 	struct qedr_qp_hwq_info sq;
 	struct qedr_qp_hwq_info rq;
 
@@ -398,6 +406,7 @@ struct qedr_qp {
 	u32 id;
 	struct qedr_pd *pd;
 	enum ib_qp_type qp_type;
+	enum qedr_qp_create_type create_type;
 	struct qed_rdma_qp *qed_qp;
 	u32 qp_id;
 	u16 icid;
@@ -440,8 +449,11 @@ struct qedr_qp {
 	/* Relevant to qps created from user space only (applications) */
 	struct qedr_userq usq;
 	struct qedr_userq urq;
-	atomic_t refcnt;
-	bool destroyed;
+
+	/* synchronization objects used with iwarp ep */
+	struct kref refcnt;
+	struct completion iwarp_cm_comp;
+	unsigned long iwarp_cm_flags; /* enum iwarp_cm_flags */
 };
 
 struct qedr_ah {
@@ -534,7 +546,7 @@ struct qedr_iw_ep {
 	struct iw_cm_id	*cm_id;
 	struct qedr_qp	*qp;
 	void		*qed_context;
-	u8		during_connect;
+	struct kref	refcnt;
 };
 
 static inline

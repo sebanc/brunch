@@ -956,9 +956,9 @@ static void lan743x_phy_link_status_change(struct net_device *netdev)
 		memset(&ksettings, 0, sizeof(ksettings));
 		phy_ethtool_get_link_ksettings(netdev, &ksettings);
 		local_advertisement =
-			ethtool_adv_to_mii_adv_t(phydev->advertising);
+			linkmode_adv_to_mii_adv_t(phydev->advertising);
 		remote_advertisement =
-			ethtool_adv_to_mii_adv_t(phydev->lp_advertising);
+			linkmode_adv_to_mii_adv_t(phydev->lp_advertising);
 
 		lan743x_phy_update_flowcontrol(adapter,
 					       ksettings.base.duplex,
@@ -983,7 +983,6 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 	struct phy_device *phydev;
 	struct net_device *netdev;
 	int ret = -EIO;
-	u32 mii_adv;
 
 	netdev = adapter->netdev;
 	phydev = phy_find_first(adapter->mdiobus);
@@ -997,13 +996,11 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 		goto return_error;
 
 	/* MAC doesn't support 1000T Half */
-	phydev->supported &= ~SUPPORTED_1000baseT_Half;
+	phy_remove_link_mode(phydev, ETHTOOL_LINK_MODE_1000baseT_Half_BIT);
 
 	/* support both flow controls */
+	phy_support_asym_pause(phydev);
 	phy->fc_request_control = (FLOW_CTRL_RX | FLOW_CTRL_TX);
-	phydev->advertising &= ~(ADVERTISED_Pause | ADVERTISED_Asym_Pause);
-	mii_adv = (u32)mii_advertise_flowctrl(phy->fc_request_control);
-	phydev->advertising |= mii_adv_to_ethtool_adv_t(mii_adv);
 	phy->fc_autoneg = phydev->autoneg;
 
 	phy_start(phydev);
@@ -1437,7 +1434,7 @@ static void lan743x_tx_frame_add_lso(struct lan743x_tx *tx,
 }
 
 static int lan743x_tx_frame_add_fragment(struct lan743x_tx *tx,
-					 const struct skb_frag_struct *fragment,
+					 const skb_frag_t *fragment,
 					 unsigned int frame_length)
 {
 	/* called only from within lan743x_tx_xmit_frame
@@ -1610,9 +1607,8 @@ static netdev_tx_t lan743x_tx_xmit_frame(struct lan743x_tx *tx,
 		goto finish;
 
 	for (j = 0; j < nr_frags; j++) {
-		const struct skb_frag_struct *frag;
+		const skb_frag_t *frag = &(skb_shinfo(skb)->frags[j]);
 
-		frag = &(skb_shinfo(skb)->frags[j]);
 		if (lan743x_tx_frame_add_fragment(tx, frag, frame_length)) {
 			/* upon error no need to call
 			 *	lan743x_tx_frame_end
@@ -2176,9 +2172,8 @@ static int lan743x_rx_napi_poll(struct napi_struct *napi, int weight)
 	}
 	count = 0;
 	while (count < weight) {
-		int rx_process_result = -1;
+		int rx_process_result = lan743x_rx_process_packet(rx);
 
-		rx_process_result = lan743x_rx_process_packet(rx);
 		if (rx_process_result == RX_PROCESS_RESULT_PACKET_RECEIVED) {
 			count++;
 		} else if (rx_process_result ==

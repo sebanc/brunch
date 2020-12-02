@@ -47,7 +47,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "vmm_impl.h"
 #include "vz_vmm_pvz.h"
-#include "vz_physheap.h"
+#include "system/vz_physheap.h"
 #include "vmm_pvz_client.h"
 
 

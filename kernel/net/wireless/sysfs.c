@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * This file provides /sys/class/ieee80211/<wiphy name>/
  * and some default attributes.
@@ -5,8 +6,6 @@
  * Copyright 2005-2006	Jiri Benc <jbenc@suse.cz>
  * Copyright 2006	Johannes Berg <johannes@sipsolutions.net>
  * Copyright (C) 2020 Intel Corporation
- *
- * This file is GPLv2 as found in COPYING.
  */
 
 #include <linux/device.h>

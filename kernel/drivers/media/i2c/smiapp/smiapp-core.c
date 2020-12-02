@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * drivers/media/i2c/smiapp/smiapp-core.c
  *
@@ -9,15 +10,6 @@
  * Based on smiapp driver by Vimarsh Zutshi
  * Based on jt8ev1.c by Vimarsh Zutshi
  * Based on smia-sensor.c by Tuukka Toivonen <tuukkat76@gmail.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
  */
 
 #include <linux/clk.h>
@@ -624,7 +616,7 @@ static int smiapp_init_late_controls(struct smiapp_sensor *sensor)
 {
 	unsigned long *valid_link_freqs = &sensor->valid_link_freqs[
 		sensor->csi_format->compressed - sensor->compressed_min_bpp];
-	unsigned int max, i;
+	unsigned int i;
 
 	for (i = 0; i < ARRAY_SIZE(sensor->test_data); i++) {
 		int max_value = (1 << sensor->csi_format->width) - 1;
@@ -634,8 +626,6 @@ static int smiapp_init_late_controls(struct smiapp_sensor *sensor)
 				&smiapp_ctrl_ops, V4L2_CID_TEST_PATTERN_RED + i,
 				0, max_value, 1, max_value);
 	}
-
-	for (max = 0; sensor->hwcfg->op_sys_clock[max + 1]; max++);
 
 	sensor->link_freq = v4l2_ctrl_new_int_menu(
 		&sensor->src->ctrl_handler, &smiapp_ctrl_ops,
@@ -2337,11 +2327,12 @@ smiapp_sysfs_nvm_read(struct device *dev, struct device_attribute *attr,
 		if (rval < 0) {
 			if (rval != -EBUSY && rval != -EAGAIN)
 				pm_runtime_set_active(&client->dev);
-			pm_runtime_put(&client->dev);
+			pm_runtime_put_noidle(&client->dev);
 			return -ENODEV;
 		}
 
 		if (smiapp_read_nvm(sensor, sensor->nvm)) {
+			pm_runtime_put(&client->dev);
 			dev_err(&client->dev, "nvm read failed\n");
 			return -ENODEV;
 		}
@@ -2617,9 +2608,7 @@ static void smiapp_create_subdev(struct smiapp_sensor *sensor,
 	ssd->npads = num_pads;
 	ssd->source_pad = num_pads - 1;
 
-	snprintf(ssd->sd.name,
-		 sizeof(ssd->sd.name), "%s %s %d-%4.4x", sensor->minfo.name,
-		 name, i2c_adapter_id(client->adapter), client->addr);
+	v4l2_i2c_subdev_set_name(&ssd->sd, client, sensor->minfo.name, name);
 
 	smiapp_get_native_size(ssd, &ssd->sink_fmt);
 
@@ -2775,7 +2764,13 @@ static struct smiapp_hwconfig *smiapp_get_hwconfig(struct device *dev)
 	if (!ep)
 		return NULL;
 
+	bus_cfg.bus_type = V4L2_MBUS_CSI2_DPHY;
 	rval = v4l2_fwnode_endpoint_alloc_parse(ep, &bus_cfg);
+	if (rval == -ENXIO) {
+		bus_cfg = (struct v4l2_fwnode_endpoint)
+			{ .bus_type = V4L2_MBUS_CCP2 };
+		rval = v4l2_fwnode_endpoint_alloc_parse(ep, &bus_cfg);
+	}
 	if (rval)
 		goto out_err;
 
@@ -2853,8 +2848,7 @@ out_err:
 	return NULL;
 }
 
-static int smiapp_probe(struct i2c_client *client,
-			const struct i2c_device_id *devid)
+static int smiapp_probe(struct i2c_client *client)
 {
 	struct smiapp_sensor *sensor;
 	struct smiapp_hwconfig *hwcfg = smiapp_get_hwconfig(&client->dev);
@@ -3064,9 +3058,9 @@ static int smiapp_probe(struct i2c_client *client,
 	if (sensor->minfo.smiapp_profile == SMIAPP_PROFILE_0)
 		sensor->pll.flags |= SMIAPP_PLL_FLAG_NO_OP_CLOCKS;
 
-	smiapp_create_subdev(sensor, sensor->scaler, "scaler", 2);
-	smiapp_create_subdev(sensor, sensor->binner, "binner", 2);
-	smiapp_create_subdev(sensor, sensor->pixel_array, "pixel_array", 1);
+	smiapp_create_subdev(sensor, sensor->scaler, " scaler", 2);
+	smiapp_create_subdev(sensor, sensor->binner, " binner", 2);
+	smiapp_create_subdev(sensor, sensor->pixel_array, " pixel_array", 1);
 
 	dev_dbg(&client->dev, "profile %d\n", sensor->minfo.smiapp_profile);
 
@@ -3182,7 +3176,7 @@ static struct i2c_driver smiapp_i2c_driver = {
 		.name = SMIAPP_NAME,
 		.pm = &smiapp_pm_ops,
 	},
-	.probe	= smiapp_probe,
+	.probe_new = smiapp_probe,
 	.remove	= smiapp_remove,
 	.id_table = smiapp_id_table,
 };

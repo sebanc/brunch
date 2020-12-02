@@ -11,16 +11,21 @@
 #include <linux/bitops.h>
 #include <linux/etherdevice.h>
 #include <linux/if_vlan.h>
+#include <linux/net_tstamp.h>
+#include <linux/phy.h>
+#include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/ptp_clock_kernel.h>
 #include <linux/regmap.h>
 
 #include "ocelot_ana.h"
 #include "ocelot_dev.h"
-#include "ocelot_hsio.h"
 #include "ocelot_qsys.h"
 #include "ocelot_rew.h"
 #include "ocelot_sys.h"
 #include "ocelot_qs.h"
+#include "ocelot_tc.h"
+#include "ocelot_ptp.h"
 
 #define PGID_AGGR    64
 #define PGID_SRC     80
@@ -36,14 +41,17 @@
 
 #define OCELOT_STATS_CHECK_DELAY (2 * HZ)
 
+#define OCELOT_PTP_QUEUE_SZ	128
+
 #define IFH_LEN 4
 
 struct frame_info {
 	u32 len;
 	u16 port;
 	u16 vid;
-	u8 cpuq;
 	u8 tag_type;
+	u16 rew_op;
+	u32 timestamp;	/* rew_val */
 };
 
 #define IFH_INJ_BYPASS	BIT(31)
@@ -51,6 +59,12 @@ struct frame_info {
 
 #define IFH_TAG_TYPE_C 0
 #define IFH_TAG_TYPE_S 1
+
+#define IFH_REW_OP_NOOP			0x0
+#define IFH_REW_OP_DSCP			0x1
+#define IFH_REW_OP_ONE_STEP_PTP		0x2
+#define IFH_REW_OP_TWO_STEP_PTP		0x3
+#define IFH_REW_OP_ORIGIN_PTP		0x5
 
 #define OCELOT_SPEED_2500 0
 #define OCELOT_SPEED_1000 1
@@ -67,7 +81,9 @@ enum ocelot_target {
 	QSYS,
 	REW,
 	SYS,
+	S2,
 	HSIO,
+	PTP,
 	TARGET_MAX,
 };
 
@@ -333,79 +349,20 @@ enum ocelot_reg {
 	SYS_CM_DATA_RD,
 	SYS_CM_OP,
 	SYS_CM_DATA,
-	HSIO_PLL5G_CFG0 = HSIO << TARGET_OFFSET,
-	HSIO_PLL5G_CFG1,
-	HSIO_PLL5G_CFG2,
-	HSIO_PLL5G_CFG3,
-	HSIO_PLL5G_CFG4,
-	HSIO_PLL5G_CFG5,
-	HSIO_PLL5G_CFG6,
-	HSIO_PLL5G_STATUS0,
-	HSIO_PLL5G_STATUS1,
-	HSIO_PLL5G_BIST_CFG0,
-	HSIO_PLL5G_BIST_CFG1,
-	HSIO_PLL5G_BIST_CFG2,
-	HSIO_PLL5G_BIST_STAT0,
-	HSIO_PLL5G_BIST_STAT1,
-	HSIO_RCOMP_CFG0,
-	HSIO_RCOMP_STATUS,
-	HSIO_SYNC_ETH_CFG,
-	HSIO_SYNC_ETH_PLL_CFG,
-	HSIO_S1G_DES_CFG,
-	HSIO_S1G_IB_CFG,
-	HSIO_S1G_OB_CFG,
-	HSIO_S1G_SER_CFG,
-	HSIO_S1G_COMMON_CFG,
-	HSIO_S1G_PLL_CFG,
-	HSIO_S1G_PLL_STATUS,
-	HSIO_S1G_DFT_CFG0,
-	HSIO_S1G_DFT_CFG1,
-	HSIO_S1G_DFT_CFG2,
-	HSIO_S1G_TP_CFG,
-	HSIO_S1G_RC_PLL_BIST_CFG,
-	HSIO_S1G_MISC_CFG,
-	HSIO_S1G_DFT_STATUS,
-	HSIO_S1G_MISC_STATUS,
-	HSIO_MCB_S1G_ADDR_CFG,
-	HSIO_S6G_DIG_CFG,
-	HSIO_S6G_DFT_CFG0,
-	HSIO_S6G_DFT_CFG1,
-	HSIO_S6G_DFT_CFG2,
-	HSIO_S6G_TP_CFG0,
-	HSIO_S6G_TP_CFG1,
-	HSIO_S6G_RC_PLL_BIST_CFG,
-	HSIO_S6G_MISC_CFG,
-	HSIO_S6G_OB_ANEG_CFG,
-	HSIO_S6G_DFT_STATUS,
-	HSIO_S6G_ERR_CNT,
-	HSIO_S6G_MISC_STATUS,
-	HSIO_S6G_DES_CFG,
-	HSIO_S6G_IB_CFG,
-	HSIO_S6G_IB_CFG1,
-	HSIO_S6G_IB_CFG2,
-	HSIO_S6G_IB_CFG3,
-	HSIO_S6G_IB_CFG4,
-	HSIO_S6G_IB_CFG5,
-	HSIO_S6G_OB_CFG,
-	HSIO_S6G_OB_CFG1,
-	HSIO_S6G_SER_CFG,
-	HSIO_S6G_COMMON_CFG,
-	HSIO_S6G_PLL_CFG,
-	HSIO_S6G_ACJTAG_CFG,
-	HSIO_S6G_GP_CFG,
-	HSIO_S6G_IB_STATUS0,
-	HSIO_S6G_IB_STATUS1,
-	HSIO_S6G_ACJTAG_STATUS,
-	HSIO_S6G_PLL_STATUS,
-	HSIO_S6G_REVID,
-	HSIO_MCB_S6G_ADDR_CFG,
-	HSIO_HW_CFG,
-	HSIO_HW_QSGMII_CFG,
-	HSIO_HW_QSGMII_STAT,
-	HSIO_CLK_CFG,
-	HSIO_TEMP_SENSOR_CTRL,
-	HSIO_TEMP_SENSOR_CFG,
-	HSIO_TEMP_SENSOR_STAT,
+	S2_CORE_UPDATE_CTRL = S2 << TARGET_OFFSET,
+	S2_CORE_MV_CFG,
+	S2_CACHE_ENTRY_DAT,
+	S2_CACHE_MASK_DAT,
+	S2_CACHE_ACTION_DAT,
+	S2_CACHE_CNT_DAT,
+	S2_CACHE_TG_DAT,
+	PTP_PIN_CFG = PTP << TARGET_OFFSET,
+	PTP_PIN_TOD_SEC_MSB,
+	PTP_PIN_TOD_SEC_LSB,
+	PTP_PIN_TOD_NSEC,
+	PTP_CFG_MISC,
+	PTP_CLK_CFG_ADJ_CFG,
+	PTP_CLK_CFG_ADJ_FREQ,
 };
 
 enum ocelot_regfield {
@@ -454,6 +411,13 @@ enum ocelot_regfield {
 	SYS_RESET_CFG_MEM_ENA,
 	SYS_RESET_CFG_MEM_INIT,
 	REGFIELD_MAX
+};
+
+enum ocelot_clk_pins {
+	ALT_PPS_PIN	= 1,
+	EXT_CLK_PIN,
+	ALT_LDST_PIN,
+	TOD_ACC_PIN
 };
 
 struct ocelot_multicast {
@@ -505,6 +469,13 @@ struct ocelot {
 	u64 *stats;
 	struct delayed_work stats_work;
 	struct workqueue_struct *stats_queue;
+
+	u8 ptp:1;
+	struct ptp_clock *ptp_clock;
+	struct ptp_clock_info ptp_info;
+	struct hwtstamp_config hwtstamp_config;
+	struct mutex ptp_lock; /* Protects the PTP interface state */
+	spinlock_t ptp_clock_lock; /* Protects the PTP clock */
 };
 
 struct ocelot_port {
@@ -513,10 +484,6 @@ struct ocelot_port {
 	struct phy_device *phy;
 	void __iomem *regs;
 	u8 chip_port;
-	/* Keep a track of the mc addresses added to the mac table, so that they
-	 * can be removed when needed.
-	 */
-	struct list_head mc;
 
 	/* Ingress default VLAN (pvid) */
 	u16 pvid;
@@ -527,6 +494,21 @@ struct ocelot_port {
 	u8 vlan_aware;
 
 	u64 *stats;
+
+	phy_interface_t phy_mode;
+	struct phy *serdes;
+
+	struct ocelot_port_tc tc;
+
+	u8 ptp_cmd;
+	struct list_head skbs;
+	u8 ts_id;
+};
+
+struct ocelot_skb {
+	struct list_head head;
+	struct sk_buff *skb;
+	u8 id;
 };
 
 u32 __ocelot_read_ix(struct ocelot *ocelot, u32 reg, u32 offset);
@@ -568,5 +550,10 @@ int ocelot_probe_port(struct ocelot *ocelot, u8 port,
 		      struct phy_device *phy);
 
 extern struct notifier_block ocelot_netdevice_nb;
+extern struct notifier_block ocelot_switchdev_nb;
+extern struct notifier_block ocelot_switchdev_blocking_nb;
+
+int ocelot_ptp_gettime64(struct ptp_clock_info *ptp, struct timespec64 *ts);
+void ocelot_get_hwtimestamp(struct ocelot *ocelot, struct timespec64 *ts);
 
 #endif

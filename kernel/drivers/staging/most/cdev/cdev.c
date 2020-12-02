@@ -425,7 +425,7 @@ static int comp_tx_completion(struct most_interface *iface, int channel_id)
  * Returns 0 on success or error code otherwise.
  */
 static int comp_probe(struct most_interface *iface, int channel_id,
-		      struct most_channel_config *cfg, char *name)
+		      struct most_channel_config *cfg, char *name, char *args)
 {
 	struct comp_channel *c;
 	unsigned long cl_flags;
@@ -447,7 +447,7 @@ static int comp_probe(struct most_interface *iface, int channel_id,
 	c = kzalloc(sizeof(*c), GFP_KERNEL);
 	if (!c) {
 		retval = -ENOMEM;
-		goto error_alloc_channel;
+		goto err_remove_ida;
 	}
 
 	c->devno = MKDEV(comp.major, current_minor);
@@ -463,10 +463,8 @@ static int comp_probe(struct most_interface *iface, int channel_id,
 	spin_lock_init(&c->unlink);
 	INIT_KFIFO(c->fifo);
 	retval = kfifo_alloc(&c->fifo, cfg->num_buffers, GFP_KERNEL);
-	if (retval) {
-		pr_info("failed to alloc channel kfifo");
-		goto error_alloc_kfifo;
-	}
+	if (retval)
+		goto err_del_cdev_and_free_channel;
 	init_waitqueue_head(&c->wq);
 	mutex_init(&c->io_mutex);
 	spin_lock_irqsave(&ch_list_lock, cl_flags);
@@ -477,19 +475,19 @@ static int comp_probe(struct most_interface *iface, int channel_id,
 	if (IS_ERR(c->dev)) {
 		retval = PTR_ERR(c->dev);
 		pr_info("failed to create new device node %s\n", name);
-		goto error_create_device;
+		goto err_free_kfifo_and_del_list;
 	}
 	kobject_uevent(&c->dev->kobj, KOBJ_ADD);
 	return 0;
 
-error_create_device:
+err_free_kfifo_and_del_list:
 	kfifo_free(&c->fifo);
 	list_del(&c->list);
-error_alloc_kfifo:
+err_del_cdev_and_free_channel:
 	cdev_del(&c->cdev);
 err_free_c:
 	kfree(c);
-error_alloc_channel:
+err_remove_ida:
 	ida_simple_remove(&comp.minor_id, current_minor);
 	return retval;
 }
@@ -527,8 +525,13 @@ static int __init mod_init(void)
 	err = most_register_component(&comp.cc);
 	if (err)
 		goto free_cdev;
+	err = most_register_configfs_subsys(&comp.cc);
+	if (err)
+		goto deregister_comp;
 	return 0;
 
+deregister_comp:
+	most_deregister_component(&comp.cc);
 free_cdev:
 	unregister_chrdev_region(comp.devno, CHRDEV_REGION_SIZE);
 dest_ida:
@@ -543,6 +546,7 @@ static void __exit mod_exit(void)
 
 	pr_info("exit module\n");
 
+	most_deregister_configfs_subsys(&comp.cc);
 	most_deregister_component(&comp.cc);
 
 	list_for_each_entry_safe(c, tmp, &channel_list, list) {

@@ -75,6 +75,7 @@ static const char *pci_bus_speed_strings[] = {
 	"5.0 GT/s PCIe",	/* 0x15 */
 	"8.0 GT/s PCIe",	/* 0x16 */
 	"16.0 GT/s PCIe",	/* 0x17 */
+	"32.0 GT/s PCIe",	/* 0x18 */
 };
 
 static ssize_t bus_speed_read(enum pci_bus_speed speed, char *buf)
@@ -372,7 +373,7 @@ void pci_hp_create_module_link(struct pci_slot *pci_slot)
 
 	if (!slot || !slot->ops)
 		return;
-	kobj = kset_find_obj(module_kset, slot->ops->mod_name);
+	kobj = kset_find_obj(module_kset, slot->mod_name);
 	if (!kobj)
 		return;
 	ret = sysfs_create_link(&pci_slot->kobj, kobj, "module");
@@ -405,7 +406,7 @@ static int pci_slot_init(void)
 	pci_slots_kset = kset_create_and_add("slots", NULL,
 						&pci_bus_kset->kobj);
 	if (!pci_slots_kset) {
-		printk(KERN_ERR "PCI: Slot initialization failure\n");
+		pr_err("PCI: Slot initialization failure\n");
 		return -ENOMEM;
 	}
 	return 0;

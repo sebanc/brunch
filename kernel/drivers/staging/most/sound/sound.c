@@ -10,6 +10,7 @@
 #include <linux/module.h>
 #include <linux/printk.h>
 #include <linux/kernel.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -19,8 +20,8 @@
 #include <most/core.h>
 
 #define DRIVER_NAME "sound"
+#define STRING_SIZE	80
 
-static struct list_head dev_list;
 static struct core_component comp;
 
 /**
@@ -55,6 +56,17 @@ struct channel {
 
 	void (*copy_fn)(void *alsa, void *most, unsigned int bytes);
 };
+
+struct sound_adapter {
+	struct list_head dev_list;
+	struct most_interface *iface;
+	struct snd_card *card;
+	struct list_head list;
+	bool registered;
+	int pcm_dev_idx;
+};
+
+static struct list_head adpt_list;
 
 #define MOST_PCM_INFO (SNDRV_PCM_INFO_MMAP | \
 		       SNDRV_PCM_INFO_MMAP_VALID | \
@@ -157,9 +169,10 @@ static void most_to_alsa_copy32(void *alsa, void *most, unsigned int bytes)
 static struct channel *get_channel(struct most_interface *iface,
 				   int channel_id)
 {
+	struct sound_adapter *adpt = iface->priv;
 	struct channel *channel, *tmp;
 
-	list_for_each_entry_safe(channel, tmp, &dev_list, list) {
+	list_for_each_entry_safe(channel, tmp, &adpt->dev_list, list) {
 		if ((channel->iface == iface) && (channel->id == channel_id))
 			return channel;
 	}
@@ -459,17 +472,11 @@ static const struct snd_pcm_ops pcm_ops = {
 	.page       = snd_pcm_lib_get_vmalloc_page,
 };
 
-static int split_arg_list(char *buf, char **card_name, u16 *ch_num,
-			  char **sample_res)
+static int split_arg_list(char *buf, u16 *ch_num, char **sample_res)
 {
 	char *num;
 	int ret;
 
-	*card_name = strsep(&buf, ".");
-	if (!*card_name) {
-		pr_err("Missing sound card name\n");
-		return -EIO;
-	}
 	num = strsep(&buf, "x");
 	if (!num)
 		goto err;
@@ -479,6 +486,7 @@ static int split_arg_list(char *buf, char **card_name, u16 *ch_num,
 	*sample_res = strsep(&buf, ".\n");
 	if (!*sample_res)
 		goto err;
+
 	return 0;
 
 err:
@@ -536,6 +544,20 @@ found:
 	return 0;
 }
 
+static void release_adapter(struct sound_adapter *adpt)
+{
+	struct channel *channel, *tmp;
+
+	list_for_each_entry_safe(channel, tmp, &adpt->dev_list, list) {
+		list_del(&channel->list);
+		kfree(channel);
+	}
+	if (adpt->card)
+		snd_card_free(adpt->card);
+	list_del(&adpt->list);
+	kfree(adpt);
+}
+
 /**
  * audio_probe_channel - probe function of the driver module
  * @iface: pointer to interface instance
@@ -550,18 +572,18 @@ found:
  */
 static int audio_probe_channel(struct most_interface *iface, int channel_id,
 			       struct most_channel_config *cfg,
-			       char *arg_list)
+			       char *device_name, char *arg_list)
 {
 	struct channel *channel;
-	struct snd_card *card;
+	struct sound_adapter *adpt;
 	struct snd_pcm *pcm;
 	int playback_count = 0;
 	int capture_count = 0;
 	int ret;
 	int direction;
-	char *card_name;
 	u16 ch_num;
 	char *sample_res;
+	char arg_list_cpy[STRING_SIZE];
 
 	if (!iface)
 		return -EINVAL;
@@ -570,7 +592,38 @@ static int audio_probe_channel(struct most_interface *iface, int channel_id,
 		pr_err("Incompatible channel type\n");
 		return -EINVAL;
 	}
+	strlcpy(arg_list_cpy, arg_list, STRING_SIZE);
+	ret = split_arg_list(arg_list_cpy, &ch_num, &sample_res);
+	if (ret < 0)
+		return ret;
 
+	list_for_each_entry(adpt, &adpt_list, list) {
+		if (adpt->iface != iface)
+			continue;
+		if (adpt->registered)
+			return -ENOSPC;
+		adpt->pcm_dev_idx++;
+		goto skip_adpt_alloc;
+	}
+	adpt = kzalloc(sizeof(*adpt), GFP_KERNEL);
+	if (!adpt)
+		return -ENOMEM;
+
+	adpt->iface = iface;
+	INIT_LIST_HEAD(&adpt->dev_list);
+	iface->priv = adpt;
+	list_add_tail(&adpt->list, &adpt_list);
+	ret = snd_card_new(iface->driver_dev, -1, "INIC", THIS_MODULE,
+			   sizeof(*channel), &adpt->card);
+	if (ret < 0)
+		goto err_free_adpt;
+	snprintf(adpt->card->driver, sizeof(adpt->card->driver),
+		 "%s", DRIVER_NAME);
+	snprintf(adpt->card->shortname, sizeof(adpt->card->shortname),
+		 "Microchip INIC");
+	snprintf(adpt->card->longname, sizeof(adpt->card->longname),
+		 "%s at %s", adpt->card->shortname, iface->description);
+skip_adpt_alloc:
 	if (get_channel(iface, channel_id)) {
 		pr_err("channel (%s:%d) is already linked\n",
 		       iface->description, channel_id);
@@ -584,54 +637,58 @@ static int audio_probe_channel(struct most_interface *iface, int channel_id,
 		capture_count = 1;
 		direction = SNDRV_PCM_STREAM_CAPTURE;
 	}
-
-	ret = split_arg_list(arg_list, &card_name, &ch_num, &sample_res);
-	if (ret < 0)
-		return ret;
-
-	ret = snd_card_new(&iface->dev, -1, card_name, THIS_MODULE,
-			   sizeof(*channel), &card);
-	if (ret < 0)
-		return ret;
-
-	channel = card->private_data;
-	channel->card = card;
+	channel = kzalloc(sizeof(*channel), GFP_KERNEL);
+	if (!channel) {
+		ret = -ENOMEM;
+		goto err_free_adpt;
+	}
+	channel->card = adpt->card;
 	channel->cfg = cfg;
 	channel->iface = iface;
 	channel->id = channel_id;
 	init_waitqueue_head(&channel->playback_waitq);
+	list_add_tail(&channel->list, &adpt->dev_list);
 
 	ret = audio_set_hw_params(&channel->pcm_hardware, ch_num, sample_res,
 				  cfg);
 	if (ret)
-		goto err_free_card;
+		goto err_free_adpt;
 
-	snprintf(card->driver, sizeof(card->driver), "%s", DRIVER_NAME);
-	snprintf(card->shortname, sizeof(card->shortname), "Microchip MOST:%d",
-		 card->number);
-	snprintf(card->longname, sizeof(card->longname), "%s at %s, ch %d",
-		 card->shortname, iface->description, channel_id);
+	ret = snd_pcm_new(adpt->card, device_name, adpt->pcm_dev_idx,
+			  playback_count, capture_count, &pcm);
 
-	ret = snd_pcm_new(card, card_name, 0, playback_count,
-			  capture_count, &pcm);
 	if (ret < 0)
-		goto err_free_card;
+		goto err_free_adpt;
 
 	pcm->private_data = channel;
-
+	strscpy(pcm->name, device_name, sizeof(pcm->name));
 	snd_pcm_set_ops(pcm, direction, &pcm_ops);
-
-	ret = snd_card_register(card);
-	if (ret < 0)
-		goto err_free_card;
-
-	list_add_tail(&channel->list, &dev_list);
 
 	return 0;
 
-err_free_card:
-	snd_card_free(card);
+err_free_adpt:
+	release_adapter(adpt);
 	return ret;
+}
+
+static int audio_create_sound_card(void)
+{
+	int ret;
+	struct sound_adapter *adpt;
+
+	list_for_each_entry(adpt, &adpt_list, list) {
+		if (!adpt->registered)
+			goto adpt_alloc;
+	}
+	return -ENODEV;
+adpt_alloc:
+	ret = snd_card_register(adpt->card);
+	if (ret < 0) {
+		release_adapter(adpt);
+		return ret;
+	}
+	adpt->registered = true;
+	return 0;
 }
 
 /**
@@ -647,6 +704,7 @@ static int audio_disconnect_channel(struct most_interface *iface,
 				    int channel_id)
 {
 	struct channel *channel;
+	struct sound_adapter *adpt = iface->priv;
 
 	channel = get_channel(iface, channel_id);
 	if (!channel) {
@@ -656,8 +714,10 @@ static int audio_disconnect_channel(struct most_interface *iface,
 	}
 
 	list_del(&channel->list);
-	snd_card_free(channel->card);
 
+	kfree(channel);
+	if (list_empty(&adpt->dev_list))
+		release_adapter(adpt);
 	return 0;
 }
 
@@ -727,28 +787,33 @@ static struct core_component comp = {
 	.disconnect_channel = audio_disconnect_channel,
 	.rx_completion = audio_rx_completion,
 	.tx_completion = audio_tx_completion,
+	.cfg_complete = audio_create_sound_card,
 };
 
 static int __init audio_init(void)
 {
+	int ret;
+
 	pr_info("init()\n");
 
-	INIT_LIST_HEAD(&dev_list);
+	INIT_LIST_HEAD(&adpt_list);
 
-	return most_register_component(&comp);
+	ret = most_register_component(&comp);
+	if (ret)
+		pr_err("Failed to register %s\n", comp.name);
+	ret = most_register_configfs_subsys(&comp);
+	if (ret) {
+		pr_err("Failed to register %s configfs subsys\n", comp.name);
+		most_deregister_component(&comp);
+	}
+
+	return ret;
 }
 
 static void __exit audio_exit(void)
 {
-	struct channel *channel, *tmp;
-
 	pr_info("exit()\n");
-
-	list_for_each_entry_safe(channel, tmp, &dev_list, list) {
-		list_del(&channel->list);
-		snd_card_free(channel->card);
-	}
-
+	most_deregister_configfs_subsys(&comp);
 	most_deregister_component(&comp);
 }
 

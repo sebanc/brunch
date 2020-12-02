@@ -76,7 +76,6 @@ enum EnumRd {
 	APL7_FCCA = 0x5C,
 	APL8_WORLD = 0x5D,
 	APL9_WORLD = 0x5E,
-	APL10_WORLD = 0x5F,
 
 	WOR0_WORLD = 0x60,
 	WOR1_WORLD = 0x61,
@@ -205,7 +204,6 @@ static struct reg_dmn_pair_mapping regDomainPairs[] = {
 	{APL6_WORLD, CTL_ETSI, CTL_ETSI},
 	{APL8_WORLD, CTL_ETSI, CTL_ETSI},
 	{APL9_WORLD, CTL_ETSI, CTL_ETSI},
-	{APL10_WORLD, CTL_ETSI, CTL_ETSI},
 
 	{APL3_FCCA, CTL_FCC, CTL_FCC},
 	{APL7_FCCA, CTL_FCC, CTL_FCC},
@@ -425,7 +423,7 @@ static struct country_code_to_enum_rd allCountries[] = {
 	{CTRY_KAZAKHSTAN, NULL1_WORLD, "KZ"},
 	{CTRY_KENYA, APL1_WORLD, "KE"},
 	{CTRY_KOREA_NORTH, APL9_WORLD, "KP"},
-	{CTRY_KOREA_ROC, APL10_WORLD, "KR"},
+	{CTRY_KOREA_ROC, APL9_WORLD, "KR"},
 	{CTRY_KOREA_ROC2, APL2_WORLD, "K2"},
 	{CTRY_KOREA_ROC3, APL9_WORLD, "K3"},
 	{CTRY_KUWAIT, ETSI3_WORLD, "KW"},
@@ -485,6 +483,8 @@ static struct country_code_to_enum_rd allCountries[] = {
 	{CTRY_UAE, NULL1_WORLD, "AE"},
 	{CTRY_UNITED_KINGDOM, ETSI1_WORLD, "GB"},
 	{CTRY_UNITED_STATES, FCC3_FCCA, "US"},
+	{CTRY_UNITED_STATES2, FCC3_FCCA, "US"},
+	{CTRY_UNITED_STATES3, FCC3_FCCA, "US"},
 	/* This "PS" is for US public safety actually... to support this we
 	 * would need to assign new special alpha2 to CRDA db as with the world
 	 * regdomain and use another alpha2 */

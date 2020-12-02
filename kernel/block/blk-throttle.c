@@ -84,8 +84,7 @@ struct throtl_service_queue {
 	 * RB tree of active children throtl_grp's, which are sorted by
 	 * their ->disptime.
 	 */
-	struct rb_root		pending_tree;	/* RB tree of active tgs */
-	struct rb_node		*first_pending;	/* first node in the tree */
+	struct rb_root_cached	pending_tree;	/* RB tree of active tgs */
 	unsigned int		nr_pending;	/* # queued in the tree */
 	unsigned long		first_pending_disptime;	/* disptime of the first tg */
 	struct timer_list	pending_timer;	/* fires on first_pending_disptime */
@@ -475,16 +474,18 @@ static void throtl_service_queue_init(struct throtl_service_queue *sq)
 {
 	INIT_LIST_HEAD(&sq->queued[0]);
 	INIT_LIST_HEAD(&sq->queued[1]);
-	sq->pending_tree = RB_ROOT;
+	sq->pending_tree = RB_ROOT_CACHED;
 	timer_setup(&sq->pending_timer, throtl_pending_timer_fn, 0);
 }
 
-static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp, int node)
+static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp,
+						struct request_queue *q,
+						struct blkcg *blkcg)
 {
 	struct throtl_grp *tg;
 	int rw;
 
-	tg = kzalloc_node(sizeof(*tg), gfp, node);
+	tg = kzalloc_node(sizeof(*tg), gfp, q->node);
 	if (!tg)
 		return NULL;
 
@@ -616,31 +617,23 @@ static void throtl_pd_free(struct blkg_policy_data *pd)
 static struct throtl_grp *
 throtl_rb_first(struct throtl_service_queue *parent_sq)
 {
+	struct rb_node *n;
 	/* Service tree is empty */
 	if (!parent_sq->nr_pending)
 		return NULL;
 
-	if (!parent_sq->first_pending)
-		parent_sq->first_pending = rb_first(&parent_sq->pending_tree);
-
-	if (parent_sq->first_pending)
-		return rb_entry_tg(parent_sq->first_pending);
-
-	return NULL;
-}
-
-static void rb_erase_init(struct rb_node *n, struct rb_root *root)
-{
-	rb_erase(n, root);
-	RB_CLEAR_NODE(n);
+	n = rb_first_cached(&parent_sq->pending_tree);
+	WARN_ON_ONCE(!n);
+	if (!n)
+		return NULL;
+	return rb_entry_tg(n);
 }
 
 static void throtl_rb_erase(struct rb_node *n,
 			    struct throtl_service_queue *parent_sq)
 {
-	if (parent_sq->first_pending == n)
-		parent_sq->first_pending = NULL;
-	rb_erase_init(n, &parent_sq->pending_tree);
+	rb_erase_cached(n, &parent_sq->pending_tree);
+	RB_CLEAR_NODE(n);
 	--parent_sq->nr_pending;
 }
 
@@ -658,11 +651,11 @@ static void update_min_dispatch_time(struct throtl_service_queue *parent_sq)
 static void tg_service_queue_add(struct throtl_grp *tg)
 {
 	struct throtl_service_queue *parent_sq = tg->service_queue.parent_sq;
-	struct rb_node **node = &parent_sq->pending_tree.rb_node;
+	struct rb_node **node = &parent_sq->pending_tree.rb_root.rb_node;
 	struct rb_node *parent = NULL;
 	struct throtl_grp *__tg;
 	unsigned long key = tg->disptime;
-	int left = 1;
+	bool leftmost = true;
 
 	while (*node != NULL) {
 		parent = *node;
@@ -672,15 +665,13 @@ static void tg_service_queue_add(struct throtl_grp *tg)
 			node = &parent->rb_left;
 		else {
 			node = &parent->rb_right;
-			left = 0;
+			leftmost = false;
 		}
 	}
 
-	if (left)
-		parent_sq->first_pending = &tg->rb_node;
-
 	rb_link_node(&tg->rb_node, parent, node);
-	rb_insert_color(&tg->rb_node, &parent_sq->pending_tree);
+	rb_insert_color_cached(&tg->rb_node, &parent_sq->pending_tree,
+			       leftmost);
 }
 
 static void __throtl_enqueue_tg(struct throtl_grp *tg)
@@ -1228,7 +1219,7 @@ static bool throtl_can_upgrade(struct throtl_data *td,
 	struct throtl_grp *this_tg);
 /**
  * throtl_pending_timer_fn - timer function for service_queue->pending_timer
- * @arg: the throtl_service_queue being serviced
+ * @t: the pending_timer member of the throtl_service_queue being serviced
  *
  * This timer is armed when a child throtl_grp with active bio's become
  * pending and queued on the service_queue's pending_tree and expires when
@@ -1251,7 +1242,7 @@ static void throtl_pending_timer_fn(struct timer_list *t)
 	bool dispatched;
 	int ret;
 
-	spin_lock_irq(q->queue_lock);
+	spin_lock_irq(&q->queue_lock);
 	if (throtl_can_upgrade(td, NULL))
 		throtl_upgrade_state(td);
 
@@ -1274,9 +1265,9 @@ again:
 			break;
 
 		/* this dispatch windows is still open, relax and repeat */
-		spin_unlock_irq(q->queue_lock);
+		spin_unlock_irq(&q->queue_lock);
 		cpu_relax();
-		spin_lock_irq(q->queue_lock);
+		spin_lock_irq(&q->queue_lock);
 	}
 
 	if (!dispatched)
@@ -1298,7 +1289,7 @@ again:
 		queue_work(kthrotld_workqueue, &td->dispatch_work);
 	}
 out_unlock:
-	spin_unlock_irq(q->queue_lock);
+	spin_unlock_irq(&q->queue_lock);
 }
 
 /**
@@ -1322,11 +1313,11 @@ static void blk_throtl_dispatch_work_fn(struct work_struct *work)
 
 	bio_list_init(&bio_list_on_stack);
 
-	spin_lock_irq(q->queue_lock);
+	spin_lock_irq(&q->queue_lock);
 	for (rw = READ; rw <= WRITE; rw++)
 		while ((bio = throtl_pop_queued(&td_sq->queued[rw], NULL)))
 			bio_list_add(&bio_list_on_stack, bio);
-	spin_unlock_irq(q->queue_lock);
+	spin_unlock_irq(&q->queue_lock);
 
 	if (!bio_list_empty(&bio_list_on_stack)) {
 		blk_start_plug(&plug);
@@ -2123,16 +2114,6 @@ static inline void throtl_update_latency_buckets(struct throtl_data *td)
 }
 #endif
 
-static void blk_throtl_assoc_bio(struct throtl_grp *tg, struct bio *bio)
-{
-#ifdef CONFIG_BLK_DEV_THROTTLING_LOW
-	/* fallback to root_blkg if we fail to get a blkg ref */
-	if (bio->bi_css && (bio_associate_blkg(bio, tg_to_blkg(tg)) == -ENODEV))
-		bio_associate_blkg(bio, bio->bi_disk->queue->root_blkg);
-	bio_issue_init(&bio->bi_issue, bio_sectors(bio));
-#endif
-}
-
 bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 		    struct bio *bio)
 {
@@ -2149,14 +2130,10 @@ bool blk_throtl_bio(struct request_queue *q, struct blkcg_gq *blkg,
 	if (bio_flagged(bio, BIO_THROTTLED) || !tg->has_rules[rw])
 		goto out;
 
-	spin_lock_irq(q->queue_lock);
+	spin_lock_irq(&q->queue_lock);
 
 	throtl_update_latency_buckets(td);
 
-	if (unlikely(blk_queue_bypass(q)))
-		goto out_unlock;
-
-	blk_throtl_assoc_bio(tg, bio);
 	blk_throtl_update_idletime(tg);
 
 	sq = &tg->service_queue;
@@ -2235,7 +2212,7 @@ again:
 	}
 
 out_unlock:
-	spin_unlock_irq(q->queue_lock);
+	spin_unlock_irq(&q->queue_lock);
 out:
 	bio_set_flag(bio, BIO_THROTTLED);
 
@@ -2271,7 +2248,8 @@ void blk_throtl_stat_add(struct request *rq, u64 time_ns)
 	struct request_queue *q = rq->q;
 	struct throtl_data *td = q->td;
 
-	throtl_track_latency(td, rq->throtl_size, req_op(rq), time_ns >> 10);
+	throtl_track_latency(td, blk_rq_stats_sectors(rq), req_op(rq),
+			     time_ns >> 10);
 }
 
 void blk_throtl_bio_endio(struct bio *bio)
@@ -2356,7 +2334,7 @@ static void tg_drain_bios(struct throtl_service_queue *parent_sq)
  * Dispatch all currently throttled bios on @q through ->make_request_fn().
  */
 void blk_throtl_drain(struct request_queue *q)
-	__releases(q->queue_lock) __acquires(q->queue_lock)
+	__releases(&q->queue_lock) __acquires(&q->queue_lock)
 {
 	struct throtl_data *td = q->td;
 	struct blkcg_gq *blkg;
@@ -2364,7 +2342,6 @@ void blk_throtl_drain(struct request_queue *q)
 	struct bio *bio;
 	int rw;
 
-	queue_lockdep_assert_held(q);
 	rcu_read_lock();
 
 	/*
@@ -2380,7 +2357,7 @@ void blk_throtl_drain(struct request_queue *q)
 	tg_drain_bios(&td->service_queue);
 
 	rcu_read_unlock();
-	spin_unlock_irq(q->queue_lock);
+	spin_unlock_irq(&q->queue_lock);
 
 	/* all bios now should be in td->service_queue, issue them */
 	for (rw = READ; rw <= WRITE; rw++)
@@ -2388,7 +2365,7 @@ void blk_throtl_drain(struct request_queue *q)
 						NULL)))
 			generic_make_request(bio);
 
-	spin_lock_irq(q->queue_lock);
+	spin_lock_irq(&q->queue_lock);
 }
 
 int blk_throtl_init(struct request_queue *q)
@@ -2468,7 +2445,7 @@ void blk_throtl_register_queue(struct request_queue *q)
 	td->throtl_slice = DFL_THROTL_SLICE_HD;
 #endif
 
-	td->track_bio_latency = !queue_is_rq_based(q);
+	td->track_bio_latency = !queue_is_mq(q);
 	if (!td->track_bio_latency)
 		blk_stat_enable_accounting(q);
 }

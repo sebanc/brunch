@@ -66,6 +66,7 @@ qla24xx_deallocate_vp_id(scsi_qla_host_t *vha)
 	uint16_t vp_id;
 	struct qla_hw_data *ha = vha->hw;
 	unsigned long flags = 0;
+	u8 i;
 
 	mutex_lock(&ha->vport_lock);
 	/*
@@ -75,8 +76,11 @@ qla24xx_deallocate_vp_id(scsi_qla_host_t *vha)
 	 * ensures no active vp_list traversal while the vport is removed
 	 * from the queue)
 	 */
-	wait_event_timeout(vha->vref_waitq, !atomic_read(&vha->vref_count),
-	    10*HZ);
+	for (i = 0; i < 10; i++) {
+		if (wait_event_timeout(vha->vref_waitq,
+		    !atomic_read(&vha->vref_count), HZ) > 0)
+			break;
+	}
 
 	spin_lock_irqsave(&ha->vport_slock, flags);
 	if (atomic_read(&vha->vref_count)) {
@@ -262,6 +266,9 @@ qla2x00_alert_all_vps(struct rsp_que *rsp, uint16_t *mb)
 	spin_lock_irqsave(&ha->vport_slock, flags);
 	list_for_each_entry(vha, &ha->vp_list, list) {
 		if (vha->vp_idx) {
+			if (test_bit(VPORT_DELETE, &vha->dpc_flags))
+				continue;
+
 			atomic_inc(&vha->vref_count);
 			spin_unlock_irqrestore(&ha->vport_slock, flags);
 
@@ -300,6 +307,20 @@ qla2x00_alert_all_vps(struct rsp_que *rsp, uint16_t *mb)
 int
 qla2x00_vp_abort_isp(scsi_qla_host_t *vha)
 {
+	fc_port_t *fcport;
+
+	/*
+	 * To exclusively reset vport, we need to log it out first.
+	 * Note: This control_vp can fail if ISP reset is already
+	 * issued, this is expected, as the vp would be already
+	 * logged out due to ISP reset.
+	 */
+	if (!test_bit(ABORT_ISP_ACTIVE, &vha->dpc_flags)) {
+		qla24xx_control_vp(vha, VCE_COMMAND_DISABLE_VPS_LOGO_ALL);
+		list_for_each_entry(fcport, &vha->vp_fcports, list)
+			fcport->logout_on_delete = 0;
+	}
+
 	/*
 	 * Physical port will do most of the abort and recovery work. We can
 	 * just treat it as a loop down
@@ -312,16 +333,9 @@ qla2x00_vp_abort_isp(scsi_qla_host_t *vha)
 			atomic_set(&vha->loop_down_timer, LOOP_DOWN_TIME);
 	}
 
-	/*
-	 * To exclusively reset vport, we need to log it out first.  Note: this
-	 * control_vp can fail if ISP reset is already issued, this is
-	 * expected, as the vp would be already logged out due to ISP reset.
-	 */
-	if (!test_bit(ABORT_ISP_ACTIVE, &vha->dpc_flags))
-		qla24xx_control_vp(vha, VCE_COMMAND_DISABLE_VPS_LOGO_ALL);
-
 	ql_dbg(ql_dbg_taskm, vha, 0x801d,
 	    "Scheduling enable of Vport %d.\n", vha->vp_idx);
+
 	return qla24xx_enable_vp(vha);
 }
 
@@ -507,6 +521,7 @@ qla24xx_create_vhost(struct fc_vport *fc_vport)
 	qla2x00_start_timer(vha, WATCH_INTERVAL);
 
 	vha->req = base_vha->req;
+	vha->flags.nvme_enabled = base_vha->flags.nvme_enabled;
 	host->can_queue = base_vha->req->length + 128;
 	host->cmd_per_lun = 3;
 	if (IS_T10_PI_CAPABLE(ha) && ql2xenabledif)
@@ -900,11 +915,10 @@ failed:
 	return 0;
 }
 
-static void qla_ctrlvp_sp_done(void *s, int res)
+static void qla_ctrlvp_sp_done(srb_t *sp, int res)
 {
-	struct srb *sp = s;
-
-	complete(&sp->comp);
+	if (sp->comp)
+		complete(sp->comp);
 	/* don't free sp here. Let the caller do the free */
 }
 
@@ -921,6 +935,7 @@ int qla24xx_control_vp(scsi_qla_host_t *vha, int cmd)
 	struct qla_hw_data *ha = vha->hw;
 	int	vp_index = vha->vp_idx;
 	struct scsi_qla_host *base_vha = pci_get_drvdata(ha->pdev);
+	DECLARE_COMPLETION_ONSTACK(comp);
 	srb_t *sp;
 
 	ql_dbg(ql_dbg_vport, vha, 0x10c1,
@@ -935,6 +950,7 @@ int qla24xx_control_vp(scsi_qla_host_t *vha, int cmd)
 
 	sp->type = SRB_CTRL_VP;
 	sp->name = "ctrl_vp";
+	sp->comp = &comp;
 	sp->done = qla_ctrlvp_sp_done;
 	sp->u.iocb_cmd.timeout = qla2x00_async_iocb_timeout;
 	qla2x00_init_timer(sp, qla2x00_get_async_timeout(vha) + 2);
@@ -952,7 +968,9 @@ int qla24xx_control_vp(scsi_qla_host_t *vha, int cmd)
 	ql_dbg(ql_dbg_vport, vha, 0x113f, "%s hndl %x submitted\n",
 	    sp->name, sp->handle);
 
-	wait_for_completion(&sp->comp);
+	wait_for_completion(&comp);
+	sp->comp = NULL;
+
 	rval = sp->rc;
 	switch (rval) {
 	case QLA_FUNCTION_TIMEOUT:

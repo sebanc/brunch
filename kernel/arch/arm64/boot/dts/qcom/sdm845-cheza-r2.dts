@@ -11,7 +11,7 @@
 
 / {
 	model = "Google Cheza (rev2)";
-	compatible = "google,cheza-rev2", "google,cheza", "qcom,sdm845";
+	compatible = "google,cheza-rev2", "qcom,sdm845";
 
 	/*
 	 * FIXED REGULATORS (not in sdm845-cheza.dtsi) - parents above children

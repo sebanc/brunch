@@ -9,22 +9,17 @@
 #include "xfs_format.h"
 #include "xfs_trans_resv.h"
 #include "xfs_mount.h"
-#include "xfs_defer.h"
 #include "xfs_btree.h"
-#include "xfs_bit.h"
 #include "xfs_log_format.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
-#include "xfs_inode.h"
 #include "xfs_alloc.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_ialloc.h"
 #include "xfs_ialloc_btree.h"
 #include "xfs_rmap.h"
 #include "xfs_rmap_btree.h"
-#include "xfs_refcount.h"
 #include "xfs_refcount_btree.h"
-#include "scrub/xfs_scrub.h"
 #include "scrub/scrub.h"
 #include "scrub/common.h"
 #include "scrub/trace.h"
@@ -341,23 +336,19 @@ xrep_agf(
 	struct xrep_find_ag_btree	fab[XREP_AGF_MAX] = {
 		[XREP_AGF_BNOBT] = {
 			.rmap_owner = XFS_RMAP_OWN_AG,
-			.buf_ops = &xfs_allocbt_buf_ops,
-			.magic = XFS_ABTB_CRC_MAGIC,
+			.buf_ops = &xfs_bnobt_buf_ops,
 		},
 		[XREP_AGF_CNTBT] = {
 			.rmap_owner = XFS_RMAP_OWN_AG,
-			.buf_ops = &xfs_allocbt_buf_ops,
-			.magic = XFS_ABTC_CRC_MAGIC,
+			.buf_ops = &xfs_cntbt_buf_ops,
 		},
 		[XREP_AGF_RMAPBT] = {
 			.rmap_owner = XFS_RMAP_OWN_AG,
 			.buf_ops = &xfs_rmapbt_buf_ops,
-			.magic = XFS_RMAP_CRC_MAGIC,
 		},
 		[XREP_AGF_REFCOUNTBT] = {
 			.rmap_owner = XFS_RMAP_OWN_REFC,
 			.buf_ops = &xfs_refcountbt_buf_ops,
-			.magic = XFS_REFC_CRC_MAGIC,
 		},
 		[XREP_AGF_END] = {
 			.buf_ops = NULL,
@@ -646,7 +637,6 @@ int
 xrep_agfl(
 	struct xfs_scrub	*sc)
 {
-	struct xfs_owner_info	oinfo;
 	struct xfs_bitmap	agfl_extents;
 	struct xfs_mount	*mp = sc->mp;
 	struct xfs_buf		*agf_bp;
@@ -708,8 +698,8 @@ xrep_agfl(
 		goto err;
 
 	/* Dump any AGFL overflow. */
-	xfs_rmap_ag_owner(&oinfo, XFS_RMAP_OWN_AG);
-	return xrep_reap_extents(sc, &agfl_extents, &oinfo, XFS_AG_RESV_AGFL);
+	return xrep_reap_extents(sc, &agfl_extents, &XFS_RMAP_OINFO_AG,
+			XFS_AG_RESV_AGFL);
 err:
 	xfs_bitmap_destroy(&agfl_extents);
 	return error;
@@ -876,12 +866,10 @@ xrep_agi(
 		[XREP_AGI_INOBT] = {
 			.rmap_owner = XFS_RMAP_OWN_INOBT,
 			.buf_ops = &xfs_inobt_buf_ops,
-			.magic = XFS_IBT_CRC_MAGIC,
 		},
 		[XREP_AGI_FINOBT] = {
 			.rmap_owner = XFS_RMAP_OWN_INOBT,
-			.buf_ops = &xfs_inobt_buf_ops,
-			.magic = XFS_FIBT_CRC_MAGIC,
+			.buf_ops = &xfs_finobt_buf_ops,
 		},
 		[XREP_AGI_END] = {
 			.buf_ops = NULL

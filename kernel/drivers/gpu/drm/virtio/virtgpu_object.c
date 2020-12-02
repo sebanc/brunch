@@ -23,38 +23,46 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/dma-buf.h>
+#include <linux/moduleparam.h>
+
 #include <drm/ttm/ttm_execbuf_util.h>
 
 #include "virtgpu_drv.h"
+#include <drm/virtgpu_drm.h>
+#include <linux/virtio_dma_buf.h>
+
+static int virtio_gpu_virglrenderer_workaround = 1;
+module_param_named(virglhack, virtio_gpu_virglrenderer_workaround, int, 0400);
 
 static int virtio_gpu_resource_id_get(struct virtio_gpu_device *vgdev,
 				       uint32_t *resid)
 {
-#if 0
-	int handle = ida_alloc(&vgdev->resource_ida, GFP_KERNEL);
-
-	if (handle < 0)
-		return handle;
-#else
-	/*
-	 * FIXME: dirty hack to avoid re-using IDs, virglrenderer
-	 * can't deal with that.  Needs fixing in virglrenderer, also
-	 * should figure a better way to handle that in the guest.
-	 */
-	static atomic_t seqno = ATOMIC_INIT(0);
-	int handle = atomic_inc_return(&seqno);
-#endif
-
-	*resid = handle + 1;
+	if (virtio_gpu_virglrenderer_workaround) {
+		/*
+		 * Hack to avoid re-using resource IDs.
+		 *
+		 * virglrenderer versions up to (and including) 0.7.0
+		 * can't deal with that.  virglrenderer commit
+		 * "f91a9dd35715 Fix unlinking resources from hash
+		 * table." (Feb 2019) fixes the bug.
+		 */
+		static atomic_t seqno = ATOMIC_INIT(0);
+		int handle = atomic_inc_return(&seqno);
+		*resid = handle + 1;
+	} else {
+		int handle = ida_alloc(&vgdev->resource_ida, GFP_KERNEL);
+		if (handle < 0)
+			return handle;
+		*resid = handle + 1;
+	}
 	return 0;
 }
 
 static void virtio_gpu_resource_id_put(struct virtio_gpu_device *vgdev, uint32_t id)
 {
-#if 0
-	ida_free(&vgdev->resource_ida, id - 1);
-#endif
+	if (!virtio_gpu_virglrenderer_workaround) {
+		ida_free(&vgdev->resource_ida, id - 1);
+	}
 }
 
 static void virtio_gpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
@@ -81,39 +89,31 @@ static void virtio_gpu_init_ttm_placement(struct virtio_gpu_object *vgbo)
 	u32 c = 1;
 	u32 ttm_caching_flags = 0;
 
+	bool has_guest = (vgbo->blob_mem == VIRTGPU_BLOB_MEM_GUEST ||
+	                  vgbo->blob_mem == VIRTGPU_BLOB_MEM_HOST3D_GUEST);
+
+	/*
+         * This should work for all ChromeOS devices.  AMD + ARM KVM
+         * implementations honor the guest caching attribute, and it's WC for
+         * rockchip/mediatek/grunt. Intel KVM doesn't and the attribute is always
+         * cached, so it's ignored there. Upstream kernel will look for
+         * virtio_gpu_resp_map_info, but it's not needed for chromeos-5.4.
+         */
+	ttm_caching_flags = TTM_PL_FLAG_WC;
+
 	vgbo->placement.placement = &vgbo->placement_code;
 	vgbo->placement.busy_placement = &vgbo->placement_code;
 	vgbo->placement_code.fpfn = 0;
 	vgbo->placement_code.lpfn = 0;
 
-	switch (vgbo->caching_type) {
-	case VIRTIO_GPU_CACHED:
-		ttm_caching_flags = TTM_PL_FLAG_CACHED;
-		break;
-	case VIRTIO_GPU_WRITE_COMBINE:
-		ttm_caching_flags = TTM_PL_FLAG_WC;
-		break;
-	case VIRTIO_GPU_UNCACHED:
-		ttm_caching_flags = TTM_PL_FLAG_UNCACHED;
-		break;
-	default:
-		ttm_caching_flags = TTM_PL_MASK_CACHING;
-	}
-
-
-	switch (vgbo->guest_memory_type) {
-	case VIRTIO_GPU_MEMORY_UNDEFINED:
-	case VIRTIO_GPU_MEMORY_TRANSFER:
-	case VIRTIO_GPU_MEMORY_SHARED_GUEST:
-		vgbo->placement_code.flags =
-			TTM_PL_MASK_CACHING | TTM_PL_FLAG_TT |
-			TTM_PL_FLAG_NO_EVICT;
-		break;
-	case VIRTIO_GPU_MEMORY_HOST_COHERENT:
+	if (!has_guest && vgbo->blob) {
 		vgbo->placement_code.flags =
 			ttm_caching_flags | TTM_PL_FLAG_VRAM |
 			TTM_PL_FLAG_NO_EVICT;
-		break;
+	} else {
+		vgbo->placement_code.flags =
+			TTM_PL_MASK_CACHING | TTM_PL_FLAG_TT |
+			TTM_PL_FLAG_NO_EVICT;
 	}
 	vgbo->placement.num_placement = c;
 	vgbo->placement.num_busy_placement = c;
@@ -150,9 +150,8 @@ int virtio_gpu_object_create(struct virtio_gpu_device *vgdev,
 		return ret;
 	}
 	bo->dumb = params->dumb;
-	bo->resource_v2 = params->resource_v2;
-	bo->guest_memory_type = params->guest_memory_type;
-	bo->caching_type = params->caching_type;
+	bo->blob = params->blob;
+	bo->blob_mem = params->blob_mem;
 
 	if (params->virgl) {
 		virtio_gpu_cmd_resource_create_3d(vgdev, bo, params, fence);
@@ -235,6 +234,7 @@ int virtio_gpu_object_get_sg_table(struct virtio_gpu_device *qdev,
 		.interruptible = false,
 		.no_wait_gpu = false
 	};
+	size_t max_segment;
 
 	/* wtf swapping */
 	if (bo->pages)
@@ -246,8 +246,13 @@ int virtio_gpu_object_get_sg_table(struct virtio_gpu_device *qdev,
 	if (!bo->pages)
 		goto out;
 
-	ret = sg_alloc_table_from_pages(bo->pages, pages, nr_pages, 0,
-					nr_pages << PAGE_SHIFT, GFP_KERNEL);
+	max_segment = virtio_max_dma_size(qdev->vdev);
+	max_segment &= PAGE_MASK;
+	if (max_segment > SCATTERLIST_MAX_SEGMENT)
+		max_segment = SCATTERLIST_MAX_SEGMENT;
+	ret = __sg_alloc_table_from_pages(bo->pages, pages, nr_pages, 0,
+					  nr_pages << PAGE_SHIFT,
+					  max_segment, GFP_KERNEL);
 	if (ret)
 		goto out;
 	return 0;
@@ -274,24 +279,4 @@ int virtio_gpu_object_wait(struct virtio_gpu_object *bo, bool no_wait)
 	r = ttm_bo_wait(&bo->tbo, true, no_wait);
 	ttm_bo_unreserve(&bo->tbo);
 	return r;
-}
-
-int virtio_gpu_dma_buf_to_handle(struct dma_buf *dma_buf, bool no_wait,
-				 uint32_t *handle)
-{
-	struct virtio_gpu_object *qobj;
-	struct virtio_gpu_device *vgdev;
-
-	if (dma_buf->ops != &virtgpu_dmabuf_ops)
-		return -EINVAL;
-
-	qobj = gem_to_virtio_gpu_obj(dma_buf->priv);
-	vgdev = (struct virtio_gpu_device *)qobj->gem_base.dev->dev_private;
-	if (!qobj->create_callback_done && !no_wait)
-		wait_event(vgdev->resp_wq, qobj->create_callback_done);
-	if (!qobj->create_callback_done)
-		return -ETIMEDOUT;
-
-	*handle = qobj->hw_res_handle;
-	return 0;
 }

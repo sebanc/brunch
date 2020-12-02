@@ -43,7 +43,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "rgxbvnc.h"
 #define _RGXBVNC_C_
-#include "rgx_bvnc_table_km.h"
+#include "km/rgx_bvnc_table_km.h"
 #undef _RGXBVNC_C_
 #include "oskm_apphint.h"
 #include "pvrsrv.h"

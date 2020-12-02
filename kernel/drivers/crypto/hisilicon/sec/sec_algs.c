@@ -9,7 +9,7 @@
 
 #include <crypto/aes.h>
 #include <crypto/algapi.h>
-#include <crypto/des.h>
+#include <crypto/internal/des.h>
 #include <crypto/skcipher.h>
 #include <crypto/xts.h>
 #include <crypto/internal/skcipher.h>
@@ -237,8 +237,8 @@ static int sec_alg_skcipher_setkey(struct crypto_skcipher *tfm,
 		memset(ctx->key, 0, SEC_MAX_CIPHER_KEY);
 	} else {
 		/* new key */
-		ctx->key = dma_zalloc_coherent(dev, SEC_MAX_CIPHER_KEY,
-					       &ctx->pkey, GFP_KERNEL);
+		ctx->key = dma_alloc_coherent(dev, SEC_MAX_CIPHER_KEY,
+					      &ctx->pkey, GFP_KERNEL);
 		if (!ctx->key) {
 			mutex_unlock(&ctx->lock);
 			return -ENOMEM;
@@ -343,38 +343,30 @@ static int sec_alg_skcipher_setkey_aes_xts(struct crypto_skcipher *tfm,
 static int sec_alg_skcipher_setkey_des_ecb(struct crypto_skcipher *tfm,
 					   const u8 *key, unsigned int keylen)
 {
-	if (keylen != DES_KEY_SIZE)
-		return -EINVAL;
-
-	return sec_alg_skcipher_setkey(tfm, key, keylen, SEC_C_DES_ECB_64);
+	return verify_skcipher_des_key(tfm, key) ?:
+	       sec_alg_skcipher_setkey(tfm, key, keylen, SEC_C_DES_ECB_64);
 }
 
 static int sec_alg_skcipher_setkey_des_cbc(struct crypto_skcipher *tfm,
 					   const u8 *key, unsigned int keylen)
 {
-	if (keylen != DES_KEY_SIZE)
-		return -EINVAL;
-
-	return sec_alg_skcipher_setkey(tfm, key, keylen, SEC_C_DES_CBC_64);
+	return verify_skcipher_des_key(tfm, key) ?:
+	       sec_alg_skcipher_setkey(tfm, key, keylen, SEC_C_DES_CBC_64);
 }
 
 static int sec_alg_skcipher_setkey_3des_ecb(struct crypto_skcipher *tfm,
 					    const u8 *key, unsigned int keylen)
 {
-	if (keylen != DES_KEY_SIZE * 3)
-		return -EINVAL;
-
-	return sec_alg_skcipher_setkey(tfm, key, keylen,
+	return verify_skcipher_des3_key(tfm, key) ?:
+	       sec_alg_skcipher_setkey(tfm, key, keylen,
 				       SEC_C_3DES_ECB_192_3KEY);
 }
 
 static int sec_alg_skcipher_setkey_3des_cbc(struct crypto_skcipher *tfm,
 					    const u8 *key, unsigned int keylen)
 {
-	if (keylen != DES3_EDE_KEY_SIZE)
-		return -EINVAL;
-
-	return sec_alg_skcipher_setkey(tfm, key, keylen,
+	return verify_skcipher_des3_key(tfm, key) ?:
+	       sec_alg_skcipher_setkey(tfm, key, keylen,
 				       SEC_C_3DES_CBC_192_3KEY);
 }
 

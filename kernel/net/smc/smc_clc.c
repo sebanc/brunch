@@ -97,17 +97,19 @@ static int smc_clc_prfx_set4_rcu(struct dst_entry *dst, __be32 ipv4,
 				 struct smc_clc_msg_proposal_prefix *prop)
 {
 	struct in_device *in_dev = __in_dev_get_rcu(dst->dev);
+	const struct in_ifaddr *ifa;
 
 	if (!in_dev)
 		return -ENODEV;
-	for_ifa(in_dev) {
+
+	in_dev_for_each_ifa_rcu(ifa, in_dev) {
 		if (!inet_ifa_match(ipv4, ifa))
 			continue;
 		prop->prefix_len = inet_mask_len(ifa->ifa_mask);
 		prop->outgoing_subnet = ifa->ifa_address & ifa->ifa_mask;
 		/* prop->ipv6_prefixes_cnt = 0; already done by memset before */
 		return 0;
-	} endfor_ifa(in_dev);
+	}
 	return -ENOENT;
 }
 
@@ -190,14 +192,15 @@ static int smc_clc_prfx_match4_rcu(struct net_device *dev,
 				   struct smc_clc_msg_proposal_prefix *prop)
 {
 	struct in_device *in_dev = __in_dev_get_rcu(dev);
+	const struct in_ifaddr *ifa;
 
 	if (!in_dev)
 		return -ENODEV;
-	for_ifa(in_dev) {
+	in_dev_for_each_ifa_rcu(ifa, in_dev) {
 		if (prop->prefix_len == inet_mask_len(ifa->ifa_mask) &&
 		    inet_ifa_match(prop->outgoing_subnet, ifa))
 			return 0;
-	} endfor_ifa(in_dev);
+	}
 
 	return -ENOENT;
 }
@@ -265,7 +268,7 @@ out:
  * clcsock error, -EINTR, -ECONNRESET, -EPROTO otherwise.
  */
 int smc_clc_wait_msg(struct smc_sock *smc, void *buf, int buflen,
-		     u8 expected_type)
+		     u8 expected_type, unsigned long timeout)
 {
 	long rcvtimeo = smc->clcsock->sk->sk_rcvtimeo;
 	struct sock *clc_sk = smc->clcsock->sk;
@@ -285,8 +288,8 @@ int smc_clc_wait_msg(struct smc_sock *smc, void *buf, int buflen,
 	 * sizeof(struct smc_clc_msg_hdr)
 	 */
 	krflags = MSG_PEEK | MSG_WAITALL;
-	smc->clcsock->sk->sk_rcvtimeo = CLC_WAIT_TIME;
-	iov_iter_kvec(&msg.msg_iter, READ | ITER_KVEC, &vec, 1,
+	clc_sk->sk_rcvtimeo = timeout;
+	iov_iter_kvec(&msg.msg_iter, READ, &vec, 1,
 			sizeof(struct smc_clc_msg_hdr));
 	len = sock_recvmsg(smc->clcsock, &msg, krflags);
 	if (signal_pending(current)) {
@@ -297,7 +300,11 @@ int smc_clc_wait_msg(struct smc_sock *smc, void *buf, int buflen,
 	}
 	if (clc_sk->sk_err) {
 		reason_code = -clc_sk->sk_err;
-		smc->sk.sk_err = clc_sk->sk_err;
+		if (clc_sk->sk_err == EAGAIN &&
+		    expected_type == SMC_CLC_DECLINE)
+			clc_sk->sk_err = 0; /* reset for fallback usage */
+		else
+			smc->sk.sk_err = clc_sk->sk_err;
 		goto out;
 	}
 	if (!len) { /* peer has performed orderly shutdown */
@@ -306,7 +313,8 @@ int smc_clc_wait_msg(struct smc_sock *smc, void *buf, int buflen,
 		goto out;
 	}
 	if (len < 0) {
-		smc->sk.sk_err = -len;
+		if (len != -EAGAIN || expected_type != SMC_CLC_DECLINE)
+			smc->sk.sk_err = -len;
 		reason_code = len;
 		goto out;
 	}
@@ -325,7 +333,7 @@ int smc_clc_wait_msg(struct smc_sock *smc, void *buf, int buflen,
 
 	/* receive the complete CLC message */
 	memset(&msg, 0, sizeof(struct msghdr));
-	iov_iter_kvec(&msg.msg_iter, READ | ITER_KVEC, &vec, 1, datlen);
+	iov_iter_kvec(&msg.msg_iter, READ, &vec, 1, datlen);
 	krflags = MSG_WAITALL;
 	len = sock_recvmsg(smc->clcsock, &msg, krflags);
 	if (len < datlen || !smc_clc_msg_hdr_valid(clcm)) {
@@ -346,7 +354,7 @@ int smc_clc_wait_msg(struct smc_sock *smc, void *buf, int buflen,
 	}
 
 out:
-	smc->clcsock->sk->sk_rcvtimeo = rcvtimeo;
+	clc_sk->sk_rcvtimeo = rcvtimeo;
 	return reason_code;
 }
 
@@ -375,17 +383,14 @@ int smc_clc_send_decline(struct smc_sock *smc, u32 peer_diag_info)
 	vec.iov_len = sizeof(struct smc_clc_msg_decline);
 	len = kernel_sendmsg(smc->clcsock, &msg, &vec, 1,
 			     sizeof(struct smc_clc_msg_decline));
-	if (len < sizeof(struct smc_clc_msg_decline))
-		smc->sk.sk_err = EPROTO;
-	if (len < 0)
-		smc->sk.sk_err = -len;
-	return sock_error(&smc->sk);
+	if (len < 0 || len < sizeof(struct smc_clc_msg_decline))
+		len = -EPROTO;
+	return len > 0 ? 0 : len;
 }
 
 /* send CLC PROPOSAL message across internal TCP socket */
 int smc_clc_send_proposal(struct smc_sock *smc, int smc_type,
-			  struct smc_ib_device *ibdev, u8 ibport, u8 gid[],
-			  struct smcd_dev *ismdev)
+			  struct smc_init_info *ini)
 {
 	struct smc_clc_ipv6_prefix ipv6_prfx[SMC_CLC_MAX_V6_PREFIX];
 	struct smc_clc_msg_proposal_prefix pclc_prfx;
@@ -415,8 +420,9 @@ int smc_clc_send_proposal(struct smc_sock *smc, int smc_type,
 		/* add SMC-R specifics */
 		memcpy(pclc.lcl.id_for_peer, local_systemid,
 		       sizeof(local_systemid));
-		memcpy(&pclc.lcl.gid, gid, SMC_GID_SIZE);
-		memcpy(&pclc.lcl.mac, &ibdev->mac[ibport - 1], ETH_ALEN);
+		memcpy(&pclc.lcl.gid, ini->ib_gid, SMC_GID_SIZE);
+		memcpy(&pclc.lcl.mac, &ini->ib_dev->mac[ini->ib_port - 1],
+		       ETH_ALEN);
 		pclc.iparea_offset = htons(0);
 	}
 	if (smc_type == SMC_TYPE_D || smc_type == SMC_TYPE_B) {
@@ -424,7 +430,7 @@ int smc_clc_send_proposal(struct smc_sock *smc, int smc_type,
 		memset(&pclc_smcd, 0, sizeof(pclc_smcd));
 		plen += sizeof(pclc_smcd);
 		pclc.iparea_offset = htons(SMC_CLC_PROPOSAL_MAX_OFFSET);
-		pclc_smcd.gid = ismdev->local_gid;
+		pclc_smcd.gid = ini->ism_dev->local_gid;
 	}
 	pclc.hdr.length = htons(plen);
 
@@ -538,7 +544,6 @@ int smc_clc_send_accept(struct smc_sock *new_smc, int srv_first_contact)
 	struct smc_link *link;
 	struct msghdr msg;
 	struct kvec vec;
-	int rc = 0;
 	int len;
 
 	memset(&aclc, 0, sizeof(aclc));
@@ -591,13 +596,8 @@ int smc_clc_send_accept(struct smc_sock *new_smc, int srv_first_contact)
 	vec.iov_len = ntohs(aclc.hdr.length);
 	len = kernel_sendmsg(new_smc->clcsock, &msg, &vec, 1,
 			     ntohs(aclc.hdr.length));
-	if (len < ntohs(aclc.hdr.length)) {
-		if (len >= 0)
-			new_smc->sk.sk_err = EPROTO;
-		else
-			new_smc->sk.sk_err = new_smc->clcsock->sk->sk_err;
-		rc = sock_error(&new_smc->sk);
-	}
+	if (len < ntohs(aclc.hdr.length))
+		len = len >= 0 ? -EPROTO : -new_smc->clcsock->sk->sk_err;
 
-	return rc;
+	return len > 0 ? 0 : len;
 }

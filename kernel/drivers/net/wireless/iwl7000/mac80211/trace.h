@@ -1791,6 +1791,8 @@ TRACE_EVENT(drv_start_nan,
 		VIF_ENTRY
 		__field(u8, master_pref)
 		__field(u8, bands)
+		__field(u8, cdw_2g)
+		__field(u8, cdw_5g)
 	),
 
 	TP_fast_assign(
@@ -1798,13 +1800,16 @@ TRACE_EVENT(drv_start_nan,
 		VIF_ASSIGN;
 		__entry->master_pref = conf->master_pref;
 		__entry->bands = conf->bands;
+		__entry->cdw_2g = nan_conf_cdw_2g(conf);
+		__entry->cdw_5g = nan_conf_cdw_5g(conf);
 	),
 
 	TP_printk(
 		LOCAL_PR_FMT  VIF_PR_FMT
-		", master preference: %u, bands: 0x%0x",
+		", master preference: %u, bands: 0x%0x, cdw_2g: %u, cdw_5g: %u",
 		LOCAL_PR_ARG, VIF_PR_ARG, __entry->master_pref,
-		__entry->bands
+		__entry->bands,
+		__entry->cdw_2g, __entry->cdw_5g
 	)
 );
 
@@ -1842,6 +1847,8 @@ TRACE_EVENT(drv_nan_change_conf,
 		VIF_ENTRY
 		__field(u8, master_pref)
 		__field(u8, bands)
+		__field(u8, cdw_2g)
+		__field(u8, cdw_5g)
 		__field(u32, changes)
 	),
 
@@ -1850,14 +1857,18 @@ TRACE_EVENT(drv_nan_change_conf,
 		VIF_ASSIGN;
 		__entry->master_pref = conf->master_pref;
 		__entry->bands = conf->bands;
+		__entry->cdw_2g = nan_conf_cdw_2g(conf);
+		__entry->cdw_5g = nan_conf_cdw_5g(conf);
 		__entry->changes = changes;
 	),
 
 	TP_printk(
 		LOCAL_PR_FMT  VIF_PR_FMT
-		", master preference: %u, bands: 0x%0x, changes: 0x%x",
+		", master preference: %u, bands: 0x%0x, cdw_2g: %u, cdw_5g: %u, "
+		"changes: 0x%x",
 		LOCAL_PR_ARG, VIF_PR_ARG, __entry->master_pref,
-		__entry->bands, __entry->changes
+		__entry->bands, __entry->cdw_2g, __entry->cdw_5g,
+		__entry->changes
 	)
 );
 

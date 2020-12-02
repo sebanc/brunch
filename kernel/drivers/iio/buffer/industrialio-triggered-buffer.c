@@ -1,10 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
  /*
  * Copyright (c) 2012 Analog Devices, Inc.
  *  Author: Lars-Peter Clausen <lars@metafoo.de>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
  */
 
 #include <linux/kernel.h>
@@ -128,17 +125,6 @@ int devm_iio_triggered_buffer_setup(struct device *dev,
 	return ret;
 }
 EXPORT_SYMBOL_GPL(devm_iio_triggered_buffer_setup);
-
-void devm_iio_triggered_buffer_cleanup(struct device *dev,
-				       struct iio_dev *indio_dev)
-{
-	int rc;
-
-	rc = devres_release(dev, devm_iio_triggered_buffer_clean,
-			    devm_iio_device_match, indio_dev);
-	WARN_ON(rc);
-}
-EXPORT_SYMBOL_GPL(devm_iio_triggered_buffer_cleanup);
 
 MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
 MODULE_DESCRIPTION("IIO helper functions for setting up triggered buffers");

@@ -1,18 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * vimc-debayer.c Virtual Media Controller Driver
  *
  * Copyright (C) 2015-2017 Helen Koike <helen.fornazier@gmail.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
  */
 
 #include <linux/component.h>
@@ -30,7 +20,7 @@
 static unsigned int deb_mean_win_size = 3;
 module_param(deb_mean_win_size, uint, 0000);
 MODULE_PARM_DESC(deb_mean_win_size, " the window size to calculate the mean.\n"
-	"NOTE: the window size need to be an odd number, as the main pixel "
+	"NOTE: the window size needs to be an odd number, as the main pixel "
 	"stays in the center of the window, otherwise the next odd number "
 	"is considered");
 
@@ -66,7 +56,7 @@ struct vimc_deb_device {
 static const struct v4l2_mbus_framefmt sink_fmt_default = {
 	.width = 640,
 	.height = 480,
-	.code = MEDIA_BUS_FMT_RGB888_1X24,
+	.code = MEDIA_BUS_FMT_SRGGB8_1X8,
 	.field = V4L2_FIELD_NONE,
 	.colorspace = V4L2_COLORSPACE_DEFAULT,
 };
@@ -489,6 +479,19 @@ static void *vimc_deb_process_frame(struct vimc_ent_device *ved,
 
 }
 
+static void vimc_deb_release(struct v4l2_subdev *sd)
+{
+	struct vimc_deb_device *vdeb =
+				container_of(sd, struct vimc_deb_device, sd);
+
+	vimc_pads_cleanup(vdeb->ved.pads);
+	kfree(vdeb);
+}
+
+static const struct v4l2_subdev_internal_ops vimc_deb_int_ops = {
+	.release = vimc_deb_release,
+};
+
 static void vimc_deb_comp_unbind(struct device *comp, struct device *master,
 				 void *master_data)
 {
@@ -497,7 +500,6 @@ static void vimc_deb_comp_unbind(struct device *comp, struct device *master,
 						    ved);
 
 	vimc_ent_sd_unregister(ved, &vdeb->sd);
-	kfree(vdeb);
 }
 
 static int vimc_deb_comp_bind(struct device *comp, struct device *master,
@@ -519,7 +521,7 @@ static int vimc_deb_comp_bind(struct device *comp, struct device *master,
 				   MEDIA_ENT_F_PROC_VIDEO_PIXEL_ENC_CONV, 2,
 				   (const unsigned long[2]) {MEDIA_PAD_FL_SINK,
 				   MEDIA_PAD_FL_SOURCE},
-				   &vimc_deb_ops);
+				   &vimc_deb_int_ops, &vimc_deb_ops);
 	if (ret) {
 		kfree(vdeb);
 		return ret;

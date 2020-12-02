@@ -134,7 +134,7 @@ int udl_cursor_set(struct drm_crtc *crtc, struct drm_file *file,
 			return -EINVAL;
 		}
 		err = udl_cursor_download(cursor, obj);
-		drm_gem_object_unreference(obj);
+		drm_gem_object_put_locked(obj);
 		if (err != 0) {
 			DRM_ERROR("failed to copy cursor.\n");
 			return err;

@@ -3,7 +3,9 @@
  * Copyright (C) 2014-2018 Etnaviv Project
  */
 
+#include <drm/drm_prime.h>
 #include <linux/dma-buf.h>
+
 #include "etnaviv_drv.h"
 #include "etnaviv_gem.h"
 
@@ -109,7 +111,6 @@ struct drm_gem_object *etnaviv_gem_prime_import_sg_table(struct drm_device *dev,
 	int ret, npages;
 
 	ret = etnaviv_gem_new_private(dev, size, ETNA_BO_WC,
-				      attach->dmabuf->resv,
 				      &etnaviv_gem_prime_ops, &etnaviv_obj);
 	if (ret < 0)
 		return ERR_PTR(ret);
@@ -135,14 +136,7 @@ struct drm_gem_object *etnaviv_gem_prime_import_sg_table(struct drm_device *dev,
 	return &etnaviv_obj->base;
 
 fail:
-	drm_gem_object_put_unlocked(&etnaviv_obj->base);
+	drm_gem_object_put(&etnaviv_obj->base);
 
 	return ERR_PTR(ret);
-}
-
-struct reservation_object *etnaviv_gem_prime_res_obj(struct drm_gem_object *obj)
-{
-	struct etnaviv_gem_object *etnaviv_obj = to_etnaviv_bo(obj);
-
-	return etnaviv_obj->resv;
 }

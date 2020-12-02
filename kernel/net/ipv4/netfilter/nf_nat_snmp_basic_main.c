@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * nf_nat_snmp_basic.c
  *
@@ -25,17 +26,6 @@
  *
  * Copyright (c) 2000 RP Internet (www.rpi.net.au).
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
- *
  * Author: James Morris <jmorris@intercode.com.au>
  *
  * Copyright (c) 2006-2010 Patrick McHardy <kaber@trash.net>
@@ -60,6 +50,7 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("James Morris <jmorris@intercode.com.au>");
 MODULE_DESCRIPTION("Basic SNMP Application Layer Gateway");
 MODULE_ALIAS("ip_nat_snmp_basic");
+MODULE_ALIAS_NFCT_HELPER("snmp_trap");
 
 #define SNMP_PORT 161
 #define SNMP_TRAP_PORT 162
@@ -195,7 +186,7 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 		return NF_DROP;
 	}
 
-	if (!skb_make_writable(skb, skb->len)) {
+	if (skb_ensure_writable(skb, skb->len)) {
 		nf_ct_helper_log(skb, ct, "cannot mangle packet");
 		return NF_DROP;
 	}

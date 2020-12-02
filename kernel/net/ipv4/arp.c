@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* linux/net/ipv4/arp.c
  *
  * Copyright (C) 1994 by Florian  La Roche
@@ -6,11 +7,6 @@
  * which is used to convert IP addresses (or in the future maybe other
  * high-level addresses) into a low-level hardware address (like an Ethernet
  * address).
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  *
  * Fixes:
  *		Alan Cox	:	Removed the Ethernet assumptions in
@@ -1255,6 +1251,8 @@ static int arp_netdev_event(struct notifier_block *this, unsigned long event,
 		change_info = ptr;
 		if (change_info->flags_changed & IFF_NOARP)
 			neigh_changeaddr(&arp_tbl, dev);
+		if (!netif_carrier_ok(dev))
+			neigh_carrier_down(&arp_tbl, dev);
 		break;
 	default:
 		break;

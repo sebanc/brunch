@@ -1,11 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2016, Amir Vadai <amir@vadai.me>
  * Copyright (c) 2016, Mellanox Technologies. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #include <linux/module.h>
@@ -17,6 +13,7 @@
 #include <net/netlink.h>
 #include <net/pkt_sched.h>
 #include <net/dst.h>
+#include <net/pkt_cls.h>
 
 #include <linux/tc_act/tc_tunnel_key.h>
 #include <net/tc_act/tc_tunnel_key.h>
@@ -75,8 +72,9 @@ tunnel_key_copy_geneve_opt(const struct nlattr *nla, void *dst, int dst_len,
 	int err, data_len, opt_len;
 	u8 *data;
 
-	err = nla_parse_nested(tb, TCA_TUNNEL_KEY_ENC_OPT_GENEVE_MAX,
-			       nla, geneve_opt_policy, extack);
+	err = nla_parse_nested_deprecated(tb,
+					  TCA_TUNNEL_KEY_ENC_OPT_GENEVE_MAX,
+					  nla, geneve_opt_policy, extack);
 	if (err < 0)
 		return err;
 
@@ -124,8 +122,8 @@ static int tunnel_key_copy_opts(const struct nlattr *nla, u8 *dst,
 	int err, rem, opt_len, len = nla_len(nla), opts_len = 0;
 	const struct nlattr *attr, *head = nla_data(nla);
 
-	err = nla_validate(head, len, TCA_TUNNEL_KEY_ENC_OPTS_MAX,
-			   enc_opts_policy, extack);
+	err = nla_validate_deprecated(head, len, TCA_TUNNEL_KEY_ENC_OPTS_MAX,
+				      enc_opts_policy, extack);
 	if (err)
 		return err;
 
@@ -207,25 +205,28 @@ static void tunnel_key_release_params(struct tcf_tunnel_key_params *p)
 		return;
 	if (p->tcft_action == TCA_TUNNEL_KEY_ACT_SET)
 		dst_release(&p->tcft_enc_metadata->dst);
+
 	kfree_rcu(p, rcu);
 }
 
 static int tunnel_key_init(struct net *net, struct nlattr *nla,
 			   struct nlattr *est, struct tc_action **a,
 			   int ovr, int bind, bool rtnl_held,
+			   struct tcf_proto *tp,
 			   struct netlink_ext_ack *extack)
 {
 	struct tc_action_net *tn = net_generic(net, tunnel_key_net_id);
 	struct nlattr *tb[TCA_TUNNEL_KEY_MAX + 1];
 	struct tcf_tunnel_key_params *params_new;
 	struct metadata_dst *metadata = NULL;
+	struct tcf_chain *goto_ch = NULL;
 	struct tc_tunnel_key *parm;
 	struct tcf_tunnel_key *t;
 	bool exists = false;
 	__be16 dst_port = 0;
+	__be64 key_id = 0;
 	int opts_len = 0;
-	__be64 key_id;
-	__be16 flags;
+	__be16 flags = 0;
 	u8 tos, ttl;
 	int ret = 0;
 	u32 index;
@@ -236,8 +237,8 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 		return -EINVAL;
 	}
 
-	err = nla_parse_nested(tb, TCA_TUNNEL_KEY_MAX, nla, tunnel_key_policy,
-			       extack);
+	err = nla_parse_nested_deprecated(tb, TCA_TUNNEL_KEY_MAX, nla,
+					  tunnel_key_policy, extack);
 	if (err < 0) {
 		NL_SET_ERR_MSG(extack, "Failed to parse nested tunnel key attributes");
 		return err;
@@ -261,15 +262,15 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 	case TCA_TUNNEL_KEY_ACT_RELEASE:
 		break;
 	case TCA_TUNNEL_KEY_ACT_SET:
-		if (!tb[TCA_TUNNEL_KEY_ENC_KEY_ID]) {
-			NL_SET_ERR_MSG(extack, "Missing tunnel key id");
-			ret = -EINVAL;
-			goto err_out;
+		if (tb[TCA_TUNNEL_KEY_ENC_KEY_ID]) {
+			__be32 key32;
+
+			key32 = nla_get_be32(tb[TCA_TUNNEL_KEY_ENC_KEY_ID]);
+			key_id = key32_to_tunnel_id(key32);
+			flags = TUNNEL_KEY;
 		}
 
-		key_id = key32_to_tunnel_id(nla_get_be32(tb[TCA_TUNNEL_KEY_ENC_KEY_ID]));
-
-		flags = TUNNEL_KEY | TUNNEL_CSUM;
+		flags |= TUNNEL_CSUM;
 		if (tb[TCA_TUNNEL_KEY_NO_CSUM] &&
 		    nla_get_u8(tb[TCA_TUNNEL_KEY_NO_CSUM]))
 			flags &= ~TUNNEL_CSUM;
@@ -314,7 +315,7 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 
 			metadata = __ipv6_tun_set_dst(&saddr, &daddr, tos, ttl, dst_port,
 						      0, flags,
-						      key_id, 0);
+						      key_id, opts_len);
 		} else {
 			NL_SET_ERR_MSG(extack, "Missing either ipv4 or ipv6 src and dst");
 			ret = -EINVAL;
@@ -326,6 +327,12 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 			ret = -ENOMEM;
 			goto err_out;
 		}
+
+#ifdef CONFIG_DST_CACHE
+		ret = dst_cache_init(&metadata->u.tun_info.dst_cache, GFP_KERNEL);
+		if (ret)
+			goto release_tun_meta;
+#endif
 
 		if (opts_len) {
 			ret = tunnel_key_opts_set(tb[TCA_TUNNEL_KEY_ENC_OPTS],
@@ -358,6 +365,12 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 		goto release_tun_meta;
 	}
 
+	err = tcf_action_check_ctrlact(parm->action, tp, &goto_ch, extack);
+	if (err < 0) {
+		ret = err;
+		exists = true;
+		goto release_tun_meta;
+	}
 	t = to_tunnel_key(*a);
 
 	params_new = kzalloc(sizeof(*params_new), GFP_KERNEL);
@@ -365,22 +378,25 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 		NL_SET_ERR_MSG(extack, "Cannot allocate tunnel key parameters");
 		ret = -ENOMEM;
 		exists = true;
-		goto release_tun_meta;
+		goto put_chain;
 	}
 	params_new->tcft_action = parm->t_action;
 	params_new->tcft_enc_metadata = metadata;
 
 	spin_lock_bh(&t->tcf_lock);
-	t->tcf_action = parm->action;
+	goto_ch = tcf_action_set_ctrlact(*a, parm->action, goto_ch);
 	rcu_swap_protected(t->params, params_new,
 			   lockdep_is_held(&t->tcf_lock));
 	spin_unlock_bh(&t->tcf_lock);
 	tunnel_key_release_params(params_new);
-
-	if (ret == ACT_P_CREATED)
-		tcf_idr_insert(tn, *a);
+	if (goto_ch)
+		tcf_chain_put_by_act(goto_ch);
 
 	return ret;
+
+put_chain:
+	if (goto_ch)
+		tcf_chain_put_by_act(goto_ch);
 
 release_tun_meta:
 	if (metadata)
@@ -410,7 +426,7 @@ static int tunnel_key_geneve_opts_dump(struct sk_buff *skb,
 	u8 *src = (u8 *)(info + 1);
 	struct nlattr *start;
 
-	start = nla_nest_start(skb, TCA_TUNNEL_KEY_ENC_OPTS_GENEVE);
+	start = nla_nest_start_noflag(skb, TCA_TUNNEL_KEY_ENC_OPTS_GENEVE);
 	if (!start)
 		return -EMSGSIZE;
 
@@ -444,7 +460,7 @@ static int tunnel_key_opts_dump(struct sk_buff *skb,
 	if (!info->options_len)
 		return 0;
 
-	start = nla_nest_start(skb, TCA_TUNNEL_KEY_ENC_OPTS);
+	start = nla_nest_start_noflag(skb, TCA_TUNNEL_KEY_ENC_OPTS);
 	if (!start)
 		return -EMSGSIZE;
 
@@ -518,10 +534,13 @@ static int tunnel_key_dump(struct sk_buff *skb, struct tc_action *a,
 		struct ip_tunnel_key *key = &info->key;
 		__be32 key_id = tunnel_id_to_key32(key->tun_id);
 
-		if (nla_put_be32(skb, TCA_TUNNEL_KEY_ENC_KEY_ID, key_id) ||
+		if (((key->tun_flags & TUNNEL_KEY) &&
+		     nla_put_be32(skb, TCA_TUNNEL_KEY_ENC_KEY_ID, key_id)) ||
 		    tunnel_key_dump_addresses(skb,
 					      &params->tcft_enc_metadata->u.tun_info) ||
-		    nla_put_be16(skb, TCA_TUNNEL_KEY_ENC_DST_PORT, key->tp_dst) ||
+		    (key->tp_dst &&
+		      nla_put_be16(skb, TCA_TUNNEL_KEY_ENC_DST_PORT,
+				   key->tp_dst)) ||
 		    nla_put_u8(skb, TCA_TUNNEL_KEY_NO_CSUM,
 			       !(key->tun_flags & TUNNEL_CSUM)) ||
 		    tunnel_key_opts_dump(skb, info))
@@ -558,8 +577,7 @@ static int tunnel_key_walker(struct net *net, struct sk_buff *skb,
 	return tcf_generic_walker(tn, skb, cb, type, ops, extack);
 }
 
-static int tunnel_key_search(struct net *net, struct tc_action **a, u32 index,
-			     struct netlink_ext_ack *extack)
+static int tunnel_key_search(struct net *net, struct tc_action **a, u32 index)
 {
 	struct tc_action_net *tn = net_generic(net, tunnel_key_net_id);
 
@@ -568,7 +586,7 @@ static int tunnel_key_search(struct net *net, struct tc_action **a, u32 index,
 
 static struct tc_action_ops act_tunnel_key_ops = {
 	.kind		=	"tunnel_key",
-	.type		=	TCA_ACT_TUNNEL_KEY,
+	.id		=	TCA_ID_TUNNEL_KEY,
 	.owner		=	THIS_MODULE,
 	.act		=	tunnel_key_act,
 	.dump		=	tunnel_key_dump,

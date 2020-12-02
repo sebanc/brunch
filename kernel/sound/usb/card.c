@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *   (Tentative) USB Audio Driver for ALSA
  *
@@ -8,21 +9,6 @@
  *	    Thomas Sailer (sailer@ife.ee.ethz.ch)
  *
  *   Audio Class 3.0 support by Ruslan Bilovol <ruslan.bilovol@gmail.com>
- *
- *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation; either version 2 of the License, or
- *   (at your option) any later version.
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with this program; if not, write to the Free Software
- *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
- *
  *
  *  NOTES:
  *
@@ -35,7 +21,6 @@
 
 
 #include <linux/bitops.h>
-#include <linux/cpufreq.h>
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/slab.h>
@@ -48,8 +33,6 @@
 #include <linux/usb/audio-v2.h>
 #include <linux/usb/audio-v3.h>
 #include <linux/module.h>
-
-#include <soc/rockchip/dmc-sync.h>
 
 #include <sound/control.h>
 #include <sound/core.h>
@@ -71,6 +54,7 @@
 #include "format.h"
 #include "power.h"
 #include "stream.h"
+#include "media.h"
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("USB Audio");
@@ -613,6 +597,10 @@ static int usb_audio_probe(struct usb_interface *intf,
 		}
 	}
 	if (! chip) {
+		err = snd_usb_apply_boot_quirk_once(dev, intf, quirk, id);
+		if (err < 0)
+			goto __error;
+
 		/* it's a fresh one.
 		 * now look for an empty slot and create a new card instance
 		 */
@@ -680,17 +668,13 @@ static int usb_audio_probe(struct usb_interface *intf,
 			goto __error;
 	}
 
+	if (quirk && quirk->shares_media_device) {
+		/* don't want to fail when snd_media_device_create() fails */
+		snd_media_device_create(chip, intf);
+	}
+
 	usb_chip[chip->index] = chip;
 	chip->num_interfaces++;
-
-	/*
-	 * when plug in usb audio device,
-	 * set the cpu min frequency define in dts
-	 * disable dmc
-	 */
-	cpufreq_start_complex_usb();
-	rockchip_dmc_disable();
-
 	usb_set_intfdata(intf, chip);
 	atomic_dec(&chip->active);
 	mutex_unlock(&register_mutex);
@@ -748,19 +732,19 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 		list_for_each(p, &chip->midi_list) {
 			snd_usbmidi_disconnect(p);
 		}
+		/*
+		 * Nice to check quirk && quirk->shares_media_device and
+		 * then call the snd_media_device_delete(). Don't have
+		 * access to the quirk here. snd_media_device_delete()
+		 * accesses mixer_list
+		 */
+		snd_media_device_delete(chip);
+
 		/* release mixer resources */
 		list_for_each_entry(mixer, &chip->mixer_list, list) {
 			snd_usb_mixer_disconnect(mixer);
 		}
 	}
-
-	/*
-	 * when unplug usb audio,
-	 * recovery cpu min frequency,
-	 * and enable dmc
-	 */
-	cpufreq_end_complex_usb();
-	rockchip_dmc_enable();
 
 	chip->num_interfaces--;
 	if (chip->num_interfaces <= 0) {

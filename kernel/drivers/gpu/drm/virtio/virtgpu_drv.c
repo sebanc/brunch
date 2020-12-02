@@ -29,10 +29,13 @@
 #include <linux/module.h>
 #include <linux/console.h>
 #include <linux/pci.h>
-#include <drm/drmP.h>
+
 #include <drm/drm.h>
+#include <drm/drm_drv.h>
+#include <drm/drm_file.h>
 
 #include "virtgpu_drv.h"
+
 static struct drm_driver driver;
 
 static int virtio_gpu_modeset = -1;
@@ -53,7 +56,6 @@ static int virtio_gpu_pci_quirk(struct drm_device *dev, struct virtio_device *vd
 	dev->pdev = pdev;
 	if (vga)
 		drm_fb_helper_remove_conflicting_pci_framebuffers(pdev,
-								  0,
 								  "virtiodrmfb");
 
 	/*
@@ -161,9 +163,8 @@ static unsigned int features[] = {
 	VIRTIO_GPU_F_VIRGL,
 #endif
 	VIRTIO_GPU_F_EDID,
-	VIRTIO_GPU_F_RESOURCE_V2,
-	VIRTIO_GPU_F_SHARED_GUEST,
-	VIRTIO_GPU_F_HOST_COHERENT,
+	VIRTIO_GPU_F_RESOURCE_UUID,
+	VIRTIO_GPU_F_RESOURCE_BLOB,
 };
 static struct virtio_driver virtio_gpu_driver = {
 	.feature_table = features,
@@ -198,7 +199,7 @@ static const struct file_operations virtio_gpu_driver_fops = {
 };
 
 static struct drm_driver driver = {
-	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME | DRIVER_RENDER | DRIVER_ATOMIC,
+	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_RENDER | DRIVER_ATOMIC,
 	.open = virtio_gpu_driver_open,
 	.postclose = virtio_gpu_driver_postclose,
 

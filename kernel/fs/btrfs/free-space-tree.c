@@ -10,6 +10,7 @@
 #include "locking.h"
 #include "free-space-tree.h"
 #include "transaction.h"
+#include "block-group.h"
 
 static int __add_block_group_free_space(struct btrfs_trans_handle *trans,
 					struct btrfs_block_group_cache *block_group,
@@ -74,12 +75,13 @@ out:
 	return ret;
 }
 
-struct btrfs_free_space_info *
-search_free_space_info(struct btrfs_trans_handle *trans,
-		       struct btrfs_fs_info *fs_info,
-		       struct btrfs_block_group_cache *block_group,
-		       struct btrfs_path *path, int cow)
+EXPORT_FOR_TESTS
+struct btrfs_free_space_info *search_free_space_info(
+		struct btrfs_trans_handle *trans,
+		struct btrfs_block_group_cache *block_group,
+		struct btrfs_path *path, int cow)
 {
+	struct btrfs_fs_info *fs_info = block_group->fs_info;
 	struct btrfs_root *root = fs_info->free_space_root;
 	struct btrfs_key key;
 	int ret;
@@ -176,6 +178,7 @@ static void le_bitmap_set(unsigned long *map, unsigned int start, int len)
 	}
 }
 
+EXPORT_FOR_TESTS
 int convert_free_space_to_bitmaps(struct btrfs_trans_handle *trans,
 				  struct btrfs_block_group_cache *block_group,
 				  struct btrfs_path *path)
@@ -252,7 +255,7 @@ int convert_free_space_to_bitmaps(struct btrfs_trans_handle *trans,
 		btrfs_release_path(path);
 	}
 
-	info = search_free_space_info(trans, fs_info, block_group, path, 1);
+	info = search_free_space_info(trans, block_group, path, 1);
 	if (IS_ERR(info)) {
 		ret = PTR_ERR(info);
 		goto out;
@@ -315,6 +318,7 @@ out:
 	return ret;
 }
 
+EXPORT_FOR_TESTS
 int convert_free_space_to_extents(struct btrfs_trans_handle *trans,
 				  struct btrfs_block_group_cache *block_group,
 				  struct btrfs_path *path)
@@ -396,7 +400,7 @@ int convert_free_space_to_extents(struct btrfs_trans_handle *trans,
 		btrfs_release_path(path);
 	}
 
-	info = search_free_space_info(trans, fs_info, block_group, path, 1);
+	info = search_free_space_info(trans, block_group, path, 1);
 	if (IS_ERR(info)) {
 		ret = PTR_ERR(info);
 		goto out;
@@ -461,8 +465,7 @@ static int update_free_space_extent_count(struct btrfs_trans_handle *trans,
 	if (new_extents == 0)
 		return 0;
 
-	info = search_free_space_info(trans, trans->fs_info, block_group, path,
-				      1);
+	info = search_free_space_info(trans, block_group, path, 1);
 	if (IS_ERR(info)) {
 		ret = PTR_ERR(info);
 		goto out;
@@ -487,6 +490,7 @@ out:
 	return ret;
 }
 
+EXPORT_FOR_TESTS
 int free_space_test_bit(struct btrfs_block_group_cache *block_group,
 			struct btrfs_path *path, u64 offset)
 {
@@ -775,6 +779,7 @@ out:
 	return ret;
 }
 
+EXPORT_FOR_TESTS
 int __remove_from_free_space_tree(struct btrfs_trans_handle *trans,
 				  struct btrfs_block_group_cache *block_group,
 				  struct btrfs_path *path, u64 start, u64 size)
@@ -789,8 +794,7 @@ int __remove_from_free_space_tree(struct btrfs_trans_handle *trans,
 			return ret;
 	}
 
-	info = search_free_space_info(NULL, trans->fs_info, block_group, path,
-				      0);
+	info = search_free_space_info(NULL, block_group, path, 0);
 	if (IS_ERR(info))
 		return PTR_ERR(info);
 	flags = btrfs_free_space_flags(path->nodes[0], info);
@@ -968,11 +972,11 @@ out:
 	return ret;
 }
 
+EXPORT_FOR_TESTS
 int __add_to_free_space_tree(struct btrfs_trans_handle *trans,
 			     struct btrfs_block_group_cache *block_group,
 			     struct btrfs_path *path, u64 start, u64 size)
 {
-	struct btrfs_fs_info *fs_info = trans->fs_info;
 	struct btrfs_free_space_info *info;
 	u32 flags;
 	int ret;
@@ -983,7 +987,7 @@ int __add_to_free_space_tree(struct btrfs_trans_handle *trans,
 			return ret;
 	}
 
-	info = search_free_space_info(NULL, fs_info, block_group, path, 0);
+	info = search_free_space_info(NULL, block_group, path, 0);
 	if (IS_ERR(info))
 		return PTR_ERR(info);
 	flags = btrfs_free_space_flags(path->nodes[0], info);
@@ -1145,7 +1149,7 @@ int btrfs_create_free_space_tree(struct btrfs_fs_info *fs_info)
 		return PTR_ERR(trans);
 
 	set_bit(BTRFS_FS_CREATING_FREE_SPACE_TREE, &fs_info->flags);
-	free_space_root = btrfs_create_tree(trans, fs_info,
+	free_space_root = btrfs_create_tree(trans,
 					    BTRFS_FREE_SPACE_TREE_OBJECTID);
 	if (IS_ERR(free_space_root)) {
 		ret = PTR_ERR(free_space_root);
@@ -1243,7 +1247,7 @@ int btrfs_clear_free_space_tree(struct btrfs_fs_info *fs_info)
 	list_del(&free_space_root->dirty_list);
 
 	btrfs_tree_lock(free_space_root->node);
-	clean_tree_block(fs_info, free_space_root->node);
+	btrfs_clean_tree_block(free_space_root->node);
 	btrfs_tree_unlock(free_space_root->node);
 	btrfs_free_tree_block(trans, free_space_root, free_space_root->node,
 			      0, 1);
@@ -1529,14 +1533,12 @@ out:
 int load_free_space_tree(struct btrfs_caching_control *caching_ctl)
 {
 	struct btrfs_block_group_cache *block_group;
-	struct btrfs_fs_info *fs_info;
 	struct btrfs_free_space_info *info;
 	struct btrfs_path *path;
 	u32 extent_count, flags;
 	int ret;
 
 	block_group = caching_ctl->block_group;
-	fs_info = block_group->fs_info;
 
 	path = btrfs_alloc_path();
 	if (!path)
@@ -1550,7 +1552,7 @@ int load_free_space_tree(struct btrfs_caching_control *caching_ctl)
 	path->search_commit_root = 1;
 	path->reada = READA_FORWARD;
 
-	info = search_free_space_info(NULL, fs_info, block_group, path, 0);
+	info = search_free_space_info(NULL, block_group, path, 0);
 	if (IS_ERR(info)) {
 		ret = PTR_ERR(info);
 		goto out;

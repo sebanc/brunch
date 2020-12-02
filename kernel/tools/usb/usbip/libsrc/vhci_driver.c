@@ -9,7 +9,6 @@
 #include <netdb.h>
 #include <libudev.h>
 #include <dirent.h>
-#include <stdbool.h>
 #include "sysfs_utils.h"
 
 #undef  PROGNAME
@@ -19,7 +18,7 @@ struct usbip_vhci_driver *vhci_driver;
 struct udev *udev_context;
 
 static struct usbip_imported_device *
-imported_device_init(struct usbip_imported_device *idev, const char *busid)
+imported_device_init(struct usbip_imported_device *idev, char *busid)
 {
 	struct udev_device *sudev;
 
@@ -38,89 +37,9 @@ err:
 	return NULL;
 }
 
-static void assign_idev(struct usbip_imported_device *idev, uint8_t port,
-			uint32_t status, uint32_t devid, enum hub_speed hub)
-{
-	idev->port = port;
-	idev->status = status;
-	idev->devid = devid;
-	idev->busnum = (devid >> 16);
-	idev->devnum = (devid & 0x0000ffff);
-	idev->hub = hub;
-}
-
-static int init_idev(struct usbip_imported_device *idev, const char *lbusid)
-{
-	if (idev->status != VDEV_ST_NULL &&
-	    idev->status != VDEV_ST_NOTASSIGNED) {
-		idev = imported_device_init(idev, lbusid);
-		if (!idev) {
-			dbg("imported_device_init failed");
-			return -1;
-		}
-	}
-	return 0;
-}
-
-/*
- * Parses a line from the "status" sysfs file which provides information about
- * the virtual USB host controller.
- *
- * In older kernel versions the "status" sysfs file does not contain the "hub"
- * column which indicates the hub speed of the virtual device.
- *
- * Example format:
- * prt  sta spd dev      sockfd local_busid
- * 0000 004 000 00000000 000003 1-2.3
- * 0001 004 000 00000000 000004 2-3.4
- *
- * Newer kernel versions contain the "hub" column which provides information
- * about the speed of the port.
- *
- * Example format:
- * hub port sta spd dev       sockfd local_busid
- * hs  0000 004 000 00000000  000003 1-2.3
- * ss  0008 004 000 00000000  000004 2-3.4
- *
- * If |hub_supported| is true, then we read the status line using the new
- * format. Otherwise, we read using the old format. Returns true if the scan was
- * successful.
- */
-static bool scan_status_line(const char *line, bool hub_supported, int *port,
-			     int *status, int *speed, int *devid, int *sockfd,
-			     char *lbusid, enum hub_speed *hub)
+static int parse_status(const char *value)
 {
 	int ret = 0;
-	char hub_str[3] = { 0 };
-
-	if (hub_supported) {
-		ret = sscanf(line, "%2s  %d %d %d %x %u %31s\n", hub_str, port,
-			     status, speed, devid, sockfd, lbusid);
-		if (ret != 7)
-			return false;
-
-		if (strncmp("hs", hub_str, 2) == 0)
-			*hub = HUB_SPEED_HIGH;
-		else /* strncmp("ss", hub, 2) == 0 */
-			*hub = HUB_SPEED_SUPER;
-
-		return true;
-	}
-	ret = sscanf(line, "%d %d %d %x %u %31s\n", port, status, speed, devid,
-		     sockfd, lbusid);
-	/* assume that the hub is high-speed */
-	*hub = HUB_SPEED_HIGH;
-	return ret == 6;
-}
-
-/*
- * Parses the "status" sysfs file which describes the USB ports provided by the
- * VHCI device. If |hub_supported| is true then the status file contains an
- * extra "hub" column which indicates the speed of the port. Refer to
- * scan_status_line for more information about the format of the status file.
- */
-static int parse_status_file(const char *value, bool hub_supported)
-{
 	char *c;
 
 	/* skip a header line */
@@ -133,22 +52,47 @@ static int parse_status_file(const char *value, bool hub_supported)
 		int port, status, speed, devid;
 		int sockfd;
 		char lbusid[SYSFS_BUS_ID_SIZE];
-		enum hub_speed hub;
 		struct usbip_imported_device *idev;
+		char hub[3];
 
-		if (!scan_status_line(c, hub_supported, &port, &status, &speed,
-				      &devid, &sockfd, lbusid, &hub)) {
-			dbg("failed to scan status line");
-			return -1;
+		ret = sscanf(c, "%2s  %d %d %d %x %u %31s\n",
+				hub, &port, &status, &speed,
+				&devid, &sockfd, lbusid);
+
+		if (ret < 5) {
+			dbg("sscanf failed: %d", ret);
+			BUG();
 		}
+
+		dbg("hub %s port %d status %d speed %d devid %x",
+				hub, port, status, speed, devid);
+		dbg("sockfd %u lbusid %s", sockfd, lbusid);
 
 		/* if a device is connected, look at it */
 		idev = &vhci_driver->idev[port];
 		memset(idev, 0, sizeof(*idev));
-		assign_idev(idev, port, status, devid, hub);
 
-		if (init_idev(idev, lbusid))
-			return -1;
+		if (strncmp("hs", hub, 2) == 0)
+			idev->hub = HUB_SPEED_HIGH;
+		else /* strncmp("ss", hub, 2) == 0 */
+			idev->hub = HUB_SPEED_SUPER;
+
+		idev->port	= port;
+		idev->status	= status;
+
+		idev->devid	= devid;
+
+		idev->busnum	= (devid >> 16);
+		idev->devnum	= (devid & 0x0000ffff);
+
+		if (idev->status != VDEV_ST_NULL
+		    && idev->status != VDEV_ST_NOTASSIGNED) {
+			idev = imported_device_init(idev, lbusid);
+			if (!idev) {
+				dbg("imported_device_init failed");
+				return -1;
+			}
+		}
 
 		/* go to the next line */
 		c = strchr(c, '\n');
@@ -160,38 +104,6 @@ static int parse_status_file(const char *value, bool hub_supported)
 	dbg("exit");
 
 	return 0;
-}
-
-/*
- * Parses the sysfs status contained within value to populate the idev fields
- * within vhci_driver.
- *
- * Uses the format of the header line to determine which parsing function to
- * call.
- */
-static int parse_status(const char *value)
-{
-	char *c;
-	char header[STATUS_HEADER_MAX] = { 0 };
-	size_t size;
-
-	c = strchr(value, '\n');
-	if (!c)
-		return -1;
-
-	size = c - value;
-	if (size >= STATUS_HEADER_MAX)
-		return -1;
-	strncpy(header, value, size);
-
-	if (!strcmp(header, OLD_STATUS_HEADER))
-		return parse_status_file(value, false);
-	if (!strcmp(header, NEW_STATUS_HEADER))
-		return parse_status_file(value, true);
-
-	dbg("unknown header format in status");
-
-	return -1;
 }
 
 #define MAX_STATUS_NAME 18
@@ -223,45 +135,14 @@ static int refresh_imported_device_list(void)
 	return 0;
 }
 
-static int fallback_get_nports(struct udev_device *hc_device)
-{
-	char *c;
-	int nports = 0;
-	const char *attr_status;
-
-	attr_status = udev_device_get_sysattr_value(hc_device, "status");
-	if (!attr_status)
-		return -1;
-
-	/* skip a header line */
-	c = strchr(attr_status, '\n');
-	if (!c)
-		return 0;
-	c++;
-
-	while (*c != '\0') {
-		nports++;
-		/* go to the next line */
-		c = strchr(c, '\n');
-		if (!c)
-			return nports;
-		c++;
-	}
-
-	return nports;
-}
-
 static int get_nports(struct udev_device *hc_device)
 {
-	int nports;
 	const char *attr_nports;
 
 	attr_nports = udev_device_get_sysattr_value(hc_device, "nports");
 	if (!attr_nports) {
-		nports = fallback_get_nports(hc_device);
-		if (nports < 0)
-			err("failed to determine number of ports");
-		return nports;
+		err("udev_device_get_sysattr_value nports failed");
+		return -1;
 	}
 
 	return (int)strtoul(attr_nports, NULL, 10);
@@ -269,7 +150,7 @@ static int get_nports(struct udev_device *hc_device)
 
 static int vhci_hcd_filter(const struct dirent *dirent)
 {
-	return !strncmp(dirent->d_name, "vhci_hcd", 8);
+	return !strncmp(dirent->d_name, "vhci_hcd.", 9);
 }
 
 static int get_ncontrollers(void)
@@ -359,24 +240,6 @@ static int read_record(int rhport, char *host, unsigned long host_len,
 
 /* ---------------------------------------------------------------------- */
 
-/*
- * Attempt to open the vhci udev device. If the first lookup fails fall back to
- * looking up the old name in order to support older kernel versions.
- */
-static struct udev_device *open_hc_device()
-{
-	struct udev_device *device;
-
-	device = udev_device_new_from_subsystem_sysname(
-		udev_context, USBIP_VHCI_BUS_TYPE, USBIP_VHCI_DEVICE_NAME);
-	if (!device) {
-		device = udev_device_new_from_subsystem_sysname(
-			udev_context, USBIP_VHCI_BUS_TYPE,
-			USBIP_VHCI_DEVICE_NAME_OLD);
-	}
-	return device;
-}
-
 int usbip_vhci_driver_open(void)
 {
 	int nports;
@@ -389,9 +252,12 @@ int usbip_vhci_driver_open(void)
 	}
 
 	/* will be freed in usbip_driver_close() */
-	hc_device = open_hc_device();
+	hc_device =
+		udev_device_new_from_subsystem_sysname(udev_context,
+						       USBIP_VHCI_BUS_TYPE,
+						       USBIP_VHCI_DEVICE_NAME);
 	if (!hc_device) {
-		err("failed to open VHCI device");
+		err("udev_device_new_from_subsystem_sysname failed");
 		goto err;
 	}
 

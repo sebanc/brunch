@@ -112,7 +112,7 @@ static const u16 mgmt_commands[] = {
 	MGMT_OP_SET_PHY_CONFIGURATION,
 	MGMT_OP_SET_BLOCKED_KEYS,
 	MGMT_OP_SET_WIDEBAND_SPEECH,
-	MGMT_OP_READ_CONTROLLER_CAP,
+	MGMT_OP_READ_SECURITY_INFO,
 	MGMT_OP_READ_EXP_FEATURES_INFO,
 	MGMT_OP_SET_EXP_FEATURE,
 	MGMT_OP_READ_DEF_SYSTEM_CONFIG,
@@ -177,10 +177,10 @@ static const u16 mgmt_untrusted_commands[] = {
 	MGMT_OP_READ_CONFIG_INFO,
 	MGMT_OP_READ_EXT_INDEX_LIST,
 	MGMT_OP_READ_EXT_INFO,
-	MGMT_OP_READ_CONTROLLER_CAP,
-	MGMT_OP_READ_EXP_FEATURES_INFO,
+	MGMT_OP_READ_SECURITY_INFO,
 	MGMT_OP_READ_DEF_SYSTEM_CONFIG,
 	MGMT_OP_READ_DEF_RUNTIME_CONFIG,
+	MGMT_OP_READ_EXP_FEATURES_INFO,
 };
 
 static const u16 mgmt_untrusted_events[] = {
@@ -505,7 +505,6 @@ static int read_ext_index_list(struct sock *sk, struct hci_dev *hdev,
 {
 	struct mgmt_rp_read_ext_index_list *rp;
 	struct hci_dev *d;
-	size_t rp_len;
 	u16 count;
 	int err;
 
@@ -519,8 +518,7 @@ static int read_ext_index_list(struct sock *sk, struct hci_dev *hdev,
 			count++;
 	}
 
-	rp_len = sizeof(*rp) + (sizeof(rp->entry[0]) * count);
-	rp = kmalloc(rp_len, GFP_ATOMIC);
+	rp = kmalloc(struct_size(rp, entry, count), GFP_ATOMIC);
 	if (!rp) {
 		read_unlock(&hci_dev_list_lock);
 		return -ENOMEM;
@@ -556,7 +554,6 @@ static int read_ext_index_list(struct sock *sk, struct hci_dev *hdev,
 	}
 
 	rp->num_controllers = cpu_to_le16(count);
-	rp_len = sizeof(*rp) + (sizeof(rp->entry[0]) * count);
 
 	read_unlock(&hci_dev_list_lock);
 
@@ -569,7 +566,8 @@ static int read_ext_index_list(struct sock *sk, struct hci_dev *hdev,
 	hci_sock_clear_flag(sk, HCI_MGMT_UNCONF_INDEX_EVENTS);
 
 	err = mgmt_cmd_complete(sk, MGMT_INDEX_NONE,
-				MGMT_OP_READ_EXT_INDEX_LIST, 0, rp, rp_len);
+				MGMT_OP_READ_EXT_INDEX_LIST, 0, rp,
+				struct_size(rp, entry, count));
 
 	kfree(rp);
 
@@ -2352,8 +2350,7 @@ static int load_link_keys(struct sock *sk, struct hci_dev *hdev, void *data,
 				       MGMT_STATUS_INVALID_PARAMS);
 	}
 
-	expected_len = sizeof(*cp) + key_count *
-					sizeof(struct mgmt_link_key_info);
+	expected_len = struct_size(cp, keys, key_count);
 	if (expected_len != len) {
 		bt_dev_err(hdev, "load_link_keys: expected %u bytes, got %u bytes",
 			   expected_len, len);
@@ -2648,7 +2645,6 @@ static int get_connections(struct sock *sk, struct hci_dev *hdev, void *data,
 {
 	struct mgmt_rp_get_connections *rp;
 	struct hci_conn *c;
-	size_t rp_len;
 	int err;
 	u16 i;
 
@@ -2668,8 +2664,7 @@ static int get_connections(struct sock *sk, struct hci_dev *hdev, void *data,
 			i++;
 	}
 
-	rp_len = sizeof(*rp) + (i * sizeof(struct mgmt_addr_info));
-	rp = kmalloc(rp_len, GFP_KERNEL);
+	rp = kmalloc(struct_size(rp, addr, i), GFP_KERNEL);
 	if (!rp) {
 		err = -ENOMEM;
 		goto unlock;
@@ -2689,10 +2684,8 @@ static int get_connections(struct sock *sk, struct hci_dev *hdev, void *data,
 	rp->conn_count = cpu_to_le16(i);
 
 	/* Recalculate length in case of filtered SCO connections, etc */
-	rp_len = sizeof(*rp) + (i * sizeof(struct mgmt_addr_info));
-
 	err = mgmt_cmd_complete(sk, hdev->id, MGMT_OP_GET_CONNECTIONS, 0, rp,
-				rp_len);
+				struct_size(rp, addr, i));
 
 	kfree(rp);
 
@@ -3714,12 +3707,12 @@ unlock:
 	return err;
 }
 
-static int read_controller_cap(struct sock *sk, struct hci_dev *hdev,
-			       void *data, u16 data_len)
+static int read_security_info(struct sock *sk, struct hci_dev *hdev,
+			      void *data, u16 data_len)
 {
-	char buf[20];
-	struct mgmt_rp_read_controller_cap *rp = (void *)buf;
-	u16 cap_len = 0;
+	char buf[16];
+	struct mgmt_rp_read_security_info *rp = (void *)buf;
+	u16 sec_len = 0;
 	u8 flags = 0;
 
 	bt_dev_dbg(hdev, "sock %p", sk);
@@ -3744,33 +3737,23 @@ static int read_controller_cap(struct sock *sk, struct hci_dev *hdev,
 
 	flags |= 0x08;		/* Encryption key size enforcement (LE) */
 
-	cap_len = eir_append_data(rp->cap, cap_len, MGMT_CAP_SEC_FLAGS,
-				  &flags, 1);
+	sec_len = eir_append_data(rp->sec, sec_len, 0x01, &flags, 1);
 
 	/* When the Read Simple Pairing Options command is supported, then
 	 * also max encryption key size information is provided.
 	 */
 	if (hdev->commands[41] & 0x08)
-		cap_len = eir_append_le16(rp->cap, cap_len,
-					  MGMT_CAP_MAX_ENC_KEY_SIZE,
+		sec_len = eir_append_le16(rp->sec, sec_len, 0x02,
 					  hdev->max_enc_key_size);
 
-	cap_len = eir_append_le16(rp->cap, cap_len,
-				  MGMT_CAP_SMP_MAX_ENC_KEY_SIZE,
-				  SMP_MAX_ENC_KEY_SIZE);
+	sec_len = eir_append_le16(rp->sec, sec_len, 0x03, SMP_MAX_ENC_KEY_SIZE);
 
-	/* Append the min/max LE tx power parameters */
-	cap_len = eir_append_data(rp->cap, cap_len, MGMT_CAP_LE_TX_PWR_MIN,
-				  &hdev->min_le_tx_power, 1);
-	cap_len = eir_append_data(rp->cap, cap_len, MGMT_CAP_LE_TX_PWR_MAX,
-				  &hdev->max_le_tx_power, 1);
-
-	rp->cap_len = cpu_to_le16(cap_len);
+	rp->sec_len = cpu_to_le16(sec_len);
 
 	hci_dev_unlock(hdev);
 
-	return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_READ_CONTROLLER_CAP, 0,
-				 rp, sizeof(*rp) + cap_len);
+	return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_READ_SECURITY_INFO, 0,
+				 rp, sizeof(*rp) + sec_len);
 }
 
 #ifdef CONFIG_BT_FEATURE_DEBUG
@@ -3926,6 +3909,128 @@ static int set_exp_feature(struct sock *sk, struct hci_dev *hdev,
 	return mgmt_cmd_status(sk, hdev ? hdev->id : MGMT_INDEX_NONE,
 			       MGMT_OP_SET_EXP_FEATURE,
 			       MGMT_STATUS_NOT_SUPPORTED);
+}
+
+#define SUPPORTED_DEVICE_FLAGS() ((1U << HCI_CONN_FLAG_MAX) - 1)
+
+static int get_device_flags(struct sock *sk, struct hci_dev *hdev, void *data,
+			    u16 data_len)
+{
+	struct mgmt_cp_get_device_flags *cp = data;
+	struct mgmt_rp_get_device_flags rp;
+	struct bdaddr_list_with_flags *br_params;
+	struct hci_conn_params *params;
+	u32 supported_flags = SUPPORTED_DEVICE_FLAGS();
+	u32 current_flags = 0;
+	u8 status = MGMT_STATUS_INVALID_PARAMS;
+
+	bt_dev_dbg(hdev, "Get device flags %pMR (type 0x%x)\n",
+		   &cp->addr.bdaddr, cp->addr.type);
+
+	hci_dev_lock(hdev);
+
+	if (cp->addr.type == BDADDR_BREDR) {
+		br_params = hci_bdaddr_list_lookup_with_flags(&hdev->whitelist,
+							      &cp->addr.bdaddr,
+							      cp->addr.type);
+		if (!br_params)
+			goto done;
+
+		current_flags = br_params->current_flags;
+	} else {
+		params = hci_conn_params_lookup(hdev, &cp->addr.bdaddr,
+						le_addr_type(cp->addr.type));
+
+		if (!params)
+			goto done;
+
+		current_flags = params->current_flags;
+	}
+
+	bacpy(&rp.addr.bdaddr, &cp->addr.bdaddr);
+	rp.addr.type = cp->addr.type;
+	rp.supported_flags = cpu_to_le32(supported_flags);
+	rp.current_flags = cpu_to_le32(current_flags);
+
+	status = MGMT_STATUS_SUCCESS;
+
+done:
+	hci_dev_unlock(hdev);
+
+	return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_GET_DEVICE_FLAGS, status,
+				&rp, sizeof(rp));
+}
+
+static void device_flags_changed(struct sock *sk, struct hci_dev *hdev,
+				 bdaddr_t *bdaddr, u8 bdaddr_type,
+				 u32 supported_flags, u32 current_flags)
+{
+	struct mgmt_ev_device_flags_changed ev;
+
+	bacpy(&ev.addr.bdaddr, bdaddr);
+	ev.addr.type = bdaddr_type;
+	ev.supported_flags = cpu_to_le32(supported_flags);
+	ev.current_flags = cpu_to_le32(current_flags);
+
+	mgmt_event(MGMT_EV_DEVICE_FLAGS_CHANGED, hdev, &ev, sizeof(ev), sk);
+}
+
+static int set_device_flags(struct sock *sk, struct hci_dev *hdev, void *data,
+			    u16 len)
+{
+	struct mgmt_cp_set_device_flags *cp = data;
+	struct bdaddr_list_with_flags *br_params;
+	struct hci_conn_params *params;
+	u8 status = MGMT_STATUS_INVALID_PARAMS;
+	u32 supported_flags = SUPPORTED_DEVICE_FLAGS();
+	u32 current_flags = __le32_to_cpu(cp->current_flags);
+
+	bt_dev_dbg(hdev, "Set device flags %pMR (type 0x%x) = 0x%x",
+		   &cp->addr.bdaddr, cp->addr.type,
+		   __le32_to_cpu(current_flags));
+
+	if ((supported_flags | current_flags) != supported_flags) {
+		bt_dev_warn(hdev, "Bad flag given (0x%x) vs supported (0x%0x)",
+			    current_flags, supported_flags);
+		goto done;
+	}
+
+	hci_dev_lock(hdev);
+
+	if (cp->addr.type == BDADDR_BREDR) {
+		br_params = hci_bdaddr_list_lookup_with_flags(&hdev->whitelist,
+							      &cp->addr.bdaddr,
+							      cp->addr.type);
+
+		if (br_params) {
+			br_params->current_flags = current_flags;
+			status = MGMT_STATUS_SUCCESS;
+		} else {
+			bt_dev_warn(hdev, "No such BR/EDR device %pMR (0x%x)",
+				    &cp->addr.bdaddr, cp->addr.type);
+		}
+	} else {
+		params = hci_conn_params_lookup(hdev, &cp->addr.bdaddr,
+						le_addr_type(cp->addr.type));
+		if (params) {
+			params->current_flags = current_flags;
+			status = MGMT_STATUS_SUCCESS;
+		} else {
+			bt_dev_warn(hdev, "No such LE device %pMR (0x%x)",
+				    &cp->addr.bdaddr,
+				    le_addr_type(cp->addr.type));
+		}
+	}
+
+done:
+	hci_dev_unlock(hdev);
+
+	if (status == MGMT_STATUS_SUCCESS)
+		device_flags_changed(sk, hdev, &cp->addr.bdaddr, cp->addr.type,
+				     supported_flags, current_flags);
+
+	return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_SET_DEVICE_FLAGS, status,
+				 &cp->addr, sizeof(cp->addr));
 }
 
 static void mgmt_adv_monitor_added(struct sock *sk, struct hci_dev *hdev,
@@ -4135,128 +4240,6 @@ static int remove_adv_monitor(struct sock *sk, struct hci_dev *hdev,
 unlock:
 	hci_dev_unlock(hdev);
 	return err;
-}
-
-#define SUPPORTED_DEVICE_FLAGS() ((1U << HCI_CONN_FLAG_MAX) - 1)
-
-static int get_device_flags(struct sock *sk, struct hci_dev *hdev, void *data,
-			    u16 data_len)
-{
-	struct mgmt_cp_get_device_flags *cp = data;
-	struct mgmt_rp_get_device_flags rp;
-	struct bdaddr_list_with_flags *br_params;
-	struct hci_conn_params *params;
-	u32 supported_flags = SUPPORTED_DEVICE_FLAGS();
-	u32 current_flags = 0;
-	u8 status = MGMT_STATUS_INVALID_PARAMS;
-
-	bt_dev_dbg(hdev, "Get device flags %pMR (type 0x%x)\n",
-		   &cp->addr.bdaddr, cp->addr.type);
-
-	hci_dev_lock(hdev);
-
-	if (cp->addr.type == BDADDR_BREDR) {
-		br_params = hci_bdaddr_list_lookup_with_flags(&hdev->whitelist,
-							      &cp->addr.bdaddr,
-							      cp->addr.type);
-		if (!br_params)
-			goto done;
-
-		current_flags = br_params->current_flags;
-	} else {
-		params = hci_conn_params_lookup(hdev, &cp->addr.bdaddr,
-						le_addr_type(cp->addr.type));
-
-		if (!params)
-			goto done;
-
-		current_flags = params->current_flags;
-	}
-
-	bacpy(&rp.addr.bdaddr, &cp->addr.bdaddr);
-	rp.addr.type = cp->addr.type;
-	rp.supported_flags = cpu_to_le32(supported_flags);
-	rp.current_flags = cpu_to_le32(current_flags);
-
-	status = MGMT_STATUS_SUCCESS;
-
-done:
-	hci_dev_unlock(hdev);
-
-	return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_GET_DEVICE_FLAGS, status,
-				&rp, sizeof(rp));
-}
-
-static void device_flags_changed(struct sock *sk, struct hci_dev *hdev,
-				 bdaddr_t *bdaddr, u8 bdaddr_type,
-				 u32 supported_flags, u32 current_flags)
-{
-	struct mgmt_ev_device_flags_changed ev;
-
-	bacpy(&ev.addr.bdaddr, bdaddr);
-	ev.addr.type = bdaddr_type;
-	ev.supported_flags = cpu_to_le32(supported_flags);
-	ev.current_flags = cpu_to_le32(current_flags);
-
-	mgmt_event(MGMT_EV_DEVICE_FLAGS_CHANGED, hdev, &ev, sizeof(ev), sk);
-}
-
-static int set_device_flags(struct sock *sk, struct hci_dev *hdev, void *data,
-			    u16 len)
-{
-	struct mgmt_cp_set_device_flags *cp = data;
-	struct bdaddr_list_with_flags *br_params;
-	struct hci_conn_params *params;
-	u8 status = MGMT_STATUS_INVALID_PARAMS;
-	u32 supported_flags = SUPPORTED_DEVICE_FLAGS();
-	u32 current_flags = __le32_to_cpu(cp->current_flags);
-
-	bt_dev_dbg(hdev, "Set device flags %pMR (type 0x%x) = 0x%x",
-		   &cp->addr.bdaddr, cp->addr.type,
-		   __le32_to_cpu(current_flags));
-
-	if ((supported_flags | current_flags) != supported_flags) {
-		bt_dev_warn(hdev, "Bad flag given (0x%x) vs supported (0x%0x)",
-			    current_flags, supported_flags);
-		goto done;
-	}
-
-	hci_dev_lock(hdev);
-
-	if (cp->addr.type == BDADDR_BREDR) {
-		br_params = hci_bdaddr_list_lookup_with_flags(&hdev->whitelist,
-							      &cp->addr.bdaddr,
-							      cp->addr.type);
-
-		if (br_params) {
-			br_params->current_flags = current_flags;
-			status = MGMT_STATUS_SUCCESS;
-		} else {
-			bt_dev_warn(hdev, "No such BR/EDR device %pMR (0x%x)",
-				    &cp->addr.bdaddr, cp->addr.type);
-		}
-	} else {
-		params = hci_conn_params_lookup(hdev, &cp->addr.bdaddr,
-						le_addr_type(cp->addr.type));
-		if (params) {
-			params->current_flags = current_flags;
-			status = MGMT_STATUS_SUCCESS;
-		} else {
-			bt_dev_warn(hdev, "No such LE device %pMR (0x%x)",
-				    &cp->addr.bdaddr,
-				    le_addr_type(cp->addr.type));
-		}
-	}
-
-done:
-	hci_dev_unlock(hdev);
-
-	if (status == MGMT_STATUS_SUCCESS)
-		device_flags_changed(sk, hdev, &cp->addr.bdaddr, cp->addr.type,
-				     supported_flags, current_flags);
-
-	return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_SET_DEVICE_FLAGS, status,
-				 &cp->addr, sizeof(cp->addr));
 }
 
 static void read_local_oob_data_complete(struct hci_dev *hdev, u8 status,
@@ -5788,7 +5771,7 @@ static int load_irks(struct sock *sk, struct hci_dev *hdev, void *cp_data,
 				       MGMT_STATUS_INVALID_PARAMS);
 	}
 
-	expected_len = sizeof(*cp) + irk_count * sizeof(struct mgmt_irk_info);
+	expected_len = struct_size(cp, irks, irk_count);
 	if (expected_len != len) {
 		bt_dev_err(hdev, "load_irks: expected %u bytes, got %u bytes",
 			   expected_len, len);
@@ -5878,8 +5861,7 @@ static int load_long_term_keys(struct sock *sk, struct hci_dev *hdev,
 				       MGMT_STATUS_INVALID_PARAMS);
 	}
 
-	expected_len = sizeof(*cp) + key_count *
-					sizeof(struct mgmt_ltk_info);
+	expected_len = struct_size(cp, keys, key_count);
 	if (expected_len != len) {
 		bt_dev_err(hdev, "load_keys: expected %u bytes, got %u bytes",
 			   expected_len, len);
@@ -6631,8 +6613,7 @@ static int load_conn_param(struct sock *sk, struct hci_dev *hdev, void *data,
 				       MGMT_STATUS_INVALID_PARAMS);
 	}
 
-	expected_len = sizeof(*cp) + param_count *
-					sizeof(struct mgmt_conn_param);
+	expected_len = struct_size(cp, params, param_count);
 	if (expected_len != len) {
 		bt_dev_err(hdev, "load_conn_param: expected %u bytes, got %u bytes",
 			   expected_len, len);
@@ -8063,7 +8044,7 @@ static const struct hci_mgmt_handler mgmt_handlers[] = {
 	{ set_blocked_keys,	   MGMT_OP_SET_BLOCKED_KEYS_SIZE,
 						HCI_MGMT_VAR_LEN },
 	{ set_wideband_speech,	   MGMT_SETTING_SIZE },
-	{ read_controller_cap,     MGMT_READ_CONTROLLER_CAP_SIZE,
+	{ read_security_info,      MGMT_READ_SECURITY_INFO_SIZE,
 						HCI_MGMT_UNTRUSTED },
 	{ read_exp_features_info,  MGMT_READ_EXP_FEATURES_INFO_SIZE,
 						HCI_MGMT_UNTRUSTED |

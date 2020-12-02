@@ -291,7 +291,7 @@ static bool ath6kl_cfg80211_ready(struct ath6kl_vif *vif)
 	}
 
 	if (!test_bit(WLAN_ENABLED, &vif->flags)) {
-		ath6kl_err("wlan disabled\n");
+		ath6kl_dbg(ATH6KL_DBG_WLAN_CFG, "wlan disabled\n");
 		return false;
 	}
 
@@ -1322,7 +1322,7 @@ static int ath6kl_cfg80211_set_default_key(struct wiphy *wiphy,
 	struct ath6kl_vif *vif = netdev_priv(ndev);
 	struct ath6kl_key *key = NULL;
 	u8 key_usage;
-	enum crypto_type key_type = NONE_CRYPT;
+	enum ath6kl_crypto_type key_type = NONE_CRYPT;
 
 	ath6kl_dbg(ATH6KL_DBG_WLAN_CFG, "%s: index %d\n", __func__, key_index);
 
@@ -2194,13 +2194,13 @@ static int ath6kl_wow_suspend_vif(struct ath6kl_vif *vif,
 	if (!in_dev)
 		return 0;
 
-	ifa = in_dev->ifa_list;
+	ifa = rtnl_dereference(in_dev->ifa_list);
 	memset(&ips, 0, sizeof(ips));
 
 	/* Configure IP addr only if IP address count < MAX_IP_ADDRS */
 	while (index < MAX_IP_ADDRS && ifa) {
 		ips[index] = ifa->ifa_local;
-		ifa = ifa->ifa_next;
+		ifa = rtnl_dereference(ifa->ifa_next);
 		index++;
 	}
 

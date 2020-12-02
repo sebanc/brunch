@@ -25,6 +25,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/notifier.h>
+#include <linux/pm_qos.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 
@@ -42,38 +43,84 @@ MODULE_PARM_DESC(input_boost_ms, "Duration of input boost (msec)");
 static unsigned int cpuboost_input_boost_interval_ms = 150;
 module_param_named(input_boost_interval_ms,
 		   cpuboost_input_boost_interval_ms, uint, 0644);
-MODULE_PARM_DESC(input_boost_ms,
+MODULE_PARM_DESC(input_boost_interval_ms,
 		 "Interval between input events to reactivate input boost (msec)");
 
+DEFINE_MUTEX(cpuboost_mutex);
+
 static bool cpuboost_boost_active;
+
+static LIST_HEAD(cpuboost_policy_list);
+
+struct cpuboost_policy_node {
+	struct list_head policy_list;
+	struct freq_qos_request qos_req;
+	struct cpufreq_policy *policy;
+};
 
 static int cpuboost_policy_notifier(struct notifier_block *nb,
 				    unsigned long val, void *data)
 {
 	struct cpufreq_policy *policy = data;
-	unsigned int cpu = policy->cpu;
-	unsigned int boost_freq;
+	struct cpuboost_policy_node *node;
+	int ret;
+	bool found;
 
 	switch (val) {
-	case CPUFREQ_ADJUST:
-		boost_freq = policy->cpuinfo.max_freq / 100 *
-				cpuboost_input_boost_freq_percent;
+	case CPUFREQ_CREATE_POLICY:
+		node = kzalloc(sizeof(*node), GFP_KERNEL);
+		if (!node)
+			break;
 
-		pr_debug("CPU%u current policy min: %u kHz, cpuinfo max: %u kHz boost: %u kHz, active: %d\n",
-			 cpu, policy->min, policy->cpuinfo.max_freq,
-			 boost_freq, cpuboost_boost_active);
+		node->policy = policy;
 
-		cpufreq_verify_within_limits(policy,
-					     cpuboost_boost_active ?
-							boost_freq : 0,
-					     UINT_MAX);
+		/*
+		 * Always init to no boost and we'll get the boost the next
+		 * time input comes in.
+		 */
+		ret = freq_qos_add_request(&policy->constraints,
+					   &node->qos_req, FREQ_QOS_MIN, 0);
+		if (ret < 0) {
+			pr_warn("Failed to add input boost: %d\n", ret);
+			kfree(node);
+			break;
+		}
 
-		pr_debug("CPU%u resulting policy min: %u kHz\n",
-			 cpu, policy->min);
-		break;
+		mutex_lock(&cpuboost_mutex);
+		list_add(&node->policy_list, &cpuboost_policy_list);
+		mutex_unlock(&cpuboost_mutex);
+
+		return NOTIFY_OK;
+
+	case CPUFREQ_REMOVE_POLICY:
+		mutex_lock(&cpuboost_mutex);
+		found = false;
+		list_for_each_entry(node, &cpuboost_policy_list, policy_list) {
+			if (node->policy == policy) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			pr_warn("Couldn't find input boost for policy\n");
+			mutex_unlock(&cpuboost_mutex);
+			break;
+		}
+		list_del(&node->policy_list);
+		mutex_unlock(&cpuboost_mutex);
+
+		ret = freq_qos_remove_request(&node->qos_req);
+		kfree(node);
+		if (ret < 0) {
+			pr_warn("Failed to remove input boost: %d\n", ret);
+			break;
+		}
+
+		return NOTIFY_OK;
 	}
 
-	return NOTIFY_OK;
+	return NOTIFY_DONE;
 }
 
 static struct notifier_block cpuboost_policy_nb = {
@@ -82,17 +129,21 @@ static struct notifier_block cpuboost_policy_nb = {
 
 static void cpuboost_toggle_boost(bool boost_active)
 {
-	unsigned int cpu;
+	struct cpuboost_policy_node *node;
+	int ret;
+	s32 freq = 0;
 
+	mutex_lock(&cpuboost_mutex);
 	cpuboost_boost_active = boost_active;
-
-	get_online_cpus();
-	for_each_online_cpu(cpu) {
-		pr_debug("%s input boost on CPU%d\n",
-			 boost_active ? "Starting" : "Removing", cpu);
-		cpufreq_update_policy(cpu);
+	list_for_each_entry(node, &cpuboost_policy_list, policy_list) {
+		if (boost_active)
+			freq = node->policy->cpuinfo.max_freq / 100 *
+			       cpuboost_input_boost_freq_percent;
+		ret = freq_qos_update_request(&node->qos_req, freq);
+		if (ret < 0)
+			pr_warn("Error updating cpuboost request: %d\n", ret);
 	}
-	put_online_cpus();
+	mutex_unlock(&cpuboost_mutex);
 }
 
 static void cpuboost_cancel_input_boost(struct work_struct *work)

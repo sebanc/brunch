@@ -44,7 +44,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
 #include <linux/dma-buf.h>
-#include <linux/reservation.h>
+#include <linux/dma-resv.h>
 
 #include "services_kernel_client.h"
 #include "pvr_buffer_sync.h"
@@ -80,8 +80,8 @@ struct pvr_buffer_sync_append_data {
 };
 
 
-static struct reservation_object *
-pmr_reservation_object_get(struct _PMR_ *pmr)
+static struct dma_resv *
+pmr_dma_resv_get(struct _PMR_ *pmr)
 {
 	struct dma_buf *dmabuf;
 
@@ -97,7 +97,7 @@ pvr_buffer_sync_pmrs_lock(struct pvr_buffer_sync_context *ctx,
 			  u32 nr_pmrs,
 			  struct _PMR_ **pmrs)
 {
-	struct reservation_object *resv, *cresv = NULL, *lresv = NULL;
+	struct dma_resv *resv, *cresv = NULL, *lresv = NULL;
 	int i, err;
 	struct ww_acquire_ctx *acquire_ctx = &ctx->acquire_ctx;
 
@@ -108,7 +108,7 @@ pvr_buffer_sync_pmrs_lock(struct pvr_buffer_sync_context *ctx,
 	ww_acquire_init(acquire_ctx, &reservation_ww_class);
 retry:
 	for (i = 0; i < nr_pmrs; i++) {
-		resv = pmr_reservation_object_get(pmrs[i]);
+		resv = pmr_dma_resv_get(pmrs[i]);
 		if (!resv) {
 			pr_err("%s: Failed to get reservation object from pmr %p\n",
 			       __func__, pmrs[i]);
@@ -134,7 +134,7 @@ retry:
 
 fail:
 	while (i--) {
-		resv = pmr_reservation_object_get(pmrs[i]);
+		resv = pmr_dma_resv_get(pmrs[i]);
 		if (WARN_ON_ONCE(!resv))
 			continue;
 		ww_mutex_unlock(&resv->lock);
@@ -166,12 +166,12 @@ pvr_buffer_sync_pmrs_unlock(struct pvr_buffer_sync_context *ctx,
 			    u32 nr_pmrs,
 			    struct _PMR_ **pmrs)
 {
-	struct reservation_object *resv;
+	struct dma_resv *resv;
 	int i;
 	struct ww_acquire_ctx *acquire_ctx = &ctx->acquire_ctx;
 
 	for (i = 0; i < nr_pmrs; i++) {
-		resv = pmr_reservation_object_get(pmrs[i]);
+		resv = pmr_dma_resv_get(pmrs[i]);
 		if (WARN_ON_ONCE(!resv))
 			continue;
 		ww_mutex_unlock(&resv->lock);
@@ -188,8 +188,8 @@ static u32
 pvr_buffer_sync_pmrs_fence_count(u32 nr_pmrs, struct _PMR_ **pmrs,
 				 u32 *pmr_flags)
 {
-	struct reservation_object *resv;
-	struct reservation_object_list *resv_list;
+	struct dma_resv *resv;
+	struct dma_resv_list *resv_list;
 	struct dma_fence *fence;
 	u32 fence_count = 0;
 	bool exclusive;
@@ -198,12 +198,12 @@ pvr_buffer_sync_pmrs_fence_count(u32 nr_pmrs, struct _PMR_ **pmrs,
 	for (i = 0; i < nr_pmrs; i++) {
 		exclusive = !!(pmr_flags[i] & PVR_BUFFER_FLAG_WRITE);
 
-		resv = pmr_reservation_object_get(pmrs[i]);
+		resv = pmr_dma_resv_get(pmrs[i]);
 		if (WARN_ON_ONCE(!resv))
 			continue;
 
-		resv_list = reservation_object_get_list(resv);
-		fence = reservation_object_get_excl(resv);
+		resv_list = dma_resv_get_list(resv);
+		fence = dma_resv_get_excl(resv);
 
 		if (fence &&
 		    (!exclusive || !resv_list || !resv_list->shared_count))
@@ -223,8 +223,8 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 				    u32 *pmr_flags)
 {
 	struct pvr_buffer_sync_check_data *data;
-	struct reservation_object *resv;
-	struct reservation_object_list *resv_list;
+	struct dma_resv *resv;
+	struct dma_resv_list *resv_list;
 	struct dma_fence *fence;
 	u32 fence_count;
 	bool exclusive;
@@ -245,19 +245,19 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 	}
 
 	for (i = 0; i < nr_pmrs; i++) {
-		resv = pmr_reservation_object_get(pmrs[i]);
+		resv = pmr_dma_resv_get(pmrs[i]);
 		if (WARN_ON_ONCE(!resv))
 			continue;
 
 		exclusive = !!(pmr_flags[i] & PVR_BUFFER_FLAG_WRITE);
 		if (!exclusive) {
-			err = reservation_object_reserve_shared(resv);
+			err = dma_resv_reserve_shared(resv, 1);
 			if (err)
 				goto err_destroy_fences;
 		}
 
-		resv_list = reservation_object_get_list(resv);
-		fence = reservation_object_get_excl(resv);
+		resv_list = dma_resv_get_list(resv);
+		fence = dma_resv_get_excl(resv);
 
 		if (fence &&
 		    (!exclusive || !resv_list || !resv_list->shared_count)) {
@@ -276,7 +276,7 @@ pvr_buffer_sync_check_fences_create(struct pvr_fence_context *fence_ctx,
 		if (exclusive && resv_list) {
 			for (j = 0; j < resv_list->shared_count; j++) {
 				fence = rcu_dereference_protected(resv_list->shared[j],
-								  reservation_object_held(resv));
+								  dma_resv_held(resv));
 				data->fences[data->nr_fences++] =
 					pvr_fence_create_from_fence(fence_ctx,
 								    fence,
@@ -353,10 +353,8 @@ err_exit:
 void
 pvr_buffer_sync_context_destroy(struct pvr_buffer_sync_context *ctx)
 {
-	if (ctx) {
-		pvr_fence_context_destroy(ctx->fence_ctx);
-		kfree(ctx);
-	}
+	pvr_fence_context_destroy(ctx->fence_ctx);
+	kfree(ctx);
 }
 
 int
@@ -513,13 +511,13 @@ err_free_data:
 void
 pvr_buffer_sync_kick_succeeded(struct pvr_buffer_sync_append_data *data)
 {
-	struct reservation_object *resv;
+	struct dma_resv *resv;
 	int i;
 
 	dma_fence_enable_sw_signaling(&data->update_fence->base);
 
 	for (i = 0; i < data->nr_pmrs; i++) {
-		resv = pmr_reservation_object_get(data->pmrs[i]);
+		resv = pmr_dma_resv_get(data->pmrs[i]);
 		if (WARN_ON_ONCE(!resv))
 			continue;
 
@@ -527,14 +525,14 @@ pvr_buffer_sync_kick_succeeded(struct pvr_buffer_sync_append_data *data)
 			PVR_FENCE_TRACE(&data->update_fence->base,
 					"added exclusive fence (%s) to resv %p\n",
 					data->update_fence->name, resv);
-			reservation_object_add_excl_fence(resv,
-							  &data->update_fence->base);
+			dma_resv_add_excl_fence(resv,
+						&data->update_fence->base);
 		} else if (data->pmr_flags[i] & PVR_BUFFER_FLAG_READ) {
 			PVR_FENCE_TRACE(&data->update_fence->base,
 					"added non-exclusive fence (%s) to resv %p\n",
 					data->update_fence->name, resv);
-			reservation_object_add_shared_fence(resv,
-								&data->update_fence->base);
+			dma_resv_add_shared_fence(resv,
+						  &data->update_fence->base);
 		}
 	}
 

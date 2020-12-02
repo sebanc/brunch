@@ -7,33 +7,27 @@
 #endif
 
 #ifdef CONFIG_KASAN
-#ifdef CONFIG_KASAN_EXTRA
-#define KASAN_STACK_ORDER 2
-#else
 #define KASAN_STACK_ORDER 1
-#endif
 #else
 #define KASAN_STACK_ORDER 0
 #endif
 
 #define THREAD_SIZE_ORDER	(2 + KASAN_STACK_ORDER)
 #define THREAD_SIZE  (PAGE_SIZE << THREAD_SIZE_ORDER)
-#define CURRENT_MASK (~(THREAD_SIZE - 1))
 
 #define EXCEPTION_STACK_ORDER (0 + KASAN_STACK_ORDER)
 #define EXCEPTION_STKSZ (PAGE_SIZE << EXCEPTION_STACK_ORDER)
 
-#define DEBUG_STACK_ORDER (EXCEPTION_STACK_ORDER + 1)
-#define DEBUG_STKSZ (PAGE_SIZE << DEBUG_STACK_ORDER)
-
 #define IRQ_STACK_ORDER (2 + KASAN_STACK_ORDER)
 #define IRQ_STACK_SIZE (PAGE_SIZE << IRQ_STACK_ORDER)
 
-#define DOUBLEFAULT_STACK 1
-#define NMI_STACK 2
-#define DEBUG_STACK 3
-#define MCE_STACK 4
-#define N_EXCEPTION_STACKS 4  /* hw limit: 7 */
+/*
+ * The index for the tss.ist[] array. The hardware limit is 7 entries.
+ */
+#define	IST_INDEX_DF		0
+#define	IST_INDEX_NMI		1
+#define	IST_INDEX_DB		2
+#define	IST_INDEX_MCE		3
 
 /*
  * Set __PAGE_OFFSET to the most negative possible address +
@@ -54,7 +48,7 @@
 
 #define __START_KERNEL_map	_AC(0xffffffff80000000, UL)
 
-/* See Documentation/x86/x86_64/mm.txt for a description of the memory map. */
+/* See Documentation/x86/x86_64/mm.rst for a description of the memory map. */
 
 #define __PHYSICAL_MASK_SHIFT	52
 
@@ -65,13 +59,16 @@
 #endif
 
 /*
- * Kernel image size is limited to 1GiB due to the fixmap living in the
- * next 1GiB (see level2_kernel_pgt in arch/x86/kernel/head_64.S). Use
- * 512MiB by default, leaving 1.5GiB for modules once the page tables
- * are fully set up. If kernel ASLR is configured, it can extend the
- * kernel page table mapping, reducing the size of the modules area.
+ * Maximum kernel image size is limited to 1 GiB, due to the fixmap living
+ * in the next 1 GiB (see level2_kernel_pgt in arch/x86/kernel/head_64.S).
+ *
+ * On KASLR use 1 GiB by default, leaving 1 GiB for modules once the
+ * page tables are fully set up.
+ *
+ * If KASLR is disabled we can shrink it to 0.5 GiB and increase the size
+ * of the modules area to 1.5 GiB.
  */
-#if defined(CONFIG_RANDOMIZE_BASE)
+#ifdef CONFIG_RANDOMIZE_BASE
 #define KERNEL_IMAGE_SIZE	(1024 * 1024 * 1024)
 #else
 #define KERNEL_IMAGE_SIZE	(512 * 1024 * 1024)

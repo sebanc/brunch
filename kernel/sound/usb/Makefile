@@ -11,6 +11,7 @@ snd-usb-audio-objs := 	card.o \
 			mixer.o \
 			mixer_quirks.o \
 			mixer_scarlett.o \
+			mixer_scarlett_gen2.o \
 			mixer_us16x08.o \
 			pcm.o \
 			power.o \
@@ -18,6 +19,8 @@ snd-usb-audio-objs := 	card.o \
 			quirks.o \
 			stream.o \
 			validate.o
+
+snd-usb-audio-$(CONFIG_SND_USB_AUDIO_USE_MEDIA_CONTROLLER) += media.o
 
 snd-usbmidi-lib-objs := midi.o
 

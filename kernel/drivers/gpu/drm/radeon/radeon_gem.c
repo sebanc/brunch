@@ -25,8 +25,13 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#include <drm/drmP.h>
+
+#include <drm/drm_debugfs.h>
+#include <drm/drm_device.h>
+#include <drm/drm_file.h>
+#include <drm/drm_pci.h>
 #include <drm/radeon_drm.h>
+
 #include "radeon.h"
 
 void radeon_gem_object_free(struct drm_gem_object *gobj)
@@ -78,7 +83,7 @@ retry:
 		}
 		return r;
 	}
-	*obj = &robj->gem_base;
+	*obj = &robj->tbo.base;
 	robj->pid = task_pid_nr(current);
 
 	mutex_lock(&rdev->gem.mutex);
@@ -109,7 +114,7 @@ static int radeon_gem_set_domain(struct drm_gem_object *gobj,
 	}
 	if (domain == RADEON_GEM_DOMAIN_CPU) {
 		/* Asking for cpu access wait for object idle */
-		r = reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true, 30 * HZ);
+		r = dma_resv_wait_timeout_rcu(robj->tbo.base.resv, true, true, 30 * HZ);
 		if (!r)
 			r = -EBUSY;
 
@@ -269,7 +274,7 @@ int radeon_gem_create_ioctl(struct drm_device *dev, void *data,
 	}
 	r = drm_gem_handle_create(filp, gobj, &handle);
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	if (r) {
 		up_read(&rdev->exclusive_lock);
 		r = radeon_gem_handle_lockup(rdev, r);
@@ -290,6 +295,8 @@ int radeon_gem_userptr_ioctl(struct drm_device *dev, void *data,
 	struct radeon_bo *bo;
 	uint32_t handle;
 	int r;
+
+	args->addr = untagged_addr(args->addr);
 
 	if (offset_in_page(args->addr | args->size))
 		return -EINVAL;
@@ -351,7 +358,7 @@ int radeon_gem_userptr_ioctl(struct drm_device *dev, void *data,
 
 	r = drm_gem_handle_create(filp, gobj, &handle);
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	if (r)
 		goto handle_lockup;
 
@@ -360,7 +367,7 @@ int radeon_gem_userptr_ioctl(struct drm_device *dev, void *data,
 	return 0;
 
 release_object:
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 
 handle_lockup:
 	up_read(&rdev->exclusive_lock);
@@ -394,7 +401,7 @@ int radeon_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 
 	r = radeon_gem_set_domain(gobj, args->read_domains, args->write_domain);
 
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	up_read(&rdev->exclusive_lock);
 	r = radeon_gem_handle_lockup(robj->rdev, r);
 	return r;
@@ -413,11 +420,11 @@ int radeon_mode_dumb_mmap(struct drm_file *filp,
 	}
 	robj = gem_to_radeon_bo(gobj);
 	if (radeon_ttm_tt_has_userptr(robj->tbo.ttm)) {
-		drm_gem_object_put_unlocked(gobj);
+		drm_gem_object_put(gobj);
 		return -EPERM;
 	}
 	*offset_p = radeon_bo_mmap_offset(robj);
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return 0;
 }
 
@@ -444,7 +451,7 @@ int radeon_gem_busy_ioctl(struct drm_device *dev, void *data,
 	}
 	robj = gem_to_radeon_bo(gobj);
 
-	r = reservation_object_test_signaled_rcu(robj->tbo.resv, true);
+	r = dma_resv_test_signaled_rcu(robj->tbo.base.resv, true);
 	if (r == 0)
 		r = -EBUSY;
 	else
@@ -452,7 +459,7 @@ int radeon_gem_busy_ioctl(struct drm_device *dev, void *data,
 
 	cur_placement = READ_ONCE(robj->tbo.mem.mem_type);
 	args->domain = radeon_mem_type_to_domain(cur_placement);
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -473,7 +480,7 @@ int radeon_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 	}
 	robj = gem_to_radeon_bo(gobj);
 
-	ret = reservation_object_wait_timeout_rcu(robj->tbo.resv, true, true, 30 * HZ);
+	ret = dma_resv_wait_timeout_rcu(robj->tbo.base.resv, true, true, 30 * HZ);
 	if (ret == 0)
 		r = -EBUSY;
 	else if (ret < 0)
@@ -484,7 +491,7 @@ int radeon_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 	if (rdev->asic->mmio_hdp_flush &&
 	    radeon_mem_type_to_domain(cur_placement) == RADEON_GEM_DOMAIN_VRAM)
 		robj->rdev->asic->mmio_hdp_flush(rdev);
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	r = radeon_gem_handle_lockup(rdev, r);
 	return r;
 }
@@ -503,7 +510,7 @@ int radeon_gem_set_tiling_ioctl(struct drm_device *dev, void *data,
 		return -ENOENT;
 	robj = gem_to_radeon_bo(gobj);
 	r = radeon_bo_set_tiling_flags(robj, args->tiling_flags, args->pitch);
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -526,7 +533,7 @@ int radeon_gem_get_tiling_ioctl(struct drm_device *dev, void *data,
 	radeon_bo_get_tiling_flags(rbo, &args->tiling_flags, &args->pitch);
 	radeon_bo_unreserve(rbo);
 out:
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -552,14 +559,14 @@ static void radeon_gem_va_update_vm(struct radeon_device *rdev,
 	INIT_LIST_HEAD(&list);
 
 	tv.bo = &bo_va->bo->tbo;
-	tv.shared = true;
+	tv.num_shared = 1;
 	list_add(&tv.head, &list);
 
 	vm_bos = radeon_vm_get_bos(rdev, bo_va->vm, &list);
 	if (!vm_bos)
 		return;
 
-	r = ttm_eu_reserve_buffers(&ticket, &list, true, NULL);
+	r = ttm_eu_reserve_buffers(&ticket, &list, true, NULL, true);
 	if (r)
 		goto error_free;
 
@@ -660,14 +667,14 @@ int radeon_gem_va_ioctl(struct drm_device *dev, void *data,
 	r = radeon_bo_reserve(rbo, false);
 	if (r) {
 		args->operation = RADEON_VA_RESULT_ERROR;
-		drm_gem_object_put_unlocked(gobj);
+		drm_gem_object_put(gobj);
 		return r;
 	}
 	bo_va = radeon_vm_bo_find(&fpriv->vm, rbo);
 	if (!bo_va) {
 		args->operation = RADEON_VA_RESULT_ERROR;
 		radeon_bo_unreserve(rbo);
-		drm_gem_object_put_unlocked(gobj);
+		drm_gem_object_put(gobj);
 		return -ENOENT;
 	}
 
@@ -694,7 +701,7 @@ int radeon_gem_va_ioctl(struct drm_device *dev, void *data,
 		args->operation = RADEON_VA_RESULT_ERROR;
 	}
 out:
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -735,7 +742,7 @@ int radeon_gem_op_ioctl(struct drm_device *dev, void *data,
 
 	radeon_bo_unreserve(robj);
 out:
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -761,7 +768,7 @@ int radeon_mode_dumb_create(struct drm_file *file_priv,
 
 	r = drm_gem_handle_create(file_priv, gobj, &handle);
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	if (r) {
 		return r;
 	}

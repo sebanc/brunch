@@ -1,9 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * include/linux/idr.h
  * 
  * 2002-10-18  written by Jim Houston jim.houston@ccur.com
  *	Copyright (C) 2002 by Concurrent Computer Corporation
- *	Distributed under the GNU GPL license version 2.
  *
  * Small id to pointer translation service avoiding fixed sized
  * tables.
@@ -191,14 +191,17 @@ static inline void idr_preload_end(void)
  * idr_for_each_entry_ul() - Iterate over an IDR's elements of a given type.
  * @idr: IDR handle.
  * @entry: The type * to use as cursor.
+ * @tmp: A temporary placeholder for ID.
  * @id: Entry ID.
  *
  * @entry and @id do not need to be initialized before the loop, and
  * after normal termination @entry is left with the value NULL.  This
  * is convenient for a "not found" value.
  */
-#define idr_for_each_entry_ul(idr, entry, id)			\
-	for (id = 0; ((entry) = idr_get_next_ul(idr, &(id))) != NULL; ++id)
+#define idr_for_each_entry_ul(idr, entry, tmp, id)			\
+	for (tmp = 0, id = 0;						\
+	     tmp <= id && ((entry) = idr_get_next_ul(idr, &(id))) != NULL; \
+	     tmp = id, ++id)
 
 /**
  * idr_for_each_entry_continue() - Continue iteration over an IDR's elements of a given type
@@ -213,9 +216,22 @@ static inline void idr_preload_end(void)
 	     entry;							\
 	     ++id, (entry) = idr_get_next((idr), &(id)))
 
+/**
+ * idr_for_each_entry_continue_ul() - Continue iteration over an IDR's elements of a given type
+ * @idr: IDR handle.
+ * @entry: The type * to use as a cursor.
+ * @tmp: A temporary placeholder for ID.
+ * @id: Entry ID.
+ *
+ * Continue to iterate over entries, continuing after the current position.
+ */
+#define idr_for_each_entry_continue_ul(idr, entry, tmp, id)		\
+	for (tmp = id;							\
+	     tmp <= id && ((entry) = idr_get_next_ul(idr, &(id))) != NULL; \
+	     tmp = id, ++id)
+
 /*
- * IDA - IDR based id allocator, use when translation from id to
- * pointer isn't necessary.
+ * IDA - ID Allocator, use when translation from id to pointer isn't necessary.
  */
 #define IDA_CHUNK_SIZE		128	/* 128 bytes per chunk */
 #define IDA_BITMAP_LONGS	(IDA_CHUNK_SIZE / sizeof(long))
@@ -225,14 +241,14 @@ struct ida_bitmap {
 	unsigned long		bitmap[IDA_BITMAP_LONGS];
 };
 
-DECLARE_PER_CPU(struct ida_bitmap *, ida_bitmap);
-
 struct ida {
-	struct radix_tree_root	ida_rt;
+	struct xarray xa;
 };
 
+#define IDA_INIT_FLAGS	(XA_FLAGS_LOCK_IRQ | XA_FLAGS_ALLOC)
+
 #define IDA_INIT(name)	{						\
-	.ida_rt = RADIX_TREE_INIT(name, IDR_RT_MARKER | GFP_NOWAIT),	\
+	.xa = XARRAY_INIT(name, IDA_INIT_FLAGS)				\
 }
 #define DEFINE_IDA(name)	struct ida name = IDA_INIT(name)
 
@@ -292,7 +308,7 @@ static inline int ida_alloc_max(struct ida *ida, unsigned int max, gfp_t gfp)
 
 static inline void ida_init(struct ida *ida)
 {
-	INIT_RADIX_TREE(&ida->ida_rt, IDR_RT_MARKER | GFP_NOWAIT);
+	xa_init_flags(&ida->xa, IDA_INIT_FLAGS);
 }
 
 #define ida_simple_get(ida, start, end, gfp)	\
@@ -301,9 +317,6 @@ static inline void ida_init(struct ida *ida)
 
 static inline bool ida_is_empty(const struct ida *ida)
 {
-	return radix_tree_empty(&ida->ida_rt);
+	return xa_empty(&ida->xa);
 }
-
-/* in lib/radix-tree.c */
-int ida_pre_get(struct ida *ida, gfp_t gfp_mask);
 #endif /* __IDR_H__ */

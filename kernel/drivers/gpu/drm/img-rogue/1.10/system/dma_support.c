@@ -52,7 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 #include "allocmem.h"
-#include "dma_support.h"
+#include "system/dma_support.h"
 #include "kernel_compatibility.h"
 
 #define DMA_MAX_IOREMAP_ENTRIES 2

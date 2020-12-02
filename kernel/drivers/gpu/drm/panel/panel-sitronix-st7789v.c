@@ -1,19 +1,20 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2017 Free Electrons
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License version
- * 2 as published by the Free Software Foundation.
  */
 
+#include <linux/backlight.h>
+#include <linux/delay.h>
 #include <linux/gpio/consumer.h>
+#include <linux/module.h>
 #include <linux/regulator/consumer.h>
 #include <linux/spi/spi.h>
 
-#include <drm/drmP.h>
-#include <drm/drm_panel.h>
-
 #include <video/mipi_display.h>
+
+#include <drm/drm_device.h>
+#include <drm/drm_modes.h>
+#include <drm/drm_panel.h>
 
 #define ST7789V_COLMOD_RGB_FMT_18BITS		(6 << 4)
 #define ST7789V_COLMOD_CTRL_FMT_18BITS		(6 << 0)
@@ -169,9 +170,9 @@ static const struct drm_display_mode default_mode = {
 	.vrefresh = 60,
 };
 
-static int st7789v_get_modes(struct drm_panel *panel)
+static int st7789v_get_modes(struct drm_panel *panel,
+			     struct drm_connector *connector)
 {
-	struct drm_connector *connector = panel->connector;
 	struct drm_display_mode *mode;
 
 	mode = drm_mode_duplicate(panel->drm, &default_mode);
@@ -187,8 +188,8 @@ static int st7789v_get_modes(struct drm_panel *panel)
 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(connector, mode);
 
-	panel->connector->display_info.width_mm = 61;
-	panel->connector->display_info.height_mm = 103;
+	connector->display_info.width_mm = 61;
+	connector->display_info.height_mm = 103;
 
 	return 1;
 }
@@ -380,9 +381,8 @@ static int st7789v_probe(struct spi_device *spi)
 	spi_set_drvdata(spi, ctx);
 	ctx->spi = spi;
 
-	drm_panel_init(&ctx->panel);
-	ctx->panel.dev = &spi->dev;
-	ctx->panel.funcs = &st7789v_drm_funcs;
+	drm_panel_init(&ctx->panel, &spi->dev, &st7789v_drm_funcs,
+		       DRM_MODE_CONNECTOR_DPI);
 
 	ctx->power = devm_regulator_get(&spi->dev, "power");
 	if (IS_ERR(ctx->power))

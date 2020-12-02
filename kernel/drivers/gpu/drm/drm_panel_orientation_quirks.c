@@ -15,6 +15,17 @@
 
 #ifdef CONFIG_DMI
 
+static const struct dmi_system_id inverted_screen[] = {
+	{	/* TrekStor SurfTab duo W3 */
+        	.ident = "TrekStor SurfTab duo W3",
+		.matches = {
+		  DMI_MATCH(DMI_SYS_VENDOR, "TrekStor"),
+		  DMI_MATCH(DMI_PRODUCT_NAME, "SurfTab duo W3"),
+		},
+	},
+	{}
+};
+
 /*
  * Some x86 clamshell design devices use portrait tablet screens and a display
  * engine which cannot rotate in hardware, so we need to rotate the fbcon to
@@ -69,6 +80,14 @@ static const struct drm_dmi_panel_orientation_data gpd_win = {
 	.orientation = DRM_MODE_PANEL_ORIENTATION_RIGHT_UP,
 };
 
+static const struct drm_dmi_panel_orientation_data gpd_win2 = {
+	.width = 720,
+	.height = 1280,
+	.bios_dates = (const char * const []){
+		"12/07/2017", "05/24/2018", "06/29/2018", NULL },
+	.orientation = DRM_MODE_PANEL_ORIENTATION_RIGHT_UP,
+};
+
 static const struct drm_dmi_panel_orientation_data itworks_tw891 = {
 	.width = 800,
 	.height = 1280,
@@ -88,15 +107,15 @@ static const struct drm_dmi_panel_orientation_data lcd800x1280_rightside_up = {
 	.orientation = DRM_MODE_PANEL_ORIENTATION_RIGHT_UP,
 };
 
-static const struct drm_dmi_panel_orientation_data lcd800x1280_bottom_up = {
-	.width = 800,
-	.height = 1280,
-	.orientation = DRM_MODE_PANEL_ORIENTATION_BOTTOM_UP,
-};
- 
-static const struct drm_dmi_panel_orientation_data lcd1200x1920_left_up = {
+static const struct drm_dmi_panel_orientation_data lcd1200x1920_rightside_up = {
 	.width = 1200,
 	.height = 1920,
+	.orientation = DRM_MODE_PANEL_ORIENTATION_RIGHT_UP,
+};
+
+static const struct drm_dmi_panel_orientation_data lcd800x600_leftside_up = {
+	.width = 800,
+	.height = 600,
 	.orientation = DRM_MODE_PANEL_ORIENTATION_LEFT_UP,
 };
 
@@ -168,6 +187,14 @@ static const struct dmi_system_id orientation_data[] = {
 		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "Default string"),
 		},
 		.driver_data = (void *)&gpd_win,
+	}, {	/* GPD Win 2 (too generic strings, also match on bios date) */
+		.matches = {
+		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "Default string"),
+		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "Default string"),
+		  DMI_EXACT_MATCH(DMI_BOARD_VENDOR, "Default string"),
+		  DMI_EXACT_MATCH(DMI_BOARD_NAME, "Default string"),
+		},
+		.driver_data = (void *)&gpd_win2,
 	}, {	/* I.T.Works TW891 */
 		.matches = {
 		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "To be filled by O.E.M."),
@@ -181,13 +208,7 @@ static const struct dmi_system_id orientation_data[] = {
 		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "EVOO Products Company, LLC."),
 		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "EV-T2in1-101-2"),
 		},
-		.driver_data = (void *)&lcd800x1280_bottom_up,
-	}, {	/* CHUWI Innovation And Technology(ShenZhen)co.,Ltd Hi10 X */
-		.matches = {
-		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "CHUWI Innovation And Technology(ShenZhen)co.,Ltd"),
-		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "Hi10 X"),
-		},
-		.driver_data = (void *)&lcd1200x1920_left_up,
+		.driver_data = (void *)&lcd800x600_leftside_up,
 	}, {	/* Lenovo Ideapad D330 */
 		.matches = {
 		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "LENOVO"),
@@ -213,6 +234,13 @@ static const struct dmi_system_id orientation_data[] = {
 		  DMI_EXACT_MATCH(DMI_PRODUCT_VERSION, "Lenovo MIIX 320-10ICR"),
 		},
 		.driver_data = (void *)&lcd800x1280_rightside_up,
+	}, {	/* Lenovo Ideapad D330 */
+		.matches = {
+		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "LENOVO"),
+		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "81H3"),
+		  DMI_EXACT_MATCH(DMI_PRODUCT_VERSION, "Lenovo ideapad D330-10IGM"),
+		},
+		.driver_data = (void *)&lcd1200x1920_rightside_up,
 	}, {	/* VIOS LTH17 */
 		.matches = {
 		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "VIOS"),
@@ -251,6 +279,11 @@ int drm_get_panel_orientation_quirk(int width, int height)
 	
 	pr_info("drm_get_panel_orientation_quirk called with width=%d height=%d", width, height);
 
+	if (dmi_check_system(inverted_screen)) {
+		pr_info("applying orientation quirk\n");
+		return DRM_MODE_PANEL_ORIENTATION_BOTTOM_UP;
+	}
+
 	for (match = dmi_first_match(orientation_data);
 	     match;
 	     match = dmi_first_match(match + 1)) {
@@ -262,10 +295,8 @@ int drm_get_panel_orientation_quirk(int width, int height)
 		    data->height != height)
 			continue;
 
-		if (!data->bios_dates) {
-			pr_info("drm_get_panel_orientation_quirk dmi match applied");
+		if (!data->bios_dates)
 			return data->orientation;
-		}
 
 		bios_date = dmi_get_system_info(DMI_BIOS_DATE);
 		if (!bios_date)

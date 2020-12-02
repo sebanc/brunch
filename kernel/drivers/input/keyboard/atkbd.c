@@ -1,14 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * AT and PS/2 keyboard driver
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
  */
 
-/*
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
- */
 
 /*
  * This driver can handle standard AT keyboards and PS/2 keyboards in
@@ -70,7 +66,7 @@ MODULE_PARM_DESC(terminal, "Enable break codes on an IBM Terminal keyboard conne
 
 #define MAX_FUNCTION_ROW_KEYS	24
 
-#define PHYSCODE(keymap)	((keymap >> 16) & 0xFFFF)
+#define SCANCODE(keymap)	((keymap >> 16) & 0xFFFF)
 #define KEYCODE(keymap)		(keymap & 0xFFFF)
 
 /*
@@ -241,7 +237,7 @@ struct atkbd {
 	/* Serializes reconnect(), attr->set() and event work */
 	struct mutex mutex;
 
-	u16 function_row_physmap[MAX_FUNCTION_ROW_KEYS];
+	u32 function_row_physmap[MAX_FUNCTION_ROW_KEYS];
 	int num_function_row_keys;
 };
 
@@ -319,9 +315,9 @@ static ssize_t atkbd_show_function_row_physmap(struct atkbd *atkbd, char *buf)
 		return 0;
 
 	for (i = 0; i < atkbd->num_function_row_keys; i++)
-		size += sprintf(buf + size, "%02X ",
-				atkbd->function_row_physmap[i]);
-	size += sprintf(buf + size, "\n");
+		size += scnprintf(buf + size, PAGE_SIZE - size, "%02X ",
+				  atkbd->function_row_physmap[i]);
+	size += scnprintf(buf + size, PAGE_SIZE - size, "\n");
 	return size;
 }
 
@@ -884,7 +880,7 @@ static int atkbd_select_set(struct atkbd *atkbd, int target_set, int allow_extra
 	if (param[0] != 3) {
 		param[0] = 2;
 		if (ps2_command(ps2dev, param, ATKBD_CMD_SSCANSET))
-		return 2;
+			return 2;
 	}
 
 	ps2_command(ps2dev, param, ATKBD_CMD_SETALL_MBR);
@@ -1044,7 +1040,7 @@ static int atkbd_get_keymap_from_fwnode(struct atkbd *atkbd)
 	struct device *dev = &atkbd->ps2dev.serio->dev;
 	int i, n;
 	u32 *ptr;
-	u16 physcode, keycode;
+	u16 scancode, keycode;
 
 	/* Parse "linux,keymap" property */
 	n = device_property_count_u32(dev, "linux,keymap");
@@ -1063,10 +1059,11 @@ static int atkbd_get_keymap_from_fwnode(struct atkbd *atkbd)
 
 	memset(atkbd->keycode, 0, sizeof(atkbd->keycode));
 	for (i = 0; i < n; i++) {
-		physcode = PHYSCODE(ptr[i]);
+		scancode = SCANCODE(ptr[i]);
 		keycode = KEYCODE(ptr[i]);
-		atkbd->keycode[physcode] = keycode;
+		atkbd->keycode[scancode] = keycode;
 	}
+
 	kfree(ptr);
 	return 0;
 }
@@ -1208,14 +1205,13 @@ static void atkbd_parse_fwnode_data(struct serio *serio)
 	int n;
 
 	/* Parse "function-row-physmap" property */
-	n = device_property_count_u16(dev, "function-row-physmap");
+	n = device_property_count_u32(dev, "function-row-physmap");
 	if (n > 0 && n <= MAX_FUNCTION_ROW_KEYS &&
-	    !device_property_read_u16_array(dev, "function-row-physmap",
+	    !device_property_read_u32_array(dev, "function-row-physmap",
 					    atkbd->function_row_physmap, n)) {
 		atkbd->num_function_row_keys = n;
 		dev_dbg(dev, "FW reported %d function-row key locations\n", n);
 	}
-
 }
 
 /*

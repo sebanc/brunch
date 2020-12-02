@@ -47,7 +47,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #if defined(SUPPORT_GPUVIRT_VALIDATION)
 #include "img_types.h"
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 #include "virt_validation_defs.h"
 
 void SysSetOSidRegisters(IMG_UINT32 aui32OSidMin[GPUVIRT_VALIDATION_NUM_REGIONS][GPUVIRT_VALIDATION_NUM_OS],

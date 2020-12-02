@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Main USB camera driver
  *
@@ -5,16 +6,6 @@
  *
  * Camera button input handling by Márton Németh
  * Copyright (C) 2009-2010 Márton Németh <nm127@freemail.hu>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * for more details.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -916,23 +907,30 @@ static void gspca_set_default_mode(struct gspca_dev *gspca_dev)
 }
 
 static int wxh_to_mode(struct gspca_dev *gspca_dev,
-			int width, int height)
+			int width, int height, u32 pixelformat)
 {
 	int i;
 
 	for (i = 0; i < gspca_dev->cam.nmodes; i++) {
 		if (width == gspca_dev->cam.cam_mode[i].width
-		    && height == gspca_dev->cam.cam_mode[i].height)
+		    && height == gspca_dev->cam.cam_mode[i].height
+		    && pixelformat == gspca_dev->cam.cam_mode[i].pixelformat)
 			return i;
 	}
 	return -EINVAL;
 }
 
 static int wxh_to_nearest_mode(struct gspca_dev *gspca_dev,
-			int width, int height)
+			int width, int height, u32 pixelformat)
 {
 	int i;
 
+	for (i = gspca_dev->cam.nmodes; --i > 0; ) {
+		if (width >= gspca_dev->cam.cam_mode[i].width
+		    && height >= gspca_dev->cam.cam_mode[i].height
+		    && pixelformat == gspca_dev->cam.cam_mode[i].pixelformat)
+			return i;
+	}
 	for (i = gspca_dev->cam.nmodes; --i > 0; ) {
 		if (width >= gspca_dev->cam.cam_mode[i].width
 		    && height >= gspca_dev->cam.cam_mode[i].height)
@@ -1026,27 +1024,18 @@ static int vidioc_enum_fmt_vid_cap(struct file *file, void  *priv,
 		return -EINVAL;		/* no more format */
 
 	fmtdesc->pixelformat = fmt_tb[index];
-	if (gspca_dev->cam.cam_mode[i].sizeimage <
-			gspca_dev->cam.cam_mode[i].width *
-				gspca_dev->cam.cam_mode[i].height)
-		fmtdesc->flags = V4L2_FMT_FLAG_COMPRESSED;
-	fmtdesc->description[0] = fmtdesc->pixelformat & 0xff;
-	fmtdesc->description[1] = (fmtdesc->pixelformat >> 8) & 0xff;
-	fmtdesc->description[2] = (fmtdesc->pixelformat >> 16) & 0xff;
-	fmtdesc->description[3] = fmtdesc->pixelformat >> 24;
-	fmtdesc->description[4] = '\0';
 	return 0;
 }
 
-static int vidioc_g_fmt_vid_cap(struct file *file, void *priv,
-			    struct v4l2_format *fmt)
+static int vidioc_g_fmt_vid_cap(struct file *file, void *_priv,
+				struct v4l2_format *fmt)
 {
 	struct gspca_dev *gspca_dev = video_drvdata(file);
+	u32 priv = fmt->fmt.pix.priv;
 
 	fmt->fmt.pix = gspca_dev->pixfmt;
-	/* some drivers use priv internally, zero it before giving it back to
-	   the core */
-	fmt->fmt.pix.priv = 0;
+	/* some drivers use priv internally, so keep the original value */
+	fmt->fmt.pix.priv = priv;
 	return 0;
 }
 
@@ -1062,7 +1051,7 @@ static int try_fmt_vid_cap(struct gspca_dev *gspca_dev,
 		    fmt->fmt.pix.pixelformat, w, h);
 
 	/* search the nearest mode for width and height */
-	mode = wxh_to_nearest_mode(gspca_dev, w, h);
+	mode = wxh_to_nearest_mode(gspca_dev, w, h, fmt->fmt.pix.pixelformat);
 
 	/* OK if right palette */
 	if (gspca_dev->cam.cam_mode[mode].pixelformat
@@ -1081,27 +1070,27 @@ static int try_fmt_vid_cap(struct gspca_dev *gspca_dev,
 		fmt->fmt.pix.height = h;
 		gspca_dev->sd_desc->try_fmt(gspca_dev, fmt);
 	}
-	/* some drivers use priv internally, zero it before giving it back to
-	   the core */
-	fmt->fmt.pix.priv = 0;
 	return mode;			/* used when s_fmt */
 }
 
-static int vidioc_try_fmt_vid_cap(struct file *file,
-			      void *priv,
-			      struct v4l2_format *fmt)
+static int vidioc_try_fmt_vid_cap(struct file *file, void *_priv,
+				  struct v4l2_format *fmt)
 {
 	struct gspca_dev *gspca_dev = video_drvdata(file);
+	u32 priv = fmt->fmt.pix.priv;
 
 	if (try_fmt_vid_cap(gspca_dev, fmt) < 0)
 		return -EINVAL;
+	/* some drivers use priv internally, so keep the original value */
+	fmt->fmt.pix.priv = priv;
 	return 0;
 }
 
-static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
-			    struct v4l2_format *fmt)
+static int vidioc_s_fmt_vid_cap(struct file *file, void *_priv,
+				struct v4l2_format *fmt)
 {
 	struct gspca_dev *gspca_dev = video_drvdata(file);
+	u32 priv = fmt->fmt.pix.priv;
 	int mode;
 
 	if (vb2_is_busy(&gspca_dev->queue))
@@ -1117,6 +1106,8 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
 		gspca_dev->pixfmt = fmt->fmt.pix;
 	else
 		gspca_dev->pixfmt = gspca_dev->cam.cam_mode[mode];
+	/* some drivers use priv internally, so keep the original value */
+	fmt->fmt.pix.priv = priv;
 	return 0;
 }
 
@@ -1156,7 +1147,8 @@ static int vidioc_enum_frameintervals(struct file *filp, void *priv,
 	int mode;
 	__u32 i;
 
-	mode = wxh_to_mode(gspca_dev, fival->width, fival->height);
+	mode = wxh_to_mode(gspca_dev, fival->width, fival->height,
+			   fival->pixel_format);
 	if (mode < 0)
 		return -EINVAL;
 
@@ -1210,10 +1202,6 @@ static int vidioc_querycap(struct file *file, void  *priv,
 	}
 	usb_make_path(gspca_dev->dev, (char *) cap->bus_info,
 			sizeof(cap->bus_info));
-	cap->device_caps = V4L2_CAP_VIDEO_CAPTURE
-			  | V4L2_CAP_STREAMING
-			  | V4L2_CAP_READWRITE;
-	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
 	return 0;
 }
 
@@ -1509,6 +1497,8 @@ int gspca_dev_probe2(struct usb_interface *intf,
 	gspca_dev->empty_packet = -1;	/* don't check the empty packets */
 	gspca_dev->vdev = gspca_template;
 	gspca_dev->vdev.v4l2_dev = &gspca_dev->v4l2_dev;
+	gspca_dev->vdev.device_caps = V4L2_CAP_VIDEO_CAPTURE |
+				      V4L2_CAP_STREAMING | V4L2_CAP_READWRITE;
 	video_set_drvdata(&gspca_dev->vdev, gspca_dev);
 	gspca_dev->module = module;
 

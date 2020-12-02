@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
 config VIRTIO
 	tristate
 	---help---
@@ -73,12 +74,12 @@ config VIRTIO_INPUT
 
 	 If unsure, say M.
 
- config VIRTIO_MMIO
+config VIRTIO_MMIO
 	tristate "Platform bus driver for memory mapped virtio devices"
 	depends on HAS_IOMEM && HAS_DMA
- 	select VIRTIO
- 	---help---
- 	 This drivers provides support for memory mapped virtio
+	select VIRTIO
+	---help---
+	 This drivers provides support for memory mapped virtio
 	 platform device driver.
 
  	 If unsure, say N.
@@ -93,6 +94,13 @@ config VIRTIO_MMIO_CMDLINE_DEVICES
 	 See Documentation/admin-guide/kernel-parameters.rst for details.
 
 	 If unsure, say 'N'.
+
+config VIRTIO_DMA_SHARED_BUFFER
+	tristate
+	depends on DMA_SHARED_BUFFER
+	help
+	 This option adds a flavor of dma buffers that are backed by
+	 virtio resources.
 
 config VIRTIO_WL
 	bool "Virtio Wayland driver"

@@ -1,16 +1,14 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * drmem.h: Power specific logical memory block representation
  *
  * Copyright 2017 IBM Corporation
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  */
 
 #ifndef _ASM_POWERPC_LMB_H
 #define _ASM_POWERPC_LMB_H
+
+#include <linux/sched.h>
 
 struct drmem_lmb {
 	u64     base_addr;
@@ -22,13 +20,27 @@ struct drmem_lmb {
 struct drmem_lmb_info {
 	struct drmem_lmb        *lmbs;
 	int                     n_lmbs;
-	u32                     lmb_size;
+	u64                     lmb_size;
 };
 
 extern struct drmem_lmb_info *drmem_info;
 
+static inline struct drmem_lmb *drmem_lmb_next(struct drmem_lmb *lmb,
+					       const struct drmem_lmb *start)
+{
+	/*
+	 * DLPAR code paths can take several milliseconds per element
+	 * when interacting with firmware. Ensure that we don't
+	 * unfairly monopolize the CPU.
+	 */
+	if (((++lmb - start) % 16) == 0)
+		cond_resched();
+
+	return lmb;
+}
+
 #define for_each_drmem_lmb_in_range(lmb, start, end)		\
-	for ((lmb) = (start); (lmb) < (end); (lmb)++)
+	for ((lmb) = (start); (lmb) < (end); lmb = drmem_lmb_next(lmb, start))
 
 #define for_each_drmem_lmb(lmb)					\
 	for_each_drmem_lmb_in_range((lmb),			\
@@ -67,7 +79,7 @@ struct of_drconf_cell_v2 {
 #define DRCONF_MEM_AI_INVALID	0x00000040
 #define DRCONF_MEM_RESERVED	0x00000080
 
-static inline u32 drmem_lmb_size(void)
+static inline u64 drmem_lmb_size(void)
 {
 	return drmem_info->lmb_size;
 }

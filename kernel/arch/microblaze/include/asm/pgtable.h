@@ -46,8 +46,6 @@ extern int mem_init_done;
 
 #define swapper_pg_dir ((pgd_t *) NULL)
 
-#define pgtable_cache_init()	do {} while (0)
-
 #define arch_enter_lazy_cpu_mode()	do {} while (0)
 
 #define pgprot_noncached_wc(prot)	prot
@@ -200,7 +198,7 @@ static inline pte_t pte_mkspecial(pte_t pte)	{ return pte; }
  * is cleared in the TLB miss handler before the TLB entry is loaded.
  * - All other bits of the PTE are loaded into TLBLO without
  *  * modification, leaving us only the bits 20, 21, 24, 25, 26, 30 for
- * software PTE bits.  We actually use use bits 21, 24, 25, and
+ * software PTE bits.  We actually use bits 21, 24, 25, and
  * 30 respectively for the software bits: ACCESSED, DIRTY, RW, and
  * PRESENT.
  */
@@ -526,11 +524,6 @@ extern unsigned long iopa(unsigned long addr);
 /* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
 #define kern_addr_valid(addr)	(1)
 
-/*
- * No page table caches to initialise
- */
-#define pgtable_cache_init()	do { } while (0)
-
 void do_page_fault(struct pt_regs *regs, unsigned long address,
 		   unsigned long error_code);
 
@@ -552,8 +545,6 @@ void __init *early_get_page(void);
 #include <asm-generic/pgtable.h>
 
 extern unsigned long ioremap_bot, ioremap_base;
-
-unsigned long consistent_virt_to_pfn(void *vaddr);
 
 void setup_memory(void);
 #endif /* __ASSEMBLY__ */

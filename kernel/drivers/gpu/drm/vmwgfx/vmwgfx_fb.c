@@ -26,13 +26,13 @@
  *
  **************************************************************************/
 
-#include <linux/export.h>
+#include <linux/pci.h>
 
-#include <drm/drmP.h>
+#include <drm/drm_fourcc.h>
+#include <drm/ttm/ttm_placement.h>
+
 #include "vmwgfx_drv.h"
 #include "vmwgfx_kms.h"
-
-#include <drm/ttm/ttm_placement.h>
 
 #define VMW_DIRTY_DELAY (HZ / 30)
 
@@ -624,7 +624,7 @@ out_unlock:
 }
 
 
-static struct fb_ops vmw_fb_ops = {
+static const struct fb_ops vmw_fb_ops = {
 	.owner = THIS_MODULE,
 	.fb_check_var = vmw_fb_check_var,
 	.fb_set_par = vmw_fb_set_par,
@@ -642,12 +642,11 @@ int vmw_fb_init(struct vmw_private *vmw_priv)
 	struct vmw_fb_par *par;
 	struct fb_info *info;
 	unsigned fb_width, fb_height;
-	unsigned fb_bpp, fb_depth, fb_offset, fb_pitch, fb_size;
+	unsigned int fb_bpp, fb_pitch, fb_size;
 	struct drm_display_mode *init_mode;
 	int ret;
 
 	fb_bpp = 32;
-	fb_depth = 24;
 
 	/* XXX As shouldn't these be as well. */
 	fb_width = min(vmw_priv->fb_max_width, (unsigned)2048);
@@ -655,7 +654,6 @@ int vmw_fb_init(struct vmw_private *vmw_priv)
 
 	fb_pitch = fb_width * fb_bpp / 8;
 	fb_size = fb_pitch * fb_height;
-	fb_offset = vmw_read(vmw_priv, SVGA_REG_FB_OFFSET);
 
 	info = framebuffer_alloc(sizeof(*par), device);
 	if (!info)

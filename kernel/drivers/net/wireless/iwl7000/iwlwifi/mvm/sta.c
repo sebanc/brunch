@@ -85,7 +85,7 @@ static int iwl_mvm_find_free_sta_id(struct iwl_mvm *mvm,
 	int sta_id;
 	u32 reserved_ids = 0;
 
-	BUILD_BUG_ON(IWL_MVM_STATION_COUNT_MAX > 32);
+	BUILD_BUG_ON(IWL_MVM_STATION_COUNT > 32);
 	WARN_ON_ONCE(test_bit(IWL_MVM_STATUS_IN_HW_RESTART, &mvm->status));
 
 	lockdep_assert_held(&mvm->mutex);
@@ -95,7 +95,7 @@ static int iwl_mvm_find_free_sta_id(struct iwl_mvm *mvm,
 		reserved_ids = BIT(0);
 
 	/* Don't take rcu_read_lock() since we are protected by mvm->mutex */
-	for (sta_id = 0; sta_id < mvm->fw->ucode_capa.num_stations; sta_id++) {
+	for (sta_id = 0; sta_id < ARRAY_SIZE(mvm->fw_id_to_mac_id); sta_id++) {
 		if (BIT(sta_id) & reserved_ids)
 			continue;
 
@@ -788,6 +788,8 @@ static int iwl_mvm_tvqm_enable_txq(struct iwl_mvm *mvm,
 	IWL_DEBUG_TX_QUEUES(mvm, "Enabling TXQ #%d for sta %d tid %d\n",
 			    queue, sta_id, tid);
 
+	IWL_DEBUG_TX_QUEUES(mvm, "Enabling TXQ #%d\n", queue);
+
 	return queue;
 }
 
@@ -1383,6 +1385,14 @@ out_err:
 	return ret;
 }
 
+static inline u8 iwl_mvm_tid_to_ac_queue(int tid)
+{
+	if (tid == IWL_MAX_TID_COUNT)
+		return IEEE80211_AC_VO; /* MGMT */
+
+	return tid_to_mac80211_ac[tid];
+}
+
 void iwl_mvm_add_new_dqa_stream_wk(struct work_struct *wk)
 {
 	struct iwl_mvm *mvm = container_of(wk, struct iwl_mvm,
@@ -1556,15 +1566,8 @@ static int iwl_mvm_add_int_sta_common(struct iwl_mvm *mvm,
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.sta_id = sta->sta_id;
-
-	if (iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP, ADD_STA,
-				  0) >= 12 &&
-	    sta->type == IWL_STA_AUX_ACTIVITY)
-		cmd.mac_id_n_color = cpu_to_le32(mac_id);
-	else
-		cmd.mac_id_n_color = cpu_to_le32(FW_CMD_ID_AND_COLOR(mac_id,
-								     color));
-
+	cmd.mac_id_n_color = cpu_to_le32(FW_CMD_ID_AND_COLOR(mac_id,
+							     color));
 	if (fw_has_api(&mvm->fw->ucode_capa, IWL_UCODE_TLV_API_STA_TYPE))
 		cmd.station_type = sta->type;
 
@@ -1881,7 +1884,7 @@ int iwl_mvm_rm_sta(struct iwl_mvm *mvm,
 		return ret;
 
 	/* flush its queues here since we are freeing mvm_sta */
-	ret = iwl_mvm_flush_sta(mvm, mvm_sta, false);
+	ret = iwl_mvm_flush_sta(mvm, mvm_sta, false, 0);
 	if (ret)
 		return ret;
 	if (iwl_mvm_has_new_tx_api(mvm)) {
@@ -2057,7 +2060,7 @@ static int iwl_mvm_add_int_sta_with_queue(struct iwl_mvm *mvm, int macidx,
 	return 0;
 }
 
-int iwl_mvm_add_aux_sta(struct iwl_mvm *mvm, u32 lmac_id)
+int iwl_mvm_add_aux_sta(struct iwl_mvm *mvm)
 {
 	int ret;
 
@@ -2070,11 +2073,7 @@ int iwl_mvm_add_aux_sta(struct iwl_mvm *mvm, u32 lmac_id)
 	if (ret)
 		return ret;
 
-	/*
-	 * In CDB NICs we need to specify which lmac to use for aux activity
-	 * using the mac_id argument place to send lmac_id to the function
-	 */
-	ret = iwl_mvm_add_int_sta_with_queue(mvm, lmac_id, 0, NULL,
+	ret = iwl_mvm_add_int_sta_with_queue(mvm, MAC_INDEX_AUX, 0, NULL,
 					     &mvm->aux_sta, &mvm->aux_queue,
 					     IWL_MVM_TX_FIFO_MCAST);
 	if (ret) {
@@ -2217,7 +2216,7 @@ static void iwl_mvm_free_bcast_sta_queues(struct iwl_mvm *mvm,
 
 	lockdep_assert_held(&mvm->mutex);
 
-	iwl_mvm_flush_sta(mvm, &mvmvif->bcast_sta, true);
+	iwl_mvm_flush_sta(mvm, &mvmvif->bcast_sta, true, 0);
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
@@ -2466,7 +2465,7 @@ int iwl_mvm_rm_mcast_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif)
 
 	lockdep_assert_held(&mvm->mutex);
 
-	iwl_mvm_flush_sta(mvm, &mvmvif->mcast_sta, true);
+	iwl_mvm_flush_sta(mvm, &mvmvif->mcast_sta, true, 0);
 
 	iwl_mvm_disable_txq(mvm, NULL, mvmvif->cab_queue, 0, 0);
 
@@ -3350,8 +3349,7 @@ static int iwl_mvm_send_sta_igtk(struct iwl_mvm *mvm,
 
 	/* verify the key details match the required command's expectations */
 	if (WARN_ON((keyconf->flags & IEEE80211_KEY_FLAG_PAIRWISE) ||
-		    (keyconf->keyidx != 4 && keyconf->keyidx != 5 &&
-		     keyconf->keyidx != 6 && keyconf->keyidx != 7) ||
+		    (keyconf->keyidx != 4 && keyconf->keyidx != 5) ||
 		    (keyconf->cipher != WLAN_CIPHER_SUITE_AES_CMAC &&
 		     keyconf->cipher != WLAN_CIPHER_SUITE_BIP_GMAC_128 &&
 		     keyconf->cipher != WLAN_CIPHER_SUITE_BIP_GMAC_256)))
@@ -3400,10 +3398,9 @@ static int iwl_mvm_send_sta_igtk(struct iwl_mvm *mvm,
 						       ((u64) pn[0] << 40));
 	}
 
-	IWL_DEBUG_INFO(mvm, "%s %sIGTK (%d) for sta %u\n",
+	IWL_DEBUG_INFO(mvm, "%s igtk for sta %u\n",
 		       remove_key ? "removing" : "installing",
-		       keyconf->keyidx >= 6 ? "B" : "",
-		       keyconf->keyidx, igtk_cmd.sta_id);
+		       igtk_cmd.sta_id);
 
 	if (!iwl_mvm_has_new_rx_api(mvm)) {
 		struct iwl_mvm_mgmt_mcast_key_cmd_v1 igtk_cmd_v1 = {
@@ -3791,7 +3788,7 @@ void iwl_mvm_rx_eosp_notif(struct iwl_mvm *mvm,
 	struct ieee80211_sta *sta;
 	u32 sta_id = le32_to_cpu(notif->sta_id);
 
-	if (WARN_ON_ONCE(sta_id >= mvm->fw->ucode_capa.num_stations))
+	if (WARN_ON_ONCE(sta_id >= IWL_MVM_STATION_COUNT))
 		return;
 
 	rcu_read_lock();
@@ -3874,7 +3871,7 @@ void iwl_mvm_modify_all_sta_disable_tx(struct iwl_mvm *mvm,
 	lockdep_assert_held(&mvm->mutex);
 
 	/* Block/unblock all the stations of the given mvmvif */
-	for (i = 0; i < mvm->fw->ucode_capa.num_stations; i++) {
+	for (i = 0; i < ARRAY_SIZE(mvm->fw_id_to_mac_id); i++) {
 		sta = rcu_dereference_protected(mvm->fw_id_to_mac_id[i],
 						lockdep_is_held(&mvm->mutex));
 		if (IS_ERR_OR_NULL(sta))

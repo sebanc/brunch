@@ -619,6 +619,7 @@ Date:		February 2018
 Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file shows the device init status. The full information
 		about the flag could be found at UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/flags/permanent_wpe
 Date:		February 2018
@@ -626,8 +627,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file shows whether permanent write protection is enabled.
 		The full information about the flag could be found at
 		UFS specifications 2.1.
-		Warning: This flag can only be written one time within the
-		lifetime of the device. Once set, it cannot be unset.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/flags/power_on_wpe
 Date:		February 2018
@@ -636,7 +636,7 @@ Description:	This file shows whether write protection is enabled on all
 		logical units configured as power on write protected. The
 		full information about the flag could be found at
 		UFS specifications 2.1.
-		Once set, this flag cannot be cleared without a device reset.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/flags/bkops_enable
 Date:		February 2018
@@ -644,6 +644,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file shows whether the device background operations are
 		enabled. The full information about the flag could be
 		found at UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/flags/life_span_mode_enable
 Date:		February 2018
@@ -653,22 +654,13 @@ Description:	This file shows whether the device life span mode is enabled.
 		UFS specifications 2.1.
 		The file is read only.
 
-What:		/sys/bus/platform/drivers/ufshcd/*/flags/purge_enable
-Date:		August 2018
-Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
-Description:	This file shall only be set when the command queue of all
-		logical units are empty and purge status is idle. This flag is
-		automatically cleared by the UFS device when the operation
-		completes or an error occurs. This flag is write-only, it
-		cannot be read. Complete information about the flag can be
-		found in the UFS specification 2.20A.
-
 What:		/sys/bus/platform/drivers/ufshcd/*/flags/phy_resource_removal
 Date:		February 2018
 Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file shows whether physical resource removal is enable.
 		The full information about the flag could be found at
 		UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/flags/busy_rtc
 Date:		February 2018
@@ -693,6 +685,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the boot lun enabled UFS device attribute.
 		The full information about the attribute could be found at
 		UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/current_power_mode
 Date:		February 2018
@@ -700,6 +693,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the current power mode UFS device attribute.
 		The full information about the attribute could be found at
 		UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/active_icc_level
 Date:		February 2018
@@ -707,6 +701,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the active icc level UFS device attribute.
 		The full information about the attribute could be found at
 		UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/ooo_data_enabled
 Date:		February 2018
@@ -714,9 +709,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the out of order data transfer enabled UFS
 		device attribute. The full information about the attribute
 		could be found at UFS specifications 2.1.
-		Warning: This attribute can only be written one time
-		within the lifetime of the device. Once written, it cannot be
-		changed.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/bkops_status
 Date:		February 2018
@@ -724,6 +717,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the background operations status UFS device
 		attribute. The full information about the attribute could
 		be found at UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/purge_status
 Date:		February 2018
@@ -731,9 +725,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the purge operation status UFS device
 		attribute. The full information about the attribute could
 		be found at UFS specifications 2.1.
-		Warning: This attribute can only be written one time
-		within the lifetime of the device. Once written, it cannot be
-		changed.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/max_data_in_size
 Date:		February 2018
@@ -741,6 +733,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file shows the maximum data size in a DATA IN
 		UPIU. The full information about the attribute could
 		be found at UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/max_data_out_size
 Date:		February 2018
@@ -748,6 +741,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file shows the maximum number of bytes that can be
 		requested with a READY TO TRANSFER UPIU. The full information
 		about the attribute could be found at UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/reference_clock_frequency
 Date:		February 2018
@@ -755,19 +749,14 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the reference clock frequency UFS device
 		attribute. The full information about the attribute could
 		be found at UFS specifications 2.1.
-		Warning: This attribute can only be written one time
-		within the lifetime of the device. Once written, it cannot be
-		changed.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/configuration_descriptor_lock
 Date:		February 2018
 Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file shows whether the configuration descriptor is locked.
 		The full information about the attribute could be found at
-		UFS specifications 2.1.
-		Warning: This attribute can only be written one time
-		within the lifetime of the device. Once written, it cannot be
-		changed.
+		UFS specifications 2.1. The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/max_number_of_rtt
 Date:		February 2018
@@ -776,6 +765,7 @@ Description:	This file provides the maximum current number of
 		outstanding RTTs in device that is allowed. The full
 		information about the attribute could be found at
 		UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/exception_event_control
 Date:		February 2018
@@ -783,6 +773,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the exception event control UFS device
 		attribute. The full information about the attribute could
 		be found at UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/exception_event_status
 Date:		February 2018
@@ -790,6 +781,7 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the exception event status UFS device
 		attribute. The full information about the attribute could
 		be found at UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/ffu_status
 Date:		February 2018
@@ -797,12 +789,14 @@ Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file provides the ffu status UFS device attribute.
 		The full information about the attribute could be found at
 		UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/psa_state
 Date:		February 2018
 Contact:	Stanislav Nijnikov <stanislav.nijnikov@wdc.com>
 Description:	This file show the PSA feature status. The full information
 		about the attribute could be found at UFS specifications 2.1.
+		The file is read only.
 
 What:		/sys/bus/platform/drivers/ufshcd/*/attributes/psa_data_size
 Date:		February 2018
@@ -811,6 +805,7 @@ Description:	This file shows the amount of data that the host plans to
 		load to all logical units in pre-soldering state.
 		The full information about the attribute could be found at
 		UFS specifications 2.1.
+		The file is read only.
 
 
 What:		/sys/class/scsi_device/*/device/dyn_cap_needed

@@ -73,7 +73,8 @@ static int tls_enc_record(struct aead_request *aead_req,
 	len -= TLS_CIPHER_AES_GCM_128_IV_SIZE;
 
 	tls_make_aad(aad, len - TLS_CIPHER_AES_GCM_128_TAG_SIZE,
-		     (char *)&rcd_sn, sizeof(rcd_sn), buf[0]);
+		(char *)&rcd_sn, sizeof(rcd_sn), buf[0],
+		TLS_1_2_VERSION);
 
 	memcpy(iv + TLS_CIPHER_AES_GCM_128_SALT_SIZE, buf + TLS_HEADER_SIZE,
 	       TLS_CIPHER_AES_GCM_128_IV_SIZE);
@@ -243,7 +244,6 @@ static int fill_sg_in(struct scatterlist *sg_in,
 	record = tls_get_record(ctx, tcp_seq, rcd_sn);
 	if (!record) {
 		spin_unlock_irqrestore(&ctx->lock, flags);
-		WARN(1, "Record not found for seq %u\n", tcp_seq);
 		return -EINVAL;
 	}
 
@@ -273,7 +273,7 @@ static int fill_sg_in(struct scatterlist *sg_in,
 
 		__skb_frag_ref(frag);
 		sg_set_page(sg_in + i, skb_frag_page(frag),
-			    skb_frag_size(frag), frag->page_offset);
+			    skb_frag_size(frag), skb_frag_off(frag));
 
 		remaining -= skb_frag_size(frag);
 
@@ -412,7 +412,10 @@ put_sg:
 		put_page(sg_page(&sg_in[--resync_sgs]));
 	kfree(sg_in);
 free_orig:
-	kfree_skb(skb);
+	if (nskb)
+		consume_skb(skb);
+	else
+		kfree_skb(skb);
 	return nskb;
 }
 
@@ -426,6 +429,12 @@ struct sk_buff *tls_validate_xmit_skb(struct sock *sk,
 	return tls_sw_fallback(sk, skb);
 }
 EXPORT_SYMBOL_GPL(tls_validate_xmit_skb);
+
+struct sk_buff *tls_encrypt_skb(struct sk_buff *skb)
+{
+	return tls_sw_fallback(skb->sk, skb);
+}
+EXPORT_SYMBOL_GPL(tls_encrypt_skb);
 
 int tls_sw_fallback_init(struct sock *sk,
 			 struct tls_offload_context_tx *offload_ctx,

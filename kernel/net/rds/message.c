@@ -313,11 +313,16 @@ struct scatterlist *rds_message_alloc_sgs(struct rds_message *rm, int nents)
 	struct scatterlist *sg_first = (struct scatterlist *) &rm[1];
 	struct scatterlist *sg_ret;
 
-	WARN_ON(rm->m_used_sgs + nents > rm->m_total_sgs);
-	WARN_ON(!nents);
+	if (nents <= 0) {
+		pr_warn("rds: alloc sgs failed! nents <= 0\n");
+		return ERR_PTR(-EINVAL);
+	}
 
-	if (rm->m_used_sgs + nents > rm->m_total_sgs)
-		return NULL;
+	if (rm->m_used_sgs + nents > rm->m_total_sgs) {
+		pr_warn("rds: alloc sgs failed! total %d used %d nents %d\n",
+			rm->m_total_sgs, rm->m_used_sgs, nents);
+		return ERR_PTR(-ENOMEM);
+	}
 
 	sg_ret = &sg_first[rm->m_used_sgs];
 	sg_init_table(sg_ret, nents);
@@ -330,7 +335,7 @@ struct rds_message *rds_message_map_pages(unsigned long *page_addrs, unsigned in
 {
 	struct rds_message *rm;
 	unsigned int i;
-	int num_sgs = ceil(total_len, PAGE_SIZE);
+	int num_sgs = DIV_ROUND_UP(total_len, PAGE_SIZE);
 	int extra_bytes = num_sgs * sizeof(struct scatterlist);
 
 	rm = rds_message_alloc(extra_bytes, GFP_NOWAIT);
@@ -339,11 +344,11 @@ struct rds_message *rds_message_map_pages(unsigned long *page_addrs, unsigned in
 
 	set_bit(RDS_MSG_PAGEVEC, &rm->m_flags);
 	rm->m_inc.i_hdr.h_len = cpu_to_be32(total_len);
-	rm->data.op_nents = ceil(total_len, PAGE_SIZE);
+	rm->data.op_nents = DIV_ROUND_UP(total_len, PAGE_SIZE);
 	rm->data.op_sg = rds_message_alloc_sgs(rm, num_sgs);
-	if (!rm->data.op_sg) {
+	if (IS_ERR(rm->data.op_sg)) {
 		rds_message_put(rm);
-		return ERR_PTR(-ENOMEM);
+		return ERR_CAST(rm->data.op_sg);
 	}
 
 	for (i = 0; i < rm->data.op_nents; ++i) {

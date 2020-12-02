@@ -36,6 +36,7 @@ extern struct sock *reuseport_select_sock(struct sock *sk,
 					  struct sk_buff *skb,
 					  int hdr_len);
 extern int reuseport_attach_prog(struct sock *sk, struct bpf_prog *prog);
+extern int reuseport_detach_prog(struct sock *sk);
 
 static inline bool reuseport_has_conns(struct sock *sk, bool set)
 {

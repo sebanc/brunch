@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Handle caching attributes in page tables (PAT)
  *
@@ -8,7 +9,7 @@
  */
 
 #include <linux/seq_file.h>
-#include <linux/bootmem.h>
+#include <linux/memblock.h>
 #include <linux/debugfs.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>

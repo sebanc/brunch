@@ -573,8 +573,7 @@ net2272_read_fifo(struct net2272_ep *ep, struct net2272_request *req)
 
 		/* completion */
 		if (unlikely(cleanup || is_short ||
-				((req->req.actual == req->req.length)
-				 && !req->req.zero))) {
+				req->req.actual == req->req.length)) {
 
 			if (cleanup) {
 				net2272_out_flush(ep);
@@ -1178,11 +1177,6 @@ registers_show(struct device *_dev, struct device_attribute *attr, char *buf)
 	next = buf;
 	size = PAGE_SIZE;
 	spin_lock_irqsave(&dev->lock, flags);
-
-	if (dev->driver)
-		s = dev->driver->driver.name;
-	else
-		s = "(none)";
 
 	/* Main Control Registers */
 	t = scnprintf(next, size, "%s version %s,"

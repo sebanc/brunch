@@ -2,12 +2,12 @@
 #include <linux/bug.h>
 #include <linux/kernel.h>
 #include <linux/bitops.h>
+#include <linux/fixp-arith.h>
+#include <linux/iio/adc/qcom-vadc-common.h>
 #include <linux/math64.h>
 #include <linux/log2.h>
 #include <linux/err.h>
 #include <linux/module.h>
-
-#include "qcom-vadc-common.h"
 
 /* Voltage to temperature */
 static const struct vadc_map_pt adcmap_100k_104ef_104fb[] = {
@@ -88,11 +88,216 @@ static const struct vadc_map_pt adcmap_100k_104ef_104fb_1875_vref[] = {
 	{ 46,	125000 },
 };
 
+static const struct vadc_map_pt adcmap7_die_temp[] = {
+	{ 433700, 1967},
+	{ 473100, 1964},
+	{ 512400, 1957},
+	{ 551500, 1949},
+	{ 590500, 1940},
+	{ 629300, 1930},
+	{ 667900, 1921},
+	{ 706400, 1910},
+	{ 744600, 1896},
+	{ 782500, 1878},
+	{ 820100, 1859},
+	{ 857300, 0},
+};
+
+/*
+ * Resistance to temperature table for 100k pull up for NTCG104EF104.
+ */
+static const struct vadc_map_pt adcmap7_100k[] = {
+	{ 4250657, -40960 },
+	{ 3962085, -39936 },
+	{ 3694875, -38912 },
+	{ 3447322, -37888 },
+	{ 3217867, -36864 },
+	{ 3005082, -35840 },
+	{ 2807660, -34816 },
+	{ 2624405, -33792 },
+	{ 2454218, -32768 },
+	{ 2296094, -31744 },
+	{ 2149108, -30720 },
+	{ 2012414, -29696 },
+	{ 1885232, -28672 },
+	{ 1766846, -27648 },
+	{ 1656598, -26624 },
+	{ 1553884, -25600 },
+	{ 1458147, -24576 },
+	{ 1368873, -23552 },
+	{ 1285590, -22528 },
+	{ 1207863, -21504 },
+	{ 1135290, -20480 },
+	{ 1067501, -19456 },
+	{ 1004155, -18432 },
+	{ 944935, -17408 },
+	{ 889550, -16384 },
+	{ 837731, -15360 },
+	{ 789229, -14336 },
+	{ 743813, -13312 },
+	{ 701271, -12288 },
+	{ 661405, -11264 },
+	{ 624032, -10240 },
+	{ 588982, -9216 },
+	{ 556100, -8192 },
+	{ 525239, -7168 },
+	{ 496264, -6144 },
+	{ 469050, -5120 },
+	{ 443480, -4096 },
+	{ 419448, -3072 },
+	{ 396851, -2048 },
+	{ 375597, -1024 },
+	{ 355598, 0 },
+	{ 336775, 1024 },
+	{ 319052, 2048 },
+	{ 302359, 3072 },
+	{ 286630, 4096 },
+	{ 271806, 5120 },
+	{ 257829, 6144 },
+	{ 244646, 7168 },
+	{ 232209, 8192 },
+	{ 220471, 9216 },
+	{ 209390, 10240 },
+	{ 198926, 11264 },
+	{ 189040, 12288 },
+	{ 179698, 13312 },
+	{ 170868, 14336 },
+	{ 162519, 15360 },
+	{ 154622, 16384 },
+	{ 147150, 17408 },
+	{ 140079, 18432 },
+	{ 133385, 19456 },
+	{ 127046, 20480 },
+	{ 121042, 21504 },
+	{ 115352, 22528 },
+	{ 109960, 23552 },
+	{ 104848, 24576 },
+	{ 100000, 25600 },
+	{ 95402, 26624 },
+	{ 91038, 27648 },
+	{ 86897, 28672 },
+	{ 82965, 29696 },
+	{ 79232, 30720 },
+	{ 75686, 31744 },
+	{ 72316, 32768 },
+	{ 69114, 33792 },
+	{ 66070, 34816 },
+	{ 63176, 35840 },
+	{ 60423, 36864 },
+	{ 57804, 37888 },
+	{ 55312, 38912 },
+	{ 52940, 39936 },
+	{ 50681, 40960 },
+	{ 48531, 41984 },
+	{ 46482, 43008 },
+	{ 44530, 44032 },
+	{ 42670, 45056 },
+	{ 40897, 46080 },
+	{ 39207, 47104 },
+	{ 37595, 48128 },
+	{ 36057, 49152 },
+	{ 34590, 50176 },
+	{ 33190, 51200 },
+	{ 31853, 52224 },
+	{ 30577, 53248 },
+	{ 29358, 54272 },
+	{ 28194, 55296 },
+	{ 27082, 56320 },
+	{ 26020, 57344 },
+	{ 25004, 58368 },
+	{ 24033, 59392 },
+	{ 23104, 60416 },
+	{ 22216, 61440 },
+	{ 21367, 62464 },
+	{ 20554, 63488 },
+	{ 19776, 64512 },
+	{ 19031, 65536 },
+	{ 18318, 66560 },
+	{ 17636, 67584 },
+	{ 16982, 68608 },
+	{ 16355, 69632 },
+	{ 15755, 70656 },
+	{ 15180, 71680 },
+	{ 14628, 72704 },
+	{ 14099, 73728 },
+	{ 13592, 74752 },
+	{ 13106, 75776 },
+	{ 12640, 76800 },
+	{ 12192, 77824 },
+	{ 11762, 78848 },
+	{ 11350, 79872 },
+	{ 10954, 80896 },
+	{ 10574, 81920 },
+	{ 10209, 82944 },
+	{ 9858, 83968 },
+	{ 9521, 84992 },
+	{ 9197, 86016 },
+	{ 8886, 87040 },
+	{ 8587, 88064 },
+	{ 8299, 89088 },
+	{ 8023, 90112 },
+	{ 7757, 91136 },
+	{ 7501, 92160 },
+	{ 7254, 93184 },
+	{ 7017, 94208 },
+	{ 6789, 95232 },
+	{ 6570, 96256 },
+	{ 6358, 97280 },
+	{ 6155, 98304 },
+	{ 5959, 99328 },
+	{ 5770, 100352 },
+	{ 5588, 101376 },
+	{ 5412, 102400 },
+	{ 5243, 103424 },
+	{ 5080, 104448 },
+	{ 4923, 105472 },
+	{ 4771, 106496 },
+	{ 4625, 107520 },
+	{ 4484, 108544 },
+	{ 4348, 109568 },
+	{ 4217, 110592 },
+	{ 4090, 111616 },
+	{ 3968, 112640 },
+	{ 3850, 113664 },
+	{ 3736, 114688 },
+	{ 3626, 115712 },
+	{ 3519, 116736 },
+	{ 3417, 117760 },
+	{ 3317, 118784 },
+	{ 3221, 119808 },
+	{ 3129, 120832 },
+	{ 3039, 121856 },
+	{ 2952, 122880 },
+	{ 2868, 123904 },
+	{ 2787, 124928 },
+	{ 2709, 125952 },
+	{ 2633, 126976 },
+	{ 2560, 128000 },
+	{ 2489, 129024 },
+	{ 2420, 130048 }
+};
+
+static const struct vadc_prescale_ratio adc5_prescale_ratios[] = {
+	{.num =  1, .den =  1},
+	{.num =  1, .den =  3},
+	{.num =  1, .den =  4},
+	{.num =  1, .den =  6},
+	{.num =  1, .den = 20},
+	{.num =  1, .den =  8},
+	{.num = 10, .den = 81},
+	{.num =  1, .den = 10},
+	{.num =  1, .den = 16}
+};
+
 static int qcom_vadc_scale_hw_calib_volt(
 				const struct vadc_prescale_ratio *prescale,
 				const struct adc5_data *data,
 				u16 adc_code, int *result_uv);
 static int qcom_vadc_scale_hw_calib_therm(
+				const struct vadc_prescale_ratio *prescale,
+				const struct adc5_data *data,
+				u16 adc_code, int *result_mdec);
+static int qcom_vadc7_scale_hw_calib_therm(
 				const struct vadc_prescale_ratio *prescale,
 				const struct adc5_data *data,
 				u16 adc_code, int *result_mdec);
@@ -108,12 +313,20 @@ static int qcom_vadc_scale_hw_calib_die_temp(
 				const struct vadc_prescale_ratio *prescale,
 				const struct adc5_data *data,
 				u16 adc_code, int *result_mdec);
+static int qcom_vadc7_scale_hw_calib_die_temp(
+				const struct vadc_prescale_ratio *prescale,
+				const struct adc5_data *data,
+				u16 adc_code, int *result_mdec);
 
 static struct qcom_adc5_scale_type scale_adc5_fn[] = {
 	[SCALE_HW_CALIB_DEFAULT] = {qcom_vadc_scale_hw_calib_volt},
 	[SCALE_HW_CALIB_THERM_100K_PULLUP] = {qcom_vadc_scale_hw_calib_therm},
 	[SCALE_HW_CALIB_XOTHERM] = {qcom_vadc_scale_hw_calib_therm},
+	[SCALE_HW_CALIB_THERM_100K_PU_PM7] = {
+					qcom_vadc7_scale_hw_calib_therm},
 	[SCALE_HW_CALIB_PMIC_THERM] = {qcom_vadc_scale_hw_calib_die_temp},
+	[SCALE_HW_CALIB_PMIC_THERM_PM7] = {
+					qcom_vadc7_scale_hw_calib_die_temp},
 	[SCALE_HW_CALIB_PM5_CHG_TEMP] = {qcom_vadc_scale_hw_chg5_temp},
 	[SCALE_HW_CALIB_PM5_SMB_TEMP] = {qcom_vadc_scale_hw_smb_temp},
 };
@@ -154,13 +367,48 @@ static int qcom_vadc_map_voltage_temp(const struct vadc_map_pt *pts,
 	} else {
 		/* result is between search_index and search_index-1 */
 		/* interpolate linearly */
-		*output = (((s32)((pts[i].y - pts[i - 1].y) *
-			(input - pts[i - 1].x)) /
-			(pts[i].x - pts[i - 1].x)) +
-			pts[i - 1].y);
+		*output = fixp_linear_interpolate(pts[i - 1].x, pts[i - 1].y,
+						  pts[i].x, pts[i].y,
+						  input);
 	}
 
 	return 0;
+}
+
+static s32 qcom_vadc_map_temp_voltage(const struct vadc_map_pt *pts,
+				      u32 tablesize, int input)
+{
+	bool descending = 1;
+	u32 i = 0;
+
+	/* Check if table is descending or ascending */
+	if (tablesize > 1) {
+		if (pts[0].y < pts[1].y)
+			descending = 0;
+	}
+
+	while (i < tablesize) {
+		if (descending && pts[i].y < input) {
+			/* table entry is less than measured*/
+			 /* value and table is descending, stop */
+			break;
+		} else if ((!descending) && pts[i].y > input) {
+			/* table entry is greater than measured*/
+			/*value and table is ascending, stop */
+			break;
+		}
+		i++;
+	}
+
+	if (i == 0)
+		return pts[0].x;
+	if (i == tablesize)
+		return pts[tablesize - 1].x;
+
+	/* result is between search_index and search_index-1 */
+	/* interpolate linearly */
+	return fixp_linear_interpolate(pts[i - 1].y, pts[i - 1].x,
+			pts[i].y, pts[i].x, input);
 }
 
 static void qcom_vadc_scale_calib(const struct vadc_linear_graph *calib_graph,
@@ -261,6 +509,19 @@ static int qcom_vadc_scale_chg_temp(const struct vadc_linear_graph *calib_graph,
 	return 0;
 }
 
+static u16 qcom_vadc_scale_voltage_code(int voltage,
+					const struct vadc_prescale_ratio *prescale,
+					const u32 full_scale_code_volt,
+					unsigned int factor)
+{
+	s64 volt = voltage, adc_vdd_ref_mv = 1875;
+
+	volt *= prescale->num * factor * full_scale_code_volt;
+	volt = div64_s64(volt, (s64)prescale->den * adc_vdd_ref_mv * 1000);
+
+	return volt;
+}
+
 static int qcom_vadc_scale_code_voltage_factor(u16 adc_code,
 				const struct vadc_prescale_ratio *prescale,
 				const struct adc5_data *data,
@@ -289,6 +550,32 @@ static int qcom_vadc_scale_code_voltage_factor(u16 adc_code,
 	}
 
 	return (int) voltage;
+}
+
+static int qcom_vadc7_scale_hw_calib_therm(
+				const struct vadc_prescale_ratio *prescale,
+				const struct adc5_data *data,
+				u16 adc_code, int *result_mdec)
+{
+	s64 resistance = adc_code;
+	int ret, result;
+
+	if (adc_code >= RATIO_MAX_ADC7)
+		return -EINVAL;
+
+	/* (ADC code * R_PULLUP (100Kohm)) / (full_scale_code - ADC code)*/
+	resistance *= R_PU_100K;
+	resistance = div64_s64(resistance, RATIO_MAX_ADC7 - adc_code);
+
+	ret = qcom_vadc_map_voltage_temp(adcmap7_100k,
+				 ARRAY_SIZE(adcmap7_100k),
+				 resistance, &result);
+	if (ret)
+		return ret;
+
+	*result_mdec = result;
+
+	return 0;
 }
 
 static int qcom_vadc_scale_hw_calib_volt(
@@ -326,6 +613,41 @@ static int qcom_vadc_scale_hw_calib_die_temp(
 	*result_mdec = qcom_vadc_scale_code_voltage_factor(adc_code,
 				prescale, data, 2);
 	*result_mdec -= KELVINMIL_CELSIUSMIL;
+
+	return 0;
+}
+
+static int qcom_vadc7_scale_hw_calib_die_temp(
+				const struct vadc_prescale_ratio *prescale,
+				const struct adc5_data *data,
+				u16 adc_code, int *result_mdec)
+{
+
+	int voltage, vtemp0, temp, i;
+
+	voltage = qcom_vadc_scale_code_voltage_factor(adc_code,
+				prescale, data, 1);
+
+	if (adcmap7_die_temp[0].x > voltage) {
+		*result_mdec = DIE_TEMP_ADC7_SCALE_1;
+		return 0;
+	}
+
+	if (adcmap7_die_temp[ARRAY_SIZE(adcmap7_die_temp) - 1].x <= voltage) {
+		*result_mdec = DIE_TEMP_ADC7_MAX;
+		return 0;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(adcmap7_die_temp); i++)
+		if (adcmap7_die_temp[i].x > voltage)
+			break;
+
+	vtemp0 = adcmap7_die_temp[i - 1].x;
+	voltage = voltage - vtemp0;
+	temp = div64_s64(voltage * DIE_TEMP_ADC7_SCALE_FACTOR,
+		adcmap7_die_temp[i - 1].y);
+	temp += DIE_TEMP_ADC7_SCALE_1 + (DIE_TEMP_ADC7_SCALE_2 * (i - 1));
+	*result_mdec = temp;
 
 	return 0;
 }
@@ -384,11 +706,26 @@ int qcom_vadc_scale(enum vadc_scale_fn_type scaletype,
 }
 EXPORT_SYMBOL(qcom_vadc_scale);
 
+u16 qcom_adc_tm5_temp_volt_scale(unsigned int prescale_ratio,
+				 u32 full_scale_code_volt, int temp)
+{
+	const struct vadc_prescale_ratio *prescale = &adc5_prescale_ratios[prescale_ratio];
+	s32 voltage;
+
+	voltage = qcom_vadc_map_temp_voltage(adcmap_100k_104ef_104fb_1875_vref,
+					     ARRAY_SIZE(adcmap_100k_104ef_104fb_1875_vref),
+					     temp);
+	return qcom_vadc_scale_voltage_code(voltage, prescale, full_scale_code_volt, 1000);
+}
+EXPORT_SYMBOL(qcom_adc_tm5_temp_volt_scale);
+
 int qcom_adc5_hw_scale(enum vadc_scale_fn_type scaletype,
-		    const struct vadc_prescale_ratio *prescale,
+		    unsigned int prescale_ratio,
 		    const struct adc5_data *data,
 		    u16 adc_code, int *result)
 {
+	const struct vadc_prescale_ratio *prescale = &adc5_prescale_ratios[prescale_ratio];
+
 	if (!(scaletype >= SCALE_HW_CALIB_DEFAULT &&
 		scaletype < SCALE_HW_CALIB_INVALID)) {
 		pr_err("Invalid scale type %d\n", scaletype);
@@ -399,6 +736,58 @@ int qcom_adc5_hw_scale(enum vadc_scale_fn_type scaletype,
 					adc_code, result);
 }
 EXPORT_SYMBOL(qcom_adc5_hw_scale);
+
+int qcom_adc5_prescaling_from_dt(u32 num, u32 den)
+{
+	unsigned int pre;
+
+	for (pre = 0; pre < ARRAY_SIZE(adc5_prescale_ratios); pre++)
+		if (adc5_prescale_ratios[pre].num == num &&
+		    adc5_prescale_ratios[pre].den == den)
+			break;
+
+	if (pre == ARRAY_SIZE(adc5_prescale_ratios))
+		return -EINVAL;
+
+	return pre;
+}
+EXPORT_SYMBOL(qcom_adc5_prescaling_from_dt);
+
+int qcom_adc5_hw_settle_time_from_dt(u32 value,
+				     const unsigned int *hw_settle)
+{
+	unsigned int i;
+
+	for (i = 0; i < VADC_HW_SETTLE_SAMPLES_MAX; i++) {
+		if (value == hw_settle[i])
+			return i;
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL(qcom_adc5_hw_settle_time_from_dt);
+
+int qcom_adc5_avg_samples_from_dt(u32 value)
+{
+	if (!is_power_of_2(value) || value > ADC5_AVG_SAMPLES_MAX)
+		return -EINVAL;
+
+	return __ffs(value);
+}
+EXPORT_SYMBOL(qcom_adc5_avg_samples_from_dt);
+
+int qcom_adc5_decimation_from_dt(u32 value, const unsigned int *decimation)
+{
+	unsigned int i;
+
+	for (i = 0; i < ADC5_DECIMATION_SAMPLES_MAX; i++) {
+		if (value == decimation[i])
+			return i;
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL(qcom_adc5_decimation_from_dt);
 
 int qcom_vadc_decimation_from_dt(u32 value)
 {

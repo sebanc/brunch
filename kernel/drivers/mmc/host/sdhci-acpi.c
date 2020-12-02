@@ -1,21 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Secure Digital Host Controller Interface ACPI driver.
  *
  * Copyright (c) 2012, Intel Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
- *
  */
 
 #include <linux/init.h>
@@ -247,7 +234,7 @@ static const struct sdhci_acpi_chip sdhci_acpi_chip_int = {
 static bool sdhci_acpi_byt(void)
 {
 	static const struct x86_cpu_id byt[] = {
-		{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ATOM_SILVERMONT },
+		X86_MATCH_INTEL_FAM6_MODEL(ATOM_SILVERMONT, NULL),
 		{}
 	};
 
@@ -257,7 +244,7 @@ static bool sdhci_acpi_byt(void)
 static bool sdhci_acpi_cht(void)
 {
 	static const struct x86_cpu_id cht[] = {
-		{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ATOM_AIRMONT },
+		X86_MATCH_INTEL_FAM6_MODEL(ATOM_AIRMONT, NULL),
 		{}
 	};
 
@@ -437,7 +424,8 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_int_emmc = {
 		   MMC_CAP_HW_RESET | MMC_CAP_1_8V_DDR |
 		   MMC_CAP_CMD_DURING_TFR | MMC_CAP_WAIT_WHILE_BUSY,
 	.flags   = SDHCI_ACPI_RUNTIME_PM,
-	.quirks  = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC,
+	.quirks  = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
+		   SDHCI_QUIRK_NO_LED,
 	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
 		   SDHCI_QUIRK2_STOP_WITH_TC |
 		   SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400,
@@ -448,6 +436,7 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_int_emmc = {
 
 static const struct sdhci_acpi_slot sdhci_acpi_slot_int_sdio = {
 	.quirks  = SDHCI_QUIRK_BROKEN_CARD_DETECTION |
+		   SDHCI_QUIRK_NO_LED |
 		   SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC,
 	.quirks2 = SDHCI_QUIRK2_HOST_OFF_CARD_ON,
 	.caps    = MMC_CAP_NONREMOVABLE | MMC_CAP_POWER_OFF_CARD |
@@ -462,7 +451,8 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_int_sdio = {
 static const struct sdhci_acpi_slot sdhci_acpi_slot_int_sd = {
 	.flags   = SDHCI_ACPI_SD_CD | SDHCI_ACPI_SD_CD_OVERRIDE_LEVEL |
 		   SDHCI_ACPI_RUNTIME_PM,
-	.quirks  = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC,
+	.quirks  = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
+		   SDHCI_QUIRK_NO_LED,
 	.quirks2 = SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON |
 		   SDHCI_QUIRK2_STOP_WITH_TC,
 	.caps    = MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_AGGRESSIVE_PM,
@@ -471,10 +461,70 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_int_sd = {
 	.priv_size	= sizeof(struct intel_host),
 };
 
+#define VENDOR_SPECIFIC_PWRCTL_CLEAR_REG	0x1a8
+#define VENDOR_SPECIFIC_PWRCTL_CTL_REG		0x1ac
+static irqreturn_t sdhci_acpi_qcom_handler(int irq, void *ptr)
+{
+	struct sdhci_host *host = ptr;
+
+	sdhci_writel(host, 0x3, VENDOR_SPECIFIC_PWRCTL_CLEAR_REG);
+	sdhci_writel(host, 0x1, VENDOR_SPECIFIC_PWRCTL_CTL_REG);
+
+	return IRQ_HANDLED;
+}
+
+static int qcom_probe_slot(struct platform_device *pdev, const char *hid,
+			   const char *uid)
+{
+	struct sdhci_acpi_host *c = platform_get_drvdata(pdev);
+	struct sdhci_host *host = c->host;
+	int *irq = sdhci_acpi_priv(c);
+
+	*irq = -EINVAL;
+
+	if (strcmp(hid, "QCOM8051"))
+		return 0;
+
+	*irq = platform_get_irq(pdev, 1);
+	if (*irq < 0)
+		return 0;
+
+	return request_threaded_irq(*irq, NULL, sdhci_acpi_qcom_handler,
+				    IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+				    "sdhci_qcom", host);
+}
+
+static int qcom_free_slot(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct sdhci_acpi_host *c = platform_get_drvdata(pdev);
+	struct sdhci_host *host = c->host;
+	struct acpi_device *adev;
+	int *irq = sdhci_acpi_priv(c);
+	const char *hid;
+
+	adev = ACPI_COMPANION(dev);
+	if (!adev)
+		return -ENODEV;
+
+	hid = acpi_device_hid(adev);
+	if (strcmp(hid, "QCOM8051"))
+		return 0;
+
+	if (*irq < 0)
+		return 0;
+
+	free_irq(*irq, host);
+	return 0;
+}
+
 static const struct sdhci_acpi_slot sdhci_acpi_slot_qcom_sd_3v = {
 	.quirks  = SDHCI_QUIRK_BROKEN_CARD_DETECTION,
 	.quirks2 = SDHCI_QUIRK2_NO_1_8_V,
 	.caps    = MMC_CAP_NONREMOVABLE,
+	.priv_size	= sizeof(int),
+	.probe_slot	= qcom_probe_slot,
+	.free_slot	= qcom_free_slot,
 };
 
 static const struct sdhci_acpi_slot sdhci_acpi_slot_qcom_sd = {
@@ -482,49 +532,145 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_qcom_sd = {
 	.caps    = MMC_CAP_NONREMOVABLE,
 };
 
+struct amd_sdhci_host {
+	bool	tuned_clock;
+	bool	dll_enabled;
+};
+
 /* AMD sdhci reset dll register. */
 #define SDHCI_AMD_RESET_DLL_REGISTER    0x908
 
 static int amd_select_drive_strength(struct mmc_card *card,
 				     unsigned int max_dtr, int host_drv,
-				     int card_drv, int *drv_type)
+				     int card_drv, int *host_driver_strength)
 {
-	return MMC_SET_DRIVER_TYPE_A;
+	struct sdhci_host *host = mmc_priv(card->host);
+	u16 preset, preset_driver_strength;
+
+	/*
+	 * This method is only called by mmc_select_hs200 so we only need to
+	 * read from the HS200 (SDR104) preset register.
+	 *
+	 * Firmware that has "invalid/default" presets return a driver strength
+	 * of A. This matches the previously hard coded value.
+	 */
+	preset = sdhci_readw(host, SDHCI_PRESET_FOR_SDR104);
+	preset_driver_strength =
+		(preset & SDHCI_PRESET_DRV_MASK) >> SDHCI_PRESET_DRV_SHIFT;
+
+	/*
+	 * We want the controller driver strength to match the card's driver
+	 * strength so they have similar rise/fall times.
+	 *
+	 * The controller driver strength set by this method is sticky for all
+	 * timings after this method is called. This unfortunately means that
+	 * while HS400 tuning is in progress we end up with mismatched driver
+	 * strengths between the controller and the card. HS400 tuning requires
+	 * switching from HS400->DDR52->HS->HS200->HS400. So the driver mismatch
+	 * happens while in DDR52 and HS modes. This has not been observed to
+	 * cause problems. Enabling presets would fix this issue.
+	 */
+	*host_driver_strength = preset_driver_strength;
+
+	/*
+	 * The resulting card driver strength is only set when switching the
+	 * card's timing to HS200 or HS400. The card will use the default driver
+	 * strength (B) for any other mode.
+	 */
+	return preset_driver_strength;
+
 }
 
-static void sdhci_acpi_amd_hs400_dll(struct sdhci_host *host)
+static void sdhci_acpi_amd_hs400_dll(struct sdhci_host *host, bool enable)
 {
+	struct sdhci_acpi_host *acpi_host = sdhci_priv(host);
+	struct amd_sdhci_host *amd_host = sdhci_acpi_priv(acpi_host);
+
 	/* AMD Platform requires dll setting */
 	sdhci_writel(host, 0x40003210, SDHCI_AMD_RESET_DLL_REGISTER);
 	usleep_range(10, 20);
-	sdhci_writel(host, 0x40033210, SDHCI_AMD_RESET_DLL_REGISTER);
+	if (enable)
+		sdhci_writel(host, 0x40033210, SDHCI_AMD_RESET_DLL_REGISTER);
+
+	amd_host->dll_enabled = enable;
 }
 
 /*
- * For AMD Platform it is required to disable the tuning
- * bit first controller to bring to HS Mode from HS200
- * mode, later enable to tune to HS400 mode.
+ * The initialization sequence for HS400 is:
+ *     HS->HS200->Perform Tuning->HS->HS400
+ *
+ * The re-tuning sequence is:
+ *     HS400->DDR52->HS->HS200->Perform Tuning->HS->HS400
+ *
+ * The AMD eMMC Controller can only use the tuned clock while in HS200 and HS400
+ * mode. If we switch to a different mode, we need to disable the tuned clock.
+ * If we have previously performed tuning and switch back to HS200 or
+ * HS400, we can re-enable the tuned clock.
+ *
  */
 static void amd_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
+	struct sdhci_acpi_host *acpi_host = sdhci_priv(host);
+	struct amd_sdhci_host *amd_host = sdhci_acpi_priv(acpi_host);
 	unsigned int old_timing = host->timing;
+	u16 val;
 
 	sdhci_set_ios(mmc, ios);
-	if (old_timing == MMC_TIMING_MMC_HS200 &&
-	    ios->timing == MMC_TIMING_MMC_HS)
-		sdhci_writew(host, 0x9, SDHCI_HOST_CONTROL2);
-	if (old_timing != MMC_TIMING_MMC_HS400 &&
-	    ios->timing == MMC_TIMING_MMC_HS400) {
-		sdhci_writew(host, 0x80, SDHCI_HOST_CONTROL2);
-		sdhci_acpi_amd_hs400_dll(host);
+
+	if (old_timing != host->timing && amd_host->tuned_clock) {
+		if (host->timing == MMC_TIMING_MMC_HS400 ||
+		    host->timing == MMC_TIMING_MMC_HS200) {
+			val = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+			val |= SDHCI_CTRL_TUNED_CLK;
+			sdhci_writew(host, val, SDHCI_HOST_CONTROL2);
+		} else {
+			val = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+			val &= ~SDHCI_CTRL_TUNED_CLK;
+			sdhci_writew(host, val, SDHCI_HOST_CONTROL2);
+		}
+
+		/* DLL is only required for HS400 */
+		if (host->timing == MMC_TIMING_MMC_HS400 &&
+		    !amd_host->dll_enabled)
+			sdhci_acpi_amd_hs400_dll(host, true);
 	}
+}
+
+static int amd_sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+{
+	int err;
+	struct sdhci_host *host = mmc_priv(mmc);
+	struct sdhci_acpi_host *acpi_host = sdhci_priv(host);
+	struct amd_sdhci_host *amd_host = sdhci_acpi_priv(acpi_host);
+
+	amd_host->tuned_clock = false;
+
+	err = sdhci_execute_tuning(mmc, opcode);
+
+	if (!err && !host->tuning_err)
+		amd_host->tuned_clock = true;
+
+	return err;
+}
+
+static void amd_sdhci_reset(struct sdhci_host *host, u8 mask)
+{
+	struct sdhci_acpi_host *acpi_host = sdhci_priv(host);
+	struct amd_sdhci_host *amd_host = sdhci_acpi_priv(acpi_host);
+
+	if (mask & SDHCI_RESET_ALL) {
+		amd_host->tuned_clock = false;
+		sdhci_acpi_amd_hs400_dll(host, false);
+	}
+
+	sdhci_reset(host, mask);
 }
 
 static const struct sdhci_ops sdhci_acpi_ops_amd = {
 	.set_clock	= sdhci_set_clock,
 	.set_bus_width	= sdhci_set_bus_width,
-	.reset		= sdhci_reset,
+	.reset		= amd_sdhci_reset,
 	.set_uhs_signaling = sdhci_set_uhs_signaling,
 };
 
@@ -546,8 +692,46 @@ static int sdhci_acpi_emmc_amd_probe_slot(struct platform_device *pdev,
 	    (host->mmc->caps & MMC_CAP_1_8V_DDR))
 		host->mmc->caps2 = MMC_CAP2_HS400_1_8V;
 
+	/*
+	 * There are two types of presets out in the wild:
+	 * 1) Default/broken presets.
+	 *    These presets have two sets of problems:
+	 *    a) The clock divisor for SDR12, SDR25, and SDR50 is too small.
+	 *       This results in clock frequencies that are 2x higher than
+	 *       acceptable. i.e., SDR12 = 25 MHz, SDR25 = 50 MHz, SDR50 =
+	 *       100 MHz.x
+	 *    b) The HS200 and HS400 driver strengths don't match.
+	 *       By default, the SDR104 preset register has a driver strength of
+	 *       A, but the (internal) HS400 preset register has a driver
+	 *       strength of B. As part of initializing HS400, HS200 tuning
+	 *       needs to be performed. Having different driver strengths
+	 *       between tuning and operation is wrong. It results in different
+	 *       rise/fall times that lead to incorrect sampling.
+	 * 2) Firmware with properly initialized presets.
+	 *    These presets have proper clock divisors. i.e., SDR12 => 12MHz,
+	 *    SDR25 => 25 MHz, SDR50 => 50 MHz. Additionally the HS200 and
+	 *    HS400 preset driver strengths match.
+	 *
+	 *    Enabling presets for HS400 doesn't work for the following reasons:
+	 *    1) sdhci_set_ios has a hard coded list of timings that are used
+	 *       to determine if presets should be enabled.
+	 *    2) sdhci_get_preset_value is using a non-standard register to
+	 *       read out HS400 presets. The AMD controller doesn't support this
+	 *       non-standard register. In fact, it doesn't expose the HS400
+	 *       preset register anywhere in the SDHCI memory map. This results
+	 *       in reading a garbage value and using the wrong presets.
+	 *
+	 *       Since HS400 and HS200 presets must be identical, we could
+	 *       instead use the the SDR104 preset register.
+	 *
+	 *    If the above issues are resolved we could remove this quirk for
+	 *    firmware that that has valid presets (i.e., SDR12 <= 12 MHz).
+	 */
+	host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
+
 	host->mmc_host_ops.select_drive_strength = amd_select_drive_strength;
 	host->mmc_host_ops.set_ios = amd_set_ios;
+	host->mmc_host_ops.execute_tuning = amd_sdhci_execute_tuning;
 	return 0;
 }
 
@@ -559,6 +743,7 @@ static const struct sdhci_acpi_slot sdhci_acpi_slot_amd_emmc = {
 			  SDHCI_QUIRK_32BIT_ADMA_SIZE,
 	.quirks2	= SDHCI_QUIRK2_BROKEN_64_BIT_DMA,
 	.probe_slot     = sdhci_acpi_emmc_amd_probe_slot,
+	.priv_size	= sizeof(struct amd_sdhci_host),
 };
 
 struct sdhci_acpi_uid_slot {
@@ -835,7 +1020,7 @@ static int sdhci_acpi_runtime_resume(struct device *dev)
 
 	sdhci_acpi_byt_setting(&c->pdev->dev);
 
-	return sdhci_runtime_resume_host(c->host);
+	return sdhci_runtime_resume_host(c->host, 0);
 }
 
 #endif

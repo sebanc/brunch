@@ -103,10 +103,9 @@
 				};
 			};
 
-			flash@0,00000000 {
+			flash@0 {
 				/* 2 * 32MiB NOR Flash memory mounted on CS0 */
 				compatible = "arm,vexpress-flash", "cfi-flash";
-				linux,part-probe = "afs";
 				reg = <0 0x00000000 0x04000000>;
 				bank-width = <4>;
 				/*
@@ -116,9 +115,12 @@
 				 * flash hardware access is disabled by default.
 				 */
 				status = "disabled";
+				partitions {
+					compatible = "arm,arm-firmware-suite";
+				};
 			};
 
-			ethernet@2,00000000 {
+			ethernet@200000000 {
 				compatible = "smsc,lan9118", "smsc,lan9115";
 				reg = <2 0x00000000 0x10000>;
 				interrupts = <3>;
@@ -131,7 +133,7 @@
 				vddvario-supply = <&mb_fixed_3v3>;
 			};
 
-			iofpga@3,00000000 {
+			iofpga@300000000 {
 				compatible = "simple-bus";
 				#address-cells = <1>;
 				#size-cells = <1>;

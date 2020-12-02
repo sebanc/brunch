@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
 #
 # Block device driver configuration
 #
@@ -215,17 +216,6 @@ config BLK_DEV_DM
 
 	  If unsure, say N.
 
-config DM_MQ_DEFAULT
-	bool "request-based DM: use blk-mq I/O path by default"
-	depends on BLK_DEV_DM
-	---help---
-	  This option enables the blk-mq based I/O path for request-based
-	  DM devices by default.  With the option the dm_mod.use_blk_mq
-	  module/boot option defaults to Y, without it to N, but it can
-	  still be overriden either way.
-
-	  If unsure say N.
-
 config DM_DEBUG
 	bool "Device mapper debugging support"
 	depends on BLK_DEV_DM
@@ -281,6 +271,7 @@ config DM_CRYPT
 	depends on BLK_DEV_DM
 	select CRYPTO
 	select CRYPTO_CBC
+	select CRYPTO_ESSIV
 	---help---
 	  This device-mapper target allows you to create a device that
 	  transparently encrypts the data on it. You'll need to activate
@@ -368,6 +359,20 @@ config DM_ERA
          dm-era tracks which parts of a block device are written to
          over time.  Useful for maintaining cache coherency when using
          vendor snapshots.
+
+config DM_CLONE
+       tristate "Clone target (EXPERIMENTAL)"
+       depends on BLK_DEV_DM
+       default n
+       select DM_PERSISTENT_DATA
+       ---help---
+         dm-clone produces a one-to-one copy of an existing, read-only source
+         device into a writable destination device. The cloned device is
+         visible/mountable immediately and the copy of the source device to the
+         destination device happens in the background, in parallel with user
+         I/O.
+
+         If unsure, say N.
 
 config DM_MIRROR
        tristate "Mirror target"
@@ -460,6 +465,27 @@ config DM_DELAY
 
 	If unsure, say N.
 
+config DM_DUST
+	tristate "Bad sector simulation target"
+	depends on BLK_DEV_DM
+	---help---
+	A target that simulates bad sector behavior.
+	Useful for testing.
+
+	If unsure, say N.
+
+config DM_INIT
+	bool "DM \"dm-mod.create=\" parameter support"
+	depends on BLK_DEV_DM=y
+	---help---
+	Enable "dm-mod.create=" parameter to create mapped devices at init time.
+	This option is useful to allow mounting rootfs without requiring an
+	initramfs.
+	See Documentation/admin-guide/device-mapper/dm-init.rst for dm-mod.create="..."
+	format.
+
+	If unsure, say N.
+
 config DM_UEVENT
 	bool "DM uevents"
 	depends on BLK_DEV_DM
@@ -489,6 +515,29 @@ config DM_VERITY
 
 	  To compile this code as a module, choose M here: the module will
 	  be called dm-verity.
+
+	  If unsure, say N.
+
+config DM_VERITY_VERIFY_ROOTHASH_SIG
+	def_bool n
+	bool "Verity data device root hash signature verification support"
+	depends on DM_VERITY
+	select SYSTEM_DATA_VERIFICATION
+	  help
+	  Add ability for dm-verity device to be validated if the
+	  pre-generated tree of cryptographic checksums passed has a pkcs#7
+	  signature file that can validate the roothash of the tree.
+
+	  If unsure, say N.
+
+config DM_VERITY_AVB
+	tristate "Support AVB specific verity error behavior"
+	depends on DM_VERITY
+	---help---
+	  Enables Android Verified Boot platform-specific error
+	  behavior. In particular, it will modify the vbmeta partition
+	  specified on the kernel command-line when non-transient error
+	  occurs (followed by a panic).
 
 	  If unsure, say N.
 
@@ -569,6 +618,18 @@ config DM_ZONED
 
 	  To compile this code as a module, choose M here: the module will
 	  be called dm-zoned.
+
+	  If unsure, say N.
+
+config DM_BOW
+	tristate "Backup block device"
+	depends on BLK_DEV_DM
+	select DM_BUFIO
+	---help---
+	  This device-mapper target takes a device and keeps a log of all
+	  changes using free blocks identified by issuing a trim command.
+	  This can then be restored by running a command line utility,
+	  or committed by simply replacing the target.
 
 	  If unsure, say N.
 

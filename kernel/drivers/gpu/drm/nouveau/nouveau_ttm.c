@@ -164,13 +164,6 @@ nouveau_ttm_mmap(struct file *filp, struct vm_area_struct *vma)
 	struct drm_file *file_priv = filp->private_data;
 	struct nouveau_drm *drm = nouveau_drm(file_priv->minor->dev);
 
-	if (unlikely(vma->vm_pgoff < DRM_FILE_PAGE_OFFSET))
-#if defined(CONFIG_NOUVEAU_LEGACY_CTX_SUPPORT)
-		return drm_legacy_mmap(filp, vma);
-#else
-		return -EINVAL;
-#endif
-
 	return ttm_bo_mmap(filp, vma, &drm->ttm.bdev);
 }
 

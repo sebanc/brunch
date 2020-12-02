@@ -86,7 +86,6 @@
 
 #define MVM_UCODE_ALIVE_TIMEOUT	(HZ * CPTCFG_IWL_TIMEOUT_FACTOR)
 #define MVM_UCODE_CALIB_TIMEOUT	(2 * HZ * CPTCFG_IWL_TIMEOUT_FACTOR)
-#define MVM_UCODE_PNVM_TIMEOUT	(HZ / 10 * CPTCFG_IWL_TIMEOUT_FACTOR)
 
 #define UCODE_VALID_OK	cpu_to_le32(0x1)
 
@@ -225,55 +224,25 @@ static bool iwl_alive_fn(struct iwl_notif_wait_data *notif_wait,
 	struct iwl_mvm *mvm =
 		container_of(notif_wait, struct iwl_mvm, notif_wait);
 	struct iwl_mvm_alive_data *alive_data = data;
+	struct mvm_alive_resp_v3 *palive3;
+	struct mvm_alive_resp *palive;
 	struct iwl_umac_alive *umac;
 	struct iwl_lmac_alive *lmac1;
 	struct iwl_lmac_alive *lmac2 = NULL;
 	u16 status;
 	u32 lmac_error_event_table, umac_error_table;
 
-	/*
-	 * For v5 and above, we can check the version, for older
-	 * versions we need to check the size.
-	 */
-	if (iwl_fw_lookup_notif_ver(mvm->fw, LEGACY_GROUP,
-				    UCODE_ALIVE_NTFY, 0) == 5) {
-		struct iwl_alive_ntf_v5 *palive;
-
+	if (iwl_rx_packet_payload_len(pkt) == sizeof(*palive)) {
 		palive = (void *)pkt->data;
 		umac = &palive->umac_data;
 		lmac1 = &palive->lmac_data[0];
 		lmac2 = &palive->lmac_data[1];
 		status = le16_to_cpu(palive->status);
-
-		mvm->trans->sku_id[0] = le32_to_cpu(palive->sku_id.data[0]);
-		mvm->trans->sku_id[1] = le32_to_cpu(palive->sku_id.data[1]);
-		mvm->trans->sku_id[2] = le32_to_cpu(palive->sku_id.data[2]);
-
-		IWL_DEBUG_FW(mvm, "Got sku_id: 0x0%x 0x0%x 0x0%x\n",
-			     mvm->trans->sku_id[0],
-			     mvm->trans->sku_id[1],
-			     mvm->trans->sku_id[2]);
-	} else if (iwl_rx_packet_payload_len(pkt) == sizeof(struct iwl_alive_ntf_v4)) {
-		struct iwl_alive_ntf_v4 *palive;
-
-		palive = (void *)pkt->data;
-		umac = &palive->umac_data;
-		lmac1 = &palive->lmac_data[0];
-		lmac2 = &palive->lmac_data[1];
-		status = le16_to_cpu(palive->status);
-	} else if (iwl_rx_packet_payload_len(pkt) ==
-		   sizeof(struct iwl_alive_ntf_v3)) {
-		struct iwl_alive_ntf_v3 *palive3;
-
+	} else {
 		palive3 = (void *)pkt->data;
 		umac = &palive3->umac_data;
 		lmac1 = &palive3->lmac_data;
 		status = le16_to_cpu(palive3->status);
-	} else {
-		WARN(1, "unsupported alive notification (size %d)\n",
-		     iwl_rx_packet_payload_len(pkt));
-		/* get timeout later */
-		return false;
 	}
 
 	lmac_error_event_table =
@@ -324,20 +293,6 @@ static bool iwl_alive_fn(struct iwl_notif_wait_data *notif_wait,
 	return true;
 }
 
-static bool iwl_pnvm_complete_fn(struct iwl_notif_wait_data *notif_wait,
-				 struct iwl_rx_packet *pkt, void *data)
-{
-	struct iwl_mvm *mvm =
-		container_of(notif_wait, struct iwl_mvm, notif_wait);
-	struct iwl_pnvm_init_complete_ntfy *pnvm_ntf = (void *)pkt->data;
-
-	IWL_DEBUG_FW(mvm,
-		     "PNVM complete notification received with status %d\n",
-		     le32_to_cpu(pnvm_ntf->status));
-
-	return true;
-}
-
 static bool iwl_wait_init_complete(struct iwl_notif_wait_data *notif_wait,
 				   struct iwl_rx_packet *pkt, void *data)
 {
@@ -361,35 +316,6 @@ static bool iwl_wait_phy_db_entry(struct iwl_notif_wait_data *notif_wait,
 	return false;
 }
 
-static int iwl_mvm_load_pnvm(struct iwl_mvm *mvm)
-{
-	struct iwl_notification_wait pnvm_wait;
-	static const u16 ntf_cmds[] = { WIDE_ID(REGULATORY_AND_NVM_GROUP,
-						PNVM_INIT_COMPLETE_NTFY) };
-
-	/* if the SKU_ID is empty, there's nothing to do */
-	if (!mvm->trans->sku_id[0] &&
-	    !mvm->trans->sku_id[1] &&
-	    !mvm->trans->sku_id[2])
-		return 0;
-
-	/*
-	 * TODO: phase 2: load the pnvm file, find the right section,
-	 * load it and set the right DMA pointer.
-	 */
-
-	iwl_init_notification_wait(&mvm->notif_wait, &pnvm_wait,
-				   ntf_cmds, ARRAY_SIZE(ntf_cmds),
-				   iwl_pnvm_complete_fn, NULL);
-
-	/* kick the doorbell */
-	iwl_write_umac_prph(mvm->trans, UREG_DOORBELL_TO_ISR6,
-			    UREG_DOORBELL_TO_ISR6_PNVM);
-
-	return iwl_wait_notification(&mvm->notif_wait, &pnvm_wait,
-				     MVM_UCODE_PNVM_TIMEOUT);
-}
-
 static int iwl_mvm_load_ucode_wait_alive(struct iwl_mvm *mvm,
 					 enum iwl_ucode_type ucode_type)
 {
@@ -398,7 +324,7 @@ static int iwl_mvm_load_ucode_wait_alive(struct iwl_mvm *mvm,
 	const struct fw_img *fw;
 	int ret;
 	enum iwl_ucode_type old_type = mvm->fwrt.cur_fw_img;
-	static const u16 alive_cmd[] = { UCODE_ALIVE_NTFY };
+	static const u16 alive_cmd[] = { MVM_ALIVE };
 	bool run_in_rfkill =
 		ucode_type == IWL_UCODE_INIT || iwl_mvm_has_unified_ucode(mvm);
 
@@ -477,13 +403,6 @@ static int iwl_mvm_load_ucode_wait_alive(struct iwl_mvm *mvm,
 		IWL_ERR(mvm, "Loaded ucode is not valid!\n");
 		iwl_fw_set_current_image(&mvm->fwrt, old_type);
 		return -EIO;
-	}
-
-	ret = iwl_mvm_load_pnvm(mvm);
-	if (ret) {
-		IWL_ERR(mvm, "Timeout waiting for PNVM load!\n");
-		iwl_fw_set_current_image(&mvm->fwrt, old_type);
-		return ret;
 	}
 
 	iwl_trans_fw_alive(mvm->trans, alive_data.scd_base_addr);
@@ -715,8 +634,7 @@ static int iwl_send_phy_cfg_cmd(struct iwl_mvm *mvm)
 		mvm->fw->default_calib[ucode_type].flow_trigger;
 
 	cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw, IWL_ALWAYS_LONG_GROUP,
-					PHY_CONFIGURATION_CMD,
-					IWL_FW_CMD_VER_UNKNOWN);
+					PHY_CONFIGURATION_CMD);
 	if (cmd_ver == 3) {
 		iwl_mvm_phy_filter_init(mvm, &phy_filters);
 		memcpy(&phy_cfg_cmd.phy_specific_cfg, &phy_filters,
@@ -944,8 +862,7 @@ int iwl_mvm_sar_select_profile(struct iwl_mvm *mvm, int prof_a, int prof_b)
 	u16 len = 0;
 	u32 n_subbands;
 	u8 cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-					   REDUCE_TX_POWER_CMD,
-					   IWL_FW_CMD_VER_UNKNOWN);
+					   REDUCE_TX_POWER_CMD);
 
 	if (cmd_ver == 6) {
 		len = sizeof(cmd.v6);
@@ -988,9 +905,8 @@ int iwl_mvm_get_sar_geo_profile(struct iwl_mvm *mvm)
 	u16 len;
 	int ret;
 	struct iwl_host_cmd cmd;
-	u8 cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw, PHY_OPS_GROUP,
-					   GEO_TX_POWER_LIMIT,
-					   IWL_FW_CMD_VER_UNKNOWN);
+	u8 cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw,
+					   PHY_OPS_GROUP, GEO_TX_POWER_LIMIT);
 
 	/* the ops field is at the same spot for all versions, so set in v1 */
 	geo_tx_cmd.v1.ops =
@@ -1036,9 +952,8 @@ static int iwl_mvm_sar_geo_init(struct iwl_mvm *mvm)
 	u16 len;
 	u32 n_bands;
 	int ret;
-	u8 cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw, PHY_OPS_GROUP,
-					   GEO_TX_POWER_LIMIT,
-					   IWL_FW_CMD_VER_UNKNOWN);
+	u8 cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw,
+					   PHY_OPS_GROUP, GEO_TX_POWER_LIMIT);
 
 	BUILD_BUG_ON(offsetof(struct iwl_geo_tx_power_profiles_cmd_v1, ops) !=
 		     offsetof(struct iwl_geo_tx_power_profiles_cmd_v2, ops) ||
@@ -1050,12 +965,10 @@ static int iwl_mvm_sar_geo_init(struct iwl_mvm *mvm)
 	if (cmd_ver == 3) {
 		len = sizeof(cmd.v3);
 		n_bands = ARRAY_SIZE(cmd.v3.table[0]);
-		cmd.v3.table_revision = cpu_to_le32(mvm->fwrt.geo_rev);
 	} else if (fw_has_api(&mvm->fwrt.fw->ucode_capa,
 			      IWL_UCODE_TLV_API_SAR_TABLE_VER)) {
 		len = sizeof(cmd.v2);
 		n_bands = ARRAY_SIZE(cmd.v2.table[0]);
-		cmd.v2.table_revision = cpu_to_le32(mvm->fwrt.geo_rev);
 	} else {
 		len = sizeof(cmd.v1);
 		n_bands = ARRAY_SIZE(cmd.v1.table[0]);
@@ -1074,6 +987,16 @@ static int iwl_mvm_sar_geo_init(struct iwl_mvm *mvm)
 	 */
 	if (ret)
 		return 0;
+
+	/*
+	 * Set the revision on versions that contain it.
+	 * This must be done after calling iwl_sar_geo_init().
+	 */
+	if (cmd_ver == 3)
+		cmd.v3.table_revision = cpu_to_le32(mvm->fwrt.geo_rev);
+	else if (fw_has_api(&mvm->fwrt.fw->ucode_capa,
+			    IWL_UCODE_TLV_API_SAR_TABLE_VER))
+		cmd.v2.table_revision = cpu_to_le32(mvm->fwrt.geo_rev);
 
 	return iwl_mvm_send_cmd_pdu(mvm,
 				    WIDE_ID(PHY_OPS_GROUP, GEO_TX_POWER_LIMIT),
@@ -1189,8 +1112,7 @@ int iwl_mvm_ppag_send_cmd(struct iwl_mvm *mvm)
 	}
 
 	cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw, PHY_OPS_GROUP,
-					PER_PLATFORM_ANT_GAIN_CMD,
-					IWL_FW_CMD_VER_UNKNOWN);
+					PER_PLATFORM_ANT_GAIN_CMD);
 	if (cmd_ver == 1) {
 		num_sub_bands = IWL_NUM_SUB_BANDS;
 		gain = mvm->fwrt.ppag_table.v1.gain[0];
@@ -1615,7 +1537,7 @@ int iwl_mvm_up(struct iwl_mvm *mvm)
 	}
 
 	/* init the fw <-> mac80211 STA mapping */
-	for (i = 0; i < mvm->fw->ucode_capa.num_stations; i++)
+	for (i = 0; i < ARRAY_SIZE(mvm->fw_id_to_mac_id); i++)
 		RCU_INIT_POINTER(mvm->fw_id_to_mac_id[i], NULL);
 
 	mvm->tdls_cs.peer.sta_id = IWL_MVM_INVALID_STA;
@@ -1629,23 +1551,10 @@ int iwl_mvm_up(struct iwl_mvm *mvm)
 			goto error;
 	}
 
-	/*
-	 * Add auxiliary station for scanning.
-	 * Newer versions of this command implies that the fw uses
-	 * internal aux station for all aux activities that don't
-	 * requires a dedicated data queue.
-	 */
-	if (iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-				  ADD_STA,
-				  0) < 12) {
-		 /*
-		  * In old version the aux station uses mac id like other
-		  * station and not lmac id
-		  */
-		ret = iwl_mvm_add_aux_sta(mvm, MAC_INDEX_AUX);
-		if (ret)
-			goto error;
-	}
+	/* Add auxiliary station for scanning */
+	ret = iwl_mvm_add_aux_sta(mvm);
+	if (ret)
+		goto error;
 
 	/* Add all the PHY contexts */
 	i = 0;
@@ -1733,8 +1642,7 @@ int iwl_mvm_up(struct iwl_mvm *mvm)
 	    IWL_TX_POWER_MODE_SET_DEVICE) {
 		int len;
 		u8 cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-						   REDUCE_TX_POWER_CMD,
-						   IWL_FW_CMD_VER_UNKNOWN);
+						   REDUCE_TX_POWER_CMD);
 
 		if (cmd_ver == 6)
 			len = sizeof(mvm->txp_cmd.v6);
@@ -1831,24 +1739,13 @@ int iwl_mvm_load_d3_fw(struct iwl_mvm *mvm)
 		goto error;
 
 	/* init the fw <-> mac80211 STA mapping */
-	for (i = 0; i < mvm->fw->ucode_capa.num_stations; i++)
+	for (i = 0; i < ARRAY_SIZE(mvm->fw_id_to_mac_id); i++)
 		RCU_INIT_POINTER(mvm->fw_id_to_mac_id[i], NULL);
 
-	if (iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-				  ADD_STA,
-				  0) < 12) {
-		/*
-		 * Add auxiliary station for scanning.
-		 * Newer versions of this command implies that the fw uses
-		 * internal aux station for all aux activities that don't
-		 * requires a dedicated data queue.
-		 * In old version the aux station uses mac id like other
-		 * station and not lmac id
-		 */
-		ret = iwl_mvm_add_aux_sta(mvm, MAC_INDEX_AUX);
-		if (ret)
-			goto error;
-	}
+	/* Add auxiliary station for scanning */
+	ret = iwl_mvm_add_aux_sta(mvm);
+	if (ret)
+		goto error;
 
 	return 0;
  error:

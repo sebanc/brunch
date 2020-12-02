@@ -384,9 +384,6 @@ static u32 iwl_get_channel_flags(u8 ch_num, int ch_idx, enum nl80211_band band,
 
 static enum nl80211_band iwl_nl80211_band_from_channel_idx(int ch_idx)
 {
-	if (ch_idx >= NUM_2GHZ_CHANNELS + NUM_5GHZ_CHANNELS)
-		return NL80211_BAND_6GHZ;
-
 	if (ch_idx >= NUM_2GHZ_CHANNELS)
 		return NL80211_BAND_5GHZ;
 	return NL80211_BAND_2GHZ;
@@ -589,7 +586,8 @@ static struct ieee80211_sband_iftype_data iwl_he_capa[] = {
 			.has_he = true,
 			.he_cap_elem = {
 				.mac_cap_info[0] =
-					IEEE80211_HE_MAC_CAP0_HTC_HE,
+					IEEE80211_HE_MAC_CAP0_HTC_HE |
+					IEEE80211_HE_MAC_CAP0_TWT_REQ,
 				.mac_cap_info[1] =
 					IEEE80211_HE_MAC_CAP1_TF_MAC_PAD_DUR_16US |
 					IEEE80211_HE_MAC_CAP1_MULTI_TID_AGG_RX_QOS_8,
@@ -854,10 +852,6 @@ static void iwl_init_he_override(struct iwl_trans *trans,
 				cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << 2);
 		}
 
-		if (trans->dbg_cfg.ack_en & 0x1)
-			iftype_data->he_cap.he_cap_elem.mac_cap_info[2] |=
-				IEEE80211_HE_MAC_CAP2_ACK_EN;
-
 		if (trans->dbg_cfg.no_ldpc)
 			iftype_data->he_cap.he_cap_elem.phy_cap_info[1] &=
 				~IEEE80211_HE_PHY_CAP1_LDPC_CODING_IN_PAYLOAD;
@@ -901,12 +895,13 @@ static void iwl_init_he_override(struct iwl_trans *trans,
 				       trans->dbg_cfg.he_phy_cap.data,
 				       trans->dbg_cfg.he_phy_cap.len);
 			}
-		} else if (iftype_data->types_mask == BIT(NL80211_IFTYPE_STATION) &&
-		    trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
+		}
+
+		if (iftype_data->types_mask == BIT(NL80211_IFTYPE_STATION) &&
+		    trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210)
 			iftype_data->he_cap.he_cap_elem.phy_cap_info[2] |=
 				IEEE80211_HE_PHY_CAP2_UL_MU_FULL_MU_MIMO |
 				IEEE80211_HE_PHY_CAP2_UL_MU_PARTIAL_MU_MIMO;
-		}
 
 	}
 }
@@ -1304,15 +1299,11 @@ static u32 iwl_nvm_get_regdom_bw_flags(const u16 *nvm_chan,
 			flags &= ~NL80211_RRF_NO_HT40PLUS;
 		if (nvm_chan[ch_idx] >= FIRST_2GHZ_HT_MINUS)
 			flags &= ~NL80211_RRF_NO_HT40MINUS;
-	} else if (ch_idx < NUM_2GHZ_CHANNELS + NUM_5GHZ_CHANNELS &&
-		   nvm_flags & NVM_CHANNEL_40MHZ) {
+	} else if (nvm_flags & NVM_CHANNEL_40MHZ) {
 		if ((ch_idx - NUM_2GHZ_CHANNELS) % 2 == 0)
 			flags &= ~NL80211_RRF_NO_HT40PLUS;
 		else
 			flags &= ~NL80211_RRF_NO_HT40MINUS;
-	} else if (nvm_flags & NVM_CHANNEL_40MHZ) {
-		flags &= ~NL80211_RRF_NO_HT40PLUS;
-		flags &= ~NL80211_RRF_NO_HT40MINUS;
 	}
 
 	if (!(nvm_flags & NVM_CHANNEL_80MHZ))

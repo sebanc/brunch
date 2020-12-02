@@ -203,14 +203,7 @@ static struct multipath *alloc_multipath(struct dm_target *ti)
 static int alloc_multipath_stage2(struct dm_target *ti, struct multipath *m)
 {
 	if (m->queue_mode == DM_TYPE_NONE) {
-		/*
-		 * Default to request-based.
-		 */
-		if (dm_use_blk_mq(dm_table_get_md(ti->table)))
-			m->queue_mode = DM_TYPE_MQ_REQUEST_BASED;
-		else
-			m->queue_mode = DM_TYPE_REQUEST_BASED;
-
+		m->queue_mode = DM_TYPE_REQUEST_BASED;
 	} else if (m->queue_mode == DM_TYPE_BIO_BASED) {
 		INIT_WORK(&m->process_queued_bios, process_queued_bios);
 		/*
@@ -537,10 +530,7 @@ static int multipath_clone_and_map(struct dm_target *ti, struct request *rq,
 		 * get the queue busy feedback (via BLK_STS_RESOURCE),
 		 * otherwise I/O merging can suffer.
 		 */
-		if (q->mq_ops)
-			return DM_MAPIO_REQUEUE;
-		else
-			return DM_MAPIO_DELAY_REQUEUE;
+		return DM_MAPIO_REQUEUE;
 	}
 	clone->bio = clone->biotail = NULL;
 	clone->rq_disk = bdev->bd_disk;
@@ -650,7 +640,7 @@ static int multipath_map_bio(struct dm_target *ti, struct bio *bio)
 
 static void process_queued_io_list(struct multipath *m)
 {
-	if (m->queue_mode == DM_TYPE_MQ_REQUEST_BASED)
+	if (m->queue_mode == DM_TYPE_REQUEST_BASED)
 		dm_mq_kick_requeue_list(dm_table_get_md(m->ti->table));
 	else if (m->queue_mode == DM_TYPE_BIO_BASED)
 		queue_work(kmultipathd, &m->process_queued_bios);
@@ -1071,10 +1061,9 @@ static int parse_features(struct dm_arg_set *as, struct multipath *m)
 
 			if (!strcasecmp(queue_mode_name, "bio"))
 				m->queue_mode = DM_TYPE_BIO_BASED;
-			else if (!strcasecmp(queue_mode_name, "rq"))
+			else if (!strcasecmp(queue_mode_name, "rq") ||
+				 !strcasecmp(queue_mode_name, "mq"))
 				m->queue_mode = DM_TYPE_REQUEST_BASED;
-			else if (!strcasecmp(queue_mode_name, "mq"))
-				m->queue_mode = DM_TYPE_MQ_REQUEST_BASED;
 			else {
 				ti->error = "Unknown 'queue_mode' requested";
 				r = -EINVAL;
@@ -1201,17 +1190,27 @@ static void multipath_wait_for_pg_init_completion(struct multipath *m)
 static void flush_multipath_work(struct multipath *m)
 {
 	if (m->hw_handler_name) {
-		set_bit(MPATHF_PG_INIT_DISABLED, &m->flags);
-		smp_mb__after_atomic();
+		unsigned long flags;
 
-		flush_workqueue(kmpath_handlerd);
-		multipath_wait_for_pg_init_completion(m);
+		if (!atomic_read(&m->pg_init_in_progress))
+			goto skip;
 
-		clear_bit(MPATHF_PG_INIT_DISABLED, &m->flags);
-		smp_mb__after_atomic();
+		spin_lock_irqsave(&m->lock, flags);
+		if (atomic_read(&m->pg_init_in_progress) &&
+		    !test_and_set_bit(MPATHF_PG_INIT_DISABLED, &m->flags)) {
+			spin_unlock_irqrestore(&m->lock, flags);
+
+			flush_workqueue(kmpath_handlerd);
+			multipath_wait_for_pg_init_completion(m);
+
+			spin_lock_irqsave(&m->lock, flags);
+			clear_bit(MPATHF_PG_INIT_DISABLED, &m->flags);
+		}
+		spin_unlock_irqrestore(&m->lock, flags);
 	}
-
-	flush_workqueue(kmultipathd);
+skip:
+	if (m->queue_mode == DM_TYPE_BIO_BASED)
+		flush_work(&m->process_queued_bios);
 	flush_work(&m->trigger_event);
 }
 
@@ -1708,9 +1707,6 @@ static void multipath_status(struct dm_target *ti, status_type_t type,
 			case DM_TYPE_BIO_BASED:
 				DMEMIT("queue_mode bio ");
 				break;
-			case DM_TYPE_MQ_REQUEST_BASED:
-				DMEMIT("queue_mode mq ");
-				break;
 			default:
 				WARN_ON_ONCE(true);
 				break;
@@ -1954,7 +1950,7 @@ static int multipath_busy(struct dm_target *ti)
 
 	/* no paths available, for blk-mq: rely on IO mapping to delay requeue */
 	if (!atomic_read(&m->nr_valid_paths) && test_bit(MPATHF_QUEUE_IF_NO_PATH, &m->flags))
-		return (m->queue_mode != DM_TYPE_MQ_REQUEST_BASED);
+		return (m->queue_mode != DM_TYPE_REQUEST_BASED);
 
 	/* Guess which priority_group will be used at next mapping time */
 	pg = READ_ONCE(m->current_pg);

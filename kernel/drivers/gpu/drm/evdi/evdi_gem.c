@@ -46,7 +46,7 @@ struct evdi_gem_object *evdi_gem_alloc_object(struct drm_device *dev,
 		return NULL;
 	}
 
-	reservation_object_init(&obj->_resv);
+	dma_resv_init(&obj->_resv);
 	obj->resv = &obj->_resv;
 
 	return obj;
@@ -73,7 +73,7 @@ evdi_gem_create(struct drm_file *file,
 		return ret;
 	}
 
-	drm_gem_object_unreference_unlocked(&obj->base);
+	drm_gem_object_put(&obj->base);
 	*handle_p = handle;
 	return 0;
 }
@@ -100,7 +100,7 @@ int evdi_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	return ret;
 }
 
-int evdi_gem_fault(struct vm_fault *vmf)
+vm_fault_t evdi_gem_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
 	struct evdi_gem_object *obj = to_evdi_bo(vma->vm_private_data);
@@ -216,7 +216,7 @@ void evdi_gem_free_object(struct drm_gem_object *gem_obj)
 	if (gem_obj->dev->vma_offset_manager)
 		drm_gem_free_mmap_offset(gem_obj);
 
-	reservation_object_fini(&obj->_resv);
+	dma_resv_init(&obj->_resv);
 	obj->resv = NULL;
 }
 
@@ -250,7 +250,7 @@ int evdi_gem_mmap(struct drm_file *file,
 	*offset = drm_vma_node_offset_addr(&gobj->base.vma_node);
 
  out:
-	drm_gem_object_unreference(&gobj->base);
+	drm_gem_object_put_locked(&gobj->base);
  unlock:
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
@@ -446,7 +446,7 @@ struct drm_gem_object *evdi_gem_prime_import(struct drm_device *dev,
 	if (dma_buf->ops == &evdi_dmabuf_ops) {
 		uobj = to_evdi_bo(dma_buf->priv);
 		if (uobj->base.dev == dev) {
-			drm_gem_object_reference(&uobj->base);
+			drm_gem_object_get(&uobj->base);
 			return &uobj->base;
 		}
 	}
@@ -485,8 +485,7 @@ struct drm_gem_object *evdi_gem_prime_import(struct drm_device *dev,
 	return ERR_PTR(ret);
 }
 
-struct dma_buf *evdi_gem_prime_export(struct drm_device *dev,
-				      struct drm_gem_object *obj, int flags)
+struct dma_buf *evdi_gem_prime_export(struct drm_gem_object *obj, int flags)
 {
 	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
 	struct evdi_gem_object *evdi_obj = to_evdi_bo(obj);
@@ -498,5 +497,5 @@ struct dma_buf *evdi_gem_prime_export(struct drm_device *dev,
 	exp_info.resv = evdi_obj->resv,
 	exp_info.priv = obj;
 
-	return drm_gem_dmabuf_export(dev, &exp_info);
+	return drm_gem_dmabuf_export(obj->dev, &exp_info);
 }

@@ -1,25 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* -*- linux-c -*- *
  *
  * ALSA driver for the digigram lx6464es interface
  *
  * Copyright (c) 2008, 2009 Tim Blechmann <tim@klingt.org>
- *
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.
- *
  */
 
 #include <linux/module.h>
@@ -277,9 +261,8 @@ exit:
 
 static int lx_pcm_close(struct snd_pcm_substream *substream)
 {
-	int err = 0;
 	dev_dbg(substream->pcm->card->dev, "->lx_pcm_close\n");
-	return err;
+	return 0;
 }
 
 static snd_pcm_uframes_t lx_pcm_stream_pointer(struct snd_pcm_substream
@@ -954,13 +937,7 @@ static void lx_proc_levels_read(struct snd_info_entry *entry,
 
 static int lx_proc_create(struct snd_card *card, struct lx6464es *chip)
 {
-	struct snd_info_entry *entry;
-	int err = snd_card_proc_new(card, "levels", &entry);
-	if (err < 0)
-		return err;
-
-	snd_info_set_text_ops(entry, chip, lx_proc_levels_read);
-	return 0;
+	return snd_card_ro_proc_new(card, "levels", chip, lx_proc_levels_read);
 }
 
 

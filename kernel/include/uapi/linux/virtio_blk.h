@@ -180,11 +180,11 @@ struct virtio_blk_outhdr {
 /* Discard/write zeroes range for each request. */
 struct virtio_blk_discard_write_zeroes {
 	/* discard/write zeroes start sector */
-	__virtio64 sector;
+	__le64 sector;
 	/* number of discard/write zeroes sectors */
-	__virtio32 num_sectors;
+	__le32 num_sectors;
 	/* flags for this range */
-	__virtio32 flags;
+	__le32 flags;
 };
 
 #ifndef VIRTIO_BLK_NO_LEGACY

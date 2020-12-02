@@ -1,18 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Device property helpers for GPIO chips.
  *
  * Copyright (C) 2016, Intel Corporation
  * Author: Mika Westerberg <mika.westerberg@linux.intel.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/property.h>
 #include <linux/slab.h>
 #include <linux/gpio/consumer.h>
 #include <linux/gpio/driver.h>
+#include <linux/export.h>
 
 #include "gpiolib.h"
 
@@ -59,3 +57,4 @@ void devprop_gpiochip_set_names(struct gpio_chip *chip,
 
 	kfree(names);
 }
+EXPORT_SYMBOL_GPL(devprop_gpiochip_set_names);

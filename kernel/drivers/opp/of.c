@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Generic OPP OF helpers
  *
@@ -5,10 +6,6 @@
  *	Nishanth Menon
  *	Romit Dasgupta
  *	Kevin Hilman
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -146,7 +143,7 @@ static void _opp_table_free_required_tables(struct opp_table *opp_table)
 
 	for (i = 0; i < opp_table->required_opp_count; i++) {
 		if (IS_ERR_OR_NULL(required_opp_tables[i]))
-			continue;
+			break;
 
 		dev_pm_opp_put_opp_table(required_opp_tables[i]);
 	}
@@ -166,8 +163,8 @@ static void _opp_table_alloc_required_tables(struct opp_table *opp_table,
 					     struct device_node *opp_np)
 {
 	struct opp_table **required_opp_tables;
-	struct device_node *np;
-	int count;
+	struct device_node *required_np, *np;
+	int count, i;
 
 	/* Traversing the first OPP node is all we need */
 	np = of_get_next_available_child(opp_np, NULL);
@@ -177,61 +174,46 @@ static void _opp_table_alloc_required_tables(struct opp_table *opp_table,
 	}
 
 	count = of_count_phandle_with_args(np, "required-opps", NULL);
-	of_node_put(np);
 	if (!count)
-		return;
+		goto put_np;
 
 	required_opp_tables = kcalloc(count, sizeof(*required_opp_tables),
 				      GFP_KERNEL);
 	if (!required_opp_tables)
-		return;
+		goto put_np;
 
 	opp_table->required_opp_tables = required_opp_tables;
 	opp_table->required_opp_count = count;
-}
 
-void _of_lazy_link_required_tables(struct opp_table *src)
-{
-	struct dev_pm_opp *src_opp, *tmp_opp;
-	struct opp_table *req_table;
-	struct device_node *req_np;
-	int i;
+	for (i = 0; i < count; i++) {
+		required_np = of_parse_required_opp(np, i);
+		if (!required_np)
+			goto free_required_tables;
 
-	mutex_lock_nested(&src->lock, 1);
+		required_opp_tables[i] = _find_table_of_opp_np(required_np);
+		of_node_put(required_np);
 
-	if (list_empty(&src->opp_list))
-		goto out;
+		if (IS_ERR(required_opp_tables[i]))
+			goto free_required_tables;
 
-	src_opp = list_first_entry(&src->opp_list, struct dev_pm_opp, node);
-
-	for (i = 0; i < src->required_opp_count; i++) {
-		if (src->required_opp_tables[i])
-			continue;
-
-		req_np = of_parse_required_opp(src_opp->np, i);
-		if (!req_np)
-			continue;
-
-		mutex_lock(&opp_table_lock);
-		req_table = _find_table_of_opp_np(req_np);
-		mutex_unlock(&opp_table_lock);
-		of_node_put(req_np);
-		if (!req_table)
-			continue;
-
-		src->required_opp_tables[i] = req_table;
-		list_for_each_entry(tmp_opp, &src->opp_list, node) {
-			req_np = of_parse_required_opp(tmp_opp->np, i);
-			mutex_lock(&opp_table_lock);
-			tmp_opp->required_opps[i] = _find_opp_of_np(req_table,
-								    req_np);
-			mutex_unlock(&opp_table_lock);
-			of_node_put(req_np);
+		/*
+		 * We only support genpd's OPPs in the "required-opps" for now,
+		 * as we don't know how much about other cases. Error out if the
+		 * required OPP doesn't belong to a genpd.
+		 */
+		if (!required_opp_tables[i]->is_genpd) {
+			dev_err(dev, "required-opp doesn't belong to genpd: %pOF\n",
+				required_np);
+			goto free_required_tables;
 		}
 	}
 
-out:
-	mutex_unlock(&src->lock);
+	goto put_np;
+
+free_required_tables:
+	_opp_table_free_required_tables(opp_table);
+put_np:
+	of_node_put(np);
 }
 
 void _of_init_opp_table(struct opp_table *opp_table, struct device *dev,
@@ -294,7 +276,7 @@ void _of_opp_free_required_opps(struct opp_table *opp_table,
 
 	for (i = 0; i < opp_table->required_opp_count; i++) {
 		if (!required_opps[i])
-			continue;
+			break;
 
 		/* Put the reference back */
 		dev_pm_opp_put(required_opps[i]);
@@ -309,7 +291,9 @@ static int _of_opp_alloc_required_opps(struct opp_table *opp_table,
 				       struct dev_pm_opp *opp)
 {
 	struct dev_pm_opp **required_opps;
-	int count = opp_table->required_opp_count;
+	struct opp_table *required_table;
+	struct device_node *np;
+	int i, ret, count = opp_table->required_opp_count;
 
 	if (!count)
 		return 0;
@@ -320,8 +304,132 @@ static int _of_opp_alloc_required_opps(struct opp_table *opp_table,
 
 	opp->required_opps = required_opps;
 
+	for (i = 0; i < count; i++) {
+		required_table = opp_table->required_opp_tables[i];
+
+		np = of_parse_required_opp(opp->np, i);
+		if (unlikely(!np)) {
+			ret = -ENODEV;
+			goto free_required_opps;
+		}
+
+		required_opps[i] = _find_opp_of_np(required_table, np);
+		of_node_put(np);
+
+		if (!required_opps[i]) {
+			pr_err("%s: Unable to find required OPP node: %pOF (%d)\n",
+			       __func__, opp->np, i);
+			ret = -ENODEV;
+			goto free_required_opps;
+		}
+	}
+
 	return 0;
+
+free_required_opps:
+	_of_opp_free_required_opps(opp_table, opp);
+
+	return ret;
 }
+
+static int _bandwidth_supported(struct device *dev, struct opp_table *opp_table)
+{
+	struct device_node *np, *opp_np;
+	struct property *prop;
+
+	if (!opp_table) {
+		np = of_node_get(dev->of_node);
+		if (!np)
+			return -ENODEV;
+
+		opp_np = _opp_of_get_opp_desc_node(np, 0);
+		of_node_put(np);
+	} else {
+		opp_np = of_node_get(opp_table->np);
+	}
+
+	/* Lets not fail in case we are parsing opp-v1 bindings */
+	if (!opp_np)
+		return 0;
+
+	/* Checking only first OPP is sufficient */
+	np = of_get_next_available_child(opp_np, NULL);
+	if (!np) {
+		dev_err(dev, "OPP table empty\n");
+		return -EINVAL;
+	}
+	of_node_put(opp_np);
+
+	prop = of_find_property(np, "opp-peak-kBps", NULL);
+	of_node_put(np);
+
+	if (!prop || !prop->length)
+		return 0;
+
+	return 1;
+}
+
+int dev_pm_opp_of_find_icc_paths(struct device *dev,
+				 struct opp_table *opp_table)
+{
+	struct device_node *np;
+	int ret, i, count, num_paths;
+	struct icc_path **paths;
+
+	ret = _bandwidth_supported(dev, opp_table);
+	if (ret <= 0)
+		return ret;
+
+	ret = 0;
+
+	np = of_node_get(dev->of_node);
+	if (!np)
+		return 0;
+
+	count = of_count_phandle_with_args(np, "interconnects",
+					   "#interconnect-cells");
+	of_node_put(np);
+	if (count < 0)
+		return 0;
+
+	/* two phandles when #interconnect-cells = <1> */
+	if (count % 2) {
+		dev_err(dev, "%s: Invalid interconnects values\n", __func__);
+		return -EINVAL;
+	}
+
+	num_paths = count / 2;
+	paths = kcalloc(num_paths, sizeof(*paths), GFP_KERNEL);
+	if (!paths)
+		return -ENOMEM;
+
+	for (i = 0; i < num_paths; i++) {
+		paths[i] = of_icc_get_by_index(dev, i);
+		if (IS_ERR(paths[i])) {
+			ret = PTR_ERR(paths[i]);
+			if (ret != -EPROBE_DEFER) {
+				dev_err(dev, "%s: Unable to get path%d: %d\n",
+					__func__, i, ret);
+			}
+			goto err;
+		}
+	}
+
+	if (opp_table) {
+		opp_table->paths = paths;
+		opp_table->path_count = num_paths;
+		return 0;
+	}
+
+err:
+	while (i--)
+		icc_put(paths[i]);
+
+	kfree(paths);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(dev_pm_opp_of_find_icc_paths);
 
 static bool _opp_is_supported(struct device *dev, struct opp_table *opp_table,
 			      struct device_node *np)
@@ -512,6 +620,90 @@ void dev_pm_opp_of_remove_table(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(dev_pm_opp_of_remove_table);
 
+static int _read_bw(struct dev_pm_opp *new_opp, struct opp_table *table,
+		    struct device_node *np, bool peak)
+{
+	const char *name = peak ? "opp-peak-kBps" : "opp-avg-kBps";
+	struct property *prop;
+	int i, count, ret;
+	u32 *bw;
+
+	prop = of_find_property(np, name, NULL);
+	if (!prop)
+		return -ENODEV;
+
+	count = prop->length / sizeof(u32);
+	if (table->path_count != count) {
+		pr_err("%s: Mismatch between %s and paths (%d %d)\n",
+				__func__, name, count, table->path_count);
+		return -EINVAL;
+	}
+
+	bw = kmalloc_array(count, sizeof(*bw), GFP_KERNEL);
+	if (!bw)
+		return -ENOMEM;
+
+	ret = of_property_read_u32_array(np, name, bw, count);
+	if (ret) {
+		pr_err("%s: Error parsing %s: %d\n", __func__, name, ret);
+		goto out;
+	}
+
+	for (i = 0; i < count; i++) {
+		if (peak)
+			new_opp->bandwidth[i].peak = kBps_to_icc(bw[i]);
+		else
+			new_opp->bandwidth[i].avg = kBps_to_icc(bw[i]);
+	}
+
+out:
+	kfree(bw);
+	return ret;
+}
+
+static int _read_opp_key(struct dev_pm_opp *new_opp, struct opp_table *table,
+			 struct device_node *np, bool *rate_not_available)
+{
+	bool found = false;
+	u64 rate;
+	int ret;
+
+	ret = of_property_read_u64(np, "opp-hz", &rate);
+	if (!ret) {
+		/*
+		 * Rate is defined as an unsigned long in clk API, and so
+		 * casting explicitly to its type. Must be fixed once rate is 64
+		 * bit guaranteed in clk API.
+		 */
+		new_opp->rate = (unsigned long)rate;
+		found = true;
+	}
+	*rate_not_available = !!ret;
+
+	/*
+	 * Bandwidth consists of peak and average (optional) values:
+	 * opp-peak-kBps = <path1_value path2_value>;
+	 * opp-avg-kBps = <path1_value path2_value>;
+	 */
+	ret = _read_bw(new_opp, table, np, true);
+	if (!ret) {
+		found = true;
+		ret = _read_bw(new_opp, table, np, false);
+	}
+
+	/* The properties were found but we failed to parse them */
+	if (ret && ret != -ENODEV)
+		return ret;
+
+	if (!of_property_read_u32(np, "opp-level", &new_opp->level))
+		found = true;
+
+	if (found)
+		return 0;
+
+	return ret;
+}
+
 /**
  * _opp_add_static_v2() - Allocate static OPPs (As per 'v2' DT bindings)
  * @opp_table:	OPP table
@@ -549,25 +741,11 @@ static struct dev_pm_opp *_opp_add_static_v2(struct opp_table *opp_table,
 	if (!new_opp)
 		return ERR_PTR(-ENOMEM);
 
-	ret = of_property_read_u64(np, "opp-hz", &rate);
-	if (ret < 0) {
-		/* "opp-hz" is optional for devices like power domains. */
-		if (!opp_table->is_genpd) {
-			dev_err(dev, "%s: opp-hz not found\n", __func__);
-			goto free_opp;
-		}
-
-		rate_not_available = true;
-	} else {
-		/*
-		 * Rate is defined as an unsigned long in clk API, and so
-		 * casting explicitly to its type. Must be fixed once rate is 64
-		 * bit guaranteed in clk API.
-		 */
-		new_opp->rate = (unsigned long)rate;
+	ret = _read_opp_key(new_opp, opp_table, np, &rate_not_available);
+	if (ret < 0 && !opp_table->is_genpd) {
+		dev_err(dev, "%s: opp key field not found\n", __func__);
+		goto free_opp;
 	}
-
-	of_property_read_u32(np, "opp-level", &new_opp->level);
 
 	/* Check if the OPP supports hardware's hierarchy of versions or not */
 	if (!_opp_is_supported(dev, opp_table, np)) {
@@ -606,9 +784,12 @@ static struct dev_pm_opp *_opp_add_static_v2(struct opp_table *opp_table,
 	/* OPP to select on device suspend */
 	if (of_property_read_bool(np, "opp-suspend")) {
 		if (opp_table->suspend_opp) {
-			dev_warn(dev, "%s: Multiple suspend OPPs found (%lu %lu)\n",
-				 __func__, opp_table->suspend_opp->rate,
-				 new_opp->rate);
+			/* Pick the OPP with higher rate as suspend OPP */
+			if (new_opp->rate > opp_table->suspend_opp->rate) {
+				opp_table->suspend_opp->suspend = false;
+				new_opp->suspend = true;
+				opp_table->suspend_opp = new_opp;
+			}
 		} else {
 			new_opp->suspend = true;
 			opp_table->suspend_opp = new_opp;
@@ -646,17 +827,15 @@ static int _of_add_opp_table_v2(struct device *dev, struct opp_table *opp_table)
 	struct dev_pm_opp *opp;
 
 	/* OPP table is already initialized for the device */
+	mutex_lock(&opp_table->lock);
 	if (opp_table->parsed_static_opps) {
-		kref_get(&opp_table->list_kref);
+		opp_table->parsed_static_opps++;
+		mutex_unlock(&opp_table->lock);
 		return 0;
 	}
 
-	/*
-	 * Re-initialize list_kref every time we add static OPPs to the OPP
-	 * table as the reference count may be 0 after the last tie static OPPs
-	 * were removed.
-	 */
-	kref_init(&opp_table->list_kref);
+	opp_table->parsed_static_opps = 1;
+	mutex_unlock(&opp_table->lock);
 
 	/* We have opp-table node now, iterate over it and add OPPs */
 	for_each_available_child_of_node(opp_table->np, np) {
@@ -666,7 +845,7 @@ static int _of_add_opp_table_v2(struct device *dev, struct opp_table *opp_table)
 			dev_err(dev, "%s: Failed to add OPP, %d\n", __func__,
 				ret);
 			of_node_put(np);
-			goto put_list_kref;
+			goto remove_static_opp;
 		} else if (opp) {
 			count++;
 		}
@@ -675,7 +854,7 @@ static int _of_add_opp_table_v2(struct device *dev, struct opp_table *opp_table)
 	/* There should be one of more OPP defined */
 	if (WARN_ON(!count)) {
 		ret = -ENOENT;
-		goto put_list_kref;
+		goto remove_static_opp;
 	}
 
 	list_for_each_entry(opp, &opp_table->opp_list, node)
@@ -686,18 +865,16 @@ static int _of_add_opp_table_v2(struct device *dev, struct opp_table *opp_table)
 		dev_err(dev, "Not all nodes have performance state set (%d: %d)\n",
 			count, pstate_count);
 		ret = -ENOENT;
-		goto put_list_kref;
+		goto remove_static_opp;
 	}
 
 	if (pstate_count)
 		opp_table->genpd_performance_state = true;
 
-	opp_table->parsed_static_opps = true;
-
 	return 0;
 
-put_list_kref:
-	_put_opp_list_kref(opp_table);
+remove_static_opp:
+	_opp_remove_all_static(opp_table);
 
 	return ret;
 }
@@ -725,6 +902,10 @@ static int _of_add_opp_table_v1(struct device *dev, struct opp_table *opp_table)
 		return -EINVAL;
 	}
 
+	mutex_lock(&opp_table->lock);
+	opp_table->parsed_static_opps = 1;
+	mutex_unlock(&opp_table->lock);
+
 	val = prop->value;
 	while (nr) {
 		unsigned long freq = be32_to_cpup(val++) * 1000;
@@ -734,7 +915,7 @@ static int _of_add_opp_table_v1(struct device *dev, struct opp_table *opp_table)
 		if (ret) {
 			dev_err(dev, "%s: Failed to add OPP %ld (%d)\n",
 				__func__, freq, ret);
-			_put_opp_list_kref(opp_table);
+			_opp_remove_all_static(opp_table);
 			return ret;
 		}
 		nr -= 2;

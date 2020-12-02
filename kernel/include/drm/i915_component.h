@@ -28,12 +28,13 @@
 
 enum i915_component_type {
 	I915_COMPONENT_AUDIO = 1,
+	I915_COMPONENT_HDCP,
 };
 
 /* MAX_PORT is the number of port
  * It must be sync with I915_MAX_PORTS defined i915_drv.h
  */
-#define MAX_PORTS 6
+#define MAX_PORTS 9
 
 /**
  * struct i915_audio_component - Used for direct communication between i915 and hda drivers

@@ -1,11 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 #ifndef _LINUX_I8042_H
 #define _LINUX_I8042_H
 
-/*
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
- */
 
 #include <linux/types.h>
 
@@ -59,8 +55,6 @@ struct serio;
 
 #if defined(CONFIG_SERIO_I8042) || defined(CONFIG_SERIO_I8042_MODULE)
 
-void i8042_lock_chip(void);
-void i8042_unlock_chip(void);
 int i8042_command(unsigned char *param, int command);
 int i8042_install_filter(bool (*filter)(unsigned char data, unsigned char str,
 					struct serio *serio));
@@ -68,14 +62,6 @@ int i8042_remove_filter(bool (*filter)(unsigned char data, unsigned char str,
 				       struct serio *serio));
 
 #else
-
-static inline void i8042_lock_chip(void)
-{
-}
-
-static inline void i8042_unlock_chip(void)
-{
-}
 
 static inline int i8042_command(unsigned char *param, int command)
 {

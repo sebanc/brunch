@@ -11,13 +11,7 @@
 
 / {
 	model = "Google Cheza (rev3+)";
-	compatible = "google,cheza-rev15", "google,cheza-rev14",
-		     "google,cheza-rev13", "google,cheza-rev12",
-		     "google,cheza-rev11", "google,cheza-rev10",
-		     "google,cheza-rev9", "google,cheza-rev8",
-		     "google,cheza-rev7", "google,cheza-rev6",
-		     "google,cheza-rev5", "google,cheza-rev4",
-		     "google,cheza-rev3", "google,cheza", "qcom,sdm845";
+	compatible = "google,cheza", "qcom,sdm845";
 };
 
 /* PINCTRL - board-specific pinctrl */

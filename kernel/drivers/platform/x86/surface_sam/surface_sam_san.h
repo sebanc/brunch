@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Interface for Surface ACPI/Notify (SAN).
  *
@@ -17,7 +18,7 @@ struct surface_sam_san_rqsg {
 	u8 tc;				// target category
 	u8 cid;				// command ID
 	u8 iid;				// instance ID
-	u8 cdl;				// command data length (lenght of payload)
+	u8 cdl;				// command data length (length of payload)
 	u8 *pld;			// pointer to payload of length cdl
 };
 

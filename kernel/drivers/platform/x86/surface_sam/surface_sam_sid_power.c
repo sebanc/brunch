@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Surface SID Battery/AC Driver.
  * Provides support for the battery and AC on 7th generation Surface devices.
@@ -331,7 +332,7 @@ struct spwr_ac_device {
 struct spwr_subsystem {
 	struct mutex lock;
 
-	unsigned refcount;
+	unsigned int refcount;
 	struct spwr_ac_device *ac;
 	struct spwr_battery_device *battery[__SPWR_NUM_BAT];
 };
@@ -387,18 +388,18 @@ static int spwr_battery_register(struct spwr_battery_device *bat, struct platfor
 static int spwr_battery_unregister(struct spwr_battery_device *bat);
 
 
-inline static bool spwr_battery_present(struct spwr_battery_device *bat)
+static inline bool spwr_battery_present(struct spwr_battery_device *bat)
 {
 	return bat->sta & SAM_BATTERY_STA_PRESENT;
 }
 
 
-inline static int spwr_battery_load_sta(struct spwr_battery_device *bat)
+static inline int spwr_battery_load_sta(struct spwr_battery_device *bat)
 {
 	return sam_psy_get_sta(bat->id + 1, &bat->sta);
 }
 
-inline static int spwr_battery_load_bix(struct spwr_battery_device *bat)
+static inline int spwr_battery_load_bix(struct spwr_battery_device *bat)
 {
 	if (!spwr_battery_present(bat))
 		return 0;
@@ -406,7 +407,7 @@ inline static int spwr_battery_load_bix(struct spwr_battery_device *bat)
 	return sam_psy_get_bix(bat->id + 1, &bat->bix);
 }
 
-inline static int spwr_battery_load_bst(struct spwr_battery_device *bat)
+static inline int spwr_battery_load_bst(struct spwr_battery_device *bat)
 {
 	if (!spwr_battery_present(bat))
 		return 0;
@@ -415,13 +416,13 @@ inline static int spwr_battery_load_bst(struct spwr_battery_device *bat)
 }
 
 
-inline static int spwr_battery_set_alarm_unlocked(struct spwr_battery_device *bat, u32 value)
+static inline int spwr_battery_set_alarm_unlocked(struct spwr_battery_device *bat, u32 value)
 {
 	bat->alarm = value;
 	return sam_psy_set_btp(bat->id + 1, bat->alarm);
 }
 
-inline static int spwr_battery_set_alarm(struct spwr_battery_device *bat, u32 value)
+static inline int spwr_battery_set_alarm(struct spwr_battery_device *bat, u32 value)
 {
 	int status;
 
@@ -432,7 +433,7 @@ inline static int spwr_battery_set_alarm(struct spwr_battery_device *bat, u32 va
 	return status;
 }
 
-inline static int spwr_battery_update_bst_unlocked(struct spwr_battery_device *bat, bool cached)
+static inline int spwr_battery_update_bst_unlocked(struct spwr_battery_device *bat, bool cached)
 {
 	unsigned long cache_deadline = bat->timestamp + msecs_to_jiffies(cache_time);
 	int status;
@@ -463,7 +464,7 @@ static int spwr_battery_update_bst(struct spwr_battery_device *bat, bool cached)
 	return status;
 }
 
-inline static int spwr_battery_update_bix_unlocked(struct spwr_battery_device *bat)
+static inline int spwr_battery_update_bix_unlocked(struct spwr_battery_device *bat)
 {
 	int status;
 
@@ -494,7 +495,7 @@ static int spwr_battery_update_bix(struct spwr_battery_device *bat)
 	return status;
 }
 
-inline static int spwr_ac_update_unlocked(struct spwr_ac_device *ac)
+static inline int spwr_ac_update_unlocked(struct spwr_ac_device *ac)
 {
 	return sam_psy_get_psrc(0x00, &ac->state);
 }
@@ -672,7 +673,7 @@ static void spwr_battery_update_bst_workfn(struct work_struct *work)
 }
 
 
-inline static int spwr_battery_prop_status(struct spwr_battery_device *bat)
+static inline int spwr_battery_prop_status(struct spwr_battery_device *bat)
 {
 	if (bat->bst.state & SAM_BATTERY_STATE_DISCHARGING)
 		return POWER_SUPPLY_STATUS_DISCHARGING;
@@ -689,7 +690,7 @@ inline static int spwr_battery_prop_status(struct spwr_battery_device *bat)
 	return POWER_SUPPLY_STATUS_UNKNOWN;
 }
 
-inline static int spwr_battery_prop_technology(struct spwr_battery_device *bat)
+static inline int spwr_battery_prop_technology(struct spwr_battery_device *bat)
 {
 	if (!strcasecmp("NiCd", bat->bix.type))
 		return POWER_SUPPLY_TECHNOLOGY_NiCd;
@@ -709,7 +710,7 @@ inline static int spwr_battery_prop_technology(struct spwr_battery_device *bat)
 	return POWER_SUPPLY_TECHNOLOGY_UNKNOWN;
 }
 
-inline static int spwr_battery_prop_capacity(struct spwr_battery_device *bat)
+static inline int spwr_battery_prop_capacity(struct spwr_battery_device *bat)
 {
 	if (bat->bst.remaining_cap && bat->bix.last_full_charge_cap)
 		return bat->bst.remaining_cap * 100 / bat->bix.last_full_charge_cap;
@@ -717,7 +718,7 @@ inline static int spwr_battery_prop_capacity(struct spwr_battery_device *bat)
 		return 0;
 }
 
-inline static int spwr_battery_prop_capacity_level(struct spwr_battery_device *bat)
+static inline int spwr_battery_prop_capacity_level(struct spwr_battery_device *bat)
 {
 	if (bat->bst.state & SAM_BATTERY_STATE_CRITICAL)
 		return POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL;
@@ -899,14 +900,12 @@ static int spwr_subsys_init_unlocked(void)
 	int status;
 
 	status = surface_sam_ssh_set_event_handler(SAM_PWR_RQID, spwr_handle_event, NULL);
-	if (status) {
+	if (status)
 		goto err_handler;
-	}
 
 	status = surface_sam_ssh_enable_event_source(SAM_PWR_TC, 0x01, SAM_PWR_RQID);
-	if (status) {
+	if (status)
 		goto err_source;
-	}
 
 	return 0;
 
@@ -1111,7 +1110,7 @@ static int spwr_battery_unregister(struct spwr_battery_device *bat)
 	int status;
 
 	if (bat->id < 0 || bat->id >= __SPWR_NUM_BAT)
-		return -EINVAL ;
+		return -EINVAL;
 
 	mutex_lock(&spwr_subsystem.lock);
 	if (spwr_subsystem.battery[bat->id] != bat) {
@@ -1140,7 +1139,9 @@ static int spwr_battery_unregister(struct spwr_battery_device *bat)
 #ifdef CONFIG_PM_SLEEP
 static int surface_sam_sid_battery_resume(struct device *dev)
 {
-	struct spwr_battery_device *bat = dev_get_drvdata(dev);
+	struct spwr_battery_device *bat;
+
+	bat = dev_get_drvdata(dev);
 	return spwr_battery_recheck(bat);
 }
 #else
@@ -1169,7 +1170,9 @@ static int surface_sam_sid_battery_probe(struct platform_device *pdev)
 
 static int surface_sam_sid_battery_remove(struct platform_device *pdev)
 {
-	struct spwr_battery_device *bat = platform_get_drvdata(pdev);
+	struct spwr_battery_device *bat;
+
+	bat = platform_get_drvdata(pdev);
 	return spwr_battery_unregister(bat);
 }
 
@@ -1212,7 +1215,9 @@ static int surface_sam_sid_ac_probe(struct platform_device *pdev)
 
 static int surface_sam_sid_ac_remove(struct platform_device *pdev)
 {
-	struct spwr_ac_device *ac = platform_get_drvdata(pdev);
+	struct spwr_ac_device *ac;
+
+	ac = platform_get_drvdata(pdev);
 	return spwr_ac_unregister(ac);
 }
 

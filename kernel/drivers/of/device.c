@@ -17,7 +17,7 @@
 
 /**
  * of_match_device - Tell if a struct device matches an of_device_id list
- * @ids: array of of device match structures to search in
+ * @matches: array of of device match structures to search in
  * @dev: the of device structure to match against
  *
  * Used by a driver to check whether an platform_device present in the
@@ -172,18 +172,6 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
 }
 EXPORT_SYMBOL_GPL(of_dma_configure);
 
-/**
- * of_dma_deconfigure - Clean up DMA configuration
- * @dev:	Device for which to clean up DMA configuration
- *
- * Clean up all configuration performed by of_dma_configure_ops() and free all
- * resources that have been allocated.
- */
-void of_dma_deconfigure(struct device *dev)
-{
-	arch_teardown_dma_ops(dev);
-}
-
 int of_device_register(struct platform_device *pdev)
 {
 	device_initialize(&pdev->dev);
@@ -223,7 +211,7 @@ static ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len
 	/* Name & Type */
 	/* %p eats all alphanum characters, so %c must be used here */
 	csize = snprintf(str, len, "of:N%pOFn%c%s", dev->of_node, 'T',
-			 dev->of_node->type);
+			 of_node_get_device_type(dev->of_node));
 	tsize = csize;
 	len -= csize;
 	if (str)
@@ -293,7 +281,7 @@ EXPORT_SYMBOL_GPL(of_device_modalias);
  */
 void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
-	const char *compat;
+	const char *compat, *type;
 	struct alias_prop *app;
 	struct property *p;
 	int seen = 0;
@@ -303,8 +291,9 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
 
 	add_uevent_var(env, "OF_NAME=%pOFn", dev->of_node);
 	add_uevent_var(env, "OF_FULLNAME=%pOF", dev->of_node);
-	if (dev->of_node->type && strcmp("<NULL>", dev->of_node->type) != 0)
-		add_uevent_var(env, "OF_TYPE=%s", dev->of_node->type);
+	type = of_node_get_device_type(dev->of_node);
+	if (type)
+		add_uevent_var(env, "OF_TYPE=%s", type);
 
 	/* Since the compatible field can contain pretty much anything
 	 * it's not really legal to split it out with commas. We split it

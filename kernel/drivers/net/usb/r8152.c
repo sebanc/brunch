@@ -1,10 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  Copyright (c) 2014 Realtek Semiconductor Corp. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
  */
 
 #include <linux/signal.h>
@@ -380,10 +376,8 @@
 #define DEBUG_LTSSM		0x0082
 
 /* PLA_EXTRA_STATUS */
-#define CUR_LINK_OK		BIT(15)
 #define U3P3_CHECK_EN		BIT(7)	/* RTL_VER_05 only */
 #define LINK_CHANGE_FLAG	BIT(8)
-#define POLL_LINK_CHG		BIT(0)
 
 /* USB_USB2PHY */
 #define USB2PHY_SUSPEND		0x0001
@@ -2868,17 +2862,6 @@ static int rtl8153_enable(struct r8152 *tp)
 	r8153_set_rx_early_timeout(tp);
 	r8153_set_rx_early_size(tp);
 
-	if (tp->version == RTL_VER_09) {
-		u32 ocp_data;
-
-		ocp_data = ocp_read_word(tp, MCU_TYPE_USB, USB_FW_TASK);
-		ocp_data &= ~FC_PATCH_TASK;
-		ocp_write_word(tp, MCU_TYPE_USB, USB_FW_TASK, ocp_data);
-		usleep_range(1000, 2000);
-		ocp_data |= FC_PATCH_TASK;
-		ocp_write_word(tp, MCU_TYPE_USB, USB_FW_TASK, ocp_data);
-	}
-
 	return rtl_enable(tp);
 }
 
@@ -3394,8 +3377,7 @@ static void rtl8153b_runtime_enable(struct r8152 *tp, bool enable)
 		r8153b_ups_en(tp, false);
 		r8153_queue_wake(tp, false);
 		rtl_runtime_suspend_enable(tp, false);
-		if (tp->udev->speed != USB_SPEED_HIGH)
-			r8153b_u1u2en(tp, true);
+		r8153b_u1u2en(tp, true);
 	}
 }
 
@@ -5049,9 +5031,7 @@ static void rtl8153b_up(struct r8152 *tp)
 	ocp_write_word(tp, MCU_TYPE_PLA, PLA_MAC_PWR_CTRL3, ocp_data);
 
 	r8153_aldps_en(tp, true);
-
-	if (tp->udev->speed != USB_SPEED_HIGH)
-		r8153b_u1u2en(tp, true);
+	r8153b_u1u2en(tp, true);
 }
 
 static void rtl8153b_down(struct r8152 *tp)
@@ -5441,16 +5421,6 @@ static void r8153_init(struct r8152 *tp)
 		else
 			ocp_data |= DYNAMIC_BURST;
 		ocp_write_byte(tp, MCU_TYPE_USB, USB_CSR_DUMMY1, ocp_data);
-
-		r8153_queue_wake(tp, false);
-
-		ocp_data = ocp_read_word(tp, MCU_TYPE_PLA, PLA_EXTRA_STATUS);
-		if (rtl8152_get_speed(tp) & LINK_STATUS)
-			ocp_data |= CUR_LINK_OK;
-		else
-			ocp_data &= ~CUR_LINK_OK;
-		ocp_data |= POLL_LINK_CHG;
-		ocp_write_word(tp, MCU_TYPE_PLA, PLA_EXTRA_STATUS, ocp_data);
 	}
 
 	ocp_data = ocp_read_byte(tp, MCU_TYPE_USB, USB_CSR_DUMMY2);
@@ -5480,7 +5450,6 @@ static void r8153_init(struct r8152 *tp)
 	ocp_write_word(tp, MCU_TYPE_USB, USB_CONNECT_TIMER, 0x0001);
 
 	r8153_power_cut_en(tp, false);
-	rtl_runtime_suspend_enable(tp, false);
 	r8153_u1u2en(tp, true);
 	r8153_mac_clk_spd(tp, false);
 	usb_enable_lpm(tp->udev);
@@ -5560,17 +5529,7 @@ static void r8153b_init(struct r8152 *tp)
 	r8153b_ups_en(tp, false);
 	r8153_queue_wake(tp, false);
 	rtl_runtime_suspend_enable(tp, false);
-
-	ocp_data = ocp_read_word(tp, MCU_TYPE_PLA, PLA_EXTRA_STATUS);
-	if (rtl8152_get_speed(tp) & LINK_STATUS)
-		ocp_data |= CUR_LINK_OK;
-	else
-		ocp_data &= ~CUR_LINK_OK;
-	ocp_data |= POLL_LINK_CHG;
-	ocp_write_word(tp, MCU_TYPE_PLA, PLA_EXTRA_STATUS, ocp_data);
-
-	if (tp->udev->speed != USB_SPEED_HIGH)
-		r8153b_u1u2en(tp, true);
+	r8153b_u1u2en(tp, true);
 	usb_enable_lpm(tp->udev);
 
 	/* MAC clock speed down */
@@ -5639,10 +5598,10 @@ static int rtl8152_post_reset(struct usb_interface *intf)
 	if (!tp)
 		return 0;
 
-	/* reset the MAC address in case of policy change */
+	/* reset the MAC adddress in case of policy change */
 	if (determine_ethernet_addr(tp, &sa) >= 0) {
 		rtnl_lock();
-		dev_set_mac_address(tp->netdev, &sa);
+		dev_set_mac_address (tp->netdev, &sa, NULL);
 		rtnl_unlock();
 	}
 

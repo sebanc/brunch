@@ -17,8 +17,9 @@ struct page_change_data {
 	pgprot_t clear_mask;
 };
 
-static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
-			void *data)
+bool rodata_full __ro_after_init = IS_ENABLED(CONFIG_RODATA_FULL_DEFAULT_ENABLED);
+
+static int change_page_range(pte_t *ptep, unsigned long addr, void *data)
 {
 	struct page_change_data *cdata = data;
 	pte_t pte = READ_ONCE(*ptep);
@@ -56,6 +57,7 @@ static int change_memory_common(unsigned long addr, int numpages,
 	unsigned long size = PAGE_SIZE*numpages;
 	unsigned long end = start + size;
 	struct vm_struct *area;
+	int i;
 
 	if (!PAGE_ALIGNED(addr)) {
 		start &= PAGE_MASK;
@@ -85,6 +87,24 @@ static int change_memory_common(unsigned long addr, int numpages,
 	if (!numpages)
 		return 0;
 
+	/*
+	 * If we are manipulating read-only permissions, apply the same
+	 * change to the linear mapping of the pages that back this VM area.
+	 */
+	if (rodata_full && (pgprot_val(set_mask) == PTE_RDONLY ||
+			    pgprot_val(clear_mask) == PTE_RDONLY)) {
+		for (i = 0; i < area->nr_pages; i++) {
+			__change_memory_common((u64)page_address(area->pages[i]),
+					       PAGE_SIZE, set_mask, clear_mask);
+		}
+	}
+
+	/*
+	 * Get rid of potentially aliasing lazily unmapped vm areas that may
+	 * have permissions set that deviate from the ones we are setting here.
+	 */
+	vm_unmap_aliases();
+
 	return __change_memory_common(start, size, set_mask, clear_mask);
 }
 
@@ -108,7 +128,6 @@ int set_memory_nx(unsigned long addr, int numpages)
 					__pgprot(PTE_PXN),
 					__pgprot(0));
 }
-EXPORT_SYMBOL_GPL(set_memory_nx);
 
 int set_memory_x(unsigned long addr, int numpages)
 {
@@ -116,7 +135,6 @@ int set_memory_x(unsigned long addr, int numpages)
 					__pgprot(0),
 					__pgprot(PTE_PXN));
 }
-EXPORT_SYMBOL_GPL(set_memory_x);
 
 int set_memory_valid(unsigned long addr, int numpages, int enable)
 {
@@ -130,17 +148,48 @@ int set_memory_valid(unsigned long addr, int numpages, int enable)
 					__pgprot(PTE_VALID));
 }
 
-#ifdef CONFIG_DEBUG_PAGEALLOC
+int set_direct_map_invalid_noflush(struct page *page)
+{
+	struct page_change_data data = {
+		.set_mask = __pgprot(0),
+		.clear_mask = __pgprot(PTE_VALID),
+	};
+
+	if (!rodata_full)
+		return 0;
+
+	return apply_to_page_range(&init_mm,
+				   (unsigned long)page_address(page),
+				   PAGE_SIZE, change_page_range, &data);
+}
+
+int set_direct_map_default_noflush(struct page *page)
+{
+	struct page_change_data data = {
+		.set_mask = __pgprot(PTE_VALID | PTE_WRITE),
+		.clear_mask = __pgprot(PTE_RDONLY),
+	};
+
+	if (!rodata_full)
+		return 0;
+
+	return apply_to_page_range(&init_mm,
+				   (unsigned long)page_address(page),
+				   PAGE_SIZE, change_page_range, &data);
+}
+
 void __kernel_map_pages(struct page *page, int numpages, int enable)
 {
+	if (!debug_pagealloc_enabled() && !rodata_full)
+		return;
+
 	set_memory_valid((unsigned long)page_address(page), numpages, enable);
 }
-#ifdef CONFIG_HIBERNATION
+
 /*
- * When built with CONFIG_DEBUG_PAGEALLOC and CONFIG_HIBERNATION, this function
- * is used to determine if a linear map page has been marked as not-valid by
- * CONFIG_DEBUG_PAGEALLOC. Walk the page table and check the PTE_VALID bit.
- * This is based on kern_addr_valid(), which almost does what we need.
+ * This function is used to determine if a linear map page has been marked as
+ * not-valid. Walk the page table and check the PTE_VALID bit. This is based
+ * on kern_addr_valid(), which almost does what we need.
  *
  * Because this is only called on the kernel linear map,  p?d_sect() implies
  * p?d_present(). When debug_pagealloc is enabled, sections mappings are
@@ -153,6 +202,9 @@ bool kernel_page_present(struct page *page)
 	pmd_t *pmdp, pmd;
 	pte_t *ptep;
 	unsigned long addr = (unsigned long)page_address(page);
+
+	if (!debug_pagealloc_enabled() && !rodata_full)
+		return true;
 
 	pgdp = pgd_offset_k(addr);
 	if (pgd_none(READ_ONCE(*pgdp)))
@@ -175,5 +227,3 @@ bool kernel_page_present(struct page *page)
 	ptep = pte_offset_kernel(pmdp, addr);
 	return pte_valid(READ_ONCE(*ptep));
 }
-#endif /* CONFIG_HIBERNATION */
-#endif /* CONFIG_DEBUG_PAGEALLOC */

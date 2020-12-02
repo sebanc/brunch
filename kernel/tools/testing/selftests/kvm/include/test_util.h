@@ -1,14 +1,12 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * tools/testing/selftests/kvm/include/test_util.h
  *
  * Copyright (C) 2018, Google LLC.
- *
- * This work is licensed under the terms of the GNU GPL, version 2.
- *
  */
 
-#ifndef TEST_UTIL_H
-#define TEST_UTIL_H 1
+#ifndef SELFTEST_KVM_TEST_UTIL_H
+#define SELFTEST_KVM_TEST_UTIL_H
 
 #include <stdlib.h>
 #include <stdarg.h>
@@ -41,4 +39,4 @@ void test_assert(bool exp, const char *exp_str,
 		    #a, #b, #a, (unsigned long) __a, #b, (unsigned long) __b); \
 } while (0)
 
-#endif /* TEST_UTIL_H */
+#endif /* SELFTEST_KVM_TEST_UTIL_H */

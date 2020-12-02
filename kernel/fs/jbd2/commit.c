@@ -184,7 +184,7 @@ static int journal_wait_on_commit_record(journal_t *journal,
 /*
  * write the filemap data using writepage() address_space_operations.
  * We don't do block allocation here even for delalloc. We don't
- * use writepages() because with dealyed allocation we may be doing
+ * use writepages() because with delayed allocation we may be doing
  * block allocation in writepages().
  */
 static int journal_submit_inode_data_buffers(struct address_space *mapping,
@@ -450,6 +450,8 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 		finish_wait(&journal->j_wait_updates, &wait);
 	}
 	spin_unlock(&commit_transaction->t_handle_lock);
+	commit_transaction->t_state = T_SWITCH;
+	write_unlock(&journal->j_state_lock);
 
 	J_ASSERT (atomic_read(&commit_transaction->t_outstanding_credits) <=
 			journal->j_max_transaction_buffers);
@@ -516,6 +518,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	atomic_sub(atomic_read(&journal->j_reserved_credits),
 		   &commit_transaction->t_outstanding_credits);
 
+	write_lock(&journal->j_state_lock);
 	trace_jbd2_commit_flushing(journal, commit_transaction);
 	stats.run.rs_flushing = jiffies;
 	stats.run.rs_locked = jbd2_time_diff(stats.run.rs_locked,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  Copyright (C) 2000-2002	   Michael Cornwell <cornwell@acm.org>
  *  Copyright (C) 2000-2002	   Andre Hedrick <andre@linux-ide.org>
@@ -440,7 +441,7 @@ int ide_raw_taskfile(ide_drive_t *drive, struct ide_cmd *cmd, u8 *buf,
 			goto put_req;
 	}
 
-	rq->special = cmd;
+	ide_req(rq)->special = cmd;
 	cmd->rq = rq;
 
 	blk_execute_rq(drive->queue, NULL, rq, 0);

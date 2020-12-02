@@ -350,6 +350,9 @@ struct ieee80211_fast_rx {
 	u8 icv_len;
 	u8 key:1,
 	   sta_notify:1,
+#ifdef CPTCFG_IWLMVM_VENDOR_CMDS
+	   drop_grat_arp_unsol_na:1,
+#endif
 	   internal_forward:1,
 	   uses_rss:1;
 	u8 da_offs, sa_offs;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  Copyright (C) 2001 Ben. Herrenschmidt (benh@kernel.crashing.org)
  *
@@ -5,11 +6,6 @@
  *      Copyright (C) 2003 Dave Engebretsen <engebret@us.ibm.com>
  *
  *  Copyright 2008 Michael Ellerman, IBM Corporation.
- *
- *  This program is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; either version
- *  2 of the License, or (at your option) any later version.
  */
 
 #include <linux/types.h>
@@ -118,7 +114,7 @@ void do_feature_fixups(unsigned long value, void *fixup_start, void *fixup_end)
 }
 
 #ifdef CONFIG_PPC_BOOK3S_64
-void do_stf_entry_barrier_fixups(enum stf_barrier_type types)
+static void do_stf_entry_barrier_fixups(enum stf_barrier_type types)
 {
 	unsigned int instrs[3], *dest;
 	long *start, *end;
@@ -168,7 +164,7 @@ void do_stf_entry_barrier_fixups(enum stf_barrier_type types)
 		                                           : "unknown");
 }
 
-void do_stf_exit_barrier_fixups(enum stf_barrier_type types)
+static void do_stf_exit_barrier_fixups(enum stf_barrier_type types)
 {
 	unsigned int instrs[6], *dest;
 	long *start, *end;

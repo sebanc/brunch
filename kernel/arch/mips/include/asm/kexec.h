@@ -1,9 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * kexec.h for kexec
  * Created by <nschichan@corp.free.fr> on Thu Oct 12 14:59:34 2006
- *
- * This source code is licensed under the GNU General Public License,
- * Version 2.  See the file COPYING for more details.
  */
 
 #ifndef _MIPS_KEXEC
@@ -39,11 +37,12 @@ extern unsigned long kexec_args[4];
 extern int (*_machine_kexec_prepare)(struct kimage *);
 extern void (*_machine_kexec_shutdown)(void);
 extern void (*_machine_crash_shutdown)(struct pt_regs *regs);
-extern void default_machine_crash_shutdown(struct pt_regs *regs);
+void default_machine_crash_shutdown(struct pt_regs *regs);
+void kexec_nonboot_cpu_jump(void);
+void kexec_reboot(void);
 #ifdef CONFIG_SMP
 extern const unsigned char kexec_smp_wait[];
 extern unsigned long secondary_kexec_args[4];
-extern void (*relocated_kexec_smp_wait) (void *);
 extern atomic_t kexec_ready_to_reboot;
 extern void (*_crash_smp_send_stop)(void);
 #endif

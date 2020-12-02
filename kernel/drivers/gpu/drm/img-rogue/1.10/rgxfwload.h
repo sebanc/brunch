@@ -49,7 +49,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define __RGXFWLOAD_H__
 
 #include "img_defs.h"
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 #include "device_connection.h"
 
 #if defined (__cplusplus)

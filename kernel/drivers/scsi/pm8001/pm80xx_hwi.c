@@ -1316,7 +1316,7 @@ pm80xx_chip_soft_rst(struct pm8001_hba_info *pm8001_ha)
 
 static void pm80xx_hw_chip_rst(struct pm8001_hba_info *pm8001_ha)
 {
-	 u32 i;
+	u32 i;
 
 	PM8001_INIT_DBG(pm8001_ha,
 		pm8001_printk("chip reset start\n"));
@@ -2066,7 +2066,7 @@ mpi_sata_completion(struct pm8001_hba_info *pm8001_ha, void *piomb)
 	if ((status != IO_SUCCESS) && (status != IO_OVERFLOW) &&
 		(status != IO_UNDERFLOW)) {
 		if (!((t->dev->parent) &&
-			(DEV_IS_EXPANDER(t->dev->parent->dev_type)))) {
+			(dev_is_expander(t->dev->parent->dev_type)))) {
 			for (i = 0 , j = 4; i <= 3 && j <= 7; i++ , j++)
 				sata_addr_low[i] = pm8001_ha->sas_addr[j];
 			for (i = 0 , j = 0; i <= 3 && j <= 3; i++ , j++)
@@ -2133,7 +2133,7 @@ mpi_sata_completion(struct pm8001_hba_info *pm8001_ha, void *piomb)
 			sata_resp = &psataPayload->sata_resp[0];
 			resp = (struct ata_task_resp *)ts->buf;
 			if (t->ata_task.dma_xfer == 0 &&
-			t->data_dir == PCI_DMA_FROMDEVICE) {
+			    t->data_dir == DMA_FROM_DEVICE) {
 				len = sizeof(struct pio_setup_fis);
 				PM8001_IO_DBG(pm8001_ha,
 				pm8001_printk("PIO read len = %d\n", len));
@@ -3130,8 +3130,9 @@ static int mpi_phy_start_resp(struct pm8001_hba_info *pm8001_ha, void *piomb)
 		pm8001_printk("phy start resp status:0x%x, phyid:0x%x\n",
 				status, phy_id));
 	if (status == 0) {
-		phy->phy_state = 1;
-		if (pm8001_ha->flags == PM8001F_RUN_TIME)
+		phy->phy_state = PHY_LINK_DOWN;
+		if (pm8001_ha->flags == PM8001F_RUN_TIME &&
+				phy->enable_completion != NULL)
 			complete(phy->enable_completion);
 	}
 	return 0;
@@ -3223,7 +3224,7 @@ static int mpi_hw_event(struct pm8001_hba_info *pm8001_ha, void *piomb)
 			return 0;
 		}
 		phy->phy_attached = 0;
-		phy->phy_state = 0;
+		phy->phy_state = PHY_LINK_DISABLE;
 		break;
 	case HW_EVENT_PORT_INVALID:
 		PM8001_MSG_DBG(pm8001_ha,
@@ -3396,13 +3397,14 @@ static int mpi_phy_stop_resp(struct pm8001_hba_info *pm8001_ha, void *piomb)
 	u32 status =
 		le32_to_cpu(pPayload->status);
 	u32 phyid =
-		le32_to_cpu(pPayload->phyid);
+		le32_to_cpu(pPayload->phyid) & 0xFF;
 	struct pm8001_phy *phy = &pm8001_ha->phy[phyid];
 	PM8001_MSG_DBG(pm8001_ha,
 			pm8001_printk("phy:0x%x status:0x%x\n",
 					phyid, status));
-	if (status == 0)
-		phy->phy_state = 0;
+	if (status == PHY_STOP_SUCCESS ||
+		status == PHY_STOP_ERR_DEVICE_ATTACHED)
+		phy->phy_state = PHY_LINK_DISABLE;
 	return 0;
 }
 
@@ -3855,12 +3857,12 @@ static int process_oq(struct pm8001_hba_info *pm8001_ha, u8 vec)
 	return ret;
 }
 
-/* PCI_DMA_... to our direction translation. */
+/* DMA_... to our direction translation. */
 static const u8 data_dir_flags[] = {
-	[PCI_DMA_BIDIRECTIONAL] = DATA_DIR_BYRECIPIENT,/* UNSPECIFIED */
-	[PCI_DMA_TODEVICE]	= DATA_DIR_OUT,/* OUTBOUND */
-	[PCI_DMA_FROMDEVICE]	= DATA_DIR_IN,/* INBOUND */
-	[PCI_DMA_NONE]		= DATA_DIR_NONE,/* NO TRANSFER */
+	[DMA_BIDIRECTIONAL]	= DATA_DIR_BYRECIPIENT,	/* UNSPECIFIED */
+	[DMA_TO_DEVICE]		= DATA_DIR_OUT,		/* OUTBOUND */
+	[DMA_FROM_DEVICE]	= DATA_DIR_IN,		/* INBOUND */
+	[DMA_NONE]		= DATA_DIR_NONE,	/* NO TRANSFER */
 };
 
 static void build_smp_cmd(u32 deviceID, __le32 hTag,
@@ -3902,13 +3904,13 @@ static int pm80xx_chip_smp_req(struct pm8001_hba_info *pm8001_ha,
 	 * DMA-map SMP request, response buffers
 	 */
 	sg_req = &task->smp_task.smp_req;
-	elem = dma_map_sg(pm8001_ha->dev, sg_req, 1, PCI_DMA_TODEVICE);
+	elem = dma_map_sg(pm8001_ha->dev, sg_req, 1, DMA_TO_DEVICE);
 	if (!elem)
 		return -ENOMEM;
 	req_len = sg_dma_len(sg_req);
 
 	sg_resp = &task->smp_task.smp_resp;
-	elem = dma_map_sg(pm8001_ha->dev, sg_resp, 1, PCI_DMA_FROMDEVICE);
+	elem = dma_map_sg(pm8001_ha->dev, sg_resp, 1, DMA_FROM_DEVICE);
 	if (!elem) {
 		rc = -ENOMEM;
 		goto err_out;
@@ -3999,10 +4001,10 @@ static int pm80xx_chip_smp_req(struct pm8001_hba_info *pm8001_ha,
 
 err_out_2:
 	dma_unmap_sg(pm8001_ha->dev, &ccb->task->smp_task.smp_resp, 1,
-			PCI_DMA_FROMDEVICE);
+			DMA_FROM_DEVICE);
 err_out:
 	dma_unmap_sg(pm8001_ha->dev, &ccb->task->smp_task.smp_req, 1,
-			PCI_DMA_TODEVICE);
+			DMA_TO_DEVICE);
 	return rc;
 }
 
@@ -4226,7 +4228,7 @@ static int pm80xx_chip_sata_req(struct pm8001_hba_info *pm8001_ha,
 	q_index = (u32) (pm8001_ha_dev->id & 0x00ffffff) % PM8001_MAX_INB_NUM;
 	circularQ = &pm8001_ha->inbnd_q_tbl[q_index];
 
-	if (task->data_dir == PCI_DMA_NONE) {
+	if (task->data_dir == DMA_NONE) {
 		ATAP = 0x04; /* no data*/
 		PM8001_IO_DBG(pm8001_ha, pm8001_printk("no data\n"));
 	} else if (likely(!task->ata_task.device_control_reg_update)) {
@@ -4381,27 +4383,27 @@ static int pm80xx_chip_sata_req(struct pm8001_hba_info *pm8001_ha,
 			sata_cmd.len = cpu_to_le32(task->total_xfer_len);
 			sata_cmd.esgl = 0;
 		}
-			/* scsi cdb */
-			sata_cmd.atapi_scsi_cdb[0] =
-				cpu_to_le32(((task->ata_task.atapi_packet[0]) |
-				(task->ata_task.atapi_packet[1] << 8) |
-				(task->ata_task.atapi_packet[2] << 16) |
-				(task->ata_task.atapi_packet[3] << 24)));
-			sata_cmd.atapi_scsi_cdb[1] =
-				cpu_to_le32(((task->ata_task.atapi_packet[4]) |
-				(task->ata_task.atapi_packet[5] << 8) |
-				(task->ata_task.atapi_packet[6] << 16) |
-				(task->ata_task.atapi_packet[7] << 24)));
-			sata_cmd.atapi_scsi_cdb[2] =
-				cpu_to_le32(((task->ata_task.atapi_packet[8]) |
-				(task->ata_task.atapi_packet[9] << 8) |
-				(task->ata_task.atapi_packet[10] << 16) |
-				(task->ata_task.atapi_packet[11] << 24)));
-			sata_cmd.atapi_scsi_cdb[3] =
-				cpu_to_le32(((task->ata_task.atapi_packet[12]) |
-				(task->ata_task.atapi_packet[13] << 8) |
-				(task->ata_task.atapi_packet[14] << 16) |
-				(task->ata_task.atapi_packet[15] << 24)));
+		/* scsi cdb */
+		sata_cmd.atapi_scsi_cdb[0] =
+			cpu_to_le32(((task->ata_task.atapi_packet[0]) |
+			(task->ata_task.atapi_packet[1] << 8) |
+			(task->ata_task.atapi_packet[2] << 16) |
+			(task->ata_task.atapi_packet[3] << 24)));
+		sata_cmd.atapi_scsi_cdb[1] =
+			cpu_to_le32(((task->ata_task.atapi_packet[4]) |
+			(task->ata_task.atapi_packet[5] << 8) |
+			(task->ata_task.atapi_packet[6] << 16) |
+			(task->ata_task.atapi_packet[7] << 24)));
+		sata_cmd.atapi_scsi_cdb[2] =
+			cpu_to_le32(((task->ata_task.atapi_packet[8]) |
+			(task->ata_task.atapi_packet[9] << 8) |
+			(task->ata_task.atapi_packet[10] << 16) |
+			(task->ata_task.atapi_packet[11] << 24)));
+		sata_cmd.atapi_scsi_cdb[3] =
+			cpu_to_le32(((task->ata_task.atapi_packet[12]) |
+			(task->ata_task.atapi_packet[13] << 8) |
+			(task->ata_task.atapi_packet[14] << 16) |
+			(task->ata_task.atapi_packet[15] << 24)));
 	}
 
 	/* Check for read log for failed drive and return */
@@ -4561,7 +4563,7 @@ static int pm80xx_chip_reg_dev_req(struct pm8001_hba_info *pm8001_ha,
 			pm8001_dev->dev_type == SAS_FANOUT_EXPANDER_DEVICE)
 			stp_sspsmp_sata = 0x01; /*ssp or smp*/
 	}
-	if (parent_dev && DEV_IS_EXPANDER(parent_dev->dev_type))
+	if (parent_dev && dev_is_expander(parent_dev->dev_type))
 		phy_id = parent_dev->ex_dev.ex_phy->phy_id;
 	else
 		phy_id = pm8001_dev->attached_phy;
@@ -4617,17 +4619,18 @@ static int pm80xx_chip_phy_ctl_req(struct pm8001_hba_info *pm8001_ha,
 	return pm8001_mpi_build_cmd(pm8001_ha, circularQ, opc, &payload, 0);
 }
 
-static u32 pm80xx_chip_is_our_interupt(struct pm8001_hba_info *pm8001_ha)
+static u32 pm80xx_chip_is_our_interrupt(struct pm8001_hba_info *pm8001_ha)
 {
-	u32 value;
 #ifdef PM8001_USE_MSIX
 	return 1;
-#endif
+#else
+	u32 value;
+
 	value = pm8001_cr32(pm8001_ha, 0, MSGU_ODR);
 	if (value)
 		return 1;
 	return 0;
-
+#endif
 }
 
 /**
@@ -4676,9 +4679,8 @@ void mpi_set_phy_profile_req(struct pm8001_hba_info *pm8001_ha,
 void pm8001_set_phy_profile(struct pm8001_hba_info *pm8001_ha,
 	u32 length, u8 *buf)
 {
-	u32 page_code, i;
+	u32 i;
 
-	page_code = SAS_PHY_ANALOG_SETTINGS_PAGE;
 	for (i = 0; i < pm8001_ha->chip->n_phy; i++) {
 		mpi_set_phy_profile_req(pm8001_ha,
 			SAS_PHY_ANALOG_SETTINGS_PAGE, i, length, (u32 *)buf);
@@ -4725,7 +4727,7 @@ const struct pm8001_dispatch pm8001_80xx_dispatch = {
 	.chip_rst		= pm80xx_hw_chip_rst,
 	.chip_iounmap		= pm8001_chip_iounmap,
 	.isr			= pm80xx_chip_isr,
-	.is_our_interupt	= pm80xx_chip_is_our_interupt,
+	.is_our_interrupt	= pm80xx_chip_is_our_interrupt,
 	.isr_process_oq		= process_oq,
 	.interrupt_enable	= pm80xx_chip_interrupt_enable,
 	.interrupt_disable	= pm80xx_chip_interrupt_disable,

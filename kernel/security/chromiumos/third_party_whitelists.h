@@ -49,6 +49,7 @@ static struct syscall_whitelist_entry third_party_whitelist[] = {
 	SYSCALL_ENTRY(getpgid),
 	SYSCALL_ENTRY(getppid),
 	SYSCALL_ENTRY(getpriority),
+	SYSCALL_ENTRY(getrlimit),
 	SYSCALL_ENTRY(getsid),
 	SYSCALL_ENTRY(gettimeofday),
 	SYSCALL_ENTRY(ioctl),
@@ -106,26 +107,22 @@ static struct syscall_whitelist_entry third_party_whitelist[] = {
 	SYSCALL_ENTRY(unlink),
 #endif
 
-	/* ARM32 only syscalls. */
-#if defined(CONFIG_ARM)
-	SYSCALL_ENTRY(fcntl64),
-	SYSCALL_ENTRY(fstat64),
-	SYSCALL_ENTRY(geteuid32),
-	SYSCALL_ENTRY(getuid32),
-	SYSCALL_ENTRY(_llseek),
-	SYSCALL_ENTRY(lstat64),
-	SYSCALL_ENTRY(_newselect),
-	SYSCALL_ENTRY(mmap2),
-	SYSCALL_ENTRY(stat64),
-	SYSCALL_ENTRY(ugetrlimit),
-#endif
+	SYSCALL_ENTRY(accept),
+	SYSCALL_ENTRY(bind),
+	SYSCALL_ENTRY(connect),
+	SYSCALL_ENTRY(listen),
+	SYSCALL_ENTRY(recvfrom),
+	SYSCALL_ENTRY(recvmsg),
+	SYSCALL_ENTRY(sendmsg),
+	SYSCALL_ENTRY(sendto),
+	SYSCALL_ENTRY(setsockopt),
+	SYSCALL_ENTRY(socket),
+	SYSCALL_ENTRY(socketpair),
 
 	/* 64-bit only syscalls. */
-#if defined(CONFIG_X86_64) || defined(CONFIG_ARM64)
 	SYSCALL_ENTRY(getegid),
 	SYSCALL_ENTRY(geteuid),
 	SYSCALL_ENTRY(getgid),
-	SYSCALL_ENTRY(getrlimit),
 	SYSCALL_ENTRY(getuid),
 	SYSCALL_ENTRY(mmap),
 	SYSCALL_ENTRY(setgid),
@@ -136,7 +133,6 @@ static struct syscall_whitelist_entry third_party_whitelist[] = {
 	 */
 #ifndef CONFIG_ARM64
 	SYSCALL_ENTRY(select),
-#endif
 #endif
 
 	/* X86_64-specific syscalls. */

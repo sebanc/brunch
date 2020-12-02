@@ -22,14 +22,18 @@
 /**
  * struct rpmhpd - top level RPMh power domain resource data structure
  * @dev:		rpmh power domain controller device
- * @pd: 		generic_pm_domain corrresponding to the power domain
- * @peer:		A peer power domain in case Active only Voting is supported
+ * @pd:			generic_pm_domain corrresponding to the power domain
+ * @peer:		A peer power domain in case Active only Voting is
+ *			supported
  * @active_only:	True if it represents an Active only peer
- * @level:		An array of level (vlvl) to corner (hlvl) mappings derived from cmd-db
- * @level_count:	Number of levels supported by the power domain. max being 16 (0 - 15)
+ * @level:		An array of level (vlvl) to corner (hlvl) mappings
+ *			derived from cmd-db
+ * @level_count:	Number of levels supported by the power domain. max
+ *			being 16 (0 - 15)
  * @enabled:		true if the power domain is enabled
  * @res_name:		Resource name used for cmd-db lookup
- * @addr:		Resource address as looped up using resource name from cmd-db
+ * @addr:		Resource address as looped up using resource name from
+ *			cmd-db
  */
 struct rpmhpd {
 	struct device	*dev;
@@ -127,8 +131,62 @@ static const struct rpmhpd_desc sdm845_desc = {
 	.num_pds = ARRAY_SIZE(sdm845_rpmhpds),
 };
 
+/* SM8150 RPMH powerdomains */
+
+static struct rpmhpd sm8150_mmcx_ao;
+static struct rpmhpd sm8150_mmcx = {
+	.pd = { .name = "mmcx", },
+	.peer = &sm8150_mmcx_ao,
+	.res_name = "mmcx.lvl",
+};
+
+static struct rpmhpd sm8150_mmcx_ao = {
+	.pd = { .name = "mmcx_ao", },
+	.active_only = true,
+	.peer = &sm8150_mmcx,
+	.res_name = "mmcx.lvl",
+};
+
+static struct rpmhpd *sm8150_rpmhpds[] = {
+	[SM8150_MSS] = &sdm845_mss,
+	[SM8150_EBI] = &sdm845_ebi,
+	[SM8150_LMX] = &sdm845_lmx,
+	[SM8150_LCX] = &sdm845_lcx,
+	[SM8150_GFX] = &sdm845_gfx,
+	[SM8150_MX] = &sdm845_mx,
+	[SM8150_MX_AO] = &sdm845_mx_ao,
+	[SM8150_CX] = &sdm845_cx,
+	[SM8150_CX_AO] = &sdm845_cx_ao,
+	[SM8150_MMCX] = &sm8150_mmcx,
+	[SM8150_MMCX_AO] = &sm8150_mmcx_ao,
+};
+
+static const struct rpmhpd_desc sm8150_desc = {
+	.rpmhpds = sm8150_rpmhpds,
+	.num_pds = ARRAY_SIZE(sm8150_rpmhpds),
+};
+
+/* SC7180 RPMH powerdomains */
+static struct rpmhpd *sc7180_rpmhpds[] = {
+	[SC7180_CX] = &sdm845_cx,
+	[SC7180_CX_AO] = &sdm845_cx_ao,
+	[SC7180_GFX] = &sdm845_gfx,
+	[SC7180_MX] = &sdm845_mx,
+	[SC7180_MX_AO] = &sdm845_mx_ao,
+	[SC7180_LMX] = &sdm845_lmx,
+	[SC7180_LCX] = &sdm845_lcx,
+	[SC7180_MSS] = &sdm845_mss,
+};
+
+static const struct rpmhpd_desc sc7180_desc = {
+	.rpmhpds = sc7180_rpmhpds,
+	.num_pds = ARRAY_SIZE(sc7180_rpmhpds),
+};
+
 static const struct of_device_id rpmhpd_match_table[] = {
+	{ .compatible = "qcom,sc7180-rpmhpd", .data = &sc7180_desc },
 	{ .compatible = "qcom,sdm845-rpmhpd", .data = &sdm845_desc },
+	{ .compatible = "qcom,sm8150-rpmhpd", .data = &sm8150_desc },
 	{ }
 };
 

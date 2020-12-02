@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
- * Virtual HID Framwork (VHF) driver for input events via SAM.
+ * Virtual HID Framework (VHF) driver for input events via SAM.
  * Used for keyboard input events on the Surface Laptops.
  */
 
@@ -152,9 +153,8 @@ static struct hid_device *vhf_create_hid_device(struct platform_device *pdev)
 	struct hid_device *hid;
 
 	hid = hid_allocate_device();
-	if (IS_ERR(hid)) {
+	if (IS_ERR(hid))
 		return hid;
-	}
 
 	hid->dev.parent = &pdev->dev;
 
@@ -173,9 +173,8 @@ static int vhf_event_handler(struct surface_sam_ssh_event *event, void *data)
 {
 	struct vhf_evtctx *ctx = (struct vhf_evtctx *)data;
 
-	if (event->tc == 0x08 && (event->cid == 0x03 || event->cid == 0x04)) {
+	if (event->tc == 0x08 && (event->cid == 0x03 || event->cid == 0x04))
 		return hid_input_report(ctx->hid, HID_INPUT_REPORT, event->pld, event->len, 1);
-	}
 
 	dev_warn(ctx->dev, "unsupported event (tc = %d, cid = %d)\n", event->tc, event->cid);
 	return 0;
@@ -189,14 +188,12 @@ static int surface_sam_vhf_probe(struct platform_device *pdev)
 
 	// add device link to EC
 	status = surface_sam_ssh_consumer_register(&pdev->dev);
-	if (status) {
+	if (status)
 		return status == -ENXIO ? -EPROBE_DEFER : status;
-	}
 
 	drvdata = kzalloc(sizeof(struct vhf_drvdata), GFP_KERNEL);
-	if (!drvdata) {
+	if (!drvdata)
 		return -ENOMEM;
-	}
 
 	hid = vhf_create_hid_device(pdev);
 	if (IS_ERR(hid)) {
@@ -205,9 +202,8 @@ static int surface_sam_vhf_probe(struct platform_device *pdev)
 	}
 
 	status = hid_add_device(hid);
-	if (status) {
+	if (status)
 		goto err_add_hid;
-	}
 
 	drvdata->event_ctx.dev = &pdev->dev;
 	drvdata->event_ctx.hid = hid;
@@ -216,16 +212,14 @@ static int surface_sam_vhf_probe(struct platform_device *pdev)
 
 	status = surface_sam_ssh_set_event_handler(
 			SAM_EVENT_VHF_RQID,
-	                vhf_event_handler,
+			vhf_event_handler,
 			&drvdata->event_ctx);
-	if (status) {
+	if (status)
 		goto err_add_hid;
-	}
 
 	status = surface_sam_ssh_enable_event_source(SAM_EVENT_VHF_TC, 0x01, SAM_EVENT_VHF_RQID);
-	if (status) {
+	if (status)
 		goto err_event_source;
-	}
 
 	return 0;
 

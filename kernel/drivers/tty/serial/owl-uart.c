@@ -662,10 +662,8 @@ static int owl_uart_probe(struct platform_device *pdev)
 	}
 
 	irq = platform_get_irq(pdev, 0);
-	if (irq < 0) {
-		dev_err(&pdev->dev, "could not get irq\n");
+	if (irq < 0)
 		return irq;
-	}
 
 	if (owl_uart_ports[pdev->id]) {
 		dev_err(&pdev->dev, "port %d already allocated\n", pdev->id);
@@ -680,6 +678,12 @@ static int owl_uart_probe(struct platform_device *pdev)
 	if (IS_ERR(owl_port->clk)) {
 		dev_err(&pdev->dev, "could not get clk\n");
 		return PTR_ERR(owl_port->clk);
+	}
+
+	ret = clk_prepare_enable(owl_port->clk);
+	if (ret) {
+		dev_err(&pdev->dev, "could not enable clk\n");
+		return ret;
 	}
 
 	owl_port->port.dev = &pdev->dev;
@@ -714,6 +718,7 @@ static int owl_uart_remove(struct platform_device *pdev)
 
 	uart_remove_one_port(&owl_uart_driver, &owl_port->port);
 	owl_uart_ports[pdev->id] = NULL;
+	clk_disable_unprepare(owl_port->clk);
 
 	return 0;
 }

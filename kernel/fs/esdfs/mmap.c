@@ -13,9 +13,9 @@
 
 #include "esdfs.h"
 
-static int esdfs_fault(struct vm_fault *vmf)
+static vm_fault_t esdfs_fault(struct vm_fault *vmf)
 {
-	int err;
+	vm_fault_t err;
 	struct file *file;
 	const struct vm_operations_struct *lower_vm_ops;
 	struct esdfs_sb_info *sbi;
@@ -26,7 +26,7 @@ static int esdfs_fault(struct vm_fault *vmf)
 	sbi = ESDFS_SB(file->f_path.dentry->d_sb);
 	creds = esdfs_override_creds(sbi, ESDFS_I(file->f_inode), NULL);
 	if (!creds)
-		return -ENOMEM;
+		return VM_FAULT_OOM;
 
 	lower_vm_ops = ESDFS_F(file)->lower_vm_ops;
 	BUG_ON(!lower_vm_ops);
@@ -49,9 +49,9 @@ static void esdfs_vm_close(struct vm_area_struct *vma)
 	fput(file);
 }
 
-static int esdfs_page_mkwrite(struct vm_fault *vmf)
+static vm_fault_t esdfs_page_mkwrite(struct vm_fault *vmf)
 {
-	int err = 0;
+	vm_fault_t err = 0;
 	struct file *file;
 	const struct vm_operations_struct *lower_vm_ops;
 	struct esdfs_sb_info *sbi;
@@ -62,7 +62,7 @@ static int esdfs_page_mkwrite(struct vm_fault *vmf)
 	sbi = ESDFS_SB(file->f_path.dentry->d_sb);
 	creds = esdfs_override_creds(sbi, ESDFS_I(file->f_inode), NULL);
 	if (!creds)
-		return -ENOMEM;
+		return VM_FAULT_OOM;
 
 	lower_vm_ops = ESDFS_F(file)->lower_vm_ops;
 	BUG_ON(!lower_vm_ops);

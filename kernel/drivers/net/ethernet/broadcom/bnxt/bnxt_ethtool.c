@@ -137,7 +137,45 @@ reset_coalesce:
 	return rc;
 }
 
-#define BNXT_NUM_STATS	21
+static const char * const bnxt_ring_stats_str[] = {
+	"rx_ucast_packets",
+	"rx_mcast_packets",
+	"rx_bcast_packets",
+	"rx_discards",
+	"rx_drops",
+	"rx_ucast_bytes",
+	"rx_mcast_bytes",
+	"rx_bcast_bytes",
+	"tx_ucast_packets",
+	"tx_mcast_packets",
+	"tx_bcast_packets",
+	"tx_discards",
+	"tx_drops",
+	"tx_ucast_bytes",
+	"tx_mcast_bytes",
+	"tx_bcast_bytes",
+};
+
+static const char * const bnxt_ring_tpa_stats_str[] = {
+	"tpa_packets",
+	"tpa_bytes",
+	"tpa_events",
+	"tpa_aborts",
+};
+
+static const char * const bnxt_ring_tpa2_stats_str[] = {
+	"rx_tpa_eligible_pkt",
+	"rx_tpa_eligible_bytes",
+	"rx_tpa_pkt",
+	"rx_tpa_bytes",
+	"rx_tpa_errors",
+};
+
+static const char * const bnxt_ring_sw_stats_str[] = {
+	"rx_l4_csum_errors",
+	"rx_buf_errors",
+	"missed_irqs",
+};
 
 #define BNXT_RX_STATS_ENTRY(counter)	\
 	{ BNXT_RX_STATS_OFFSET(counter), __stringify(counter) }
@@ -147,6 +185,110 @@ reset_coalesce:
 
 #define BNXT_RX_STATS_EXT_ENTRY(counter)	\
 	{ BNXT_RX_STATS_EXT_OFFSET(counter), __stringify(counter) }
+
+#define BNXT_TX_STATS_EXT_ENTRY(counter)	\
+	{ BNXT_TX_STATS_EXT_OFFSET(counter), __stringify(counter) }
+
+#define BNXT_RX_STATS_EXT_PFC_ENTRY(n)				\
+	BNXT_RX_STATS_EXT_ENTRY(pfc_pri##n##_rx_duration_us),	\
+	BNXT_RX_STATS_EXT_ENTRY(pfc_pri##n##_rx_transitions)
+
+#define BNXT_TX_STATS_EXT_PFC_ENTRY(n)				\
+	BNXT_TX_STATS_EXT_ENTRY(pfc_pri##n##_tx_duration_us),	\
+	BNXT_TX_STATS_EXT_ENTRY(pfc_pri##n##_tx_transitions)
+
+#define BNXT_RX_STATS_EXT_PFC_ENTRIES				\
+	BNXT_RX_STATS_EXT_PFC_ENTRY(0),				\
+	BNXT_RX_STATS_EXT_PFC_ENTRY(1),				\
+	BNXT_RX_STATS_EXT_PFC_ENTRY(2),				\
+	BNXT_RX_STATS_EXT_PFC_ENTRY(3),				\
+	BNXT_RX_STATS_EXT_PFC_ENTRY(4),				\
+	BNXT_RX_STATS_EXT_PFC_ENTRY(5),				\
+	BNXT_RX_STATS_EXT_PFC_ENTRY(6),				\
+	BNXT_RX_STATS_EXT_PFC_ENTRY(7)
+
+#define BNXT_TX_STATS_EXT_PFC_ENTRIES				\
+	BNXT_TX_STATS_EXT_PFC_ENTRY(0),				\
+	BNXT_TX_STATS_EXT_PFC_ENTRY(1),				\
+	BNXT_TX_STATS_EXT_PFC_ENTRY(2),				\
+	BNXT_TX_STATS_EXT_PFC_ENTRY(3),				\
+	BNXT_TX_STATS_EXT_PFC_ENTRY(4),				\
+	BNXT_TX_STATS_EXT_PFC_ENTRY(5),				\
+	BNXT_TX_STATS_EXT_PFC_ENTRY(6),				\
+	BNXT_TX_STATS_EXT_PFC_ENTRY(7)
+
+#define BNXT_RX_STATS_EXT_COS_ENTRY(n)				\
+	BNXT_RX_STATS_EXT_ENTRY(rx_bytes_cos##n),		\
+	BNXT_RX_STATS_EXT_ENTRY(rx_packets_cos##n)
+
+#define BNXT_TX_STATS_EXT_COS_ENTRY(n)				\
+	BNXT_TX_STATS_EXT_ENTRY(tx_bytes_cos##n),		\
+	BNXT_TX_STATS_EXT_ENTRY(tx_packets_cos##n)
+
+#define BNXT_RX_STATS_EXT_COS_ENTRIES				\
+	BNXT_RX_STATS_EXT_COS_ENTRY(0),				\
+	BNXT_RX_STATS_EXT_COS_ENTRY(1),				\
+	BNXT_RX_STATS_EXT_COS_ENTRY(2),				\
+	BNXT_RX_STATS_EXT_COS_ENTRY(3),				\
+	BNXT_RX_STATS_EXT_COS_ENTRY(4),				\
+	BNXT_RX_STATS_EXT_COS_ENTRY(5),				\
+	BNXT_RX_STATS_EXT_COS_ENTRY(6),				\
+	BNXT_RX_STATS_EXT_COS_ENTRY(7)				\
+
+#define BNXT_TX_STATS_EXT_COS_ENTRIES				\
+	BNXT_TX_STATS_EXT_COS_ENTRY(0),				\
+	BNXT_TX_STATS_EXT_COS_ENTRY(1),				\
+	BNXT_TX_STATS_EXT_COS_ENTRY(2),				\
+	BNXT_TX_STATS_EXT_COS_ENTRY(3),				\
+	BNXT_TX_STATS_EXT_COS_ENTRY(4),				\
+	BNXT_TX_STATS_EXT_COS_ENTRY(5),				\
+	BNXT_TX_STATS_EXT_COS_ENTRY(6),				\
+	BNXT_TX_STATS_EXT_COS_ENTRY(7)				\
+
+#define BNXT_RX_STATS_EXT_DISCARD_COS_ENTRY(n)			\
+	BNXT_RX_STATS_EXT_ENTRY(rx_discard_bytes_cos##n),	\
+	BNXT_RX_STATS_EXT_ENTRY(rx_discard_packets_cos##n)
+
+#define BNXT_RX_STATS_EXT_DISCARD_COS_ENTRIES				\
+	BNXT_RX_STATS_EXT_DISCARD_COS_ENTRY(0),				\
+	BNXT_RX_STATS_EXT_DISCARD_COS_ENTRY(1),				\
+	BNXT_RX_STATS_EXT_DISCARD_COS_ENTRY(2),				\
+	BNXT_RX_STATS_EXT_DISCARD_COS_ENTRY(3),				\
+	BNXT_RX_STATS_EXT_DISCARD_COS_ENTRY(4),				\
+	BNXT_RX_STATS_EXT_DISCARD_COS_ENTRY(5),				\
+	BNXT_RX_STATS_EXT_DISCARD_COS_ENTRY(6),				\
+	BNXT_RX_STATS_EXT_DISCARD_COS_ENTRY(7)
+
+#define BNXT_RX_STATS_PRI_ENTRY(counter, n)		\
+	{ BNXT_RX_STATS_EXT_OFFSET(counter##_cos0),	\
+	  __stringify(counter##_pri##n) }
+
+#define BNXT_TX_STATS_PRI_ENTRY(counter, n)		\
+	{ BNXT_TX_STATS_EXT_OFFSET(counter##_cos0),	\
+	  __stringify(counter##_pri##n) }
+
+#define BNXT_RX_STATS_PRI_ENTRIES(counter)		\
+	BNXT_RX_STATS_PRI_ENTRY(counter, 0),		\
+	BNXT_RX_STATS_PRI_ENTRY(counter, 1),		\
+	BNXT_RX_STATS_PRI_ENTRY(counter, 2),		\
+	BNXT_RX_STATS_PRI_ENTRY(counter, 3),		\
+	BNXT_RX_STATS_PRI_ENTRY(counter, 4),		\
+	BNXT_RX_STATS_PRI_ENTRY(counter, 5),		\
+	BNXT_RX_STATS_PRI_ENTRY(counter, 6),		\
+	BNXT_RX_STATS_PRI_ENTRY(counter, 7)
+
+#define BNXT_TX_STATS_PRI_ENTRIES(counter)		\
+	BNXT_TX_STATS_PRI_ENTRY(counter, 0),		\
+	BNXT_TX_STATS_PRI_ENTRY(counter, 1),		\
+	BNXT_TX_STATS_PRI_ENTRY(counter, 2),		\
+	BNXT_TX_STATS_PRI_ENTRY(counter, 3),		\
+	BNXT_TX_STATS_PRI_ENTRY(counter, 4),		\
+	BNXT_TX_STATS_PRI_ENTRY(counter, 5),		\
+	BNXT_TX_STATS_PRI_ENTRY(counter, 6),		\
+	BNXT_TX_STATS_PRI_ENTRY(counter, 7)
+
+#define BNXT_PCIE_STATS_ENTRY(counter)	\
+	{ BNXT_PCIE_STATS_OFFSET(counter), __stringify(counter) }
 
 enum {
 	RX_TOTAL_DISCARDS,
@@ -256,23 +398,116 @@ static const struct {
 	BNXT_RX_STATS_EXT_ENTRY(resume_pause_events),
 	BNXT_RX_STATS_EXT_ENTRY(continuous_roce_pause_events),
 	BNXT_RX_STATS_EXT_ENTRY(resume_roce_pause_events),
+	BNXT_RX_STATS_EXT_COS_ENTRIES,
+	BNXT_RX_STATS_EXT_PFC_ENTRIES,
+	BNXT_RX_STATS_EXT_ENTRY(rx_bits),
+	BNXT_RX_STATS_EXT_ENTRY(rx_buffer_passed_threshold),
+	BNXT_RX_STATS_EXT_ENTRY(rx_pcs_symbol_err),
+	BNXT_RX_STATS_EXT_ENTRY(rx_corrected_bits),
+	BNXT_RX_STATS_EXT_DISCARD_COS_ENTRIES,
+};
+
+static const struct {
+	long offset;
+	char string[ETH_GSTRING_LEN];
+} bnxt_tx_port_stats_ext_arr[] = {
+	BNXT_TX_STATS_EXT_COS_ENTRIES,
+	BNXT_TX_STATS_EXT_PFC_ENTRIES,
+};
+
+static const struct {
+	long base_off;
+	char string[ETH_GSTRING_LEN];
+} bnxt_rx_bytes_pri_arr[] = {
+	BNXT_RX_STATS_PRI_ENTRIES(rx_bytes),
+};
+
+static const struct {
+	long base_off;
+	char string[ETH_GSTRING_LEN];
+} bnxt_rx_pkts_pri_arr[] = {
+	BNXT_RX_STATS_PRI_ENTRIES(rx_packets),
+};
+
+static const struct {
+	long base_off;
+	char string[ETH_GSTRING_LEN];
+} bnxt_tx_bytes_pri_arr[] = {
+	BNXT_TX_STATS_PRI_ENTRIES(tx_bytes),
+};
+
+static const struct {
+	long base_off;
+	char string[ETH_GSTRING_LEN];
+} bnxt_tx_pkts_pri_arr[] = {
+	BNXT_TX_STATS_PRI_ENTRIES(tx_packets),
+};
+
+static const struct {
+	long offset;
+	char string[ETH_GSTRING_LEN];
+} bnxt_pcie_stats_arr[] = {
+	BNXT_PCIE_STATS_ENTRY(pcie_pl_signal_integrity),
+	BNXT_PCIE_STATS_ENTRY(pcie_dl_signal_integrity),
+	BNXT_PCIE_STATS_ENTRY(pcie_tl_signal_integrity),
+	BNXT_PCIE_STATS_ENTRY(pcie_link_integrity),
+	BNXT_PCIE_STATS_ENTRY(pcie_tx_traffic_rate),
+	BNXT_PCIE_STATS_ENTRY(pcie_rx_traffic_rate),
+	BNXT_PCIE_STATS_ENTRY(pcie_tx_dllp_statistics),
+	BNXT_PCIE_STATS_ENTRY(pcie_rx_dllp_statistics),
+	BNXT_PCIE_STATS_ENTRY(pcie_equalization_time),
+	BNXT_PCIE_STATS_ENTRY(pcie_ltssm_histogram[0]),
+	BNXT_PCIE_STATS_ENTRY(pcie_ltssm_histogram[2]),
+	BNXT_PCIE_STATS_ENTRY(pcie_recovery_histogram),
 };
 
 #define BNXT_NUM_SW_FUNC_STATS	ARRAY_SIZE(bnxt_sw_func_stats)
 #define BNXT_NUM_PORT_STATS ARRAY_SIZE(bnxt_port_stats_arr)
-#define BNXT_NUM_PORT_STATS_EXT ARRAY_SIZE(bnxt_port_stats_ext_arr)
+#define BNXT_NUM_STATS_PRI			\
+	(ARRAY_SIZE(bnxt_rx_bytes_pri_arr) +	\
+	 ARRAY_SIZE(bnxt_rx_pkts_pri_arr) +	\
+	 ARRAY_SIZE(bnxt_tx_bytes_pri_arr) +	\
+	 ARRAY_SIZE(bnxt_tx_pkts_pri_arr))
+#define BNXT_NUM_PCIE_STATS ARRAY_SIZE(bnxt_pcie_stats_arr)
+
+static int bnxt_get_num_tpa_ring_stats(struct bnxt *bp)
+{
+	if (BNXT_SUPPORTS_TPA(bp)) {
+		if (bp->max_tpa_v2)
+			return ARRAY_SIZE(bnxt_ring_tpa2_stats_str);
+		return ARRAY_SIZE(bnxt_ring_tpa_stats_str);
+	}
+	return 0;
+}
+
+static int bnxt_get_num_ring_stats(struct bnxt *bp)
+{
+	int num_stats;
+
+	num_stats = ARRAY_SIZE(bnxt_ring_stats_str) +
+		    ARRAY_SIZE(bnxt_ring_sw_stats_str) +
+		    bnxt_get_num_tpa_ring_stats(bp);
+	return num_stats * bp->cp_nr_rings;
+}
 
 static int bnxt_get_num_stats(struct bnxt *bp)
 {
-	int num_stats = BNXT_NUM_STATS * bp->cp_nr_rings;
+	int num_stats = bnxt_get_num_ring_stats(bp);
 
 	num_stats += BNXT_NUM_SW_FUNC_STATS;
 
 	if (bp->flags & BNXT_FLAG_PORT_STATS)
 		num_stats += BNXT_NUM_PORT_STATS;
 
-	if (bp->flags & BNXT_FLAG_PORT_STATS_EXT)
-		num_stats += BNXT_NUM_PORT_STATS_EXT;
+	if (bp->flags & BNXT_FLAG_PORT_STATS_EXT) {
+		num_stats += bp->fw_rx_stats_ext_size +
+			     bp->fw_tx_stats_ext_size;
+		if (bp->pri2cos_valid)
+			num_stats += BNXT_NUM_STATS_PRI;
+	}
+
+	if (bp->flags & BNXT_FLAG_PCIE_STATS)
+		num_stats += BNXT_NUM_PCIE_STATS;
 
 	return num_stats;
 }
@@ -298,10 +533,13 @@ static void bnxt_get_ethtool_stats(struct net_device *dev,
 {
 	u32 i, j = 0;
 	struct bnxt *bp = netdev_priv(dev);
-	u32 stat_fields = sizeof(struct ctx_hw_stats) / 8;
+	u32 stat_fields = ARRAY_SIZE(bnxt_ring_stats_str) +
+			  bnxt_get_num_tpa_ring_stats(bp);
 
-	if (!bp->bnapi)
-		return;
+	if (!bp->bnapi) {
+		j += bnxt_get_num_ring_stats(bp) + BNXT_NUM_SW_FUNC_STATS;
+		goto skip_ring_stats;
+	}
 
 	for (i = 0; i < BNXT_NUM_SW_FUNC_STATS; i++)
 		bnxt_sw_func_stats[i].counter = 0;
@@ -315,6 +553,8 @@ static void bnxt_get_ethtool_stats(struct net_device *dev,
 		for (k = 0; k < stat_fields; j++, k++)
 			buf[j] = le64_to_cpu(hw_stats[k]);
 		buf[j++] = cpr->rx_l4_csum_errors;
+		buf[j++] = cpr->rx_buf_errors;
+		buf[j++] = cpr->missed_irqs;
 
 		bnxt_sw_func_stats[RX_TOTAL_DISCARDS].counter +=
 			le64_to_cpu(cpr->hw_stats->rx_discard_pkts);
@@ -325,6 +565,7 @@ static void bnxt_get_ethtool_stats(struct net_device *dev,
 	for (i = 0; i < BNXT_NUM_SW_FUNC_STATS; i++, j++)
 		buf[j] = bnxt_sw_func_stats[i].counter;
 
+skip_ring_stats:
 	if (bp->flags & BNXT_FLAG_PORT_STATS) {
 		__le64 *port_stats = (__le64 *)bp->hw_rx_port_stats;
 
@@ -334,11 +575,50 @@ static void bnxt_get_ethtool_stats(struct net_device *dev,
 		}
 	}
 	if (bp->flags & BNXT_FLAG_PORT_STATS_EXT) {
-		__le64 *port_stats_ext = (__le64 *)bp->hw_rx_port_stats_ext;
+		__le64 *rx_port_stats_ext = (__le64 *)bp->hw_rx_port_stats_ext;
+		__le64 *tx_port_stats_ext = (__le64 *)bp->hw_tx_port_stats_ext;
 
-		for (i = 0; i < BNXT_NUM_PORT_STATS_EXT; i++, j++) {
-			buf[j] = le64_to_cpu(*(port_stats_ext +
+		for (i = 0; i < bp->fw_rx_stats_ext_size; i++, j++) {
+			buf[j] = le64_to_cpu(*(rx_port_stats_ext +
 					    bnxt_port_stats_ext_arr[i].offset));
+		}
+		for (i = 0; i < bp->fw_tx_stats_ext_size; i++, j++) {
+			buf[j] = le64_to_cpu(*(tx_port_stats_ext +
+					bnxt_tx_port_stats_ext_arr[i].offset));
+		}
+		if (bp->pri2cos_valid) {
+			for (i = 0; i < 8; i++, j++) {
+				long n = bnxt_rx_bytes_pri_arr[i].base_off +
+					 bp->pri2cos_idx[i];
+
+				buf[j] = le64_to_cpu(*(rx_port_stats_ext + n));
+			}
+			for (i = 0; i < 8; i++, j++) {
+				long n = bnxt_rx_pkts_pri_arr[i].base_off +
+					 bp->pri2cos_idx[i];
+
+				buf[j] = le64_to_cpu(*(rx_port_stats_ext + n));
+			}
+			for (i = 0; i < 8; i++, j++) {
+				long n = bnxt_tx_bytes_pri_arr[i].base_off +
+					 bp->pri2cos_idx[i];
+
+				buf[j] = le64_to_cpu(*(tx_port_stats_ext + n));
+			}
+			for (i = 0; i < 8; i++, j++) {
+				long n = bnxt_tx_pkts_pri_arr[i].base_off +
+					 bp->pri2cos_idx[i];
+
+				buf[j] = le64_to_cpu(*(tx_port_stats_ext + n));
+			}
+		}
+	}
+	if (bp->flags & BNXT_FLAG_PCIE_STATS) {
+		__le64 *pcie_stats = (__le64 *)bp->hw_pcie_stats;
+
+		for (i = 0; i < BNXT_NUM_PCIE_STATS; i++, j++) {
+			buf[j] = le64_to_cpu(*(pcie_stats +
+					       bnxt_pcie_stats_arr[i].offset));
 		}
 	}
 }
@@ -346,54 +626,39 @@ static void bnxt_get_ethtool_stats(struct net_device *dev,
 static void bnxt_get_strings(struct net_device *dev, u32 stringset, u8 *buf)
 {
 	struct bnxt *bp = netdev_priv(dev);
-	u32 i;
+	static const char * const *str;
+	u32 i, j, num_str;
 
 	switch (stringset) {
-	/* The number of strings must match BNXT_NUM_STATS defined above. */
 	case ETH_SS_STATS:
 		for (i = 0; i < bp->cp_nr_rings; i++) {
-			sprintf(buf, "[%d]: rx_ucast_packets", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: rx_mcast_packets", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: rx_bcast_packets", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: rx_discards", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: rx_drops", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: rx_ucast_bytes", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: rx_mcast_bytes", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: rx_bcast_bytes", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tx_ucast_packets", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tx_mcast_packets", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tx_bcast_packets", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tx_discards", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tx_drops", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tx_ucast_bytes", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tx_mcast_bytes", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tx_bcast_bytes", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tpa_packets", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tpa_bytes", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tpa_events", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: tpa_aborts", i);
-			buf += ETH_GSTRING_LEN;
-			sprintf(buf, "[%d]: rx_l4_csum_errors", i);
-			buf += ETH_GSTRING_LEN;
+			num_str = ARRAY_SIZE(bnxt_ring_stats_str);
+			for (j = 0; j < num_str; j++) {
+				sprintf(buf, "[%d]: %s", i,
+					bnxt_ring_stats_str[j]);
+				buf += ETH_GSTRING_LEN;
+			}
+			if (!BNXT_SUPPORTS_TPA(bp))
+				goto skip_tpa_stats;
+
+			if (bp->max_tpa_v2) {
+				num_str = ARRAY_SIZE(bnxt_ring_tpa2_stats_str);
+				str = bnxt_ring_tpa2_stats_str;
+			} else {
+				num_str = ARRAY_SIZE(bnxt_ring_tpa_stats_str);
+				str = bnxt_ring_tpa_stats_str;
+			}
+			for (j = 0; j < num_str; j++) {
+				sprintf(buf, "[%d]: %s", i, str[j]);
+				buf += ETH_GSTRING_LEN;
+			}
+skip_tpa_stats:
+			num_str = ARRAY_SIZE(bnxt_ring_sw_stats_str);
+			for (j = 0; j < num_str; j++) {
+				sprintf(buf, "[%d]: %s", i,
+					bnxt_ring_sw_stats_str[j]);
+				buf += ETH_GSTRING_LEN;
+			}
 		}
 		for (i = 0; i < BNXT_NUM_SW_FUNC_STATS; i++) {
 			strcpy(buf, bnxt_sw_func_stats[i].string);
@@ -407,8 +672,41 @@ static void bnxt_get_strings(struct net_device *dev, u32 stringset, u8 *buf)
 			}
 		}
 		if (bp->flags & BNXT_FLAG_PORT_STATS_EXT) {
-			for (i = 0; i < BNXT_NUM_PORT_STATS_EXT; i++) {
+			for (i = 0; i < bp->fw_rx_stats_ext_size; i++) {
 				strcpy(buf, bnxt_port_stats_ext_arr[i].string);
+				buf += ETH_GSTRING_LEN;
+			}
+			for (i = 0; i < bp->fw_tx_stats_ext_size; i++) {
+				strcpy(buf,
+				       bnxt_tx_port_stats_ext_arr[i].string);
+				buf += ETH_GSTRING_LEN;
+			}
+			if (bp->pri2cos_valid) {
+				for (i = 0; i < 8; i++) {
+					strcpy(buf,
+					       bnxt_rx_bytes_pri_arr[i].string);
+					buf += ETH_GSTRING_LEN;
+				}
+				for (i = 0; i < 8; i++) {
+					strcpy(buf,
+					       bnxt_rx_pkts_pri_arr[i].string);
+					buf += ETH_GSTRING_LEN;
+				}
+				for (i = 0; i < 8; i++) {
+					strcpy(buf,
+					       bnxt_tx_bytes_pri_arr[i].string);
+					buf += ETH_GSTRING_LEN;
+				}
+				for (i = 0; i < 8; i++) {
+					strcpy(buf,
+					       bnxt_tx_pkts_pri_arr[i].string);
+					buf += ETH_GSTRING_LEN;
+				}
+			}
+		}
+		if (bp->flags & BNXT_FLAG_PCIE_STATS) {
+			for (i = 0; i < BNXT_NUM_PCIE_STATS; i++) {
+				strcpy(buf, bnxt_pcie_stats_arr[i].string);
 				buf += ETH_GSTRING_LEN;
 			}
 		}
@@ -581,8 +879,6 @@ static int bnxt_set_channels(struct net_device *dev,
 	bp->cp_nr_rings = sh ? max_t(int, bp->tx_nr_rings, bp->rx_nr_rings) :
 			       bp->tx_nr_rings + bp->rx_nr_rings;
 
-	bp->num_stat_ctxs = bp->cp_nr_rings;
-
 	/* After changing number of rx channels, update NTUPLE feature. */
 	netdev_update_features(dev);
 	if (netif_running(dev)) {
@@ -593,7 +889,7 @@ static int bnxt_set_channels(struct net_device *dev,
 			 */
 		}
 	} else {
-		rc = bnxt_reserve_rings(bp);
+		rc = bnxt_reserve_rings(bp, true);
 	}
 
 	return rc;
@@ -1411,6 +1707,11 @@ static u32 bnxt_get_link(struct net_device *dev)
 	return bp->link_info.link_up;
 }
 
+static void bnxt_print_admin_err(struct bnxt *bp)
+{
+	netdev_info(bp->dev, "PF does not have admin privileges to flash or reset the device\n");
+}
+
 static int bnxt_find_nvram_item(struct net_device *dev, u16 type, u16 ordinal,
 				u16 ext, u16 *index, u32 *item_length,
 				u32 *data_length);
@@ -1450,13 +1751,8 @@ static int bnxt_flash_nvram(struct net_device *dev,
 	rc = hwrm_send_message(bp, &req, sizeof(req), FLASH_NVRAM_TIMEOUT);
 	dma_free_coherent(&bp->pdev->dev, data_len, kmem, dma_handle);
 
-	if (rc == HWRM_ERR_CODE_RESOURCE_ACCESS_DENIED) {
-		netdev_info(dev,
-			    "PF does not have admin privileges to flash the device\n");
-		rc = -EACCES;
-	} else if (rc) {
-		rc = -EIO;
-	}
+	if (rc == -EACCES)
+		bnxt_print_admin_err(bp);
 	return rc;
 }
 
@@ -1506,13 +1802,8 @@ static int bnxt_firmware_reset(struct net_device *dev,
 	}
 
 	rc = hwrm_send_message(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT);
-	if (rc == HWRM_ERR_CODE_RESOURCE_ACCESS_DENIED) {
-		netdev_info(dev,
-			    "PF does not have admin privileges to reset the device\n");
-		rc = -EACCES;
-	} else if (rc) {
-		rc = -EIO;
-	}
+	if (rc == -EACCES)
+		bnxt_print_admin_err(bp);
 	return rc;
 }
 
@@ -1720,8 +2011,8 @@ static int bnxt_flash_package_from_file(struct net_device *dev,
 	struct hwrm_nvm_install_update_output *resp = bp->hwrm_cmd_resp_addr;
 	struct hwrm_nvm_install_update_input install = {0};
 	const struct firmware *fw;
-	int rc, hwrm_err = 0;
 	u32 item_len;
+	int rc = 0;
 	u16 index;
 
 	bnxt_hwrm_fw_set_time(bp);
@@ -1765,15 +2056,14 @@ static int bnxt_flash_package_from_file(struct net_device *dev,
 			memcpy(kmem, fw->data, fw->size);
 			modify.host_src_addr = cpu_to_le64(dma_handle);
 
-			hwrm_err = hwrm_send_message(bp, &modify,
-						     sizeof(modify),
-						     FLASH_PACKAGE_TIMEOUT);
+			rc = hwrm_send_message(bp, &modify, sizeof(modify),
+					       FLASH_PACKAGE_TIMEOUT);
 			dma_free_coherent(&bp->pdev->dev, fw->size, kmem,
 					  dma_handle);
 		}
 	}
 	release_firmware(fw);
-	if (rc || hwrm_err)
+	if (rc)
 		goto err_exit;
 
 	if ((install_type & 0xffff) == 0)
@@ -1782,20 +2072,19 @@ static int bnxt_flash_package_from_file(struct net_device *dev,
 	install.install_type = cpu_to_le32(install_type);
 
 	mutex_lock(&bp->hwrm_cmd_lock);
-	hwrm_err = _hwrm_send_message(bp, &install, sizeof(install),
-				      INSTALL_PACKAGE_TIMEOUT);
-	if (hwrm_err) {
+	rc = _hwrm_send_message(bp, &install, sizeof(install),
+				INSTALL_PACKAGE_TIMEOUT);
+	if (rc) {
 		u8 error_code = ((struct hwrm_err_output *)resp)->cmd_err;
 
 		if (resp->error_code && error_code ==
 		    NVM_INSTALL_UPDATE_CMD_ERR_CODE_FRAG_ERR) {
 			install.flags |= cpu_to_le16(
 			       NVM_INSTALL_UPDATE_REQ_FLAGS_ALLOWED_TO_DEFRAG);
-			hwrm_err = _hwrm_send_message(bp, &install,
-						      sizeof(install),
-						      INSTALL_PACKAGE_TIMEOUT);
+			rc = _hwrm_send_message(bp, &install, sizeof(install),
+						INSTALL_PACKAGE_TIMEOUT);
 		}
-		if (hwrm_err)
+		if (rc)
 			goto flash_pkg_exit;
 	}
 
@@ -1807,13 +2096,8 @@ static int bnxt_flash_package_from_file(struct net_device *dev,
 flash_pkg_exit:
 	mutex_unlock(&bp->hwrm_cmd_lock);
 err_exit:
-	if (hwrm_err == HWRM_ERR_CODE_RESOURCE_ACCESS_DENIED) {
-		netdev_info(dev,
-			    "PF does not have admin privileges to flash the device\n");
-		rc = -EACCES;
-	} else if (hwrm_err) {
-		rc = -EOPNOTSUPP;
-	}
+	if (rc == -EACCES)
+		bnxt_print_admin_err(bp);
 	return rc;
 }
 
@@ -2361,8 +2645,6 @@ static int bnxt_set_phys_id(struct net_device *dev,
 		led_cfg->led_group_id = bp->leds[i].led_group_id;
 	}
 	rc = hwrm_send_message(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT);
-	if (rc)
-		rc = -EIO;
 	return rc;
 }
 
@@ -2474,11 +2756,11 @@ static int bnxt_hwrm_phy_loopback(struct bnxt *bp, bool enable, bool ext)
 	return hwrm_send_message(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT);
 }
 
-static int bnxt_rx_loopback(struct bnxt *bp, struct bnxt_napi *bnapi,
+static int bnxt_rx_loopback(struct bnxt *bp, struct bnxt_cp_ring_info *cpr,
 			    u32 raw_cons, int pkt_size)
 {
-	struct bnxt_cp_ring_info *cpr = &bnapi->cp_ring;
-	struct bnxt_rx_ring_info *rxr = bnapi->rx_ring;
+	struct bnxt_napi *bnapi = cpr->bnapi;
+	struct bnxt_rx_ring_info *rxr;
 	struct bnxt_sw_rx_bd *rx_buf;
 	struct rx_cmp *rxcmp;
 	u16 cp_cons, cons;
@@ -2486,6 +2768,7 @@ static int bnxt_rx_loopback(struct bnxt *bp, struct bnxt_napi *bnapi,
 	u32 len;
 	int i;
 
+	rxr = bnapi->rx_ring;
 	cp_cons = RING_CMP(raw_cons);
 	rxcmp = (struct rx_cmp *)
 		&cpr->cp_desc_ring[CP_RING(cp_cons)][CP_IDX(cp_cons)];
@@ -2506,17 +2789,15 @@ static int bnxt_rx_loopback(struct bnxt *bp, struct bnxt_napi *bnapi,
 	return 0;
 }
 
-static int bnxt_poll_loopback(struct bnxt *bp, int pkt_size)
+static int bnxt_poll_loopback(struct bnxt *bp, struct bnxt_cp_ring_info *cpr,
+			      int pkt_size)
 {
-	struct bnxt_napi *bnapi = bp->bnapi[0];
-	struct bnxt_cp_ring_info *cpr;
 	struct tx_cmp *txcmp;
 	int rc = -EIO;
 	u32 raw_cons;
 	u32 cons;
 	int i;
 
-	cpr = &bnapi->cp_ring;
 	raw_cons = cpr->cp_raw_cons;
 	for (i = 0; i < 200; i++) {
 		cons = RING_CMP(raw_cons);
@@ -2532,7 +2813,7 @@ static int bnxt_poll_loopback(struct bnxt *bp, int pkt_size)
 		 */
 		dma_rmb();
 		if (TX_CMP_TYPE(txcmp) == CMP_TYPE_RX_L2_CMP) {
-			rc = bnxt_rx_loopback(bp, bnapi, raw_cons, pkt_size);
+			rc = bnxt_rx_loopback(bp, cpr, raw_cons, pkt_size);
 			raw_cons = NEXT_RAW_CMP(raw_cons);
 			raw_cons = NEXT_RAW_CMP(raw_cons);
 			break;
@@ -2546,12 +2827,17 @@ static int bnxt_poll_loopback(struct bnxt *bp, int pkt_size)
 static int bnxt_run_loopback(struct bnxt *bp)
 {
 	struct bnxt_tx_ring_info *txr = &bp->tx_ring[0];
+	struct bnxt_rx_ring_info *rxr = &bp->rx_ring[0];
+	struct bnxt_cp_ring_info *cpr;
 	int pkt_size, i = 0;
 	struct sk_buff *skb;
 	dma_addr_t map;
 	u8 *data;
 	int rc;
 
+	cpr = &rxr->bnapi->cp_ring;
+	if (bp->flags & BNXT_FLAG_CHIP_P5)
+		cpr = cpr->cp_ring_arr[BNXT_RX_HDL];
 	pkt_size = min(bp->dev->mtu + ETH_HLEN, bp->rx_copy_thresh);
 	skb = netdev_alloc_skb(bp->dev, pkt_size);
 	if (!skb)
@@ -2570,13 +2856,13 @@ static int bnxt_run_loopback(struct bnxt *bp)
 		dev_kfree_skb(skb);
 		return -EIO;
 	}
-	bnxt_xmit_xdp(bp, txr, map, pkt_size, 0);
+	bnxt_xmit_bd(bp, txr, map, pkt_size);
 
 	/* Sync BD data before updating doorbell */
 	wmb();
 
-	bnxt_db_write(bp, txr->tx_doorbell, DB_KEY_TX | txr->tx_prod);
-	rc = bnxt_poll_loopback(bp, pkt_size);
+	bnxt_db_write(bp, &txr->tx_db, txr->tx_prod);
+	rc = bnxt_poll_loopback(bp, cpr, pkt_size);
 
 	dma_unmap_single(&bp->pdev->dev, map, pkt_size, PCI_DMA_TODEVICE);
 	dev_kfree_skb(skb);
@@ -3098,8 +3384,10 @@ void bnxt_ethtool_init(struct bnxt *bp)
 	struct net_device *dev = bp->dev;
 	int i, rc;
 
-	bnxt_get_pkgver(dev);
+	if (!(bp->fw_cap & BNXT_FW_CAP_PKG_VER))
+		bnxt_get_pkgver(dev);
 
+	bp->num_tests = 0;
 	if (bp->hwrm_spec_code < 0x10704 || !BNXT_SINGLE_PF(bp))
 		return;
 
@@ -3109,7 +3397,9 @@ void bnxt_ethtool_init(struct bnxt *bp)
 	if (rc)
 		goto ethtool_init_exit;
 
-	test_info = kzalloc(sizeof(*bp->test_info), GFP_KERNEL);
+	test_info = bp->test_info;
+	if (!test_info)
+		test_info = kzalloc(sizeof(*bp->test_info), GFP_KERNEL);
 	if (!test_info)
 		goto ethtool_init_exit;
 

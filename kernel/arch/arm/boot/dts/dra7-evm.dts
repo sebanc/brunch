@@ -1,9 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 /dts-v1/;
 
@@ -501,7 +498,7 @@
 	phy-supply = <&ldousb_reg>;
 };
 
-&gpio7 {
+&gpio7_target {
 	ti,no-reset-on-init;
 	ti,no-idle-on-init;
 };
@@ -512,15 +509,25 @@
 };
 
 &cpsw_emac0 {
-	phy_id = <&davinci_mdio>, <2>;
+	phy-handle = <&ethphy0>;
 	phy-mode = "rgmii";
 	dual_emac_res_vlan = <1>;
 };
 
 &cpsw_emac1 {
-	phy_id = <&davinci_mdio>, <3>;
+	phy-handle = <&ethphy1>;
 	phy-mode = "rgmii";
 	dual_emac_res_vlan = <2>;
+};
+
+&davinci_mdio {
+	ethphy0: ethernet-phy@2 {
+		reg = <2>;
+	};
+
+	ethphy1: ethernet-phy@3 {
+		reg = <3>;
+	};
 };
 
 &dcan1 {

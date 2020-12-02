@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2017 Western Digital Corporation or its affiliates.
  *
@@ -8,6 +9,7 @@
 
 #include <linux/module.h>
 #include <linux/crc32.h>
+#include <linux/sched/mm.h>
 
 #define	DM_MSG_PREFIX		"zoned metadata"
 
@@ -33,7 +35,7 @@
  *    (1) Super block (1 block)
  *    (2) Chunk mapping table (nr_map_blocks)
  *    (3) Bitmap blocks (nr_bitmap_blocks)
- * All metadata blocks are stored in conventional zones, starting from the
+ * All metadata blocks are stored in conventional zones, starting from
  * the first conventional zone found on disk.
  */
 struct dmz_super {
@@ -233,7 +235,7 @@ void dmz_unlock_map(struct dmz_metadata *zmd)
  * Lock/unlock metadata access. This is a "read" lock on a semaphore
  * that prevents metadata flush from running while metadata are being
  * modified. The actual metadata write mutual exclusion is achieved with
- * the map lock and zone styate management (active and reclaim state are
+ * the map lock and zone state management (active and reclaim state are
  * mutually exclusive).
  */
 void dmz_lock_metadata(struct dmz_metadata *zmd)
@@ -1196,8 +1198,7 @@ static int dmz_init_zones(struct dmz_metadata *zmd)
 	while (sector < dev->capacity) {
 		/* Get zone information */
 		nr_blkz = DMZ_REPORT_NR_ZONES;
-		ret = blkdev_report_zones(dev->bdev, sector, blkz,
-					  &nr_blkz, GFP_KERNEL);
+		ret = blkdev_report_zones(dev->bdev, sector, blkz, &nr_blkz);
 		if (ret) {
 			dmz_dev_err(dev, "Report zones failed %d", ret);
 			goto out;
@@ -1235,12 +1236,20 @@ out:
 static int dmz_update_zone(struct dmz_metadata *zmd, struct dm_zone *zone)
 {
 	unsigned int nr_blkz = 1;
+	unsigned int noio_flag;
 	struct blk_zone blkz;
 	int ret;
 
-	/* Get zone information from disk */
+	/*
+	 * Get zone information from disk. Since blkdev_report_zones() uses
+	 * GFP_KERNEL by default for memory allocations, set the per-task
+	 * PF_MEMALLOC_NOIO flag so that all allocations are done as if
+	 * GFP_NOIO was specified.
+	 */
+	noio_flag = memalloc_noio_save();
 	ret = blkdev_report_zones(zmd->dev->bdev, dmz_start_sect(zmd, zone),
-				  &blkz, &nr_blkz, GFP_NOIO);
+				  &blkz, &nr_blkz);
+	memalloc_noio_restore(noio_flag);
 	if (!nr_blkz)
 		ret = -EIO;
 	if (ret) {
@@ -1655,7 +1664,7 @@ again:
 		if (op != REQ_OP_WRITE)
 			goto out;
 
-		/* Alloate a random zone */
+		/* Allocate a random zone */
 		dzone = dmz_alloc_zone(zmd, DMZ_ALLOC_RND);
 		if (!dzone) {
 			if (dmz_bdev_is_dying(zmd->dev)) {
@@ -1756,7 +1765,7 @@ again:
 	if (bzone)
 		goto out;
 
-	/* Alloate a random zone */
+	/* Allocate a random zone */
 	bzone = dmz_alloc_zone(zmd, DMZ_ALLOC_RND);
 	if (!bzone) {
 		if (dmz_bdev_is_dying(zmd->dev)) {

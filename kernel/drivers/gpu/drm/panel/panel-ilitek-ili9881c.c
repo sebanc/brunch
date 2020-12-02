@@ -387,9 +387,9 @@ static const struct drm_display_mode bananapi_default_mode = {
 	.vtotal		= 1280 + 10 + 10 + 20,
 };
 
-static int ili9881c_get_modes(struct drm_panel *panel)
+static int ili9881c_get_modes(struct drm_panel *panel,
+			      struct drm_connector *connector)
 {
-	struct drm_connector *connector = panel->connector;
 	struct ili9881c *ctx = panel_to_ili9881c(panel);
 	struct drm_display_mode *mode;
 
@@ -407,8 +407,8 @@ static int ili9881c_get_modes(struct drm_panel *panel)
 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(connector, mode);
 
-	panel->connector->display_info.width_mm = 62;
-	panel->connector->display_info.height_mm = 110;
+	connector->display_info.width_mm = 62;
+	connector->display_info.height_mm = 110;
 
 	return 1;
 }
@@ -433,9 +433,8 @@ static int ili9881c_dsi_probe(struct mipi_dsi_device *dsi)
 	mipi_dsi_set_drvdata(dsi, ctx);
 	ctx->dsi = dsi;
 
-	drm_panel_init(&ctx->panel);
-	ctx->panel.dev = &dsi->dev;
-	ctx->panel.funcs = &ili9881c_funcs;
+	drm_panel_init(&ctx->panel, &dsi->dev, &ili9881c_funcs,
+		       DRM_MODE_CONNECTOR_DSI);
 
 	ctx->power = devm_regulator_get(&dsi->dev, "power");
 	if (IS_ERR(ctx->power)) {

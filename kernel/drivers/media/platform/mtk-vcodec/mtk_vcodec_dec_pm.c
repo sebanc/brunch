@@ -8,12 +8,14 @@
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
 #include <linux/pm_runtime.h>
+#include <soc/mediatek/smi.h>
 
 #include "mtk_vcodec_dec_pm.h"
 #include "mtk_vcodec_util.h"
 
 int mtk_vcodec_init_dec_pm(struct mtk_vcodec_dev *mtkdev)
 {
+	struct device_node *node;
 	struct platform_device *pdev;
 	struct mtk_vcodec_pm *pm;
 	struct mtk_vcodec_clk *dec_clk;
@@ -24,6 +26,19 @@ int mtk_vcodec_init_dec_pm(struct mtk_vcodec_dev *mtkdev)
 	pm = &mtkdev->pm;
 	pm->mtkdev = mtkdev;
 	dec_clk = &pm->vdec_clk;
+	node = of_parse_phandle(pdev->dev.of_node, "mediatek,larb", 0);
+	if (!node) {
+		mtk_v4l2_err("of_parse_phandle mediatek,larb fail!");
+		return -1;
+	}
+
+	pdev = of_find_device_by_node(node);
+	of_node_put(node);
+	if (WARN_ON(!pdev)) {
+		return -1;
+	}
+	pm->larbvdec = &pdev->dev;
+	pdev = mtkdev->plat_dev;
 	pm->dev = &pdev->dev;
 
 	dec_clk->clk_num =
@@ -97,6 +112,12 @@ void mtk_vcodec_dec_clock_on(struct mtk_vcodec_pm *pm)
 			goto error;
 		}
 	}
+
+	ret = mtk_smi_larb_get(pm->larbvdec);
+	if (ret) {
+		mtk_v4l2_err("mtk_smi_larb_get larbvdec fail %d", ret);
+		goto error;
+	}
 	return;
 
 error:
@@ -109,6 +130,7 @@ void mtk_vcodec_dec_clock_off(struct mtk_vcodec_pm *pm)
 	struct mtk_vcodec_clk *dec_clk = &pm->vdec_clk;
 	int i = 0;
 
+	mtk_smi_larb_put(pm->larbvdec);
 	for (i = dec_clk->clk_num - 1; i >= 0; i--)
 		clk_disable_unprepare(dec_clk->clk_info[i].vcodec_clk);
 }

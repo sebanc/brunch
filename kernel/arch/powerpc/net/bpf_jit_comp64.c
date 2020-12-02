@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * bpf_jit_comp64.c: eBPF JIT compiler
  *
@@ -5,11 +6,6 @@
  *		  IBM Corporation
  *
  * Based on the powerpc classic BPF JIT compiler by Matt Evans
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; version 2
- * of the License.
  */
 #include <linux/moduleloader.h>
 #include <asm/cacheflush.h>
@@ -166,7 +162,33 @@ static void bpf_jit_build_epilogue(u32 *image, struct codegen_context *ctx)
 	PPC_BLR();
 }
 
-static void bpf_jit_emit_func_call(u32 *image, struct codegen_context *ctx, u64 func)
+static void bpf_jit_emit_func_call_hlp(u32 *image, struct codegen_context *ctx,
+				       u64 func)
+{
+#ifdef PPC64_ELF_ABI_v1
+	/* func points to the function descriptor */
+	PPC_LI64(b2p[TMP_REG_2], func);
+	/* Load actual entry point from function descriptor */
+	PPC_BPF_LL(b2p[TMP_REG_1], b2p[TMP_REG_2], 0);
+	/* ... and move it to LR */
+	PPC_MTLR(b2p[TMP_REG_1]);
+	/*
+	 * Load TOC from function descriptor at offset 8.
+	 * We can clobber r2 since we get called through a
+	 * function pointer (so caller will save/restore r2)
+	 * and since we don't use a TOC ourself.
+	 */
+	PPC_BPF_LL(2, b2p[TMP_REG_2], 8);
+#else
+	/* We can clobber r12 */
+	PPC_FUNC_ADDR(12, func);
+	PPC_MTLR(12);
+#endif
+	PPC_BLRL();
+}
+
+static void bpf_jit_emit_func_call_rel(u32 *image, struct codegen_context *ctx,
+				       u64 func)
 {
 	unsigned int i, ctx_idx = ctx->idx;
 
@@ -273,7 +295,7 @@ static int bpf_jit_build_body(struct bpf_prog *fp, u32 *image,
 {
 	const struct bpf_insn *insn = fp->insnsi;
 	int flen = fp->len;
-	int i;
+	int i, ret;
 
 	/* Start of epilogue code - will only be valid 2nd pass onwards */
 	u32 exit_addr = addrs[flen];
@@ -284,8 +306,9 @@ static int bpf_jit_build_body(struct bpf_prog *fp, u32 *image,
 		u32 src_reg = b2p[insn[i].src_reg];
 		s16 off = insn[i].off;
 		s32 imm = insn[i].imm;
+		bool func_addr_fixed;
+		u64 func_addr;
 		u64 imm64;
-		u8 *func;
 		u32 true_cond;
 		u32 tmp_idx;
 
@@ -477,6 +500,9 @@ static int bpf_jit_build_body(struct bpf_prog *fp, u32 *image,
 		case BPF_ALU | BPF_LSH | BPF_X: /* (u32) dst <<= (u32) src */
 			/* slw clears top 32 bits */
 			PPC_SLW(dst_reg, dst_reg, src_reg);
+			/* skip zero extension move, but set address map. */
+			if (insn_is_zext(&insn[i + 1]))
+				addrs[++i] = ctx->idx * 4;
 			break;
 		case BPF_ALU64 | BPF_LSH | BPF_X: /* dst <<= src; */
 			PPC_SLD(dst_reg, dst_reg, src_reg);
@@ -484,6 +510,8 @@ static int bpf_jit_build_body(struct bpf_prog *fp, u32 *image,
 		case BPF_ALU | BPF_LSH | BPF_K: /* (u32) dst <<== (u32) imm */
 			/* with imm 0, we still need to clear top 32 bits */
 			PPC_SLWI(dst_reg, dst_reg, imm);
+			if (insn_is_zext(&insn[i + 1]))
+				addrs[++i] = ctx->idx * 4;
 			break;
 		case BPF_ALU64 | BPF_LSH | BPF_K: /* dst <<== imm */
 			if (imm != 0)
@@ -491,20 +519,30 @@ static int bpf_jit_build_body(struct bpf_prog *fp, u32 *image,
 			break;
 		case BPF_ALU | BPF_RSH | BPF_X: /* (u32) dst >>= (u32) src */
 			PPC_SRW(dst_reg, dst_reg, src_reg);
+			if (insn_is_zext(&insn[i + 1]))
+				addrs[++i] = ctx->idx * 4;
 			break;
 		case BPF_ALU64 | BPF_RSH | BPF_X: /* dst >>= src */
 			PPC_SRD(dst_reg, dst_reg, src_reg);
 			break;
 		case BPF_ALU | BPF_RSH | BPF_K: /* (u32) dst >>= (u32) imm */
 			PPC_SRWI(dst_reg, dst_reg, imm);
+			if (insn_is_zext(&insn[i + 1]))
+				addrs[++i] = ctx->idx * 4;
 			break;
 		case BPF_ALU64 | BPF_RSH | BPF_K: /* dst >>= imm */
 			if (imm != 0)
 				PPC_SRDI(dst_reg, dst_reg, imm);
 			break;
+		case BPF_ALU | BPF_ARSH | BPF_X: /* (s32) dst >>= src */
+			PPC_SRAW(dst_reg, dst_reg, src_reg);
+			goto bpf_alu32_trunc;
 		case BPF_ALU64 | BPF_ARSH | BPF_X: /* (s64) dst >>= src */
 			PPC_SRAD(dst_reg, dst_reg, src_reg);
 			break;
+		case BPF_ALU | BPF_ARSH | BPF_K: /* (s32) dst >>= imm */
+			PPC_SRAWI(dst_reg, dst_reg, imm);
+			goto bpf_alu32_trunc;
 		case BPF_ALU64 | BPF_ARSH | BPF_K: /* (s64) dst >>= imm */
 			if (imm != 0)
 				PPC_SRADI(dst_reg, dst_reg, imm);
@@ -515,6 +553,11 @@ static int bpf_jit_build_body(struct bpf_prog *fp, u32 *image,
 		 */
 		case BPF_ALU | BPF_MOV | BPF_X: /* (u32) dst = src */
 		case BPF_ALU64 | BPF_MOV | BPF_X: /* dst = src */
+			if (imm == 1) {
+				/* special mov32 for zext */
+				PPC_RLWINM(dst_reg, dst_reg, 0, 0, 31);
+				break;
+			}
 			PPC_MR(dst_reg, src_reg);
 			goto bpf_alu32_trunc;
 		case BPF_ALU | BPF_MOV | BPF_K: /* (u32) dst = imm */
@@ -522,11 +565,13 @@ static int bpf_jit_build_body(struct bpf_prog *fp, u32 *image,
 			PPC_LI32(dst_reg, imm);
 			if (imm < 0)
 				goto bpf_alu32_trunc;
+			else if (insn_is_zext(&insn[i + 1]))
+				addrs[++i] = ctx->idx * 4;
 			break;
 
 bpf_alu32_trunc:
 		/* Truncate to 32-bits */
-		if (BPF_CLASS(code) == BPF_ALU)
+		if (BPF_CLASS(code) == BPF_ALU && !fp->aux->verifier_zext)
 			PPC_RLWINM(dst_reg, dst_reg, 0, 0, 31);
 		break;
 
@@ -585,10 +630,13 @@ emit_clear:
 			case 16:
 				/* zero-extend 16 bits into 64 bits */
 				PPC_RLDICL(dst_reg, dst_reg, 0, 48);
+				if (insn_is_zext(&insn[i + 1]))
+					addrs[++i] = ctx->idx * 4;
 				break;
 			case 32:
-				/* zero-extend 32 bits into 64 bits */
-				PPC_RLDICL(dst_reg, dst_reg, 0, 32);
+				if (!fp->aux->verifier_zext)
+					/* zero-extend 32 bits into 64 bits */
+					PPC_RLDICL(dst_reg, dst_reg, 0, 32);
 				break;
 			case 64:
 				/* nop */
@@ -665,14 +713,20 @@ emit_clear:
 		/* dst = *(u8 *)(ul) (src + off) */
 		case BPF_LDX | BPF_MEM | BPF_B:
 			PPC_LBZ(dst_reg, src_reg, off);
+			if (insn_is_zext(&insn[i + 1]))
+				addrs[++i] = ctx->idx * 4;
 			break;
 		/* dst = *(u16 *)(ul) (src + off) */
 		case BPF_LDX | BPF_MEM | BPF_H:
 			PPC_LHZ(dst_reg, src_reg, off);
+			if (insn_is_zext(&insn[i + 1]))
+				addrs[++i] = ctx->idx * 4;
 			break;
 		/* dst = *(u32 *)(ul) (src + off) */
 		case BPF_LDX | BPF_MEM | BPF_W:
 			PPC_LWZ(dst_reg, src_reg, off);
+			if (insn_is_zext(&insn[i + 1]))
+				addrs[++i] = ctx->idx * 4;
 			break;
 		/* dst = *(u64 *)(ul) (src + off) */
 		case BPF_LDX | BPF_MEM | BPF_DW:
@@ -711,23 +765,15 @@ emit_clear:
 		case BPF_JMP | BPF_CALL:
 			ctx->seen |= SEEN_FUNC;
 
-			/* bpf function call */
-			if (insn[i].src_reg == BPF_PSEUDO_CALL)
-				if (!extra_pass)
-					func = NULL;
-				else if (fp->aux->func && off < fp->aux->func_cnt)
-					/* use the subprog id from the off
-					 * field to lookup the callee address
-					 */
-					func = (u8 *) fp->aux->func[off]->bpf_func;
-				else
-					return -EINVAL;
-			/* kernel helper call */
+			ret = bpf_jit_get_func_addr(fp, &insn[i], extra_pass,
+						    &func_addr, &func_addr_fixed);
+			if (ret < 0)
+				return ret;
+
+			if (func_addr_fixed)
+				bpf_jit_emit_func_call_hlp(image, ctx, func_addr);
 			else
-				func = (u8 *) __bpf_call_base + imm;
-
-			bpf_jit_emit_func_call(image, ctx, (u64)func);
-
+				bpf_jit_emit_func_call_rel(image, ctx, func_addr);
 			/* move return value from r3 to BPF_REG_0 */
 			PPC_MR(b2p[BPF_REG_0], 3);
 			break;
@@ -743,36 +789,58 @@ emit_clear:
 		case BPF_JMP | BPF_JGT | BPF_X:
 		case BPF_JMP | BPF_JSGT | BPF_K:
 		case BPF_JMP | BPF_JSGT | BPF_X:
+		case BPF_JMP32 | BPF_JGT | BPF_K:
+		case BPF_JMP32 | BPF_JGT | BPF_X:
+		case BPF_JMP32 | BPF_JSGT | BPF_K:
+		case BPF_JMP32 | BPF_JSGT | BPF_X:
 			true_cond = COND_GT;
 			goto cond_branch;
 		case BPF_JMP | BPF_JLT | BPF_K:
 		case BPF_JMP | BPF_JLT | BPF_X:
 		case BPF_JMP | BPF_JSLT | BPF_K:
 		case BPF_JMP | BPF_JSLT | BPF_X:
+		case BPF_JMP32 | BPF_JLT | BPF_K:
+		case BPF_JMP32 | BPF_JLT | BPF_X:
+		case BPF_JMP32 | BPF_JSLT | BPF_K:
+		case BPF_JMP32 | BPF_JSLT | BPF_X:
 			true_cond = COND_LT;
 			goto cond_branch;
 		case BPF_JMP | BPF_JGE | BPF_K:
 		case BPF_JMP | BPF_JGE | BPF_X:
 		case BPF_JMP | BPF_JSGE | BPF_K:
 		case BPF_JMP | BPF_JSGE | BPF_X:
+		case BPF_JMP32 | BPF_JGE | BPF_K:
+		case BPF_JMP32 | BPF_JGE | BPF_X:
+		case BPF_JMP32 | BPF_JSGE | BPF_K:
+		case BPF_JMP32 | BPF_JSGE | BPF_X:
 			true_cond = COND_GE;
 			goto cond_branch;
 		case BPF_JMP | BPF_JLE | BPF_K:
 		case BPF_JMP | BPF_JLE | BPF_X:
 		case BPF_JMP | BPF_JSLE | BPF_K:
 		case BPF_JMP | BPF_JSLE | BPF_X:
+		case BPF_JMP32 | BPF_JLE | BPF_K:
+		case BPF_JMP32 | BPF_JLE | BPF_X:
+		case BPF_JMP32 | BPF_JSLE | BPF_K:
+		case BPF_JMP32 | BPF_JSLE | BPF_X:
 			true_cond = COND_LE;
 			goto cond_branch;
 		case BPF_JMP | BPF_JEQ | BPF_K:
 		case BPF_JMP | BPF_JEQ | BPF_X:
+		case BPF_JMP32 | BPF_JEQ | BPF_K:
+		case BPF_JMP32 | BPF_JEQ | BPF_X:
 			true_cond = COND_EQ;
 			goto cond_branch;
 		case BPF_JMP | BPF_JNE | BPF_K:
 		case BPF_JMP | BPF_JNE | BPF_X:
+		case BPF_JMP32 | BPF_JNE | BPF_K:
+		case BPF_JMP32 | BPF_JNE | BPF_X:
 			true_cond = COND_NE;
 			goto cond_branch;
 		case BPF_JMP | BPF_JSET | BPF_K:
 		case BPF_JMP | BPF_JSET | BPF_X:
+		case BPF_JMP32 | BPF_JSET | BPF_K:
+		case BPF_JMP32 | BPF_JSET | BPF_X:
 			true_cond = COND_NE;
 			/* Fall through */
 
@@ -784,18 +852,44 @@ cond_branch:
 			case BPF_JMP | BPF_JLE | BPF_X:
 			case BPF_JMP | BPF_JEQ | BPF_X:
 			case BPF_JMP | BPF_JNE | BPF_X:
+			case BPF_JMP32 | BPF_JGT | BPF_X:
+			case BPF_JMP32 | BPF_JLT | BPF_X:
+			case BPF_JMP32 | BPF_JGE | BPF_X:
+			case BPF_JMP32 | BPF_JLE | BPF_X:
+			case BPF_JMP32 | BPF_JEQ | BPF_X:
+			case BPF_JMP32 | BPF_JNE | BPF_X:
 				/* unsigned comparison */
-				PPC_CMPLD(dst_reg, src_reg);
+				if (BPF_CLASS(code) == BPF_JMP32)
+					PPC_CMPLW(dst_reg, src_reg);
+				else
+					PPC_CMPLD(dst_reg, src_reg);
 				break;
 			case BPF_JMP | BPF_JSGT | BPF_X:
 			case BPF_JMP | BPF_JSLT | BPF_X:
 			case BPF_JMP | BPF_JSGE | BPF_X:
 			case BPF_JMP | BPF_JSLE | BPF_X:
+			case BPF_JMP32 | BPF_JSGT | BPF_X:
+			case BPF_JMP32 | BPF_JSLT | BPF_X:
+			case BPF_JMP32 | BPF_JSGE | BPF_X:
+			case BPF_JMP32 | BPF_JSLE | BPF_X:
 				/* signed comparison */
-				PPC_CMPD(dst_reg, src_reg);
+				if (BPF_CLASS(code) == BPF_JMP32)
+					PPC_CMPW(dst_reg, src_reg);
+				else
+					PPC_CMPD(dst_reg, src_reg);
 				break;
 			case BPF_JMP | BPF_JSET | BPF_X:
-				PPC_AND_DOT(b2p[TMP_REG_1], dst_reg, src_reg);
+			case BPF_JMP32 | BPF_JSET | BPF_X:
+				if (BPF_CLASS(code) == BPF_JMP) {
+					PPC_AND_DOT(b2p[TMP_REG_1], dst_reg,
+						    src_reg);
+				} else {
+					int tmp_reg = b2p[TMP_REG_1];
+
+					PPC_AND(tmp_reg, dst_reg, src_reg);
+					PPC_RLWINM_DOT(tmp_reg, tmp_reg, 0, 0,
+						       31);
+				}
 				break;
 			case BPF_JMP | BPF_JNE | BPF_K:
 			case BPF_JMP | BPF_JEQ | BPF_K:
@@ -803,43 +897,87 @@ cond_branch:
 			case BPF_JMP | BPF_JLT | BPF_K:
 			case BPF_JMP | BPF_JGE | BPF_K:
 			case BPF_JMP | BPF_JLE | BPF_K:
+			case BPF_JMP32 | BPF_JNE | BPF_K:
+			case BPF_JMP32 | BPF_JEQ | BPF_K:
+			case BPF_JMP32 | BPF_JGT | BPF_K:
+			case BPF_JMP32 | BPF_JLT | BPF_K:
+			case BPF_JMP32 | BPF_JGE | BPF_K:
+			case BPF_JMP32 | BPF_JLE | BPF_K:
+			{
+				bool is_jmp32 = BPF_CLASS(code) == BPF_JMP32;
+
 				/*
 				 * Need sign-extended load, so only positive
 				 * values can be used as imm in cmpldi
 				 */
-				if (imm >= 0 && imm < 32768)
-					PPC_CMPLDI(dst_reg, imm);
-				else {
+				if (imm >= 0 && imm < 32768) {
+					if (is_jmp32)
+						PPC_CMPLWI(dst_reg, imm);
+					else
+						PPC_CMPLDI(dst_reg, imm);
+				} else {
 					/* sign-extending load */
 					PPC_LI32(b2p[TMP_REG_1], imm);
 					/* ... but unsigned comparison */
-					PPC_CMPLD(dst_reg, b2p[TMP_REG_1]);
+					if (is_jmp32)
+						PPC_CMPLW(dst_reg,
+							  b2p[TMP_REG_1]);
+					else
+						PPC_CMPLD(dst_reg,
+							  b2p[TMP_REG_1]);
 				}
 				break;
+			}
 			case BPF_JMP | BPF_JSGT | BPF_K:
 			case BPF_JMP | BPF_JSLT | BPF_K:
 			case BPF_JMP | BPF_JSGE | BPF_K:
 			case BPF_JMP | BPF_JSLE | BPF_K:
+			case BPF_JMP32 | BPF_JSGT | BPF_K:
+			case BPF_JMP32 | BPF_JSLT | BPF_K:
+			case BPF_JMP32 | BPF_JSGE | BPF_K:
+			case BPF_JMP32 | BPF_JSLE | BPF_K:
+			{
+				bool is_jmp32 = BPF_CLASS(code) == BPF_JMP32;
+
 				/*
 				 * signed comparison, so any 16-bit value
 				 * can be used in cmpdi
 				 */
-				if (imm >= -32768 && imm < 32768)
-					PPC_CMPDI(dst_reg, imm);
-				else {
+				if (imm >= -32768 && imm < 32768) {
+					if (is_jmp32)
+						PPC_CMPWI(dst_reg, imm);
+					else
+						PPC_CMPDI(dst_reg, imm);
+				} else {
 					PPC_LI32(b2p[TMP_REG_1], imm);
-					PPC_CMPD(dst_reg, b2p[TMP_REG_1]);
+					if (is_jmp32)
+						PPC_CMPW(dst_reg,
+							 b2p[TMP_REG_1]);
+					else
+						PPC_CMPD(dst_reg,
+							 b2p[TMP_REG_1]);
 				}
 				break;
+			}
 			case BPF_JMP | BPF_JSET | BPF_K:
+			case BPF_JMP32 | BPF_JSET | BPF_K:
 				/* andi does not sign-extend the immediate */
 				if (imm >= 0 && imm < 32768)
 					/* PPC_ANDI is _only/always_ dot-form */
 					PPC_ANDI(b2p[TMP_REG_1], dst_reg, imm);
 				else {
-					PPC_LI32(b2p[TMP_REG_1], imm);
-					PPC_AND_DOT(b2p[TMP_REG_1], dst_reg,
-						    b2p[TMP_REG_1]);
+					int tmp_reg = b2p[TMP_REG_1];
+
+					PPC_LI32(tmp_reg, imm);
+					if (BPF_CLASS(code) == BPF_JMP) {
+						PPC_AND_DOT(tmp_reg, dst_reg,
+							    tmp_reg);
+					} else {
+						PPC_AND(tmp_reg, dst_reg,
+							tmp_reg);
+						PPC_RLWINM_DOT(tmp_reg, tmp_reg,
+							       0, 0, 31);
+					}
 				}
 				break;
 			}
@@ -872,6 +1010,55 @@ cond_branch:
 	return 0;
 }
 
+/* Fix the branch target addresses for subprog calls */
+static int bpf_jit_fixup_subprog_calls(struct bpf_prog *fp, u32 *image,
+				       struct codegen_context *ctx, u32 *addrs)
+{
+	const struct bpf_insn *insn = fp->insnsi;
+	bool func_addr_fixed;
+	u64 func_addr;
+	u32 tmp_idx;
+	int i, ret;
+
+	for (i = 0; i < fp->len; i++) {
+		/*
+		 * During the extra pass, only the branch target addresses for
+		 * the subprog calls need to be fixed. All other instructions
+		 * can left untouched.
+		 *
+		 * The JITed image length does not change because we already
+		 * ensure that the JITed instruction sequence for these calls
+		 * are of fixed length by padding them with NOPs.
+		 */
+		if (insn[i].code == (BPF_JMP | BPF_CALL) &&
+		    insn[i].src_reg == BPF_PSEUDO_CALL) {
+			ret = bpf_jit_get_func_addr(fp, &insn[i], true,
+						    &func_addr,
+						    &func_addr_fixed);
+			if (ret < 0)
+				return ret;
+
+			/*
+			 * Save ctx->idx as this would currently point to the
+			 * end of the JITed image and set it to the offset of
+			 * the instruction sequence corresponding to the
+			 * subprog call temporarily.
+			 */
+			tmp_idx = ctx->idx;
+			ctx->idx = addrs[i] / 4;
+			bpf_jit_emit_func_call_rel(image, ctx, func_addr);
+
+			/*
+			 * Restore ctx->idx here. This is safe as the length
+			 * of the JITed sequence remains unchanged.
+			 */
+			ctx->idx = tmp_idx;
+		}
+	}
+
+	return 0;
+}
+
 struct powerpc64_jit_data {
 	struct bpf_binary_header *header;
 	u32 *addrs;
@@ -879,6 +1066,11 @@ struct powerpc64_jit_data {
 	u32 proglen;
 	struct codegen_context ctx;
 };
+
+bool bpf_jit_needs_zext(void)
+{
+	return true;
+}
 
 struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *fp)
 {
@@ -983,6 +1175,22 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *fp)
 skip_init_ctx:
 	code_base = (u32 *)(image + FUNCTION_DESCR_SIZE);
 
+	if (extra_pass) {
+		/*
+		 * Do not touch the prologue and epilogue as they will remain
+		 * unchanged. Only fix the branch target address for subprog
+		 * calls in the body.
+		 *
+		 * This does not change the offsets and lengths of the subprog
+		 * call instruction sequences and hence, the size of the JITed
+		 * image as well.
+		 */
+		bpf_jit_fixup_subprog_calls(fp, code_base, &cgctx, addrs);
+
+		/* There is no need to perform the usual passes. */
+		goto skip_codegen_passes;
+	}
+
 	/* Code generation passes 1-2 */
 	for (pass = 1; pass < 3; pass++) {
 		/* Now build the prologue, body code & epilogue for real. */
@@ -996,6 +1204,7 @@ skip_init_ctx:
 				proglen - (cgctx.idx * 4), cgctx.seen);
 	}
 
+skip_codegen_passes:
 	if (bpf_jit_enable > 1)
 		/*
 		 * Note that we output the base address of the code_base
@@ -1015,6 +1224,7 @@ skip_init_ctx:
 
 	bpf_flush_icache(bpf_hdr, (u8 *)bpf_hdr + (bpf_hdr->pages * PAGE_SIZE));
 	if (!fp->is_func || extra_pass) {
+		bpf_prog_fill_jited_linfo(fp, addrs);
 out_addrs:
 		kfree(addrs);
 		kfree(jit_data);

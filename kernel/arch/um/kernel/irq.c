@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2017 - Cambridge Greys Ltd
  * Copyright (C) 2011 - 2014 Cisco Systems Inc
  * Copyright (C) 2000 - 2007 Jeff Dike (jdike@{addtoit,linux.intel}.com)
- * Licensed under the GPL
  * Derived (i.e. mostly copied) from arch/i386/kernel/irq.c:
  *	Copyright (C) 1992, 1998 Linus Torvalds, Ingo Molnar
  */
@@ -248,8 +248,7 @@ static void garbage_collect_irq_entries(void)
 			to_free = NULL;
 		}
 		walk = walk->next;
-		if (to_free != NULL)
-			kfree(to_free);
+		kfree(to_free);
 	}
 }
 
@@ -355,11 +354,6 @@ static void free_irq_by_irq_and_dev(unsigned int irq, void *dev)
 }
 
 
-void reactivate_fd(int fd, int irqnum)
-{
-	/** NOP - we do auto-EOI now **/
-}
-
 void deactivate_fd(int fd, int irqnum)
 {
 	struct irq_entry *to_free;
@@ -390,10 +384,8 @@ EXPORT_SYMBOL(deactivate_fd);
  */
 int deactivate_all_fds(void)
 {
-	unsigned long flags;
 	struct irq_entry *to_free;
 
-	spin_lock_irqsave(&irq_lock, flags);
 	/* Stop IO. The IRQ loop has no lock so this is our
 	 * only way of making sure we are safe to dispose
 	 * of all IRQ handlers
@@ -409,8 +401,7 @@ int deactivate_all_fds(void)
 		);
 		to_free = to_free->next;
 	}
-	garbage_collect_irq_entries();
-	spin_unlock_irqrestore(&irq_lock, flags);
+	/* don't garbage collect - we can no longer call kfree() here */
 	os_close_epoll_fd();
 	return 0;
 }
@@ -454,7 +445,6 @@ int um_request_irq(unsigned int irq, int fd, int type,
 }
 
 EXPORT_SYMBOL(um_request_irq);
-EXPORT_SYMBOL(reactivate_fd);
 
 /*
  * irq_chip must define at least enable/disable and ack when
@@ -490,7 +480,7 @@ void __init init_IRQ(void)
 	irq_set_chip_and_handler(TIMER_IRQ, &SIGVTALRM_irq_type, handle_edge_irq);
 
 
-	for (i = 1; i < NR_IRQS; i++)
+	for (i = 1; i <= LAST_IRQ; i++)
 		irq_set_chip_and_handler(i, &normal_irq_type, handle_edge_irq);
 	/* Initialize EPOLL Loop */
 	os_setup_epoll();

@@ -1,12 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2017 NVIDIA CORPORATION.  All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/host1x.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -16,10 +14,10 @@
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
 
-#include <drm/drmP.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
-#include <drm/drm_crtc_helper.h>
+#include <drm/drm_fourcc.h>
+#include <drm/drm_probe_helper.h>
 
 #include "drm.h"
 #include "dc.h"
@@ -748,7 +746,9 @@ static const struct host1x_client_ops tegra_display_hub_ops = {
 
 static int tegra_display_hub_probe(struct platform_device *pdev)
 {
+	struct device_node *child = NULL;
 	struct tegra_display_hub *hub;
+	struct clk *clk;
 	unsigned int i;
 	int err;
 
@@ -807,6 +807,34 @@ static int tegra_display_hub_probe(struct platform_device *pdev)
 			return err;
 	}
 
+	hub->num_heads = of_get_child_count(pdev->dev.of_node);
+
+	hub->clk_heads = devm_kcalloc(&pdev->dev, hub->num_heads, sizeof(clk),
+				      GFP_KERNEL);
+	if (!hub->clk_heads)
+		return -ENOMEM;
+
+	for (i = 0; i < hub->num_heads; i++) {
+		child = of_get_next_child(pdev->dev.of_node, child);
+		if (!child) {
+			dev_err(&pdev->dev, "failed to find node for head %u\n",
+				i);
+			return -ENODEV;
+		}
+
+		clk = devm_get_clk_from_child(&pdev->dev, child, "dc");
+		if (IS_ERR(clk)) {
+			dev_err(&pdev->dev, "failed to get clock for head %u\n",
+				i);
+			of_node_put(child);
+			return PTR_ERR(clk);
+		}
+
+		hub->clk_heads[i] = clk;
+	}
+
+	of_node_put(child);
+
 	/* XXX: enable clock across reset? */
 	err = reset_control_assert(hub->rst);
 	if (err < 0)
@@ -846,11 +874,15 @@ static int tegra_display_hub_remove(struct platform_device *pdev)
 static int __maybe_unused tegra_display_hub_suspend(struct device *dev)
 {
 	struct tegra_display_hub *hub = dev_get_drvdata(dev);
+	unsigned int i = hub->num_heads;
 	int err;
 
 	err = reset_control_assert(hub->rst);
 	if (err < 0)
 		return err;
+
+	while (i--)
+		clk_disable_unprepare(hub->clk_heads[i]);
 
 	clk_disable_unprepare(hub->clk_hub);
 	clk_disable_unprepare(hub->clk_dsc);
@@ -862,6 +894,7 @@ static int __maybe_unused tegra_display_hub_suspend(struct device *dev)
 static int __maybe_unused tegra_display_hub_resume(struct device *dev)
 {
 	struct tegra_display_hub *hub = dev_get_drvdata(dev);
+	unsigned int i;
 	int err;
 
 	err = clk_prepare_enable(hub->clk_disp);
@@ -876,13 +909,22 @@ static int __maybe_unused tegra_display_hub_resume(struct device *dev)
 	if (err < 0)
 		goto disable_dsc;
 
+	for (i = 0; i < hub->num_heads; i++) {
+		err = clk_prepare_enable(hub->clk_heads[i]);
+		if (err < 0)
+			goto disable_heads;
+	}
+
 	err = reset_control_deassert(hub->rst);
 	if (err < 0)
-		goto disable_hub;
+		goto disable_heads;
 
 	return 0;
 
-disable_hub:
+disable_heads:
+	while (i--)
+		clk_disable_unprepare(hub->clk_heads[i]);
+
 	clk_disable_unprepare(hub->clk_hub);
 disable_dsc:
 	clk_disable_unprepare(hub->clk_dsc);

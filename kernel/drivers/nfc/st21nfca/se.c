@@ -1,17 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2014  STMicroelectronics SAS. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <net/nfc/hci.h>
@@ -322,15 +311,8 @@ int st21nfca_connectivity_event_received(struct nfc_hci_dev *hdev, u8 host,
 		 * AID		81	5 to 16
 		 * PARAMETERS	82	0 to 255
 		 */
-		if (skb->len < NFC_MIN_AID_LENGTH + 2 ||
+		if (skb->len < NFC_MIN_AID_LENGTH + 2 &&
 		    skb->data[0] != NFC_EVT_TRANSACTION_AID_TAG)
-			return -EPROTO;
-
-		/*
-		 * Buffer should have enough space for at least
-		 * two tag fields + two length fields + aid_len (skb->data[1])
-		 */
-		if (skb->len < skb->data[1] + 4)
 			return -EPROTO;
 
 		transaction = (struct nfc_evt_transaction *)devm_kzalloc(dev,
@@ -341,16 +323,13 @@ int st21nfca_connectivity_event_received(struct nfc_hci_dev *hdev, u8 host,
 		transaction->aid_len = skb->data[1];
 		memcpy(transaction->aid, &skb->data[2],
 		       transaction->aid_len);
-		transaction->params_len = skb->data[transaction->aid_len + 3];
 
-		/* Check next byte is PARAMETERS tag (82) and the length field */
+		/* Check next byte is PARAMETERS tag (82) */
 		if (skb->data[transaction->aid_len + 2] !=
-		    NFC_EVT_TRANSACTION_PARAMS_TAG ||
-		    skb->len < transaction->aid_len + transaction->params_len + 4) {
-			devm_kfree(dev, transaction);
+		    NFC_EVT_TRANSACTION_PARAMS_TAG)
 			return -EPROTO;
-		}
 
+		transaction->params_len = skb->data[transaction->aid_len + 3];
 		memcpy(transaction->params, skb->data +
 		       transaction->aid_len + 4, transaction->params_len);
 

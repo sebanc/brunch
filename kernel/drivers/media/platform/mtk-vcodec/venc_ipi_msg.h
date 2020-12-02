@@ -9,8 +9,6 @@
 #ifndef _VENC_IPI_MSG_H_
 #define _VENC_IPI_MSG_H_
 
-#include "linux/types.h"
-
 #define AP_IPIMSG_VENC_BASE 0xC000
 #define VPU_IPIMSG_VENC_BASE 0xD000
 
@@ -53,14 +51,14 @@ struct venc_ap_ipi_msg_init {
  * @vpu_inst_addr:	VPU encoder instance addr
  *			(struct venc_vp8_vsi/venc_h264_vsi *)
  * @param_id:	parameter id (venc_set_param_type)
- * @num_data:	number of items in the data array
+ * @data_item:	number of items in the data array
  * @data[8]:	data array to store the set parameters
  */
 struct venc_ap_ipi_msg_set_param {
 	uint32_t msg_id;
 	uint32_t vpu_inst_addr;
 	uint32_t param_id;
-	uint32_t num_data;
+	uint32_t data_item;
 	uint32_t data[8];
 };
 
@@ -89,6 +87,13 @@ struct venc_ap_ipi_msg_enc {
 	uint32_t bs_size;
 };
 
+/**
+ * struct venc_ap_ipi_msg_enc_ext - AP to SCP extended enc cmd structure
+ *
+ * @base:	base msg structure
+ * @data_item:	number of items in the data array
+ * @data[8]:	data array to store the set parameters
+ */
 struct venc_ap_ipi_msg_enc_ext {
 	struct venc_ap_ipi_msg_enc base;
 	uint32_t data_item;

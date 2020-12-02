@@ -1,21 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * da7219.c - DA7219 ALSA SoC Codec Driver
  *
  * Copyright (c) 2015 Dialog Semiconductor
  *
  * Author: Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
  */
 
 #include <linux/acpi.h>
 #include <linux/clk.h>
 #include <linux/clkdev.h>
 #include <linux/clk-provider.h>
-#include <linux/dmi.h>
 #include <linux/i2c.h>
 #include <linux/of_device.h>
 #include <linux/property.h>
@@ -318,13 +313,13 @@ static void da7219_alc_calib(struct snd_soc_component *component)
 	u8 mic_ctrl, mixin_ctrl, adc_ctrl, calib_ctrl;
 
 	/* Save current state of mic control register */
-	mic_ctrl = snd_soc_component_read32(component, DA7219_MIC_1_CTRL);
+	mic_ctrl = snd_soc_component_read(component, DA7219_MIC_1_CTRL);
 
 	/* Save current state of input mixer control register */
-	mixin_ctrl = snd_soc_component_read32(component, DA7219_MIXIN_L_CTRL);
+	mixin_ctrl = snd_soc_component_read(component, DA7219_MIXIN_L_CTRL);
 
 	/* Save current state of input ADC control register */
-	adc_ctrl = snd_soc_component_read32(component, DA7219_ADC_L_CTRL);
+	adc_ctrl = snd_soc_component_read(component, DA7219_ADC_L_CTRL);
 
 	/* Enable then Mute MIC PGAs */
 	snd_soc_component_update_bits(component, DA7219_MIC_1_CTRL, DA7219_MIC_1_AMP_EN_MASK,
@@ -349,7 +344,7 @@ static void da7219_alc_calib(struct snd_soc_component *component)
 			    DA7219_ALC_AUTO_CALIB_EN_MASK,
 			    DA7219_ALC_AUTO_CALIB_EN_MASK);
 	do {
-		calib_ctrl = snd_soc_component_read32(component, DA7219_ALC_CTRL1);
+		calib_ctrl = snd_soc_component_read(component, DA7219_ALC_CTRL1);
 	} while (calib_ctrl & DA7219_ALC_AUTO_CALIB_EN_MASK);
 
 	/* If auto calibration fails, disable DC offset, hybrid ALC */
@@ -799,7 +794,9 @@ static int da7219_dai_event(struct snd_soc_dapm_widget *w,
 	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
 	struct da7219_priv *da7219 = snd_soc_component_get_drvdata(component);
 	struct clk *bclk = da7219->dai_clks[DA7219_DAI_BCLK_IDX];
-	int ret;
+	u8 pll_ctrl, pll_status;
+	int i = 0, ret;
+	bool srm_lock = false;
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
@@ -823,6 +820,26 @@ static int da7219_dai_event(struct snd_soc_dapm_widget *w,
 		/* PC synchronised to DAI */
 		snd_soc_component_update_bits(component, DA7219_PC_COUNT,
 				    DA7219_PC_FREERUN_MASK, 0);
+
+		/* Slave mode, if SRM not enabled no need for status checks */
+		pll_ctrl = snd_soc_component_read(component, DA7219_PLL_CTRL);
+		if ((pll_ctrl & DA7219_PLL_MODE_MASK) != DA7219_PLL_MODE_SRM)
+			return 0;
+
+		/* Check SRM has locked */
+		do {
+			pll_status = snd_soc_component_read(component, DA7219_PLL_SRM_STS);
+			if (pll_status & DA7219_PLL_SRM_STS_SRM_LOCK) {
+				srm_lock = true;
+			} else {
+				++i;
+				msleep(50);
+			}
+		} while ((i < DA7219_SRM_CHECK_RETRIES) && (!srm_lock));
+
+		if (!srm_lock)
+			dev_warn(component->dev, "SRM failed to lock\n");
+
 		return 0;
 	case SND_SOC_DAPM_POST_PMD:
 		/* PC free-running */
@@ -911,7 +928,7 @@ static int da7219_gain_ramp_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_PRE_PMD:
 		/* Ensure nominal gain ramping for DAPM sequence */
 		da7219->gain_ramp_ctrl =
-			snd_soc_component_read32(component, DA7219_GAIN_RAMP_CTRL);
+			snd_soc_component_read(component, DA7219_GAIN_RAMP_CTRL);
 		snd_soc_component_write(component, DA7219_GAIN_RAMP_CTRL,
 			      DA7219_GAIN_RAMP_RATE_NOMINAL);
 		break;
@@ -1600,6 +1617,21 @@ static int da7219_hw_params(struct snd_pcm_substream *substream,
 
 		if (bclk) {
 			bclk_rate = frame_size * sr;
+			/*
+			 * Rounding the rate here avoids failure trying to set a
+			 * new rate on an already enabled bclk. In that
+			 * instance this will just set the same rate as is
+			 * currently in use, and so should continue without
+			 * problem, as long as the BCLK rate is suitable for the
+			 * desired frame size.
+			 */
+			bclk_rate = clk_round_rate(bclk, bclk_rate);
+			if ((bclk_rate / sr) < frame_size) {
+				dev_err(component->dev,
+					"BCLK rate mismatch against frame size");
+				return -EINVAL;
+			}
+
 			ret = clk_set_rate(bclk, bclk_rate);
 			if (ret) {
 				dev_err(component->dev,
@@ -1626,70 +1658,22 @@ static int da7219_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static void da7219_check_srm_status_work(struct work_struct *work)
-{
-	struct da7219_priv *da7219 =
-		container_of(work, struct da7219_priv, srm_work);
-	struct snd_soc_component *component = da7219->component;
-
-	u8 pll_ctrl, pll_status;
-	int i = 0;
-	bool srm_lock = false;
-
-	/* Slave mode, if SRM not enabled no need for status checks */
-	pll_ctrl = snd_soc_component_read32(component, DA7219_PLL_CTRL);
-	if ((pll_ctrl & DA7219_PLL_MODE_MASK) != DA7219_PLL_MODE_SRM)
-		return;
-
-	/* Check SRM has locked */
-	do {
-		pll_status = snd_soc_component_read32(component,
-						DA7219_PLL_SRM_STS);
-		if (pll_status & DA7219_PLL_SRM_STS_SRM_LOCK) {
-			srm_lock = true;
-		} else {
-			++i;
-			msleep(50);
-		}
-	} while ((i < DA7219_SRM_CHECK_RETRIES) && (!srm_lock));
-
-	if (!srm_lock)
-		dev_err(component->dev, "SRM failed to lock\n");
-}
-
-static int da7219_set_dai_trigger(struct snd_pcm_substream *substream, int cmd,
-				  struct snd_soc_dai *dai)
-{
-	struct snd_soc_component *component = dai->component;
-	struct da7219_priv *da7219 = snd_soc_component_get_drvdata(component);
-
-	switch (cmd) {
-	case SNDRV_PCM_TRIGGER_START:
-		schedule_work(&da7219->srm_work);
-		break;
-	case SNDRV_PCM_TRIGGER_RESUME:
-	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-	case SNDRV_PCM_TRIGGER_STOP:
-	case SNDRV_PCM_TRIGGER_SUSPEND:
-	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-	default:
-		break;
-	}
-
-	return 0;
-}
-
 static const struct snd_soc_dai_ops da7219_dai_ops = {
 	.hw_params	= da7219_hw_params,
 	.set_sysclk	= da7219_set_dai_sysclk,
 	.set_pll	= da7219_set_dai_pll,
 	.set_fmt	= da7219_set_dai_fmt,
 	.set_tdm_slot	= da7219_set_dai_tdm_slot,
-	.trigger	= da7219_set_dai_trigger,
 };
 
 #define DA7219_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE |\
 			SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
+
+#define DA7219_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 |\
+		      SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 |\
+		      SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 |\
+		      SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_88200 |\
+		      SNDRV_PCM_RATE_96000)
 
 static struct snd_soc_dai_driver da7219_dai = {
 	.name = "da7219-hifi",
@@ -1697,14 +1681,14 @@ static struct snd_soc_dai_driver da7219_dai = {
 		.stream_name = "Playback",
 		.channels_min = 1,
 		.channels_max = DA7219_DAI_CH_NUM_MAX,
-		.rates = SNDRV_PCM_RATE_8000_96000,
+		.rates = DA7219_RATES,
 		.formats = DA7219_FORMATS,
 	},
 	.capture = {
 		.stream_name = "Capture",
 		.channels_min = 1,
 		.channels_max = DA7219_DAI_CH_NUM_MAX,
-		.rates = SNDRV_PCM_RATE_8000_96000,
+		.rates = DA7219_RATES,
 		.formats = DA7219_FORMATS,
 	},
 	.ops = &da7219_dai_ops,
@@ -1948,7 +1932,7 @@ static int da7219_wclk_is_prepared(struct clk_hw *hw)
 	if (!da7219->master)
 		return -EINVAL;
 
-	clk_reg = snd_soc_component_read32(component, DA7219_DAI_CLK_MODE);
+	clk_reg = snd_soc_component_read(component, DA7219_DAI_CLK_MODE);
 
 	return !!(clk_reg & DA7219_DAI_CLK_EN_MASK);
 }
@@ -1960,10 +1944,7 @@ static unsigned long da7219_wclk_recalc_rate(struct clk_hw *hw,
 		container_of(hw, struct da7219_priv,
 			     dai_clks_hw[DA7219_DAI_WCLK_IDX]);
 	struct snd_soc_component *component = da7219->component;
-	u8 fs = snd_soc_component_read32(component, DA7219_SR);
-
-	if (!da7219->master)
-		return 0;
+	u8 fs = snd_soc_component_read(component, DA7219_SR);
 
 	switch (fs & DA7219_SR_MASK) {
 	case DA7219_SR_8000:
@@ -2048,11 +2029,8 @@ static unsigned long da7219_bclk_recalc_rate(struct clk_hw *hw,
 		container_of(hw, struct da7219_priv,
 			     dai_clks_hw[DA7219_DAI_BCLK_IDX]);
 	struct snd_soc_component *component = da7219->component;
-	u8 bclks_per_wclk = snd_soc_component_read32(component,
+	u8 bclks_per_wclk = snd_soc_component_read(component,
 						     DA7219_DAI_CLK_MODE);
-
-	if (!da7219->master)
-		return 0;
 
 	switch (bclks_per_wclk & DA7219_DAI_BCLKS_PER_WCLK_MASK) {
 	case DA7219_DAI_BCLKS_PER_WCLK_32:
@@ -2387,14 +2365,11 @@ err_disable_reg:
 static void da7219_remove(struct snd_soc_component *component)
 {
 	struct da7219_priv *da7219 = snd_soc_component_get_drvdata(component);
-
 #ifdef CONFIG_COMMON_CLK
 	int i;
 #endif
 
 	da7219_aad_exit(component);
-
-	cancel_work_sync(&da7219->srm_work);
 
 #ifdef CONFIG_COMMON_CLK
 	for (i = DA7219_DAI_NUM_CLKS - 1; i >= 0; --i) {
@@ -2409,6 +2384,56 @@ static void da7219_remove(struct snd_soc_component *component)
 	/* Supplies */
 	regulator_bulk_disable(DA7219_NUM_SUPPLIES, da7219->supplies);
 }
+
+#ifdef CONFIG_PM
+static int da7219_suspend(struct snd_soc_component *component)
+{
+	struct da7219_priv *da7219 = snd_soc_component_get_drvdata(component);
+
+	/* Suspend AAD if we're not a wake-up source */
+	if (!da7219->wakeup_source)
+		da7219_aad_suspend(component);
+
+	snd_soc_component_force_bias_level(component, SND_SOC_BIAS_OFF);
+
+	return 0;
+}
+
+static int da7219_resume(struct snd_soc_component *component)
+{
+	struct da7219_priv *da7219 = snd_soc_component_get_drvdata(component);
+
+	snd_soc_component_force_bias_level(component, SND_SOC_BIAS_STANDBY);
+
+	/* Resume AAD if previously suspended */
+	if (!da7219->wakeup_source)
+		da7219_aad_resume(component);
+
+	return 0;
+}
+#else
+#define da7219_suspend NULL
+#define da7219_resume NULL
+#endif
+
+static const struct snd_soc_component_driver soc_component_dev_da7219 = {
+	.probe			= da7219_probe,
+	.remove			= da7219_remove,
+	.suspend		= da7219_suspend,
+	.resume			= da7219_resume,
+	.set_bias_level		= da7219_set_bias_level,
+	.controls		= da7219_snd_controls,
+	.num_controls		= ARRAY_SIZE(da7219_snd_controls),
+	.dapm_widgets		= da7219_dapm_widgets,
+	.num_dapm_widgets	= ARRAY_SIZE(da7219_dapm_widgets),
+	.dapm_routes		= da7219_audio_map,
+	.num_dapm_routes	= ARRAY_SIZE(da7219_audio_map),
+	.idle_bias_on		= 1,
+	.use_pmdown_time	= 1,
+	.endianness		= 1,
+	.non_legacy_dai_naming	= 1,
+};
+
 
 /*
  * Regmap configs
@@ -2546,89 +2571,6 @@ static const struct regmap_config da7219_regmap_config = {
 };
 
 
-#ifdef CONFIG_PM
-static const struct dmi_system_id dmi_platform_google_grunt[] = {
-	{
-		.ident = "Google Grunt",
-		.matches = {
-			DMI_MATCH(DMI_SYS_VENDOR, "Google"),
-			DMI_MATCH(DMI_PRODUCT_NAME, "Grunt"),
-		},
-	},
-	{}
-};
-
-static int da7219_suspend(struct snd_soc_component *component)
-{
-	struct da7219_priv *da7219 = snd_soc_component_get_drvdata(component);
-	unsigned int i;
-
-	if (dmi_check_system(dmi_platform_google_grunt)) {
-		da7219->reg_state = kzalloc(sizeof(unsigned int) *
-					da7219_regmap_config.num_reg_defaults,
-					GFP_KERNEL);
-		for (i = 0; i < da7219_regmap_config.num_reg_defaults; i++)
-			da7219->reg_state[i] = snd_soc_component_read32(
-					component,
-					da7219_reg_defaults[i].reg);
-	}
-
-	/* Suspend AAD if we're not a wake-up source */
-	if (!da7219->wakeup_source)
-		da7219_aad_suspend(component);
-
-	snd_soc_component_force_bias_level(component, SND_SOC_BIAS_OFF);
-
-	return 0;
-}
-
-static int da7219_resume(struct snd_soc_component *component)
-{
-	struct da7219_priv *da7219 = snd_soc_component_get_drvdata(component);
-	unsigned int i, ret;
-
-	snd_soc_component_force_bias_level(component, SND_SOC_BIAS_STANDBY);
-
-	/* Resume AAD if previously suspended */
-	if (!da7219->wakeup_source)
-		da7219_aad_resume(component);
-
-	if (dmi_check_system(dmi_platform_google_grunt)) {
-		ret = da7219_handle_supplies(component);
-		if (ret)
-			return ret;
-		for (i = 0; i < da7219_regmap_config.num_reg_defaults; i++)
-			snd_soc_component_write(component,
-					da7219_reg_defaults[i].reg,
-					da7219->reg_state[i]);
-		kfree(da7219->reg_state);
-	}
-
-	return 0;
-}
-#else
-#define da7219_suspend NULL
-#define da7219_resume NULL
-#endif
-
-static const struct snd_soc_component_driver soc_component_dev_da7219 = {
-	.probe			= da7219_probe,
-	.remove			= da7219_remove,
-	.suspend		= da7219_suspend,
-	.resume			= da7219_resume,
-	.set_bias_level		= da7219_set_bias_level,
-	.controls		= da7219_snd_controls,
-	.num_controls		= ARRAY_SIZE(da7219_snd_controls),
-	.dapm_widgets		= da7219_dapm_widgets,
-	.num_dapm_widgets	= ARRAY_SIZE(da7219_dapm_widgets),
-	.dapm_routes		= da7219_audio_map,
-	.num_dapm_routes	= ARRAY_SIZE(da7219_audio_map),
-	.idle_bias_on		= 1,
-	.use_pmdown_time	= 1,
-	.endianness		= 1,
-	.non_legacy_dai_naming	= 1,
-};
-
 /*
  * I2C layer
  */
@@ -2692,9 +2634,6 @@ static int da7219_i2c_probe(struct i2c_client *i2c,
 		dev_err(&i2c->dev, "Failed to register da7219 component: %d\n",
 			ret);
 	}
-
-	INIT_WORK(&da7219->srm_work, da7219_check_srm_status_work);
-
 	return ret;
 }
 

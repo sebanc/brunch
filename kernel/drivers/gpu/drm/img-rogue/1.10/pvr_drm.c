@@ -116,23 +116,19 @@ int pvr_drm_load(struct drm_device *ddev, unsigned long flags)
 		deviceId = ddev->primary->index;
 #endif
 
-	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	priv = kmalloc(sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
 		err = -ENOMEM;
 		goto err_exit;
 	}
 	ddev->dev_private = priv;
 
-	if (!ddev->dev->dma_parms)
-		ddev->dev->dma_parms = &priv->dma_parms;
-	dma_set_max_seg_size(ddev->dev, DMA_BIT_MASK(32));
-
 #if defined(SUPPORT_BUFFER_SYNC) || defined(SUPPORT_NATIVE_FENCE_SYNC)
 	priv->fence_status_wq = create_freezable_workqueue("pvr_fce_status");
 	if (!priv->fence_status_wq) {
 		DRM_ERROR("failed to create fence status workqueue\n");
 		err = -ENOMEM;
-		goto err_unset_dma_parms;
+		goto err_free_priv;
 	}
 #endif
 
@@ -163,10 +159,8 @@ err_device_destroy:
 err_workqueue_destroy:
 #if defined(SUPPORT_BUFFER_SYNC) || defined(SUPPORT_NATIVE_FENCE_SYNC)
 	destroy_workqueue(priv->fence_status_wq);
-err_unset_dma_parms:
+err_free_priv:
 #endif
-	if (ddev->dev->dma_parms == &priv->dma_parms)
-		ddev->dev->dma_parms = NULL;
 	kfree(priv);
 err_exit:
 	return err;
@@ -194,9 +188,6 @@ void pvr_drm_unload(struct drm_device *ddev)
 #if defined(SUPPORT_BUFFER_SYNC) || defined(SUPPORT_NATIVE_FENCE_SYNC)
 	destroy_workqueue(priv->fence_status_wq);
 #endif
-
-	if (ddev->dev->dma_parms == &priv->dma_parms)
-		ddev->dev->dma_parms = NULL;
 
 	kfree(priv);
 	ddev->dev_private = NULL;

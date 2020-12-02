@@ -1,19 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
- *
+ * Copyright (c) 2003-2019, Intel Corporation. All rights reserved.
  * Intel Management Engine Interface (Intel MEI) Linux driver
- * Copyright (c) 2003-2012, Intel Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
  */
-
 #include <linux/export.h>
 #include <linux/sched.h>
 #include <linux/wait.h>
@@ -65,6 +54,7 @@ const char *mei_hbm_state_str(enum mei_hbm_state state)
 	MEI_HBM_STATE(IDLE);
 	MEI_HBM_STATE(STARTING);
 	MEI_HBM_STATE(STARTED);
+	MEI_HBM_STATE(DR_SETUP);
 	MEI_HBM_STATE(ENUM_CLIENTS);
 	MEI_HBM_STATE(CLIENT_PROPERTIES);
 	MEI_HBM_STATE(STOPPED);
@@ -290,6 +280,48 @@ int mei_hbm_start_req(struct mei_device *dev)
 	}
 
 	dev->hbm_state = MEI_HBM_STARTING;
+	dev->init_clients_timer = MEI_CLIENTS_INIT_TIMEOUT;
+	mei_schedule_stall_timer(dev);
+	return 0;
+}
+
+/**
+ * mei_hbm_dma_setup_req() - setup DMA request
+ * @dev: the device structure
+ *
+ * Return: 0 on success and < 0 on failure
+ */
+static int mei_hbm_dma_setup_req(struct mei_device *dev)
+{
+	struct mei_msg_hdr mei_hdr;
+	struct hbm_dma_setup_request req;
+	const size_t len = sizeof(struct hbm_dma_setup_request);
+	unsigned int i;
+	int ret;
+
+	mei_hbm_hdr(&mei_hdr, len);
+
+	memset(&req, 0, len);
+	req.hbm_cmd = MEI_HBM_DMA_SETUP_REQ_CMD;
+	for (i = 0; i < DMA_DSCR_NUM; i++) {
+		phys_addr_t paddr;
+
+		paddr = dev->dr_dscr[i].daddr;
+		req.dma_dscr[i].addr_hi = upper_32_bits(paddr);
+		req.dma_dscr[i].addr_lo = lower_32_bits(paddr);
+		req.dma_dscr[i].size = dev->dr_dscr[i].size;
+	}
+
+	mei_dma_ring_reset(dev);
+
+	ret = mei_hbm_write_message(dev, &mei_hdr, &req);
+	if (ret) {
+		dev_err(dev->dev, "dma setup request write failed: ret = %d.\n",
+			ret);
+		return ret;
+	}
+
+	dev->hbm_state = MEI_HBM_DR_SETUP;
 	dev->init_clients_timer = MEI_CLIENTS_INIT_TIMEOUT;
 	mei_schedule_stall_timer(dev);
 	return 0;
@@ -1051,6 +1083,7 @@ int mei_hbm_dispatch(struct mei_device *dev, struct mei_msg_hdr *hdr)
 	struct hbm_host_version_response *version_res;
 	struct hbm_props_response *props_res;
 	struct hbm_host_enum_response *enum_res;
+	struct hbm_dma_setup_response *dma_setup_res;
 	struct hbm_add_client_request *add_cl_req;
 	int ret;
 
@@ -1115,12 +1148,56 @@ int mei_hbm_dispatch(struct mei_device *dev, struct mei_msg_hdr *hdr)
 			return -EPROTO;
 		}
 
-		if (mei_hbm_enum_clients_req(dev)) {
-			dev_err(dev->dev, "hbm: start: failed to send enumeration request\n");
-			return -EIO;
+		if (dev->hbm_f_dr_supported) {
+			if (mei_dmam_ring_alloc(dev))
+				dev_info(dev->dev, "running w/o dma ring\n");
+			if (mei_dma_ring_is_allocated(dev)) {
+				if (mei_hbm_dma_setup_req(dev))
+					return -EIO;
+
+				wake_up(&dev->wait_hbm_start);
+				break;
+			}
 		}
 
+		dev->hbm_f_dr_supported = 0;
+		mei_dmam_ring_free(dev);
+
+		if (mei_hbm_enum_clients_req(dev))
+			return -EIO;
+
 		wake_up(&dev->wait_hbm_start);
+		break;
+
+	case MEI_HBM_DMA_SETUP_RES_CMD:
+		dev_dbg(dev->dev, "hbm: dma setup response: message received.\n");
+
+		dev->init_clients_timer = 0;
+
+		if (dev->hbm_state != MEI_HBM_DR_SETUP) {
+			dev_err(dev->dev, "hbm: dma setup response: state mismatch, [%d, %d]\n",
+				dev->dev_state, dev->hbm_state);
+			return -EPROTO;
+		}
+
+		dma_setup_res = (struct hbm_dma_setup_response *)mei_msg;
+
+		if (dma_setup_res->status) {
+			u8 status = dma_setup_res->status;
+
+			if (status == MEI_HBMS_NOT_ALLOWED) {
+				dev_dbg(dev->dev, "hbm: dma setup not allowed\n");
+			} else {
+				dev_info(dev->dev, "hbm: dma setup response: failure = %d %s\n",
+					 status,
+					 mei_hbm_status_str(status));
+			}
+			dev->hbm_f_dr_supported = 0;
+			mei_dmam_ring_free(dev);
+		}
+
+		if (mei_hbm_enum_clients_req(dev))
+			return -EIO;
 		break;
 
 	case CLIENT_CONNECT_RES_CMD:
@@ -1278,8 +1355,8 @@ int mei_hbm_dispatch(struct mei_device *dev, struct mei_msg_hdr *hdr)
 		break;
 
 	default:
-		BUG();
-		break;
+		WARN(1, "hbm: wrong command %d\n", mei_msg->hbm_cmd);
+		return -EPROTO;
 
 	}
 	return 0;

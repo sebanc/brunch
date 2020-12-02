@@ -70,6 +70,13 @@ static const struct {
 	[RC_PROTO_CEC] = { .name = "cec", .repeat_period = 0 },
 	[RC_PROTO_IMON] = { .name = "imon",
 		.scancode_bits = 0x7fffffff, .repeat_period = 114 },
+	[RC_PROTO_RCMM12] = { .name = "rc-mm-12",
+		.scancode_bits = 0x00000fff, .repeat_period = 114 },
+	[RC_PROTO_RCMM24] = { .name = "rc-mm-24",
+		.scancode_bits = 0x00ffffff, .repeat_period = 114 },
+	[RC_PROTO_RCMM32] = { .name = "rc-mm-32",
+		.scancode_bits = 0xffffffff, .repeat_period = 114 },
+	[RC_PROTO_XBOX_DVD] = { .name = "xbox-dvd", .repeat_period = 64 },
 };
 
 /* Used to keep track of known keymaps */
@@ -1018,6 +1025,10 @@ static const struct {
 	{ RC_PROTO_BIT_XMP,	"xmp",		"ir-xmp-decoder"	},
 	{ RC_PROTO_BIT_CEC,	"cec",		NULL			},
 	{ RC_PROTO_BIT_IMON,	"imon",		"ir-imon-decoder"	},
+	{ RC_PROTO_BIT_RCMM12 |
+	  RC_PROTO_BIT_RCMM24 |
+	  RC_PROTO_BIT_RCMM32,	"rc-mm",	"ir-rcmm-decoder"	},
+	{ RC_PROTO_BIT_XBOX_DVD, "xbox-dvd",	NULL			},
 };
 
 /**
@@ -1047,7 +1058,7 @@ struct rc_filter_attribute {
  * @buf:	a pointer to the output buffer
  *
  * This routine is a callback routine for input read the IR protocol type(s).
- * it is trigged by reading /sys/class/rc/rc?/protocols.
+ * it is triggered by reading /sys/class/rc/rc?/protocols.
  * It returns the protocol names of supported protocols.
  * Enabled protocols are printed in brackets.
  *
@@ -1218,7 +1229,7 @@ void ir_raw_load_modules(u64 *protocols)
  * @len:	length of the input buffer
  *
  * This routine is for changing the IR protocol type.
- * It is trigged by writing to /sys/class/rc/rc?/[wakeup_]protocols.
+ * It is triggered by writing to /sys/class/rc/rc?/[wakeup_]protocols.
  * See parse_protocol_change() for the valid commands.
  * Returns @len on success or a negative error code.
  *
@@ -1306,7 +1317,7 @@ out:
  * @buf:	a pointer to the output buffer
  *
  * This routine is a callback routine to read a scancode filter value or mask.
- * It is trigged by reading /sys/class/rc/rc?/[wakeup_]filter[_mask].
+ * It is triggered by reading /sys/class/rc/rc?/[wakeup_]filter[_mask].
  * It prints the current scancode filter value or mask of the appropriate filter
  * type in hexadecimal into @buf and returns the size of the buffer.
  *
@@ -1349,7 +1360,7 @@ static ssize_t show_filter(struct device *device,
  * @len:	length of the input buffer
  *
  * This routine is for changing a scancode filter value or mask.
- * It is trigged by writing to /sys/class/rc/rc?/[wakeup_]filter[_mask].
+ * It is triggered by writing to /sys/class/rc/rc?/[wakeup_]filter[_mask].
  * Returns -EINVAL if an invalid filter value for the current protocol was
  * specified or if scancode filtering is not supported by the driver, otherwise
  * returns @len.
@@ -1437,7 +1448,7 @@ unlock:
  * @buf:	a pointer to the output buffer
  *
  * This routine is a callback routine for input read the IR protocol type(s).
- * it is trigged by reading /sys/class/rc/rc?/wakeup_protocols.
+ * it is triggered by reading /sys/class/rc/rc?/wakeup_protocols.
  * It returns the protocol names of supported protocols.
  * The enabled protocols are printed in brackets.
  *
@@ -1488,7 +1499,7 @@ static ssize_t show_wakeup_protocols(struct device *device,
  * @len:	length of the input buffer
  *
  * This routine is for changing the IR protocol type.
- * It is trigged by writing to /sys/class/rc/rc?/wakeup_protocols.
+ * It is triggered by writing to /sys/class/rc/rc?/wakeup_protocols.
  * Returns @len on success or a negative error code.
  *
  * dev->lock is taken to guard against races between
@@ -1499,7 +1510,7 @@ static ssize_t store_wakeup_protocols(struct device *device,
 				      const char *buf, size_t len)
 {
 	struct rc_dev *dev = to_rc_dev(device);
-	enum rc_proto protocol;
+	enum rc_proto protocol = RC_PROTO_UNKNOWN;
 	ssize_t rc;
 	u64 allowed;
 	int i;
@@ -1512,9 +1523,7 @@ static ssize_t store_wakeup_protocols(struct device *device,
 
 	allowed = dev->allowed_wakeup_protocols;
 
-	if (sysfs_streq(buf, "none")) {
-		protocol = RC_PROTO_UNKNOWN;
-	} else {
+	if (!sysfs_streq(buf, "none")) {
 		for (i = 0; i < ARRAY_SIZE(protocols); i++) {
 			if ((allowed & (1ULL << i)) &&
 			    sysfs_streq(buf, protocols[i].name)) {
@@ -1769,10 +1778,18 @@ static int rc_prepare_rx_device(struct rc_dev *dev)
 		dev->enabled_protocols = rc_proto;
 	}
 
+	/* Keyboard events */
 	set_bit(EV_KEY, dev->input_dev->evbit);
 	set_bit(EV_REP, dev->input_dev->evbit);
 	set_bit(EV_MSC, dev->input_dev->evbit);
 	set_bit(MSC_SCAN, dev->input_dev->mscbit);
+
+	/* Pointer/mouse events */
+	set_bit(INPUT_PROP_POINTING_STICK, dev->input_dev->propbit);
+	set_bit(EV_REL, dev->input_dev->evbit);
+	set_bit(REL_X, dev->input_dev->relbit);
+	set_bit(REL_Y, dev->input_dev->relbit);
+
 	if (dev->open)
 		dev->input_dev->open = ir_open;
 	if (dev->close)

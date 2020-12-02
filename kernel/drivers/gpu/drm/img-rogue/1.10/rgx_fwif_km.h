@@ -46,7 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "img_types.h"
 #include "rgx_fwif_shared.h"
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 #include "pvr_debug.h"
 #include "dllist.h"
 #include "rgx_firmware_processor.h"

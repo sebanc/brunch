@@ -48,9 +48,9 @@ static void evdi_cursor_set_gem(struct evdi_cursor *cursor,
 				struct evdi_gem_object *obj)
 {
 	if (obj)
-		drm_gem_object_reference(&obj->base);
+		drm_gem_object_get(&obj->base);
 	if (cursor->obj)
-		drm_gem_object_unreference_unlocked(&cursor->obj->base);
+		drm_gem_object_put(&cursor->obj->base);
 
 	cursor->obj = obj;
 }

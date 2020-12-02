@@ -1,20 +1,26 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2012 Avionic Design GmbH
  * Copyright (C) 2012 NVIDIA CORPORATION.  All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/clk.h>
 #include <linux/debugfs.h>
+#include <linux/delay.h>
 #include <linux/iommu.h>
+#include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
 
 #include <soc/tegra/pmc.h>
+
+#include <drm/drm_atomic.h>
+#include <drm/drm_atomic_helper.h>
+#include <drm/drm_debugfs.h>
+#include <drm/drm_fourcc.h>
+#include <drm/drm_plane_helper.h>
+#include <drm/drm_vblank.h>
 
 #include "dc.h"
 #include "drm.h"
@@ -22,9 +28,8 @@
 #include "hub.h"
 #include "plane.h"
 
-#include <drm/drm_atomic.h>
-#include <drm/drm_atomic_helper.h>
-#include <drm/drm_plane_helper.h>
+static void tegra_crtc_atomic_destroy_state(struct drm_crtc *crtc,
+					    struct drm_crtc_state *state);
 
 static void tegra_dc_stats_reset(struct tegra_dc_stats *stats)
 {
@@ -1155,20 +1160,12 @@ static void tegra_dc_destroy(struct drm_crtc *crtc)
 
 static void tegra_crtc_reset(struct drm_crtc *crtc)
 {
-	struct tegra_dc_state *state;
+	struct tegra_dc_state *state = kzalloc(sizeof(*state), GFP_KERNEL);
 
 	if (crtc->state)
-		__drm_atomic_helper_crtc_destroy_state(crtc->state);
+		tegra_crtc_atomic_destroy_state(crtc, crtc->state);
 
-	kfree(crtc->state);
-	crtc->state = NULL;
-
-	state = kzalloc(sizeof(*state), GFP_KERNEL);
-	if (state) {
-		crtc->state = &state->base;
-		crtc->state->crtc = crtc;
-	}
-
+	__drm_atomic_helper_crtc_reset(crtc, &state->base);
 	drm_crtc_vblank_reset(crtc);
 }
 
@@ -1978,6 +1975,23 @@ static irqreturn_t tegra_dc_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static bool tegra_dc_has_window_groups(struct tegra_dc *dc)
+{
+	unsigned int i;
+
+	if (!dc->soc->wgrps)
+		return true;
+
+	for (i = 0; i < dc->soc->num_wgrps; i++) {
+		const struct tegra_windowgroup_soc *wgrp = &dc->soc->wgrps[i];
+
+		if (wgrp->dc == dc->pipe && wgrp->num_windows > 0)
+			return true;
+	}
+
+	return false;
+}
+
 static int tegra_dc_init(struct host1x_client *client)
 {
 	struct drm_device *drm = dev_get_drvdata(client->parent);
@@ -1993,22 +2007,8 @@ static int tegra_dc_init(struct host1x_client *client)
 	 * assign a primary plane to them, which in turn will cause KMS to
 	 * crash.
 	 */
-	if (dc->soc->wgrps) {
-		bool has_wgrps = false;
-		unsigned int i;
-
-		for (i = 0; i < dc->soc->num_wgrps; i++) {
-			const struct tegra_windowgroup_soc *wgrp = &dc->soc->wgrps[i];
-
-			if (wgrp->dc == dc->pipe && wgrp->num_windows > 0) {
-				has_wgrps = true;
-				break;
-			}
-		}
-
-		if (!has_wgrps)
-			return 0;
-	}
+	if (!tegra_dc_has_window_groups(dc))
+		return 0;
 
 	dc->syncpt = host1x_syncpt_request(client, flags);
 	if (!dc->syncpt)
@@ -2093,6 +2093,9 @@ static int tegra_dc_exit(struct host1x_client *client)
 {
 	struct tegra_dc *dc = host1x_client_to_dc(client);
 	int err;
+
+	if (!tegra_dc_has_window_groups(dc))
+		return 0;
 
 	devm_free_irq(dc->dev, dc->irq, dc);
 
@@ -2369,10 +2372,10 @@ static int tegra_dc_parse_dt(struct tegra_dc *dc)
 	return 0;
 }
 
-static int tegra_dc_match_by_pipe(struct device *dev, void *data)
+static int tegra_dc_match_by_pipe(struct device *dev, const void *data)
 {
 	struct tegra_dc *dc = dev_get_drvdata(dev);
-	unsigned int pipe = (unsigned long)data;
+	unsigned int pipe = (unsigned long)(void *)data;
 
 	return dc->pipe == pipe;
 }

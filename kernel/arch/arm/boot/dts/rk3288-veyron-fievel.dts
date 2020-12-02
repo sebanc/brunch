@@ -18,6 +18,8 @@
 		     "google,veyron-fievel-rev0", "google,veyron-fievel",
 		     "google,veyron", "rockchip,rk3288";
 
+	/delete-node/ bt-activity;
+
 	vccsys: vccsys {
 		compatible = "regulator-fixed";
 		regulator-name = "vccsys";
@@ -107,27 +109,6 @@
 
 		ethphy: ethernet-phy@1 {
 			reg = <1>;
-			realtek,enable-ssc;
-
-			leds {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				led@0 {
-					reg = <0>;
-					linux,default-trigger = "phy-link-activity";
-				};
-
-				led@1 {
-					reg = <1>;
-					linux,default-trigger = "phy-link-100m";
-				};
-
-				led@2 {
-					reg = <2>;
-					linux,default-trigger = "phy-link-1g";
-				};
-			};
 		};
 	};
 };
@@ -234,11 +215,7 @@
 			  "PHY_PMEB",
 
 			  "PHY_INT",
-			  /*
-			   * RECOVERY_SW_L is Chrome OS ABI.  Schematics call
-			   * it REC_MODE_L.
-			   */
-			  "RECOVERY_SW_L",
+			  "REC_MODE_L",
 			  "OTP_OUT",
 			  "",
 			  "USB_OTG_POWER_EN",
@@ -405,11 +382,7 @@
 			  "PWR_LED1",
 			  "TPM_INT_H",
 			  "SPK_ON",
-			  /*
-			   * AP_FLASH_WP_L is Chrome OS ABI.  Schematics call
-			   * it FW_WP_AP.
-			   */
-			  "AP_FLASH_WP_L",
+			  "FW_WP_AP",
 			  "",
 
 			  "CPU_NMI",

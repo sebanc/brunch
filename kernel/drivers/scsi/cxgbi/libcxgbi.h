@@ -120,6 +120,9 @@ struct cxgbi_sock {
 	int wr_max_cred;
 	int wr_cred;
 	int wr_una_cred;
+#ifdef CONFIG_CHELSIO_T4_DCB
+	u8 dcb_priority;
+#endif
 	unsigned char hcrc_len;
 	unsigned char dcrc_len;
 
@@ -614,8 +617,9 @@ void cxgbi_ddp_page_size_factor(int *);
 void cxgbi_ddp_set_one_ppod(struct cxgbi_pagepod *,
 			    struct cxgbi_task_tag_info *,
 			    struct scatterlist **sg_pp, unsigned int *sg_off);
-void cxgbi_ddp_ppm_setup(void **ppm_pp, struct cxgbi_device *,
-			 struct cxgbi_tag_format *, unsigned int ppmax,
-			 unsigned int llimit, unsigned int start,
-			 unsigned int rsvd_factor);
+int cxgbi_ddp_ppm_setup(void **ppm_pp, struct cxgbi_device *cdev,
+			struct cxgbi_tag_format *tformat,
+			unsigned int iscsi_size, unsigned int llimit,
+			unsigned int start, unsigned int rsvd_factor,
+			unsigned int edram_start, unsigned int edram_size);
 #endif	/*__LIBCXGBI_H__*/

@@ -6,6 +6,7 @@
 #include <linux/netdevice.h>
 #include <linux/rhashtable-types.h>
 #include <linux/rcupdate.h>
+#include <linux/netfilter.h>
 #include <linux/netfilter/nf_conntrack_tuple_common.h>
 #include <net/dst.h>
 
@@ -53,8 +54,6 @@ struct flow_offload_tuple {
 	u8				l4proto;
 	u8				dir;
 
-	int				oifidx;
-
 	u16				mtu;
 
 	struct dst_entry		*dst_cache;
@@ -94,11 +93,7 @@ void flow_offload_free(struct flow_offload *flow);
 int flow_offload_add(struct nf_flowtable *flow_table, struct flow_offload *flow);
 struct flow_offload_tuple_rhash *flow_offload_lookup(struct nf_flowtable *flow_table,
 						     struct flow_offload_tuple *tuple);
-int nf_flow_table_iterate(struct nf_flowtable *flow_table,
-			  void (*iter)(struct flow_offload *flow, void *data),
-			  void *data);
-
-void nf_flow_table_cleanup(struct net *net, struct net_device *dev);
+void nf_flow_table_cleanup(struct net_device *dev);
 
 int nf_flow_table_init(struct nf_flowtable *flow_table);
 void nf_flow_table_free(struct nf_flowtable *flow_table);
@@ -128,4 +123,4 @@ unsigned int nf_flow_offload_ipv6_hook(void *priv, struct sk_buff *skb,
 #define MODULE_ALIAS_NF_FLOWTABLE(family)	\
 	MODULE_ALIAS("nf-flowtable-" __stringify(family))
 
-#endif /* _FLOW_OFFLOAD_H */
+#endif /* _NF_FLOW_TABLE_H */

@@ -3,8 +3,6 @@
 # Makefile for the powerpc trace subsystem
 #
 
-subdir-ccflags-$(CONFIG_PPC_WERROR)	:= -Werror
-
 ifdef CONFIG_FUNCTION_TRACER
 # do not trace tracer code
 CFLAGS_REMOVE_ftrace.o = $(CC_FLAGS_FTRACE)
@@ -25,6 +23,7 @@ obj-$(CONFIG_TRACING)			+= trace_clock.o
 obj-$(CONFIG_PPC64)			+= $(obj64-y)
 obj-$(CONFIG_PPC32)			+= $(obj32-y)
 
-# Disable GCOV & sanitizers in odd or sensitive code
+# Disable GCOV, KCOV & sanitizers in odd or sensitive code
 GCOV_PROFILE_ftrace.o := n
+KCOV_INSTRUMENT_ftrace.o := n
 UBSAN_SANITIZE_ftrace.o := n

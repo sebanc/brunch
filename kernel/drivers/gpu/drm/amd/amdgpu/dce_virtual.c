@@ -20,7 +20,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-#include <drm/drmP.h>
+
+#include <drm/drm_vblank.h>
+
 #include "amdgpu.h"
 #include "amdgpu_pm.h"
 #include "amdgpu_i2c.h"
@@ -167,19 +169,6 @@ static void dce_virtual_crtc_disable(struct drm_crtc *crtc)
 	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 
 	dce_virtual_crtc_dpms(crtc, DRM_MODE_DPMS_OFF);
-	if (crtc->primary->fb) {
-		int r;
-		struct amdgpu_bo *abo;
-
-		abo = gem_to_amdgpu_bo(crtc->primary->fb->obj[0]);
-		r = amdgpu_bo_reserve(abo, true);
-		if (unlikely(r))
-			DRM_ERROR("failed to reserve abo before unpin\n");
-		else {
-			amdgpu_bo_unpin(abo);
-			amdgpu_bo_unreserve(abo);
-		}
-	}
 
 	amdgpu_crtc->pll_id = ATOM_PPLL_INVALID;
 	amdgpu_crtc->encoder = NULL;
@@ -464,12 +453,8 @@ static int dce_virtual_hw_init(void *handle)
 #endif
 		/* no DCE */
 		break;
-	case CHIP_VEGA10:
-	case CHIP_VEGA12:
-	case CHIP_VEGA20:
-		break;
 	default:
-		DRM_ERROR("Virtual display unsupported ASIC type: 0x%X\n", adev->asic_type);
+		break;
 	}
 	return 0;
 }
@@ -691,7 +676,9 @@ static int dce_virtual_pageflip(struct amdgpu_device *adev,
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 
 	drm_crtc_vblank_put(&amdgpu_crtc->base);
-	schedule_work(&works->unpin_work);
+	amdgpu_bo_unref(&works->old_abo);
+	kfree(works->shared);
+	kfree(works);
 
 	return 0;
 }

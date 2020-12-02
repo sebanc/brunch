@@ -1,7 +1,7 @@
 config SECURITY_CHROMIUMOS
 	bool "Chromium OS Security Module"
 	depends on SECURITY
-	depends on X86_64 || ARM64 || ARM
+	depends on X86_64 || ARM64
 	help
 	  The purpose of the Chromium OS security module is to reduce attacking
 	  surface by preventing access to general purpose access modes not
@@ -36,11 +36,6 @@ config ALT_SYSCALL_CHROMIUMOS
 	  using the alt-syscall infrastructure.  Alternate syscall tables
 	  can be selected with prctl(PR_ALT_SYSCALL).
 
-config ALT_SYSCALL_CHROMIUMOS_LEGACY_API
-       bool
-       default y
-       depends on ALT_SYSCALL_CHROMIUMOS && ARM
-
 config SECURITY_CHROMIUMOS_READONLY_PROC_SELF_MEM
 	bool "Force /proc/<pid>/mem paths to be read-only"
 	default y
@@ -48,16 +43,3 @@ config SECURITY_CHROMIUMOS_READONLY_PROC_SELF_MEM
 	  When enabled, attempts to open /proc/self/mem for write access
 	  will always fail.  Write access to this file allows bypassing
 	  of memory map permissions (such as modifying read-only code).
-
-config CC_HAS_AUTO_VAR_INIT
-       def_bool $(cc-option,-ftrivial-auto-var-init=pattern)
-
-config INIT_STACK_ALL
-	bool "0xAA-init everything on the stack (strongest)"
-	depends on CC_HAS_AUTO_VAR_INIT
-	help
-	  Initializes everything on the stack with a 0xAA
-	  pattern. This is intended to eliminate all classes
-	  of uninitialized stack variable exploits and information
-	  exposures, even variables that were warned to have been
-	  left uninitialized.

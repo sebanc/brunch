@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Surface ACPI Notify (SAN) and ACPI integration driver for SAM.
  * Translates communication from ACPI to SSH and back.
@@ -20,7 +21,7 @@
 
 static const guid_t SAN_DSM_UUID =
 	GUID_INIT(0x93b666c5, 0x70c6, 0x469f, 0xa2, 0x15, 0x3d,
-	          0x48, 0x7c, 0x91, 0xab, 0x3c);
+		  0x48, 0x7c, 0x91, 0xab, 0x3c);
 
 #define SAM_EVENT_DELAY_PWR_ADAPTER	msecs_to_jiffies(5000)
 #define SAM_EVENT_DELAY_PWR_BST		msecs_to_jiffies(2500)
@@ -202,11 +203,10 @@ static int san_acpi_notify_power_event(struct device *dev, enum san_pwr_event ev
 
 	dev_dbg(dev, "notify power event 0x%02x\n", event);
 	obj = acpi_evaluate_dsm_typed(san, &SAN_DSM_UUID, SAN_DSM_REVISION,
-	                              (u8) event, NULL, ACPI_TYPE_BUFFER);
+				      (u8) event, NULL, ACPI_TYPE_BUFFER);
 
-	if (IS_ERR_OR_NULL(obj)) {
+	if (IS_ERR_OR_NULL(obj))
 		return obj ? PTR_ERR(obj) : -ENXIO;
-	}
 
 	if (obj->buffer.length != 1 || obj->buffer.pointer[0] != 0) {
 		dev_err(dev, "got unexpected result from _DSM\n");
@@ -227,12 +227,11 @@ static int san_acpi_notify_sensor_trip_point(struct device *dev, u8 iid)
 	param.integer.value = iid;
 
 	obj = acpi_evaluate_dsm_typed(san, &SAN_DSM_UUID, SAN_DSM_REVISION,
-	                              SAN_DSM_FN_NOTIFY_SENSOR_TRIP_POINT,
+				      SAN_DSM_FN_NOTIFY_SENSOR_TRIP_POINT,
 				      &param, ACPI_TYPE_BUFFER);
 
-	if (IS_ERR_OR_NULL(obj)) {
+	if (IS_ERR_OR_NULL(obj))
 		return obj ? PTR_ERR(obj) : -ENXIO;
-	}
 
 	if (obj->buffer.length != 1 || obj->buffer.pointer[0] != 0) {
 		dev_err(dev, "got unexpected result from _DSM\n");
@@ -244,7 +243,7 @@ static int san_acpi_notify_sensor_trip_point(struct device *dev, u8 iid)
 }
 
 
-inline static int san_evt_power_adapter(struct device *dev, struct surface_sam_ssh_event *event)
+static inline int san_evt_power_adapter(struct device *dev, struct surface_sam_ssh_event *event)
 {
 	int status;
 
@@ -276,16 +275,15 @@ inline static int san_evt_power_adapter(struct device *dev, struct surface_sam_s
 	return 0;
 }
 
-inline static int san_evt_power_bix(struct device *dev, struct surface_sam_ssh_event *event)
+static inline int san_evt_power_bix(struct device *dev, struct surface_sam_ssh_event *event)
 {
 	enum san_pwr_event evcode;
 	int status;
 
-	if (event->iid == 0x02) {
+	if (event->iid == 0x02)
 		evcode = SAN_PWR_EVENT_BAT2_INFO;
-	} else {
+	else
 		evcode = SAN_PWR_EVENT_BAT1_INFO;
-	}
 
 	status = san_acpi_notify_power_event(dev, evcode);
 	if (status) {
@@ -296,16 +294,15 @@ inline static int san_evt_power_bix(struct device *dev, struct surface_sam_ssh_e
 	return 0;
 }
 
-inline static int san_evt_power_bst(struct device *dev, struct surface_sam_ssh_event *event)
+static inline int san_evt_power_bst(struct device *dev, struct surface_sam_ssh_event *event)
 {
 	enum san_pwr_event evcode;
 	int status;
 
-	if (event->iid == 0x02) {
+	if (event->iid == 0x02)
 		evcode = SAN_PWR_EVENT_BAT2_STAT;
-	} else {
+	else
 		evcode = SAN_PWR_EVENT_BAT1_STAT;
-	}
 
 	status = san_acpi_notify_power_event(dev, evcode);
 	if (status) {
@@ -371,7 +368,7 @@ static int san_evt_power(struct surface_sam_ssh_event *event, void *data)
 }
 
 
-inline static int san_evt_thermal_notify(struct device *dev, struct surface_sam_ssh_event *event)
+static inline int san_evt_thermal_notify(struct device *dev, struct surface_sam_ssh_event *event)
 {
 	int status;
 
@@ -456,9 +453,8 @@ san_rqst(struct san_opreg_context *ctx, struct gsb_buffer *buffer)
 	int status = 0;
 	int try;
 
-	if (!gsb_rqst) {
+	if (!gsb_rqst)
 		return AE_OK;
-	}
 
 	rqst.tc  = gsb_rqst->tc;
 	rqst.cid = gsb_rqst->cid;
@@ -472,17 +468,16 @@ san_rqst(struct san_opreg_context *ctx, struct gsb_buffer *buffer)
 	result.len  = 0;
 	result.data = kzalloc(result.cap, GFP_KERNEL);
 
-	if (!result.data) {
+	if (!result.data)
 		return AE_NO_MEMORY;
-	}
 
 	for (try = 0; try < SAN_RQST_RETRY; try++) {
-		if (try) {
-			dev_warn(ctx->dev, SAN_RQST_TAG "IO error occured, trying again\n");
-		}
+		if (try)
+			dev_warn(ctx->dev, SAN_RQST_TAG "IO error occurred, trying again\n");
 
 		status = surface_sam_ssh_rqst(&rqst, &result);
-		if (status != -EIO) break;
+		if (status != -EIO)
+			break;
 	}
 
 	if (rqst.tc == 0x11 && rqst.cid == 0x0D && status == -EPERM) {
@@ -534,9 +529,8 @@ san_rqsg(struct san_opreg_context *ctx, struct gsb_buffer *buffer)
 	struct surface_sam_san_rqsg rqsg = {};
 	int status;
 
-	if (!gsb_rqsg) {
+	if (!gsb_rqsg)
 		return AE_OK;
-	}
 
 	rqsg.tc  = gsb_rqsg->tc;
 	rqsg.cid = gsb_rqsg->cid;
@@ -697,22 +691,19 @@ static int san_consumers_link(struct platform_device *pdev,
 	u32 max_links = 0;
 	int status;
 
-	if (!cons) {
+	if (!cons)
 		return 0;
-	}
 
 	// count links
-	for (con = cons; con->path; ++con) {
+	for (con = cons; con->path; ++con)
 		max_links += 1;
-	}
 
 	// allocate
-	links = kzalloc(max_links * sizeof(struct san_consumer_link), GFP_KERNEL);
+	links = kcalloc(max_links, sizeof(struct san_consumer_link), GFP_KERNEL);
 	link = &links[0];
 
-	if (!links) {
+	if (!links)
 		return -ENOMEM;
-	}
 
 	// create links
 	for (con = cons; con->path; ++con) {
@@ -727,9 +718,8 @@ static int san_consumers_link(struct platform_device *pdev,
 		}
 
 		status = acpi_bus_get_device(handle, &adev);
-		if (status) {
+		if (status)
 			goto cleanup;
-		}
 
 		link->link = device_link_add(&adev->dev, &pdev->dev, con->flags);
 		if (!(link->link)) {
@@ -748,25 +738,23 @@ static int san_consumers_link(struct platform_device *pdev,
 
 cleanup:
 	for (link = link - 1; link >= links; --link) {
-		if (link->properties->flags & DL_FLAG_STATELESS) {
+		if (link->properties->flags & DL_FLAG_STATELESS)
 			device_link_del(link->link);
-		}
 	}
 
 	return status;
 }
 
-static void san_consumers_unlink(struct san_consumers *consumers) {
+static void san_consumers_unlink(struct san_consumers *consumers)
+{
 	u32 i;
 
-	if (!consumers) {
+	if (!consumers)
 		return;
-	}
 
 	for (i = 0; i < consumers->num; ++i) {
-		if (consumers->links[i].properties->flags & DL_FLAG_STATELESS) {
+		if (consumers->links[i].properties->flags & DL_FLAG_STATELESS)
 			device_link_del(consumers->links[i].link);
-		}
 	}
 
 	kfree(consumers->links);
@@ -789,22 +777,19 @@ static int surface_sam_san_probe(struct platform_device *pdev)
 	 * consumer to set up a device_link.
 	 */
 	status = surface_sam_ssh_consumer_register(&pdev->dev);
-	if (status) {
+	if (status)
 		return status == -ENXIO ? -EPROBE_DEFER : status;
-	}
 
 	drvdata = kzalloc(sizeof(struct san_drvdata), GFP_KERNEL);
-	if (!drvdata) {
+	if (!drvdata)
 		return -ENOMEM;
-	}
 
 	drvdata->opreg_ctx.dev = &pdev->dev;
 
 	cons = acpi_device_get_match_data(&pdev->dev);
 	status = san_consumers_link(pdev, cons, &drvdata->consumers);
-	if (status) {
+	if (status)
 		goto err_consumers;
-	}
 
 	platform_set_drvdata(pdev, drvdata);
 
@@ -819,21 +804,18 @@ static int surface_sam_san_probe(struct platform_device *pdev)
 	}
 
 	status = san_enable_events(pdev);
-	if (status) {
+	if (status)
 		goto err_enable_events;
-	}
 
 	mutex_lock(&rqsg_if.lock);
-	if (!rqsg_if.san_dev) {
+	if (!rqsg_if.san_dev)
 		rqsg_if.san_dev = &pdev->dev;
-	} else {
+	else
 		status = -EBUSY;
-	}
 	mutex_unlock(&rqsg_if.lock);
 
-	if (status) {
+	if (status)
 		goto err_install_dev;
-	}
 
 	acpi_walk_dep_device_list(san);
 	return 0;
@@ -880,7 +862,7 @@ static const struct san_acpi_consumer san_mshw0091_consumers[] = {
 };
 
 static const struct acpi_device_id surface_sam_san_match[] = {
-	{ "MSHW0091", (long unsigned int) san_mshw0091_consumers },
+	{ "MSHW0091", (unsigned long) san_mshw0091_consumers },
 	{ },
 };
 MODULE_DEVICE_TABLE(acpi, surface_sam_san_match);

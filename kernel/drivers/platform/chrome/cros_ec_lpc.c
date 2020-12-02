@@ -45,6 +45,8 @@ struct lpc_driver_ops {
 
 static struct lpc_driver_ops cros_ec_lpc_ops = { };
 
+static struct platform_device *pdev_extcon;
+
 /*
  * A generic instance of the read function of struct lpc_driver_ops, used for
  * the LPC EC.
@@ -425,6 +427,13 @@ static int cros_ec_lpc_probe(struct platform_device *pdev)
 				 status);
 	}
 
+	/* Revert this after we introduce Type C connector class driver. */
+	if (dmi_match(DMI_PRODUCT_FAMILY, "Google_Volteer") ||
+	    dmi_match(DMI_PRODUCT_NAME, "tglrvp"))
+		pdev_extcon = platform_device_register_data(dev,
+					"extcon-tcss-cros-ec",
+					PLATFORM_DEVID_NONE, NULL, 0);
+
 	return 0;
 }
 
@@ -432,6 +441,8 @@ static int cros_ec_lpc_remove(struct platform_device *pdev)
 {
 	struct cros_ec_device *ec_dev = platform_get_drvdata(pdev);
 	struct acpi_device *adev;
+
+	platform_device_unregister(pdev_extcon);
 
 	adev = ACPI_COMPANION(&pdev->dev);
 	if (adev)

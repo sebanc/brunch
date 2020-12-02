@@ -1,14 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2010 Texas Instruments Inc
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation version 2.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
  */
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -90,28 +82,6 @@ static int vpbe_find_encoder_sd_index(struct vpbe_config *cfg,
 	}
 
 	return -EINVAL;
-}
-
-/**
- * vpbe_g_cropcap - Get crop capabilities of the display
- * @vpbe_dev: vpbe device ptr
- * @cropcap: cropcap is a ptr to struct v4l2_cropcap
- *
- * Update the crop capabilities in crop cap for current
- * mode
- */
-static int vpbe_g_cropcap(struct vpbe_device *vpbe_dev,
-			  struct v4l2_cropcap *cropcap)
-{
-	if (!cropcap)
-		return -EINVAL;
-	cropcap->bounds.left = 0;
-	cropcap->bounds.top = 0;
-	cropcap->bounds.width = vpbe_dev->current_timings.xres;
-	cropcap->bounds.height = vpbe_dev->current_timings.yres;
-	cropcap->defrect = cropcap->bounds;
-
-	return 0;
 }
 
 /**
@@ -796,7 +766,6 @@ static void vpbe_deinitialize(struct device *dev, struct vpbe_device *vpbe_dev)
 }
 
 static const struct vpbe_device_ops vpbe_dev_ops = {
-	.g_cropcap = vpbe_g_cropcap,
 	.enum_outputs = vpbe_enum_outputs,
 	.set_output = vpbe_set_output,
 	.get_output = vpbe_get_output,

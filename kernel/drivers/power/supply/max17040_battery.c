@@ -1,14 +1,10 @@
-/*
- *  max17040_battery.c
- *  fuel-gauge systems for lithium-ion (Li+) batteries
- *
- *  Copyright (C) 2009 Samsung Electronics
- *  Minkyu Kang <mk7.kang@samsung.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- */
+// SPDX-License-Identifier: GPL-2.0
+//
+//  max17040_battery.c
+//  fuel-gauge systems for lithium-ion (Li+) batteries
+//
+//  Copyright (C) 2009 Samsung Electronics
+//  Minkyu Kang <mk7.kang@samsung.com>
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -109,7 +105,7 @@ static void max17040_get_vcell(struct i2c_client *client)
 
 	vcell = max17040_read_reg(client, MAX17040_VCELL);
 
-	chip->vcell = vcell;
+	chip->vcell = (vcell >> 4) * 1250;
 }
 
 static void max17040_get_soc(struct i2c_client *client)
@@ -197,7 +193,7 @@ static const struct power_supply_desc max17040_battery_desc = {
 static int max17040_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
-	struct i2c_adapter *adapter = to_i2c_adapter(client->dev.parent);
+	struct i2c_adapter *adapter = client->adapter;
 	struct power_supply_config psy_cfg = {};
 	struct max17040_chip *chip;
 

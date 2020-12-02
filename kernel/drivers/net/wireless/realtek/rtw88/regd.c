@@ -358,6 +358,22 @@ static bool rtw_regd_is_ww(struct rtw_regulatory *reg)
 	return false;
 }
 
+void rtw_regd_init_dfs_region(struct rtw_dev *rtwdev,
+			      enum nl80211_dfs_regions curr_region)
+{
+	struct ieee80211_hw *hw = rtwdev->hw;
+	const struct ieee80211_regdomain *wiphy_regd = NULL;
+
+	if (curr_region != RTW_REGION_INVALID)
+		return;
+
+	rcu_read_lock();
+	wiphy_regd = rcu_dereference(hw->wiphy->regd);
+	if (wiphy_regd)
+		rtwdev->regd.region = wiphy_regd->dfs_region;
+	rcu_read_unlock();
+}
+
 static int rtw_regd_notifier_apply(struct rtw_dev *rtwdev,
 				   struct wiphy *wiphy,
 				   struct regulatory_request *request)
@@ -374,10 +390,13 @@ static int rtw_regd_notifier_apply(struct rtw_dev *rtwdev,
 	    !rtwdev->efuse.country_worldwide) {
 		rtwdev->regd =
 			rtw_regd_find_reg_by_name(rtwdev->efuse.country_code);
+		/* return to the efuse setting */
+		rtw_regd_init_dfs_region(rtwdev, RTW_REGION_INVALID);
 		return 0;
 	}
 	rtwdev->regd = rtw_regd_find_reg_by_name(request->alpha2);
 	rtw_regd_apply_world_flags(wiphy, request->initiator);
+	rtwdev->regd.region = request->dfs_region;
 
 	return 0;
 }
@@ -416,6 +435,7 @@ int rtw_regd_init(struct rtw_dev *rtwdev,
 
 	rtwdev->regd = rtw_regd_find_reg_by_name(rtwdev->efuse.country_code);
 	rtw_regd_init_wiphy(rtwdev, wiphy, reg_notifier);
+	rtwdev->regd.region = RTW_REGION_INVALID;
 
 	return 0;
 }
@@ -438,6 +458,8 @@ void rtw_regd_notifier(struct wiphy *wiphy, struct regulatory_request *request)
 		request->alpha2[0], request->alpha2[1],
 		request->initiator, rtwdev->regd.chplan,
 		rtwdev->regd.txpwr_regd);
+
+	rtw_phy_adaptivity_set_mode(rtwdev);
 
 	rtw_phy_set_tx_power_level(rtwdev, hal->current_channel);
 }

@@ -936,7 +936,6 @@ struct iwl_txq {
  * @dev_cmd_offs: offset from skb->cb to iwl_device_tx_cmd pointer
  * @queue_used - bit mask of used queues
  * @queue_stopped - bit mask of stopped queues
- * @scd_bc_tbls: gen1 pointer to the byte count table of the scheduler
  */
 struct iwl_trans_txqs {
 	unsigned long queue_used[BITS_TO_LONGS(IWL_MAX_TVQM_QUEUES)];
@@ -947,7 +946,6 @@ struct iwl_trans_txqs {
 	bool bc_table_dword;
 	u8 page_offs;
 	u8 dev_cmd_offs;
-	struct __percpu iwl_tso_hdr_page * tso_hdr_page;
 
 	struct {
 		u8 fifo;
@@ -960,8 +958,6 @@ struct iwl_trans_txqs {
 		u16 size;
 		u8 addr_size;
 	} tfd;
-
-	struct iwl_dma_ptr scd_bc_tbls;
 };
 
 /**
@@ -982,6 +978,7 @@ struct iwl_trans_txqs {
  * @hw_id_str: a string with info about HW ID. Set during transport allocation.
  * @pm_support: set to true in start_hw if link pm is supported
  * @ltr_enabled: set to true if the LTR is enabled
+ * @wide_cmd_header: true when ucode supports wide command header format
  * @num_rx_queues: number of RX queues allocated by the transport;
  *	the transport must set this before calling iwl_drv_start()
  * @iml_len: the length of the image loader
@@ -1014,7 +1011,6 @@ struct iwl_trans {
 	u32 hw_rf_id;
 	u32 hw_id;
 	char hw_id_str[52];
-	u32 sku_id[3];
 
 	u8 rx_mpdu_cmd, rx_mpdu_cmd_hdr_size;
 
@@ -1023,6 +1019,7 @@ struct iwl_trans {
 
 	const struct iwl_hcmd_arr *command_groups;
 	int command_groups_size;
+	bool wide_cmd_header;
 
 	u8 num_rx_queues;
 

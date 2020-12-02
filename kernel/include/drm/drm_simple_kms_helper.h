@@ -1,10 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * Copyright (C) 2016 Noralf Trønnes
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #ifndef __LINUX_DRM_SIMPLE_KMS_HELPER_H
@@ -181,5 +177,9 @@ int drm_simple_display_pipe_init(struct drm_device *dev,
 			const uint32_t *formats, unsigned int format_count,
 			const uint64_t *format_modifiers,
 			struct drm_connector *connector);
+
+int drm_simple_encoder_init(struct drm_device *dev,
+			    struct drm_encoder *encoder,
+			    int encoder_type);
 
 #endif /* __LINUX_DRM_SIMPLE_KMS_HELPER_H */

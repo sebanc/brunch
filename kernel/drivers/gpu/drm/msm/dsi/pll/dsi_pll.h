@@ -6,8 +6,8 @@
 #ifndef __DSI_PLL_H__
 #define __DSI_PLL_H__
 
-#include <linux/clk.h>
 #include <linux/clk-provider.h>
+#include <linux/delay.h>
 
 #include "dsi.h"
 
@@ -116,5 +116,15 @@ msm_dsi_pll_10nm_init(struct platform_device *pdev, int id)
 	return ERR_PTR(-ENODEV);
 }
 #endif
+#ifdef CONFIG_DRM_MSM_DSI_7NM_PHY
+struct msm_dsi_pll *msm_dsi_pll_7nm_init(struct platform_device *pdev, int id);
+#else
+static inline struct msm_dsi_pll *
+msm_dsi_pll_7nm_init(struct platform_device *pdev, int id)
+{
+	return ERR_PTR(-ENODEV);
+}
+#endif
+
 #endif /* __DSI_PLL_H__ */
 

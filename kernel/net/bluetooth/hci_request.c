@@ -1136,9 +1136,9 @@ static void cancel_adv_timeout(struct hci_dev *hdev)
 }
 
 /* This function requires the caller holds hdev->lock */
-static void hci_suspend_adv_instances(struct hci_request *req)
+void __hci_req_pause_adv_instances(struct hci_request *req)
 {
-	bt_dev_dbg(req->hdev, "Suspending advertising instances");
+	bt_dev_dbg(req->hdev, "Pausing advertising instances");
 
 	/* Call to disable any advertisements active on the controller.
 	 * This will succeed even if no advertisements are configured.
@@ -1151,7 +1151,7 @@ static void hci_suspend_adv_instances(struct hci_request *req)
 }
 
 /* This function requires the caller holds hdev->lock */
-static void hci_resume_adv_instances(struct hci_request *req)
+static void __hci_req_resume_adv_instances(struct hci_request *req)
 {
 	struct adv_info *adv;
 
@@ -1172,6 +1172,17 @@ static void hci_resume_adv_instances(struct hci_request *req)
 						req->hdev->cur_adv_instance,
 						true);
 	}
+}
+
+/* This function requires the caller holds hdev->lock */
+int hci_req_resume_adv_instances(struct hci_dev *hdev)
+{
+	struct hci_request req;
+
+	hci_req_init(&req, hdev);
+	__hci_req_resume_adv_instances(&req);
+
+	return hci_req_run(&req, NULL);
 }
 
 static void suspend_req_complete(struct hci_dev *hdev, u8 status, u16 opcode)
@@ -1228,7 +1239,7 @@ void hci_req_prepare_suspend(struct hci_dev *hdev, enum suspended_state next)
 
 		/* Pause other advertisements */
 		if (hdev->adv_instance_cnt)
-			hci_suspend_adv_instances(&req);
+			__hci_req_pause_adv_instances(&req);
 
 		hdev->advertising_paused = true;
 		hdev->advertising_old_state = old_state;
@@ -1295,7 +1306,7 @@ void hci_req_prepare_suspend(struct hci_dev *hdev, enum suspended_state next)
 
 		/* Resume other advertisements */
 		if (hdev->adv_instance_cnt)
-			hci_resume_adv_instances(&req);
+			__hci_req_resume_adv_instances(&req);
 
 		/* Unpause discovery */
 		hdev->discovery_paused = false;
@@ -1612,11 +1623,14 @@ void __hci_req_update_scan_rsp_data(struct hci_request *req, u8 instance)
 
 		memset(&cp, 0, sizeof(cp));
 
-		if (instance)
+		/* Extended scan response data doesn't allow a response to be
+		 * set if the instance isn't scannable.
+		 */
+		if (get_adv_instance_scan_rsp_len(hdev, instance))
 			len = create_instance_scan_rsp_data(hdev, instance,
 							    cp.data);
 		else
-			len = create_default_scan_rsp_data(hdev, cp.data);
+			len = 0;
 
 		if (hdev->scan_rsp_data_len == len &&
 		    !memcmp(cp.data, hdev->scan_rsp_data, len))
@@ -2039,7 +2053,7 @@ int __hci_req_setup_ext_adv_instance(struct hci_request *req, u8 instance)
 	connectable = (flags & MGMT_ADV_FLAG_CONNECTABLE) ||
 		      mgmt_get_connectable(hdev);
 
-	 if (!is_advertising_allowed(hdev, connectable))
+	if (!is_advertising_allowed(hdev, connectable))
 		return -EPERM;
 
 	/* Set require_privacy to true only when non-connectable
@@ -3077,8 +3091,8 @@ static void start_discovery(struct hci_dev *hdev, u8 *status)
 			 * to do BR/EDR inquiry.
 			 */
 			hci_req_sync(hdev, interleaved_discov,
-				     hdev->le_scan_int_discovery * 2,
-				     HCI_CMD_TIMEOUT, status);
+				     hdev->le_scan_int_discovery * 2, HCI_CMD_TIMEOUT,
+				     status);
 			break;
 		}
 

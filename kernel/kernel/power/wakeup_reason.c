@@ -46,7 +46,8 @@ static ssize_t last_resume_reason_show(struct kobject *kobj, struct kobj_attribu
 {
 	int irq_no, buf_offset = 0;
 	struct irq_desc *desc;
-	spin_lock(&resume_reason_lock);
+	unsigned long flags;
+	spin_lock_irqsave(&resume_reason_lock, flags);
 	if (suspend_abort) {
 		buf_offset = sprintf(buf, "Abort: %s", abort_reason);
 	} else {
@@ -60,34 +61,35 @@ static ssize_t last_resume_reason_show(struct kobject *kobj, struct kobj_attribu
 						irq_list[irq_no]);
 		}
 	}
-	spin_unlock(&resume_reason_lock);
+	spin_unlock_irqrestore(&resume_reason_lock, flags);
 	return buf_offset;
 }
 
 static ssize_t last_suspend_time_show(struct kobject *kobj,
 			struct kobj_attribute *attr, char *buf)
 {
-	struct timespec sleep_time;
-	struct timespec total_time;
-	struct timespec suspend_resume_time;
+	struct timespec64 sleep_time;
+	struct timespec64 total_time;
+	struct timespec64 suspend_resume_time;
 
 	/*
 	 * total_time is calculated from monotonic bootoffsets because
 	 * unlike CLOCK_MONOTONIC it include the time spent in suspend state.
 	 */
-	total_time = ktime_to_timespec(ktime_sub(curr_stime, last_stime));
+	total_time = ktime_to_timespec64(ktime_sub(curr_stime, last_stime));
 
 	/*
 	 * suspend_resume_time is calculated as monotonic (CLOCK_MONOTONIC)
 	 * time interval before entering suspend and post suspend.
 	 */
-	suspend_resume_time = ktime_to_timespec(ktime_sub(curr_monotime, last_monotime));
+	suspend_resume_time =
+		ktime_to_timespec64(ktime_sub(curr_monotime, last_monotime));
 
 	/* sleep_time = total_time - suspend_resume_time */
-	sleep_time = timespec_sub(total_time, suspend_resume_time);
+	sleep_time = timespec64_sub(total_time, suspend_resume_time);
 
 	/* Export suspend_resume_time and sleep_time in pair here. */
-	return sprintf(buf, "%lu.%09lu %lu.%09lu\n",
+	return sprintf(buf, "%llu.%09lu %llu.%09lu\n",
 				suspend_resume_time.tv_sec, suspend_resume_time.tv_nsec,
 				sleep_time.tv_sec, sleep_time.tv_nsec);
 }
@@ -111,6 +113,7 @@ static struct attribute_group attr_group = {
 void log_wakeup_reason(int irq)
 {
 	struct irq_desc *desc;
+	unsigned long flags;
 	desc = irq_to_desc(irq);
 	if (desc && desc->action && desc->action->name)
 		printk(KERN_INFO "Resume caused by IRQ %d, %s\n", irq,
@@ -118,27 +121,28 @@ void log_wakeup_reason(int irq)
 	else
 		printk(KERN_INFO "Resume caused by IRQ %d\n", irq);
 
-	spin_lock(&resume_reason_lock);
+	spin_lock_irqsave(&resume_reason_lock, flags);
 	if (irqcount == MAX_WAKEUP_REASON_IRQS) {
-		spin_unlock(&resume_reason_lock);
+		spin_unlock_irqrestore(&resume_reason_lock, flags);
 		printk(KERN_WARNING "Resume caused by more than %d IRQs\n",
 				MAX_WAKEUP_REASON_IRQS);
 		return;
 	}
 
 	irq_list[irqcount++] = irq;
-	spin_unlock(&resume_reason_lock);
+	spin_unlock_irqrestore(&resume_reason_lock, flags);
 }
 
 void log_suspend_abort_reason(const char *fmt, ...)
 {
+	unsigned long flags;
 	va_list args;
 
-	spin_lock(&resume_reason_lock);
+	spin_lock_irqsave(&resume_reason_lock, flags);
 
 	//Suspend abort reason has already been logged.
 	if (suspend_abort) {
-		spin_unlock(&resume_reason_lock);
+		spin_unlock_irqrestore(&resume_reason_lock, flags);
 		return;
 	}
 
@@ -146,19 +150,20 @@ void log_suspend_abort_reason(const char *fmt, ...)
 	va_start(args, fmt);
 	vsnprintf(abort_reason, MAX_SUSPEND_ABORT_LEN, fmt, args);
 	va_end(args);
-	spin_unlock(&resume_reason_lock);
+	spin_unlock_irqrestore(&resume_reason_lock, flags);
 }
 
 /* Detects a suspend and clears all the previous wake up reasons*/
 static int wakeup_reason_pm_event(struct notifier_block *notifier,
 		unsigned long pm_event, void *unused)
 {
+	unsigned long flags;
 	switch (pm_event) {
 	case PM_SUSPEND_PREPARE:
-		spin_lock(&resume_reason_lock);
+		spin_lock_irqsave(&resume_reason_lock, flags);
 		irqcount = 0;
 		suspend_abort = false;
-		spin_unlock(&resume_reason_lock);
+		spin_unlock_irqrestore(&resume_reason_lock, flags);
 		/* monotonic time since boot */
 		last_monotime = ktime_get();
 		/* monotonic time since boot including the time spent in suspend */

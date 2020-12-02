@@ -62,7 +62,7 @@
 #define USBDUXFASTSUB_CPUCS	0xE600
 
 /*
- * max lenghth of the transfer-buffer for software upload
+ * max length of the transfer-buffer for software upload
  */
 #define TB_LEN	0x2000
 
@@ -1000,6 +1000,8 @@ static void usbduxfast_detach(struct comedi_device *dev)
 	kfree(devpriv->duxbuf);
 
 	mutex_unlock(&devpriv->mut);
+
+	mutex_destroy(&devpriv->mut);
 }
 
 static struct comedi_driver usbduxfast_driver = {

@@ -2,6 +2,9 @@
 #ifndef __BLK_NULL_BLK_H
 #define __BLK_NULL_BLK_H
 
+#undef pr_fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/blkdev.h>
 #include <linux/slab.h>
 #include <linux/blk-mq.h>
@@ -49,6 +52,7 @@ struct nullb_device {
 	unsigned long completion_nsec; /* time in ns to complete a request */
 	unsigned long cache_size; /* disk cache size in MB */
 	unsigned long zone_size; /* zone size in MB if device is zoned */
+	unsigned int zone_nr_conv; /* number of conventional zones */
 	unsigned int submit_queues; /* number of submission queues */
 	unsigned int home_node; /* home node for the device */
 	unsigned int queue_mode; /* block interface */
@@ -87,25 +91,29 @@ struct nullb {
 #ifdef CONFIG_BLK_DEV_ZONED
 int null_zone_init(struct nullb_device *dev);
 void null_zone_exit(struct nullb_device *dev);
-blk_status_t null_zone_report(struct nullb *nullb, struct bio *bio);
-void null_zone_write(struct nullb_cmd *cmd, sector_t sector,
-			unsigned int nr_sectors);
-void null_zone_reset(struct nullb_cmd *cmd, sector_t sector);
+int null_zone_report(struct gendisk *disk, sector_t sector,
+		     struct blk_zone *zones, unsigned int *nr_zones);
+blk_status_t null_handle_zoned(struct nullb_cmd *cmd,
+				enum req_opf op, sector_t sector,
+				sector_t nr_sectors);
 #else
 static inline int null_zone_init(struct nullb_device *dev)
 {
+	pr_err("CONFIG_BLK_DEV_ZONED not enabled\n");
 	return -EINVAL;
 }
 static inline void null_zone_exit(struct nullb_device *dev) {}
-static inline blk_status_t null_zone_report(struct nullb *nullb,
-					    struct bio *bio)
+static inline int null_zone_report(struct gendisk *disk, sector_t sector,
+				   struct blk_zone *zones,
+				   unsigned int *nr_zones)
+{
+	return -EOPNOTSUPP;
+}
+static inline blk_status_t null_handle_zoned(struct nullb_cmd *cmd,
+					     enum req_opf op, sector_t sector,
+					     sector_t nr_sectors)
 {
 	return BLK_STS_NOTSUPP;
 }
-static inline void null_zone_write(struct nullb_cmd *cmd, sector_t sector,
-				   unsigned int nr_sectors)
-{
-}
-static inline void null_zone_reset(struct nullb_cmd *cmd, sector_t sector) {}
 #endif /* CONFIG_BLK_DEV_ZONED */
 #endif /* __NULL_BLK_H */

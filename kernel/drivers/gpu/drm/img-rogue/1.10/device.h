@@ -53,11 +53,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "srvkm.h"
 #include "physheap.h"
 #include <powervr/sync_external.h>
-#include "sysinfo.h"
+#include "mt8173/sysinfo.h"
 #include "dllist.h"
 #include "cache_km.h"
 
-#include "rgx_bvnc_defs_km.h"
+#include "km/rgx_bvnc_defs_km.h"
 
 #include "lock.h"
 

@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2005,2006,2007,2008 IBM Corporation
  *
  * Authors:
  * Mimi Zohar <zohar@us.ibm.com>
  * Kylene Hall <kjhall@us.ibm.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, version 2 of the License.
  *
  * File: ima_crypto.c
  *	Calculates md5/sha1 file hash, template hash, boot-aggreate hash
@@ -341,7 +338,6 @@ static int ima_calc_file_hash_tfm(struct file *file,
 	SHASH_DESC_ON_STACK(shash, tfm);
 
 	shash->tfm = tfm;
-	shash->flags = 0;
 
 	hash->length = crypto_shash_digestsize(tfm);
 
@@ -477,7 +473,6 @@ static int ima_calc_field_array_hash_tfm(struct ima_field_data *field_data,
 	int rc, i;
 
 	shash->tfm = tfm;
-	shash->flags = 0;
 
 	hash->length = crypto_shash_digestsize(tfm);
 
@@ -599,7 +594,6 @@ static int calc_buffer_shash_tfm(const void *buf, loff_t size,
 	int rc;
 
 	shash->tfm = tfm;
-	shash->flags = 0;
 
 	hash->length = crypto_shash_digestsize(tfm);
 
@@ -651,27 +645,38 @@ int ima_calc_buffer_hash(const void *buf, loff_t len,
 	return calc_buffer_shash(buf, len, hash);
 }
 
-static void __init ima_pcrread(int idx, u8 *pcr)
+static void ima_pcrread(u32 idx, struct tpm_digest *d)
 {
 	if (!ima_tpm_chip)
 		return;
 
-	if (tpm_pcr_read(ima_tpm_chip, idx, pcr) != 0)
+	if (tpm_pcr_read(ima_tpm_chip, idx, d) != 0)
 		pr_err("Error Communicating to TPM chip\n");
 }
 
 /*
- * Calculate the boot aggregate hash
+ * The boot_aggregate is a cumulative hash over TPM registers 0 - 7.  With
+ * TPM 1.2 the boot_aggregate was based on reading the SHA1 PCRs, but with
+ * TPM 2.0 hash agility, TPM chips could support multiple TPM PCR banks,
+ * allowing firmware to configure and enable different banks.
+ *
+ * Knowing which TPM bank is read to calculate the boot_aggregate digest
+ * needs to be conveyed to a verifier.  For this reason, use the same
+ * hash algorithm for reading the TPM PCRs as for calculating the boot
+ * aggregate digest as stored in the measurement list.
  */
-static int ima_calc_boot_aggregate_tfm(char *digest,
+static int ima_calc_boot_aggregate_tfm(char *digest, u16 alg_id,
 				       struct crypto_shash *tfm)
 {
-	u8 pcr_i[TPM_DIGEST_SIZE];
-	int rc, i;
+	struct tpm_digest d = { .alg_id = alg_id, .digest = {0} };
+	int rc;
+	u32 i;
 	SHASH_DESC_ON_STACK(shash, tfm);
 
 	shash->tfm = tfm;
-	shash->flags = 0;
+
+	pr_devel("calculating the boot-aggregate based on TPM bank: %04x\n",
+		 d.alg_id);
 
 	rc = crypto_shash_init(shash);
 	if (rc != 0)
@@ -679,9 +684,12 @@ static int ima_calc_boot_aggregate_tfm(char *digest,
 
 	/* cumulative sha1 over tpm registers 0-7 */
 	for (i = TPM_PCR0; i < TPM_PCR8; i++) {
-		ima_pcrread(i, pcr_i);
+		ima_pcrread(i, &d);
 		/* now accumulate with current aggregate */
-		rc = crypto_shash_update(shash, pcr_i, TPM_DIGEST_SIZE);
+		rc = crypto_shash_update(shash, d.digest,
+					 crypto_shash_digestsize(tfm));
+		if (rc != 0)
+			return rc;
 	}
 	if (!rc)
 		crypto_shash_final(shash, digest);
@@ -691,14 +699,37 @@ static int ima_calc_boot_aggregate_tfm(char *digest,
 int ima_calc_boot_aggregate(struct ima_digest_data *hash)
 {
 	struct crypto_shash *tfm;
-	int rc;
+	u16 crypto_id, alg_id;
+	int rc, i, bank_idx = -1;
+
+	for (i = 0; i < ima_tpm_chip->nr_allocated_banks; i++) {
+		crypto_id = ima_tpm_chip->allocated_banks[i].crypto_id;
+		if (crypto_id == hash->algo) {
+			bank_idx = i;
+			break;
+		}
+
+		if (crypto_id == HASH_ALGO_SHA256)
+			bank_idx = i;
+
+		if (bank_idx == -1 && crypto_id == HASH_ALGO_SHA1)
+			bank_idx = i;
+	}
+
+	if (bank_idx == -1) {
+		pr_err("No suitable TPM algorithm for boot aggregate\n");
+		return 0;
+	}
+
+	hash->algo = ima_tpm_chip->allocated_banks[bank_idx].crypto_id;
 
 	tfm = ima_alloc_tfm(hash->algo);
 	if (IS_ERR(tfm))
 		return PTR_ERR(tfm);
 
 	hash->length = crypto_shash_digestsize(tfm);
-	rc = ima_calc_boot_aggregate_tfm(hash->digest, tfm);
+	alg_id = ima_tpm_chip->allocated_banks[bank_idx].alg_id;
+	rc = ima_calc_boot_aggregate_tfm(hash->digest, alg_id, tfm);
 
 	ima_free_tfm(tfm);
 

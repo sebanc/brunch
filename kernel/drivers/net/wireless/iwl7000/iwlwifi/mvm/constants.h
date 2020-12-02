@@ -29,7 +29,7 @@
  *
  * Copyright(c) 2013 - 2015 Intel Mobile Communications GmbH
  * Copyright(c) 2015        Intel Deutschland GmbH
- * Copyright(c) 2013 - 2014, 2018 - 2020 Intel Corporation
+ * Copyright(c) 2013 - 2014, 2018 - 2019 Intel Corporation
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -152,7 +152,6 @@
 #define IWL_MVM_FTM_INITIATOR_DYNACK		true
 #define IWL_MVM_D3_DEBUG			false
 #define IWL_MVM_USE_TWT				true
-#define IWL_MVM_TWT_TESTMODE			false
 #define IWL_MVM_AMPDU_CONSEC_DROPS_DELBA	10
 #define IWL_MVM_FTM_INITIATOR_ENABLE_SMOOTH     false
 #define IWL_MVM_FTM_INITIATOR_SMOOTH_ALPHA      40
@@ -253,7 +252,6 @@
 #define IWL_MVM_FTM_INITIATOR_FAST_ALGO_DISABLE (mvm->trans->dbg_cfg.MVM_FTM_INITIATOR_FAST_ALGO_DISABLE)
 #define IWL_MVM_D3_DEBUG			(((struct iwl_mvm *)ctx)->trans->dbg_cfg.MVM_D3_DEBUG)
 #define IWL_MVM_USE_TWT				(mvm->trans->dbg_cfg.MVM_USE_TWT)
-#define IWL_MVM_TWT_TESTMODE			(mvm->trans->dbg_cfg.MVM_TWT_TESTMODE)
 #define IWL_MVM_AMPDU_CONSEC_DROPS_DELBA	(mvm->trans->dbg_cfg.MVM_AMPDU_CONSEC_DROPS_DELBA)
 #define IWL_MVM_FTM_INITIATOR_ENABLE_SMOOTH     (mvm->trans->dbg_cfg.MVM_FTM_INITIATOR_ENABLE_SMOOTH)
 #define IWL_MVM_FTM_INITIATOR_SMOOTH_ALPHA      (mvm->trans->dbg_cfg.MVM_FTM_INITIATOR_SMOOTH_ALPHA)

@@ -1,14 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2014-2017 Broadcom
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation version 2.
- *
- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
- * kind, whether express or implied; without even the implied warranty
- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 /*
@@ -114,6 +106,7 @@ struct iproc_gpio {
 
 	raw_spinlock_t lock;
 
+	struct irq_chip irqchip;
 	struct gpio_chip gc;
 	unsigned num_banks;
 
@@ -302,14 +295,6 @@ static int iproc_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 	return 0;
 }
 
-static struct irq_chip iproc_gpio_irq_chip = {
-	.name = "bcm-iproc-gpio",
-	.irq_ack = iproc_gpio_irq_ack,
-	.irq_mask = iproc_gpio_irq_mask,
-	.irq_unmask = iproc_gpio_irq_unmask,
-	.irq_set_type = iproc_gpio_irq_set_type,
-};
-
 /*
  * Request the Iproc IOMUX pinmux controller to mux individual pins to GPIO
  */
@@ -364,6 +349,15 @@ static int iproc_gpio_direction_output(struct gpio_chip *gc, unsigned gpio,
 	dev_dbg(chip->dev, "gpio:%u set output, value:%d\n", gpio, val);
 
 	return 0;
+}
+
+static int iproc_gpio_get_direction(struct gpio_chip *gc, unsigned int gpio)
+{
+	struct iproc_gpio *chip = gpiochip_get_data(gc);
+	unsigned int offset = IPROC_GPIO_REG(gpio, IPROC_GPIO_OUT_EN_OFFSET);
+	unsigned int shift = IPROC_GPIO_SHIFT(gpio);
+
+	return !(readl(chip->base + offset) & BIT(shift));
 }
 
 static void iproc_gpio_set(struct gpio_chip *gc, unsigned gpio, int val)
@@ -842,11 +836,41 @@ static int iproc_gpio_probe(struct platform_device *pdev)
 	gc->free = iproc_gpio_free;
 	gc->direction_input = iproc_gpio_direction_input;
 	gc->direction_output = iproc_gpio_direction_output;
+	gc->get_direction = iproc_gpio_get_direction;
 	gc->set = iproc_gpio_set;
 	gc->get = iproc_gpio_get;
 
 	chip->pinmux_is_supported = of_property_read_bool(dev->of_node,
 							"gpio-ranges");
+
+	/* optional GPIO interrupt support */
+	irq = platform_get_irq(pdev, 0);
+	if (irq > 0) {
+		struct irq_chip *irqc;
+		struct gpio_irq_chip *girq;
+
+		irqc = &chip->irqchip;
+		irqc->name = "bcm-iproc-gpio";
+		irqc->irq_ack = iproc_gpio_irq_ack;
+		irqc->irq_mask = iproc_gpio_irq_mask;
+		irqc->irq_unmask = iproc_gpio_irq_unmask;
+		irqc->irq_set_type = iproc_gpio_irq_set_type;
+		irqc->irq_enable = iproc_gpio_irq_unmask;
+		irqc->irq_disable = iproc_gpio_irq_mask;
+
+		girq = &gc->irq;
+		girq->chip = irqc;
+		girq->parent_handler = iproc_gpio_irq_handler;
+		girq->num_parents = 1;
+		girq->parents = devm_kcalloc(dev, 1,
+					     sizeof(*girq->parents),
+					     GFP_KERNEL);
+		if (!girq->parents)
+			return -ENOMEM;
+		girq->parents[0] = irq;
+		girq->default_type = IRQ_TYPE_NONE;
+		girq->handler = handle_simple_irq;
+	}
 
 	ret = gpiochip_add_data(gc, chip);
 	if (ret < 0) {
@@ -870,20 +894,6 @@ static int iproc_gpio_probe(struct platform_device *pdev)
 				goto err_rm_gpiochip;
 			}
 		}
-	}
-
-	/* optional GPIO interrupt support */
-	irq = platform_get_irq(pdev, 0);
-	if (irq) {
-		ret = gpiochip_irqchip_add(gc, &iproc_gpio_irq_chip, 0,
-					   handle_simple_irq, IRQ_TYPE_NONE);
-		if (ret) {
-			dev_err(dev, "no GPIO irqchip\n");
-			goto err_rm_gpiochip;
-		}
-
-		gpiochip_set_chained_irqchip(gc, &iproc_gpio_irq_chip, irq,
-					     iproc_gpio_irq_handler);
 	}
 
 	return 0;

@@ -1,9 +1,33 @@
+.. SPDX-License-Identifier: GPL-2.0
+
 ==========================
-x86 architecture specifics
+x86-specific Documentation
 ==========================
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
+   :numbered:
 
+   boot
+   topology
+   exception-tables
+   kernel-stacks
+   entry_64
+   earlyprintk
+   orc-unwinder
+   zero-page
+   tlb
+   mtrr
+   pat
+   intel_mpx
+   intel-iommu
+   intel_txt
+   amd-memory-encryption
+   pti
    mds
+   microcode
+   resctrl_ui
    tsx_async_abort
+   usb-legacy-support
+   i386/index
+   x86_64/index

@@ -217,6 +217,22 @@ xen_single_call(unsigned int call,
 	return (long)__res;
 }
 
+static __always_inline void __xen_stac(void)
+{
+	/*
+	 * Suppress objtool seeing the STAC/CLAC and getting confused about it
+	 * calling random code with AC=1.
+	 */
+	asm volatile(ANNOTATE_IGNORE_ALTERNATIVE
+		     ASM_STAC ::: "memory", "flags");
+}
+
+static __always_inline void __xen_clac(void)
+{
+	asm volatile(ANNOTATE_IGNORE_ALTERNATIVE
+		     ASM_CLAC ::: "memory", "flags");
+}
+
 static inline long
 privcmd_call(unsigned int call,
 	     unsigned long a1, unsigned long a2,
@@ -225,9 +241,9 @@ privcmd_call(unsigned int call,
 {
 	long res;
 
-	stac();
+	__xen_stac();
 	res = xen_single_call(call, a1, a2, a3, a4, a5);
-	clac();
+	__xen_clac();
 
 	return res;
 }
@@ -335,15 +351,11 @@ HYPERVISOR_update_va_mapping(unsigned long va, pte_t new_val,
 		return _hypercall4(int, update_va_mapping, va,
 				   new_val.pte, new_val.pte >> 32, flags);
 }
-extern int __must_check xen_event_channel_op_compat(int, void *);
 
 static inline int
 HYPERVISOR_event_channel_op(int cmd, void *arg)
 {
-	int rc = _hypercall2(int, event_channel_op, cmd, arg);
-	if (unlikely(rc == -ENOSYS))
-		rc = xen_event_channel_op_compat(cmd, arg);
-	return rc;
+	return _hypercall2(int, event_channel_op, cmd, arg);
 }
 
 static inline int
@@ -358,15 +370,10 @@ HYPERVISOR_console_io(int cmd, int count, char *str)
 	return _hypercall3(int, console_io, cmd, count, str);
 }
 
-extern int __must_check xen_physdev_op_compat(int, void *);
-
 static inline int
 HYPERVISOR_physdev_op(int cmd, void *arg)
 {
-	int rc = _hypercall2(int, physdev_op, cmd, arg);
-	if (unlikely(rc == -ENOSYS))
-		rc = xen_physdev_op_compat(cmd, arg);
-	return rc;
+	return _hypercall2(int, physdev_op, cmd, arg);
 }
 
 static inline int
@@ -433,9 +440,9 @@ HYPERVISOR_dm_op(
 	domid_t dom, unsigned int nr_bufs, struct xen_dm_op_buf *bufs)
 {
 	int ret;
-	stac();
+	__xen_stac();
 	ret = _hypercall3(int, dm_op, dom, nr_bufs, bufs);
-	clac();
+	__xen_clac();
 	return ret;
 }
 

@@ -14,7 +14,9 @@
 #include <unistd.h>
 #include <dirent.h>
 #include "event-parse.h"
+#include "event-parse-local.h"
 #include "event-utils.h"
+#include "trace-seq.h"
 
 #define LOCAL_PLUGIN_DIR ".local/lib/traceevent/plugins/"
 
@@ -30,8 +32,8 @@ static struct trace_plugin_options {
 	char				*value;
 } *trace_plugin_options;
 
-struct plugin_list {
-	struct plugin_list	*next;
+struct tep_plugin_list {
+	struct tep_plugin_list	*next;
 	char			*name;
 	void			*handle;
 };
@@ -258,7 +260,7 @@ void tep_plugin_remove_options(struct tep_plugin_option *options)
  */
 void tep_print_plugins(struct trace_seq *s,
 		       const char *prefix, const char *suffix,
-		       const struct plugin_list *list)
+		       const struct tep_plugin_list *list)
 {
 	while (list) {
 		trace_seq_printf(s, "%s%s%s", prefix, list->name, suffix);
@@ -267,12 +269,12 @@ void tep_print_plugins(struct trace_seq *s,
 }
 
 static void
-load_plugin(struct tep_handle *pevent, const char *path,
+load_plugin(struct tep_handle *tep, const char *path,
 	    const char *file, void *data)
 {
-	struct plugin_list **plugin_list = data;
+	struct tep_plugin_list **plugin_list = data;
 	tep_plugin_load_func func;
-	struct plugin_list *list;
+	struct tep_plugin_list *list;
 	const char *alias;
 	char *plugin;
 	void *handle;
@@ -314,7 +316,7 @@ load_plugin(struct tep_handle *pevent, const char *path,
 	*plugin_list = list;
 
 	pr_stat("registering plugin: %s", plugin);
-	func(pevent);
+	func(tep);
 	return;
 
  out_free:
@@ -322,9 +324,9 @@ load_plugin(struct tep_handle *pevent, const char *path,
 }
 
 static void
-load_plugins_dir(struct tep_handle *pevent, const char *suffix,
+load_plugins_dir(struct tep_handle *tep, const char *suffix,
 		 const char *path,
-		 void (*load_plugin)(struct tep_handle *pevent,
+		 void (*load_plugin)(struct tep_handle *tep,
 				     const char *path,
 				     const char *name,
 				     void *data),
@@ -357,15 +359,15 @@ load_plugins_dir(struct tep_handle *pevent, const char *suffix,
 		if (strcmp(name + (strlen(name) - strlen(suffix)), suffix) != 0)
 			continue;
 
-		load_plugin(pevent, path, name, data);
+		load_plugin(tep, path, name, data);
 	}
 
 	closedir(dir);
 }
 
 static void
-load_plugins(struct tep_handle *pevent, const char *suffix,
-	     void (*load_plugin)(struct tep_handle *pevent,
+load_plugins(struct tep_handle *tep, const char *suffix,
+	     void (*load_plugin)(struct tep_handle *tep,
 				 const char *path,
 				 const char *name,
 				 void *data),
@@ -376,7 +378,7 @@ load_plugins(struct tep_handle *pevent, const char *suffix,
 	char *envdir;
 	int ret;
 
-	if (pevent->flags & TEP_DISABLE_PLUGINS)
+	if (tep->flags & TEP_DISABLE_PLUGINS)
 		return;
 
 	/*
@@ -384,8 +386,8 @@ load_plugins(struct tep_handle *pevent, const char *suffix,
 	 * check that first.
 	 */
 #ifdef PLUGIN_DIR
-	if (!(pevent->flags & TEP_DISABLE_SYS_PLUGINS))
-		load_plugins_dir(pevent, suffix, PLUGIN_DIR,
+	if (!(tep->flags & TEP_DISABLE_SYS_PLUGINS))
+		load_plugins_dir(tep, suffix, PLUGIN_DIR,
 				 load_plugin, data);
 #endif
 
@@ -395,7 +397,7 @@ load_plugins(struct tep_handle *pevent, const char *suffix,
 	 */
 	envdir = getenv("TRACEEVENT_PLUGIN_DIR");
 	if (envdir)
-		load_plugins_dir(pevent, suffix, envdir, load_plugin, data);
+		load_plugins_dir(tep, suffix, envdir, load_plugin, data);
 
 	/*
 	 * Now let the home directory override the environment
@@ -411,32 +413,32 @@ load_plugins(struct tep_handle *pevent, const char *suffix,
 		return;
 	}
 
-	load_plugins_dir(pevent, suffix, path, load_plugin, data);
+	load_plugins_dir(tep, suffix, path, load_plugin, data);
 
 	free(path);
 }
 
-struct plugin_list*
-tep_load_plugins(struct tep_handle *pevent)
+struct tep_plugin_list*
+tep_load_plugins(struct tep_handle *tep)
 {
-	struct plugin_list *list = NULL;
+	struct tep_plugin_list *list = NULL;
 
-	load_plugins(pevent, ".so", load_plugin, &list);
+	load_plugins(tep, ".so", load_plugin, &list);
 	return list;
 }
 
 void
-tep_unload_plugins(struct plugin_list *plugin_list, struct tep_handle *pevent)
+tep_unload_plugins(struct tep_plugin_list *plugin_list, struct tep_handle *tep)
 {
 	tep_plugin_unload_func func;
-	struct plugin_list *list;
+	struct tep_plugin_list *list;
 
 	while (plugin_list) {
 		list = plugin_list;
 		plugin_list = list->next;
 		func = dlsym(list->handle, TEP_PLUGIN_UNLOADER_NAME);
 		if (func)
-			func(pevent);
+			func(tep);
 		dlclose(list->handle);
 		free(list->name);
 		free(list);

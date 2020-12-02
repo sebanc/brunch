@@ -28,7 +28,8 @@
  *    Christian König <deathsimple@vodafone.de>
  */
 
-#include <drm/drmP.h>
+#include <linux/uaccess.h>
+
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
 
@@ -81,9 +82,9 @@ int amdgpu_bo_list_create(struct amdgpu_device *adev, struct drm_file *filp,
 		return -ENOMEM;
 
 	kref_init(&list->refcount);
-	list->gds_obj = adev->gds.gds_gfx_bo;
-	list->gws_obj = adev->gds.gws_gfx_bo;
-	list->oa_obj = adev->gds.oa_gfx_bo;
+	list->gds_obj = NULL;
+	list->gws_obj = NULL;
+	list->oa_obj = NULL;
 
 	array = amdgpu_bo_list_array_entry(list, 0);
 	memset(array, 0, num_entries * sizeof(struct amdgpu_bo_list_entry));
@@ -101,7 +102,7 @@ int amdgpu_bo_list_create(struct amdgpu_device *adev, struct drm_file *filp,
 		}
 
 		bo = amdgpu_bo_ref(gem_to_amdgpu_bo(gobj));
-		drm_gem_object_put_unlocked(gobj);
+		drm_gem_object_put(gobj);
 
 		usermm = amdgpu_ttm_tt_get_usermm(bo->tbo.ttm);
 		if (usermm) {
@@ -118,7 +119,6 @@ int amdgpu_bo_list_create(struct amdgpu_device *adev, struct drm_file *filp,
 		entry->priority = min(info[i].bo_priority,
 				      AMDGPU_BO_LIST_MAX_PRIORITY);
 		entry->tv.bo = &bo->tbo;
-		entry->tv.shared = !bo->prime_shared_count;
 
 		if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_GDS)
 			list->gds_obj = bo;
@@ -140,7 +140,12 @@ int amdgpu_bo_list_create(struct amdgpu_device *adev, struct drm_file *filp,
 	return 0;
 
 error_free:
-	while (i--) {
+	for (i = 0; i < last_entry; ++i) {
+		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(array[i].tv.bo);
+
+		amdgpu_bo_unref(&bo);
+	}
+	for (i = first_userptr; i < num_entries; ++i) {
 		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(array[i].tv.bo);
 
 		amdgpu_bo_unref(&bo);

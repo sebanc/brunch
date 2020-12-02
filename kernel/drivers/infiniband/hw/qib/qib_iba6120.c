@@ -1884,7 +1884,6 @@ static void qib_6120_put_tid(struct qib_devdata *dd, u64 __iomem *tidptr,
 	qib_write_kreg(dd, kr_scratch, 0xfeeddeaf);
 	writel(pa, tidp32);
 	qib_write_kreg(dd, kr_scratch, 0xdeadbeef);
-	mmiowb();
 	spin_unlock_irqrestore(tidlockp, flags);
 }
 
@@ -1928,7 +1927,6 @@ static void qib_6120_put_tid_2(struct qib_devdata *dd, u64 __iomem *tidptr,
 			pa |= 2 << 29;
 	}
 	writel(pa, tidp32);
-	mmiowb();
 }
 
 
@@ -2053,9 +2051,7 @@ static void qib_update_6120_usrhead(struct qib_ctxtdata *rcd, u64 hd,
 {
 	if (updegr)
 		qib_write_ureg(rcd->dd, ur_rcvegrindexhead, egrhd, rcd->ctxt);
-	mmiowb();
 	qib_write_ureg(rcd->dd, ur_rcvhdrhead, hd, rcd->ctxt);
-	mmiowb();
 }
 
 static u32 qib_6120_hdrqempty(struct qib_ctxtdata *rcd)
@@ -3237,7 +3233,6 @@ static int init_6120_variables(struct qib_devdata *dd)
 	/* we always allocate at least 2048 bytes for eager buffers */
 	ret = ib_mtu_enum_to_int(qib_ibmtu);
 	dd->rcvegrbufsize = ret != -1 ? max(ret, 2048) : QIB_DEFAULT_MTU;
-	BUG_ON(!is_power_of_2(dd->rcvegrbufsize));
 	dd->rcvegrbufsize_shift = ilog2(dd->rcvegrbufsize);
 
 	qib_6120_tidtemplate(dd);

@@ -39,8 +39,8 @@
 #include <drm/drm_framebuffer.h>
 #include <drm/drm_modes.h>
 #include <drm/drm_connector.h>
+#include <drm/drm_device.h>
 #include <drm/drm_property.h>
-#include <drm/drm_bridge.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_plane.h>
 #include <drm/drm_blend.h>
@@ -53,6 +53,7 @@ struct drm_mode_set;
 struct drm_file;
 struct drm_clip_rect;
 struct drm_printer;
+struct drm_self_refresh_data;
 struct device_node;
 struct dma_fence;
 struct edid;
@@ -78,7 +79,7 @@ struct drm_plane_helper_funcs;
 /**
  * struct drm_crtc_state - mutable CRTC state
  *
- * Note that the distinction between @enable and @active is rather subtile:
+ * Note that the distinction between @enable and @active is rather subtle:
  * Flipping @active while @enable is set without changing anything else may
  * never return in a failure from the &drm_mode_config_funcs.atomic_check
  * callback. Userspace assumes that a DPMS On will always succeed. In other
@@ -283,12 +284,32 @@ struct drm_crtc_state {
 	u32 target_vblank;
 
 	/**
-	 * @pageflip_flags:
+	 * @async_flip:
 	 *
-	 * DRM_MODE_PAGE_FLIP_* flags, as passed to the page flip ioctl.
-	 * Zero in any other case.
+	 * This is set when DRM_MODE_PAGE_FLIP_ASYNC is set in the legacy
+	 * PAGE_FLIP IOCTL. It's not wired up for the atomic IOCTL itself yet.
 	 */
-	u32 pageflip_flags;
+	bool async_flip;
+
+	/**
+	 * @vrr_enabled:
+	 *
+	 * Indicates if variable refresh rate should be enabled for the CRTC.
+	 * Support for the requested vrr state will depend on driver and
+	 * hardware capabiltiy - lacking support is not treated as failure.
+	 */
+	bool vrr_enabled;
+
+	/**
+	 * @self_refresh_active:
+	 *
+	 * Used by the self refresh helpers to denote when a self refresh
+	 * transition is occurring. This will be set on enable/disable callbacks
+	 * when self refresh is being enabled or disabled. In some cases, it may
+	 * not be desirable to fully shut off the crtc during self refresh.
+	 * CRTC's can inspect this flag and determine the best course of action.
+	 */
+	bool self_refresh_active;
 
 	/**
 	 * @event:
@@ -463,7 +484,7 @@ struct drm_crtc_funcs {
 	/**
 	 * @destroy:
 	 *
-	 * Clean up plane resources. This is only called at driver unload time
+	 * Clean up CRTC resources. This is only called at driver unload time
 	 * through drm_mode_config_cleanup() since a CRTC cannot be hotplugged
 	 * in DRM.
 	 */
@@ -734,6 +755,9 @@ struct drm_crtc_funcs {
 	 * provided from the configured source. Drivers must accept an "auto"
 	 * source name that will select a default source for this CRTC.
 	 *
+	 * This may trigger an atomic modeset commit if necessary, to enable CRC
+	 * generation.
+	 *
 	 * Note that "auto" can depend upon the current modeset configuration,
 	 * e.g. it could pick an encoder or output specific CRC sampling point.
 	 *
@@ -745,6 +769,7 @@ struct drm_crtc_funcs {
 	 * 0 on success or a negative error code on failure.
 	 */
 	int (*set_crc_source)(struct drm_crtc *crtc, const char *source);
+
 	/**
 	 * @verify_crc_source:
 	 *
@@ -1078,6 +1103,13 @@ struct drm_crtc {
 	 * The name of the CRTC's fence timeline.
 	 */
 	char timeline_name[32];
+
+	/**
+	 * @self_refresh_data: Holds the state for the self refresh helpers
+	 *
+	 * Initialized via drm_self_refresh_helper_init().
+	 */
+	struct drm_self_refresh_data *self_refresh_data;
 };
 
 /**
@@ -1140,9 +1172,6 @@ static inline uint32_t drm_crtc_mask(const struct drm_crtc *crtc)
 	return 1 << drm_crtc_index(crtc);
 }
 
-int drm_crtc_force_disable(struct drm_crtc *crtc);
-int drm_crtc_force_disable_all(struct drm_device *dev);
-
 int drm_mode_set_config_internal(struct drm_mode_set *set);
 struct drm_crtc *drm_crtc_from_index(struct drm_device *dev, int idx);
 
@@ -1174,5 +1203,15 @@ static inline struct drm_crtc *drm_crtc_find(struct drm_device *dev,
  */
 #define drm_for_each_crtc(crtc, dev) \
 	list_for_each_entry(crtc, &(dev)->mode_config.crtc_list, head)
+
+/**
+ * drm_for_each_crtc_reverse - iterate over all CRTCs in reverse order
+ * @crtc: a &struct drm_crtc as the loop cursor
+ * @dev: the &struct drm_device
+ *
+ * Iterate over all CRTCs of @dev.
+ */
+#define drm_for_each_crtc_reverse(crtc, dev) \
+	list_for_each_entry_reverse(crtc, &(dev)->mode_config.crtc_list, head)
 
 #endif /* __DRM_CRTC_H__ */

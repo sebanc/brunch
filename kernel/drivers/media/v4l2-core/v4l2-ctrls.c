@@ -1,22 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
     V4L2 controls framework implementation.
 
     Copyright (C) 2010  Hans Verkuil <hverkuil@xs4all.nl>
 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+#define pr_fmt(fmt) "v4l2-ctrls: " fmt
 
 #include <linux/ctype.h>
 #include <linux/mm.h>
@@ -27,6 +17,12 @@
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-dev.h>
+
+#define dprintk(vdev, fmt, arg...) do {					\
+	if (!WARN_ON(!(vdev)) && ((vdev)->dev_debug & V4L2_DEV_DEBUG_CTRL)) \
+		printk(KERN_DEBUG pr_fmt("%s: %s: " fmt),		\
+		       __func__, video_device_node_name(vdev), ##arg);	\
+} while (0)
 
 #define has_op(master, op) \
 	(master->ops && master->ops->op)
@@ -201,6 +197,7 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 	static const char * const mpeg_video_bitrate_mode[] = {
 		"Variable Bitrate",
 		"Constant Bitrate",
+		"Constant Quality",
 		NULL
 	};
 	static const char * const mpeg_stream_type[] = {
@@ -338,6 +335,10 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		"4.2",
 		"5",
 		"5.1",
+		"5.2",
+		"6.0",
+		"6.1",
+		"6.2",
 		NULL,
 	};
 	static const char * const h264_loop_filter[] = {
@@ -364,6 +365,7 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		"Scalable High Intra",
 		"Stereo High",
 		"Multiview High",
+		"Constrained High",
 		NULL,
 	};
 	static const char * const vui_sar_idc[] = {
@@ -406,9 +408,29 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		"Explicit",
 		NULL,
 	};
-	static const char * const h264_decoding_mode[] = {
-		"Slice-based",
-		"Frame-based",
+	static const char * const h264_decode_mode[] = {
+		"Slice-Based",
+		"Frame-Based",
+		NULL,
+	};
+	static const char * const h264_start_code[] = {
+		"No Start Code",
+		"Annex B Start Code",
+		NULL,
+	};
+	static const char * const mpeg_mpeg2_level[] = {
+		"Low",
+		"Main",
+		"High 1440",
+		"High",
+		NULL,
+	};
+	static const char * const mpeg2_profile[] = {
+		"Simple",
+		"Main",
+		"SNR Scalable",
+		"Spatially Scalable",
+		"High",
 		NULL,
 	};
 	static const char * const mpeg_mpeg4_level[] = {
@@ -448,6 +470,23 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		"1",
 		"2",
 		"3",
+		NULL,
+	};
+	static const char * const vp9_level[] = {
+		"1",
+		"1.1",
+		"2",
+		"2.1",
+		"3",
+		"3.1",
+		"4",
+		"4.1",
+		"5",
+		"5.1",
+		"5.2",
+		"6",
+		"6.1",
+		"6.2",
 		NULL,
 	};
 
@@ -550,6 +589,12 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		"Disabled at slice boundary",
 		"NULL",
 	};
+	static const char * const mpeg_video_frame_skip[] = {
+		"Disabled",
+		"Level Limit",
+		"VBV/CPB Limit",
+		NULL,
+	};
 
 	switch (id) {
 	case V4L2_CID_MPEG_AUDIO_SAMPLING_FREQ:
@@ -611,6 +656,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		return flash_strobe_source;
 	case V4L2_CID_MPEG_VIDEO_HEADER_MODE:
 		return header_mode;
+	case V4L2_CID_MPEG_VIDEO_FRAME_SKIP_MODE:
+		return mpeg_video_frame_skip;
 	case V4L2_CID_MPEG_VIDEO_MULTI_SLICE_MODE:
 		return multi_slice;
 	case V4L2_CID_MPEG_VIDEO_H264_ENTROPY_MODE:
@@ -627,8 +674,14 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		return h264_fp_arrangement_type;
 	case V4L2_CID_MPEG_VIDEO_H264_FMO_MAP_TYPE:
 		return h264_fmo_map_type;
-	case V4L2_CID_MPEG_VIDEO_H264_DECODING_MODE:
-		return h264_decoding_mode;
+	case V4L2_CID_MPEG_VIDEO_H264_DECODE_MODE:
+		return h264_decode_mode;
+	case V4L2_CID_MPEG_VIDEO_H264_START_CODE:
+		return h264_start_code;
+	case V4L2_CID_MPEG_VIDEO_MPEG2_LEVEL:
+		return mpeg_mpeg2_level;
+	case V4L2_CID_MPEG_VIDEO_MPEG2_PROFILE:
+		return mpeg2_profile;
 	case V4L2_CID_MPEG_VIDEO_MPEG4_LEVEL:
 		return mpeg_mpeg4_level;
 	case V4L2_CID_MPEG_VIDEO_MPEG4_PROFILE:
@@ -639,6 +692,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		return vp8_profile;
 	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
 		return vp9_profile;
+	case V4L2_CID_MPEG_VIDEO_VP9_LEVEL:
+		return vp9_level;
 	case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
 		return jpeg_chroma_subsampling;
 	case V4L2_CID_DV_TX_MODE:
@@ -781,6 +836,7 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MPEG_VIDEO_GOP_CLOSURE:	return "Video GOP Closure";
 	case V4L2_CID_MPEG_VIDEO_PULLDOWN:	return "Video Pulldown";
 	case V4L2_CID_MPEG_VIDEO_BITRATE_MODE:	return "Video Bitrate Mode";
+	case V4L2_CID_MPEG_VIDEO_CONSTANT_QUALITY:	return "Constant Quality";
 	case V4L2_CID_MPEG_VIDEO_BITRATE:	return "Video Bitrate";
 	case V4L2_CID_MPEG_VIDEO_BITRATE_PEAK:	return "Video Peak Bitrate";
 	case V4L2_CID_MPEG_VIDEO_TEMPORAL_DECIMATION: return "Video Temporal Decimation";
@@ -793,6 +849,7 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MPEG_VIDEO_MB_RC_ENABLE:			return "H264 MB Level Rate Control";
 	case V4L2_CID_MPEG_VIDEO_HEADER_MODE:			return "Sequence Header Mode";
 	case V4L2_CID_MPEG_VIDEO_MAX_REF_PIC:			return "Max Number of Reference Pics";
+	case V4L2_CID_MPEG_VIDEO_FRAME_SKIP_MODE:		return "Frame Skip Mode";
 	case V4L2_CID_MPEG_VIDEO_H263_I_FRAME_QP:		return "H263 I-Frame QP Value";
 	case V4L2_CID_MPEG_VIDEO_H263_P_FRAME_QP:		return "H263 P-Frame QP Value";
 	case V4L2_CID_MPEG_VIDEO_H263_B_FRAME_QP:		return "H263 B-Frame QP Value";
@@ -844,7 +901,10 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX:		return "H264 Scaling Matrix";
 	case V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS:		return "H264 Slice Parameters";
 	case V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS:		return "H264 Decode Parameters";
-	case V4L2_CID_MPEG_VIDEO_H264_DECODING_MODE:		return "H264 Decoding Mode";
+	case V4L2_CID_MPEG_VIDEO_H264_DECODE_MODE:		return "H264 Decode Mode";
+	case V4L2_CID_MPEG_VIDEO_H264_START_CODE:		return "H264 Start Code";
+	case V4L2_CID_MPEG_VIDEO_MPEG2_LEVEL:			return "MPEG2 Level";
+	case V4L2_CID_MPEG_VIDEO_MPEG2_PROFILE:			return "MPEG2 Profile";
 	case V4L2_CID_MPEG_VIDEO_MPEG4_I_FRAME_QP:		return "MPEG4 I-Frame QP Value";
 	case V4L2_CID_MPEG_VIDEO_MPEG4_P_FRAME_QP:		return "MPEG4 P-Frame QP Value";
 	case V4L2_CID_MPEG_VIDEO_MPEG4_B_FRAME_QP:		return "MPEG4 B-Frame QP Value";
@@ -866,6 +926,9 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME:		return "Force Key Frame";
 	case V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS:		return "MPEG-2 Slice Parameters";
 	case V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION:		return "MPEG-2 Quantization Matrices";
+	case V4L2_CID_MPEG_VIDEO_FWHT_PARAMS:			return "FWHT Stateless Parameters";
+	case V4L2_CID_FWHT_I_FRAME_QP:				return "FWHT I-Frame QP Value";
+	case V4L2_CID_FWHT_P_FRAME_QP:				return "FWHT P-Frame QP Value";
 
 	/* VPX controls */
 	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		return "VPX Number of Partitions";
@@ -881,6 +944,7 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
 	case V4L2_CID_MPEG_VIDEO_VP8_PROFILE:			return "VP8 Profile";
 	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:			return "VP9 Profile";
+	case V4L2_CID_MPEG_VIDEO_VP9_LEVEL:			return "VP9 Level";
 	case V4L2_CID_MPEG_VIDEO_VP8_FRAME_HEADER:		return "VP8 Frame Header";
 
 	/* HEVC controls */
@@ -1200,6 +1264,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_FLASH_LED_MODE:
 	case V4L2_CID_FLASH_STROBE_SOURCE:
 	case V4L2_CID_MPEG_VIDEO_HEADER_MODE:
+	case V4L2_CID_MPEG_VIDEO_FRAME_SKIP_MODE:
 	case V4L2_CID_MPEG_VIDEO_MULTI_SLICE_MODE:
 	case V4L2_CID_MPEG_VIDEO_H264_ENTROPY_MODE:
 	case V4L2_CID_MPEG_VIDEO_H264_LEVEL:
@@ -1208,7 +1273,10 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_MPEG_VIDEO_H264_VUI_SAR_IDC:
 	case V4L2_CID_MPEG_VIDEO_H264_SEI_FP_ARRANGEMENT_TYPE:
 	case V4L2_CID_MPEG_VIDEO_H264_FMO_MAP_TYPE:
-	case V4L2_CID_MPEG_VIDEO_H264_DECODING_MODE:
+	case V4L2_CID_MPEG_VIDEO_H264_DECODE_MODE:
+	case V4L2_CID_MPEG_VIDEO_H264_START_CODE:
+	case V4L2_CID_MPEG_VIDEO_MPEG2_LEVEL:
+	case V4L2_CID_MPEG_VIDEO_MPEG2_PROFILE:
 	case V4L2_CID_MPEG_VIDEO_MPEG4_LEVEL:
 	case V4L2_CID_MPEG_VIDEO_MPEG4_PROFILE:
 	case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
@@ -1226,6 +1294,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
 	case V4L2_CID_MPEG_VIDEO_VP8_PROFILE:
 	case V4L2_CID_MPEG_VIDEO_VP9_PROFILE:
+	case V4L2_CID_MPEG_VIDEO_VP9_LEVEL:
 	case V4L2_CID_DETECT_MD_MODE:
 	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
 	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
@@ -1322,6 +1391,9 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 		break;
 	case V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION:
 		*type = V4L2_CTRL_TYPE_MPEG2_QUANTIZATION;
+		break;
+	case V4L2_CID_MPEG_VIDEO_FWHT_PARAMS:
+		*type = V4L2_CTRL_TYPE_FWHT_PARAMS;
 		break;
 	case V4L2_CID_MPEG_VIDEO_H264_SPS:
 		*type = V4L2_CTRL_TYPE_H264_SPS;
@@ -1627,8 +1699,12 @@ static void std_log(const struct v4l2_ctrl *ctrl)
 /* Validate a new control */
 
 #define zero_padding(s) \
-	memset(&s.padding, 0, sizeof(s.padding))
+	memset(&(s).padding, 0, sizeof((s).padding))
 
+/*
+ * Compound controls validation requires setting unused fields/flags to zero
+ * in order to properly detect unchanged controls with std_equal's memcmp.
+ */
 static int std_validate_compound(const struct v4l2_ctrl *ctrl, u32 idx,
 				 union v4l2_ctrl_ptr ptr)
 {
@@ -1680,6 +1756,9 @@ static int std_validate_compound(const struct v4l2_ctrl *ctrl, u32 idx,
 		break;
 
 	case V4L2_CTRL_TYPE_MPEG2_QUANTIZATION:
+		break;
+
+	case V4L2_CTRL_TYPE_FWHT_PARAMS:
 		break;
 
 	case V4L2_CTRL_TYPE_H264_SPS:
@@ -1754,7 +1833,7 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
 	case V4L2_CTRL_TYPE_INTEGER_MENU:
 		if (ptr.p_s32[idx] < ctrl->minimum || ptr.p_s32[idx] > ctrl->maximum)
 			return -ERANGE;
-		if (ctrl->menu_skip_mask & (1 << ptr.p_s32[idx]))
+		if (ctrl->menu_skip_mask & (1ULL << ptr.p_s32[idx]))
 			return -EINVAL;
 		if (ctrl->type == V4L2_CTRL_TYPE_MENU &&
 		    ctrl->qmenu[ptr.p_s32[idx]][0] == '\0')
@@ -1777,10 +1856,6 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
 			return -ERANGE;
 		if ((len - (u32)ctrl->minimum) % (u32)ctrl->step)
 			return -ERANGE;
-		return 0;
-
-	/* FIXME:just return 0 for now */
-	case V4L2_CTRL_TYPE_PRIVATE:
 		return 0;
 
 	default:
@@ -2363,6 +2438,9 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
 	case V4L2_CTRL_TYPE_MPEG2_QUANTIZATION:
 		elem_size = sizeof(struct v4l2_ctrl_mpeg2_quantization);
 		break;
+	case V4L2_CTRL_TYPE_FWHT_PARAMS:
+		elem_size = sizeof(struct v4l2_ctrl_fwht_params);
+		break;
 	case V4L2_CTRL_TYPE_H264_SPS:
 		elem_size = sizeof(struct v4l2_ctrl_h264_sps);
 		break;
@@ -2759,20 +2837,15 @@ void v4l2_ctrl_activate(struct v4l2_ctrl *ctrl, bool active)
 }
 EXPORT_SYMBOL(v4l2_ctrl_activate);
 
-/* Grab/ungrab a control.
-   Typically used when streaming starts and you want to grab controls,
-   preventing the user from changing them.
-
-   Just call this and the framework will block any attempts to change
-   these controls. */
-void v4l2_ctrl_grab(struct v4l2_ctrl *ctrl, bool grabbed)
+void __v4l2_ctrl_grab(struct v4l2_ctrl *ctrl, bool grabbed)
 {
 	bool old;
 
 	if (ctrl == NULL)
 		return;
 
-	v4l2_ctrl_lock(ctrl);
+	lockdep_assert_held(ctrl->handler->lock);
+
 	if (grabbed)
 		/* set V4L2_CTRL_FLAG_GRABBED */
 		old = test_and_set_bit(1, &ctrl->flags);
@@ -2781,9 +2854,8 @@ void v4l2_ctrl_grab(struct v4l2_ctrl *ctrl, bool grabbed)
 		old = test_and_clear_bit(1, &ctrl->flags);
 	if (old != grabbed)
 		send_event(NULL, ctrl, V4L2_EVENT_CTRL_CH_FLAGS);
-	v4l2_ctrl_unlock(ctrl);
 }
-EXPORT_SYMBOL(v4l2_ctrl_grab);
+EXPORT_SYMBOL(__v4l2_ctrl_grab);
 
 /* Log the control name and value */
 static void log_ctrl(const struct v4l2_ctrl *ctrl,
@@ -3055,7 +3127,7 @@ int v4l2_querymenu(struct v4l2_ctrl_handler *hdl, struct v4l2_querymenu *qm)
 		return -EINVAL;
 
 	/* Use mask to see if this menu item should be skipped */
-	if (ctrl->menu_skip_mask & (1 << i))
+	if (ctrl->menu_skip_mask & (1ULL << i))
 		return -EINVAL;
 	/* Empty menu items should also be skipped */
 	if (ctrl->type == V4L2_CTRL_TYPE_MENU) {
@@ -3261,6 +3333,7 @@ static int v4l2_ctrl_request_bind(struct media_request *req,
 static int prepare_ext_ctrls(struct v4l2_ctrl_handler *hdl,
 			     struct v4l2_ext_controls *cs,
 			     struct v4l2_ctrl_helper *helpers,
+			     struct video_device *vdev,
 			     bool get)
 {
 	struct v4l2_ctrl_helper *h;
@@ -3278,20 +3351,31 @@ static int prepare_ext_ctrls(struct v4l2_ctrl_handler *hdl,
 		if (cs->which &&
 		    cs->which != V4L2_CTRL_WHICH_DEF_VAL &&
 		    cs->which != V4L2_CTRL_WHICH_REQUEST_VAL &&
-		    V4L2_CTRL_ID2WHICH(id) != cs->which)
+		    V4L2_CTRL_ID2WHICH(id) != cs->which) {
+			dprintk(vdev,
+				"invalid which 0x%x or control id 0x%x\n",
+				cs->which, id);
 			return -EINVAL;
+		}
 
 		/* Old-style private controls are not allowed for
 		   extended controls */
-		if (id >= V4L2_CID_PRIVATE_BASE)
+		if (id >= V4L2_CID_PRIVATE_BASE) {
+			dprintk(vdev,
+				"old-style private controls not allowed\n");
 			return -EINVAL;
+		}
 		ref = find_ref_lock(hdl, id);
-		if (ref == NULL)
+		if (ref == NULL) {
+			dprintk(vdev, "cannot find control id 0x%x\n", id);
 			return -EINVAL;
+		}
 		h->ref = ref;
 		ctrl = ref->ctrl;
-		if (ctrl->flags & V4L2_CTRL_FLAG_DISABLED)
+		if (ctrl->flags & V4L2_CTRL_FLAG_DISABLED) {
+			dprintk(vdev, "control id 0x%x is disabled\n", id);
 			return -EINVAL;
+		}
 
 		if (ctrl->cluster[0]->ncontrols > 1)
 			have_clusters = true;
@@ -3301,10 +3385,17 @@ static int prepare_ext_ctrls(struct v4l2_ctrl_handler *hdl,
 			unsigned tot_size = ctrl->elems * ctrl->elem_size;
 
 			if (c->size < tot_size) {
+				/*
+				 * In the get case the application first
+				 * queries to obtain the size of the control.
+				 */
 				if (get) {
 					c->size = tot_size;
 					return -ENOSPC;
 				}
+				dprintk(vdev,
+					"pointer control id 0x%x size too small, %d bytes but %d bytes needed\n",
+					id, c->size, tot_size);
 				return -EFAULT;
 			}
 			c->size = tot_size;
@@ -3365,7 +3456,8 @@ static int class_check(struct v4l2_ctrl_handler *hdl, u32 which)
 
 /* Get extended controls. Allocates the helpers array if needed. */
 static int v4l2_g_ext_ctrls_common(struct v4l2_ctrl_handler *hdl,
-				   struct v4l2_ext_controls *cs)
+				   struct v4l2_ext_controls *cs,
+				   struct video_device *vdev)
 {
 	struct v4l2_ctrl_helper helper[4];
 	struct v4l2_ctrl_helper *helpers = helper;
@@ -3391,7 +3483,7 @@ static int v4l2_g_ext_ctrls_common(struct v4l2_ctrl_handler *hdl,
 			return -ENOMEM;
 	}
 
-	ret = prepare_ext_ctrls(hdl, cs, helpers, true);
+	ret = prepare_ext_ctrls(hdl, cs, helpers, vdev, true);
 	cs->error_idx = cs->count;
 
 	for (i = 0; !ret && i < cs->count; i++)
@@ -3484,8 +3576,8 @@ v4l2_ctrls_find_req_obj(struct v4l2_ctrl_handler *hdl,
 	return obj;
 }
 
-int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct media_device *mdev,
-		     struct v4l2_ext_controls *cs)
+int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct video_device *vdev,
+		     struct media_device *mdev, struct v4l2_ext_controls *cs)
 {
 	struct media_request_object *obj = NULL;
 	struct media_request *req = NULL;
@@ -3521,7 +3613,7 @@ int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct media_device *mdev,
 				   req_obj);
 	}
 
-	ret = v4l2_g_ext_ctrls_common(hdl, cs);
+	ret = v4l2_g_ext_ctrls_common(hdl, cs, vdev);
 
 	if (obj) {
 		media_request_unlock_for_access(req);
@@ -3664,7 +3756,9 @@ static int try_or_set_cluster(struct v4l2_fh *fh, struct v4l2_ctrl *master,
 
 /* Validate controls. */
 static int validate_ctrls(struct v4l2_ext_controls *cs,
-			  struct v4l2_ctrl_helper *helpers, bool set)
+			  struct v4l2_ctrl_helper *helpers,
+			  struct video_device *vdev,
+			  bool set)
 {
 	unsigned i;
 	int ret = 0;
@@ -3676,16 +3770,24 @@ static int validate_ctrls(struct v4l2_ext_controls *cs,
 
 		cs->error_idx = i;
 
-		if (ctrl->flags & V4L2_CTRL_FLAG_READ_ONLY)
+		if (ctrl->flags & V4L2_CTRL_FLAG_READ_ONLY) {
+			dprintk(vdev,
+				"control id 0x%x is read-only\n",
+				ctrl->id);
 			return -EACCES;
+		}
 		/* This test is also done in try_set_control_cluster() which
 		   is called in atomic context, so that has the final say,
 		   but it makes sense to do an up-front check as well. Once
 		   an error occurs in try_set_control_cluster() some other
 		   controls may have been set already and we want to do a
 		   best-effort to avoid that. */
-		if (set && (ctrl->flags & V4L2_CTRL_FLAG_GRABBED))
+		if (set && (ctrl->flags & V4L2_CTRL_FLAG_GRABBED)) {
+			dprintk(vdev,
+				"control id 0x%x is grabbed, cannot set\n",
+				ctrl->id);
 			return -EBUSY;
+		}
 		/*
 		 * Skip validation for now if the payload needs to be copied
 		 * from userspace into kernelspace. We'll validate those later.
@@ -3720,7 +3822,8 @@ static void update_from_auto_cluster(struct v4l2_ctrl *master)
 /* Try or try-and-set controls */
 static int try_set_ext_ctrls_common(struct v4l2_fh *fh,
 				    struct v4l2_ctrl_handler *hdl,
-				    struct v4l2_ext_controls *cs, bool set)
+				    struct v4l2_ext_controls *cs,
+				    struct video_device *vdev, bool set)
 {
 	struct v4l2_ctrl_helper helper[4];
 	struct v4l2_ctrl_helper *helpers = helper;
@@ -3730,13 +3833,19 @@ static int try_set_ext_ctrls_common(struct v4l2_fh *fh,
 	cs->error_idx = cs->count;
 
 	/* Default value cannot be changed */
-	if (cs->which == V4L2_CTRL_WHICH_DEF_VAL)
+	if (cs->which == V4L2_CTRL_WHICH_DEF_VAL) {
+		dprintk(vdev, "%s: cannot change default value\n",
+			video_device_node_name(vdev));
 		return -EINVAL;
+	}
 
 	cs->which = V4L2_CTRL_ID2WHICH(cs->which);
 
-	if (hdl == NULL)
+	if (hdl == NULL) {
+		dprintk(vdev, "%s: invalid null control handler\n",
+			video_device_node_name(vdev));
 		return -EINVAL;
+	}
 
 	if (cs->count == 0)
 		return class_check(hdl, cs->which);
@@ -3747,9 +3856,9 @@ static int try_set_ext_ctrls_common(struct v4l2_fh *fh,
 		if (!helpers)
 			return -ENOMEM;
 	}
-	ret = prepare_ext_ctrls(hdl, cs, helpers, false);
+	ret = prepare_ext_ctrls(hdl, cs, helpers, vdev, false);
 	if (!ret)
-		ret = validate_ctrls(cs, helpers, set);
+		ret = validate_ctrls(cs, helpers, vdev, set);
 	if (ret && set)
 		cs->error_idx = cs->count;
 	for (i = 0; !ret && i < cs->count; i++) {
@@ -3834,7 +3943,9 @@ static int try_set_ext_ctrls_common(struct v4l2_fh *fh,
 }
 
 static int try_set_ext_ctrls(struct v4l2_fh *fh,
-			     struct v4l2_ctrl_handler *hdl, struct media_device *mdev,
+			     struct v4l2_ctrl_handler *hdl,
+			     struct video_device *vdev,
+			     struct media_device *mdev,
 			     struct v4l2_ext_controls *cs, bool set)
 {
 	struct media_request_object *obj = NULL;
@@ -3842,21 +3953,39 @@ static int try_set_ext_ctrls(struct v4l2_fh *fh,
 	int ret;
 
 	if (cs->which == V4L2_CTRL_WHICH_REQUEST_VAL) {
-		if (!mdev || cs->request_fd < 0)
+		if (!mdev) {
+			dprintk(vdev, "%s: missing media device\n",
+				video_device_node_name(vdev));
 			return -EINVAL;
+		}
+
+		if (cs->request_fd < 0) {
+			dprintk(vdev, "%s: invalid request fd %d\n",
+				video_device_node_name(vdev), cs->request_fd);
+			return -EINVAL;
+		}
 
 		req = media_request_get_by_fd(mdev, cs->request_fd);
-		if (IS_ERR(req))
+		if (IS_ERR(req)) {
+			dprintk(vdev, "%s: cannot find request fd %d\n",
+				video_device_node_name(vdev), cs->request_fd);
 			return PTR_ERR(req);
+		}
 
 		ret = media_request_lock_for_update(req);
 		if (ret) {
+			dprintk(vdev, "%s: cannot lock request fd %d\n",
+				video_device_node_name(vdev), cs->request_fd);
 			media_request_put(req);
 			return ret;
 		}
 
 		obj = v4l2_ctrls_find_req_obj(hdl, req, set);
 		if (IS_ERR(obj)) {
+			dprintk(vdev,
+				"%s: cannot find request object for request fd %d\n",
+				video_device_node_name(vdev),
+				cs->request_fd);
 			media_request_unlock_for_update(req);
 			media_request_put(req);
 			return PTR_ERR(obj);
@@ -3865,7 +3994,11 @@ static int try_set_ext_ctrls(struct v4l2_fh *fh,
 				   req_obj);
 	}
 
-	ret = try_set_ext_ctrls_common(fh, hdl, cs, set);
+	ret = try_set_ext_ctrls_common(fh, hdl, cs, vdev, set);
+	if (ret)
+		dprintk(vdev,
+			"%s: try_set_ext_ctrls_common failed (%d)\n",
+			video_device_node_name(vdev), ret);
 
 	if (obj) {
 		media_request_unlock_for_update(req);
@@ -3876,17 +4009,22 @@ static int try_set_ext_ctrls(struct v4l2_fh *fh,
 	return ret;
 }
 
-int v4l2_try_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct media_device *mdev,
+int v4l2_try_ext_ctrls(struct v4l2_ctrl_handler *hdl,
+		       struct video_device *vdev,
+		       struct media_device *mdev,
 		       struct v4l2_ext_controls *cs)
 {
-	return try_set_ext_ctrls(NULL, hdl, mdev, cs, false);
+	return try_set_ext_ctrls(NULL, hdl, vdev, mdev, cs, false);
 }
 EXPORT_SYMBOL(v4l2_try_ext_ctrls);
 
-int v4l2_s_ext_ctrls(struct v4l2_fh *fh, struct v4l2_ctrl_handler *hdl,
-		     struct media_device *mdev, struct v4l2_ext_controls *cs)
+int v4l2_s_ext_ctrls(struct v4l2_fh *fh,
+		     struct v4l2_ctrl_handler *hdl,
+		     struct video_device *vdev,
+		     struct media_device *mdev,
+		     struct v4l2_ext_controls *cs)
 {
-	return try_set_ext_ctrls(fh, hdl, mdev, cs, true);
+	return try_set_ext_ctrls(fh, hdl, vdev, mdev, cs, true);
 }
 EXPORT_SYMBOL(v4l2_s_ext_ctrls);
 

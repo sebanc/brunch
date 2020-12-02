@@ -40,7 +40,6 @@ struct scsi_eh_save {
 	unsigned char prot_op;
 	unsigned char *cmnd;
 	struct scsi_data_buffer sdb;
-	struct request *next_rq;
 	/* new command support */
 	unsigned char eh_cmnd[BLK_MAX_CDB];
 	struct scatterlist sense_sgl;

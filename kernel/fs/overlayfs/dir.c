@@ -1,10 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *
  * Copyright (C) 2011 Novell Inc.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published by
- * the Free Software Foundation.
  */
 
 #include <linux/fs.h>
@@ -21,7 +18,7 @@
 
 static unsigned short ovl_redirect_max = 256;
 module_param_named(redirect_max, ovl_redirect_max, ushort, 0644);
-MODULE_PARM_DESC(ovl_redirect_max,
+MODULE_PARM_DESC(redirect_max,
 		 "Maximum length of absolute redirect xattr value");
 
 static int ovl_set_redirect(struct dentry *dentry, bool samedir);
@@ -414,13 +411,12 @@ static int ovl_set_upper_acl(struct dentry *upperdentry, const char *name,
 	if (!IS_ENABLED(CONFIG_FS_POSIX_ACL) || !acl)
 		return 0;
 
-	size = posix_acl_to_xattr(NULL, acl, NULL, 0);
+	size = posix_acl_xattr_size(acl->a_count);
 	buffer = kmalloc(size, GFP_KERNEL);
 	if (!buffer)
 		return -ENOMEM;
 
-	size = posix_acl_to_xattr(&init_user_ns, acl, buffer, size);
-	err = size;
+	err = posix_acl_to_xattr(&init_user_ns, acl, buffer, size);
 	if (err < 0)
 		goto out_free;
 
@@ -540,7 +536,7 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 			      struct ovl_cattr *attr, bool origin)
 {
 	int err;
-	const struct cred *old_cred;
+	const struct cred *old_cred, *hold_cred = NULL;
 	struct cred *override_cred;
 	struct dentry *parent = dentry->d_parent;
 
@@ -567,14 +563,15 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 		override_cred->fsgid = inode->i_gid;
 		if (!attr->hardlink) {
 			err = security_dentry_create_files_as(dentry,
-					attr->mode, &dentry->d_name, old_cred,
+					attr->mode, &dentry->d_name,
+					old_cred ? old_cred : current_cred(),
 					override_cred);
 			if (err) {
 				put_cred(override_cred);
 				goto out_revert_creds;
 			}
 		}
-		put_cred(override_creds(override_cred));
+		hold_cred = override_creds(override_cred);
 		put_cred(override_cred);
 
 		if (!ovl_dentry_is_whiteout(dentry))
@@ -583,7 +580,9 @@ static int ovl_create_or_link(struct dentry *dentry, struct inode *inode,
 			err = ovl_create_over_whiteout(dentry, inode, attr);
 	}
 out_revert_creds:
-	revert_creds(old_cred);
+	ovl_revert_creds(dentry->d_sb, old_cred ?: hold_cred);
+	if (old_cred && hold_cred)
+		put_cred(hold_cred);
 	return err;
 }
 
@@ -659,7 +658,7 @@ static int ovl_set_link_redirect(struct dentry *dentry)
 
 	old_cred = ovl_override_creds(dentry->d_sb);
 	err = ovl_set_redirect(dentry, false);
-	revert_creds(old_cred);
+	ovl_revert_creds(dentry->d_sb, old_cred);
 
 	return err;
 }
@@ -668,7 +667,6 @@ static int ovl_link(struct dentry *old, struct inode *newdir,
 		    struct dentry *new)
 {
 	int err;
-	bool locked = false;
 	struct inode *inode;
 
 	err = ovl_want_write(old);
@@ -689,7 +687,7 @@ static int ovl_link(struct dentry *old, struct inode *newdir,
 			goto out_drop_write;
 	}
 
-	err = ovl_nlink_start(old, &locked);
+	err = ovl_nlink_start(old);
 	if (err)
 		goto out_drop_write;
 
@@ -702,7 +700,7 @@ static int ovl_link(struct dentry *old, struct inode *newdir,
 	if (err)
 		iput(inode);
 
-	ovl_nlink_end(old, locked);
+	ovl_nlink_end(old);
 out_drop_write:
 	ovl_drop_write(old);
 out:
@@ -827,7 +825,6 @@ static bool ovl_pure_upper(struct dentry *dentry)
 static int ovl_do_remove(struct dentry *dentry, bool is_dir)
 {
 	int err;
-	bool locked = false;
 	const struct cred *old_cred;
 	struct dentry *upperdentry;
 	bool lower_positive = ovl_lower_positive(dentry);
@@ -848,7 +845,7 @@ static int ovl_do_remove(struct dentry *dentry, bool is_dir)
 	if (err)
 		goto out_drop_write;
 
-	err = ovl_nlink_start(dentry, &locked);
+	err = ovl_nlink_start(dentry);
 	if (err)
 		goto out_drop_write;
 
@@ -857,14 +854,14 @@ static int ovl_do_remove(struct dentry *dentry, bool is_dir)
 		err = ovl_remove_upper(dentry, is_dir, &list);
 	else
 		err = ovl_remove_and_whiteout(dentry, &list);
-	revert_creds(old_cred);
+	ovl_revert_creds(dentry->d_sb, old_cred);
 	if (!err) {
 		if (is_dir)
 			clear_nlink(dentry->d_inode);
 		else
 			drop_nlink(dentry->d_inode);
 	}
-	ovl_nlink_end(dentry, locked);
+	ovl_nlink_end(dentry);
 
 	/*
 	 * Copy ctime
@@ -1028,7 +1025,6 @@ static int ovl_rename(struct inode *olddir, struct dentry *old,
 		      unsigned int flags)
 {
 	int err;
-	bool locked = false;
 	struct dentry *old_upperdir;
 	struct dentry *new_upperdir;
 	struct dentry *olddentry;
@@ -1037,6 +1033,7 @@ static int ovl_rename(struct inode *olddir, struct dentry *old,
 	bool old_opaque;
 	bool new_opaque;
 	bool cleanup_whiteout = false;
+	bool update_nlink = false;
 	bool overwrite = !(flags & RENAME_EXCHANGE);
 	bool is_dir = d_is_dir(old);
 	bool new_is_dir = d_is_dir(new);
@@ -1094,10 +1091,12 @@ static int ovl_rename(struct inode *olddir, struct dentry *old,
 		err = ovl_copy_up(new);
 		if (err)
 			goto out_drop_write;
-	} else {
-		err = ovl_nlink_start(new, &locked);
+	} else if (d_inode(new)) {
+		err = ovl_nlink_start(new);
 		if (err)
 			goto out_drop_write;
+
+		update_nlink = true;
 	}
 
 	old_cred = ovl_override_creds(old->d_sb);
@@ -1225,8 +1224,9 @@ out_dput_old:
 out_unlock:
 	unlock_rename(new_upperdir, old_upperdir);
 out_revert_creds:
-	revert_creds(old_cred);
-	ovl_nlink_end(new, locked);
+	ovl_revert_creds(old->d_sb, old_cred);
+	if (update_nlink)
+		ovl_nlink_end(new);
 out_drop_write:
 	ovl_drop_write(old);
 out:

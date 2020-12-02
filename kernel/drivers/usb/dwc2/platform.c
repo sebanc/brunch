@@ -230,9 +230,6 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
 
 	reset_control_deassert(hsotg->reset_ecc);
 
-	/* Set default UTMI width */
-	hsotg->phyif = GUSBCFG_PHYIF16;
-
 	/*
 	 * Attempt to find a generic PHY, then look for an old style
 	 * USB PHY and then fall back to pdata
@@ -274,20 +271,11 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
 
 	hsotg->plat = dev_get_platdata(hsotg->dev);
 
-	if (hsotg->phy) {
-		/*
-		 * If using the generic PHY framework, check if the PHY bus
-		 * width is 8-bit and set the phyif appropriately.
-		 */
-		if (phy_get_bus_width(hsotg->phy) == 8)
-			hsotg->phyif = GUSBCFG_PHYIF8;
-	}
-
 	/* Clock */
-	hsotg->clk = devm_clk_get(hsotg->dev, "otg");
+	hsotg->clk = devm_clk_get_optional(hsotg->dev, "otg");
 	if (IS_ERR(hsotg->clk)) {
-		hsotg->clk = NULL;
-		dev_dbg(hsotg->dev, "cannot get otg clock\n");
+		dev_err(hsotg->dev, "cannot get otg clock\n");
+		return PTR_ERR(hsotg->clk);
 	}
 
 	/* Regulators */
@@ -420,10 +408,8 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	spin_lock_init(&hsotg->lock);
 
 	hsotg->irq = platform_get_irq(dev, 0);
-	if (hsotg->irq < 0) {
-		dev_err(&dev->dev, "missing IRQ resource\n");
+	if (hsotg->irq < 0)
 		return hsotg->irq;
-	}
 
 	dev_dbg(hsotg->dev, "registering common handler for irq%d\n",
 		hsotg->irq);

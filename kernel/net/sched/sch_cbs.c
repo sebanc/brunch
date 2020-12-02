@@ -1,13 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * net/sched/sch_cbs.c	Credit Based Shaper
  *
- *		This program is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
  * Authors:	Vinicius Costa Gomes <vinicius.gomes@intel.com>
- *
  */
 
 /* Credit Based Shaper (CBS)
@@ -93,13 +88,14 @@ static int cbs_child_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 			     struct Qdisc *child,
 			     struct sk_buff **to_free)
 {
+	unsigned int len = qdisc_pkt_len(skb);
 	int err;
 
 	err = child->ops->enqueue(skb, child, to_free);
 	if (err != NET_XMIT_SUCCESS)
 		return err;
 
-	qdisc_qstats_backlog_inc(sch, skb);
+	sch->qstats.backlog += len;
 	sch->q.qlen++;
 
 	return NET_XMIT_SUCCESS;
@@ -313,7 +309,7 @@ static void cbs_set_port_rate(struct net_device *dev, struct cbs_sched_data *q)
 {
 	struct ethtool_link_ksettings ecmd;
 	int speed = SPEED_10;
-	int port_rate = -1;
+	int port_rate;
 	int err;
 
 	err = __ethtool_get_link_ksettings(dev, &ecmd);
@@ -370,7 +366,8 @@ static int cbs_change(struct Qdisc *sch, struct nlattr *opt,
 	struct tc_cbs_qopt *qopt;
 	int err;
 
-	err = nla_parse_nested(tb, TCA_CBS_MAX, opt, cbs_policy, extack);
+	err = nla_parse_nested_deprecated(tb, TCA_CBS_MAX, opt, cbs_policy,
+					  extack);
 	if (err < 0)
 		return err;
 
@@ -405,7 +402,6 @@ static int cbs_init(struct Qdisc *sch, struct nlattr *opt,
 {
 	struct cbs_sched_data *q = qdisc_priv(sch);
 	struct net_device *dev = qdisc_dev(sch);
-	int err;
 
 	if (!opt) {
 		NL_SET_ERR_MSG(extack, "Missing CBS qdisc options  which are mandatory");
@@ -417,6 +413,10 @@ static int cbs_init(struct Qdisc *sch, struct nlattr *opt,
 	if (!q->qdisc)
 		return -ENOMEM;
 
+	spin_lock(&cbs_list_lock);
+	list_add(&q->cbs_list, &cbs_list);
+	spin_unlock(&cbs_list_lock);
+
 	qdisc_hash_add(q->qdisc, false);
 
 	q->queue = sch->dev_queue - netdev_get_tx_queue(dev, 0);
@@ -426,17 +426,7 @@ static int cbs_init(struct Qdisc *sch, struct nlattr *opt,
 
 	qdisc_watchdog_init(&q->watchdog, sch);
 
-	err = cbs_change(sch, opt, extack);
-	if (err)
-		return err;
-
-	if (!q->offload) {
-		spin_lock(&cbs_list_lock);
-		list_add(&q->cbs_list, &cbs_list);
-		spin_unlock(&cbs_list_lock);
-	}
-
-	return 0;
+	return cbs_change(sch, opt, extack);
 }
 
 static void cbs_destroy(struct Qdisc *sch)
@@ -444,15 +434,18 @@ static void cbs_destroy(struct Qdisc *sch)
 	struct cbs_sched_data *q = qdisc_priv(sch);
 	struct net_device *dev = qdisc_dev(sch);
 
-	spin_lock(&cbs_list_lock);
-	list_del(&q->cbs_list);
-	spin_unlock(&cbs_list_lock);
+	/* Nothing to do if we couldn't create the underlying qdisc */
+	if (!q->qdisc)
+		return;
 
 	qdisc_watchdog_cancel(&q->watchdog);
 	cbs_disable_offload(dev, q);
 
-	if (q->qdisc)
-		qdisc_destroy(q->qdisc);
+	spin_lock(&cbs_list_lock);
+	list_del(&q->cbs_list);
+	spin_unlock(&cbs_list_lock);
+
+	qdisc_put(q->qdisc);
 }
 
 static int cbs_dump(struct Qdisc *sch, struct sk_buff *skb)
@@ -461,7 +454,7 @@ static int cbs_dump(struct Qdisc *sch, struct sk_buff *skb)
 	struct tc_cbs_qopt opt = { };
 	struct nlattr *nest;
 
-	nest = nla_nest_start(skb, TCA_OPTIONS);
+	nest = nla_nest_start_noflag(skb, TCA_OPTIONS);
 	if (!nest)
 		goto nla_put_failure;
 

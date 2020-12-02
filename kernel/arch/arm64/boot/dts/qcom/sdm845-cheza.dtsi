@@ -165,6 +165,7 @@
 /delete-node/ &venus_mem;
 /delete-node/ &cdsp_mem;
 /delete-node/ &cdsp_pas;
+/delete-node/ &gpu_mem;
 
 /* Increase the size from 120 MB to 128 MB */
 &mpss_region {
@@ -184,7 +185,6 @@
 		};
 	};
 };
-
 
 &qspi {
 	status = "okay";
@@ -548,6 +548,8 @@ edp_brij_i2c: &i2c3 {
 		clocks = <&rpmhcc RPMH_LN_BB_CLK2>;
 		clock-names = "refclk";
 
+		no-hpd;
+
 		ports {
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -614,6 +616,11 @@ ap_ts_i2c: &i2c14 {
 	};
 };
 
+&ipa {
+	status = "okay";
+	modem-init;
+};
+
 &lpasscc {
 	status = "okay";
 };
@@ -627,8 +634,12 @@ ap_ts_i2c: &i2c14 {
 };
 
 &mss_pil {
-	firmware-name = "qcom/sdm845-mss/google-cheza/mba.mbn",
-			"qcom/sdm845-mss/google-cheza/modem.mdt";
+	iommus = <&apps_smmu 0x781 0x0>,
+		 <&apps_smmu 0x724 0x3>;
+};
+
+&pm8998_pwrkey {
+	status = "disabled";
 };
 
 &qupv3_id_0 {
@@ -653,13 +664,12 @@ ap_ts_i2c: &i2c14 {
 
 &spi0 {
 	status = "okay";
-	spi-max-frequency = <3000000>;  /* TODO: Drop this? */
 };
 
 &spi5 {
 	status = "okay";
-	spi-max-frequency = <800000>; /* TODO: Drop this */
-	cr50@0 {
+
+	tpm@0 {
 		compatible = "google,cr50";
 		reg = <0>;
 		pinctrl-names = "default";
@@ -672,7 +682,6 @@ ap_ts_i2c: &i2c14 {
 
 &spi10 {
 	status = "okay";
-	spi-max-frequency = <3000000>;  /* TODO: Drop this? */
 
 	cros_ec: ec@0 {
 		compatible = "google,cros-ec-spi";
@@ -767,7 +776,7 @@ ap_ts_i2c: &i2c14 {
 	 * All the hardware muxes would allow us to hook things up in different
 	 * ways to some potential benefit for static configurations (you could
 	 * achieve extra USB2 bandwidth by using two different ports for the
-	 * two conenctors or possibly even get USB3 peripheral mode), but in
+	 * two connectors or possibly even get USB3 peripheral mode), but in
 	 * each case you end up forcing to disconnect/reconnect an in-use
 	 * USB session in some cases depending on what you hotplug into the
 	 * other connector.  Thus hardcoding this as peripheral makes sense.
@@ -985,27 +994,27 @@ ap_ts_i2c: &i2c14 {
 };
 
 &pm8998_adc {
-	adc-chan@ADC5_AMUX_THM1_100K_PU {
+	adc-chan@4d {
 		reg = <ADC5_AMUX_THM1_100K_PU>;
 		label = "sdm_temp";
 	};
 
-	adc-chan@ADC5_AMUX_THM2_100K_PU {
+	adc-chan@4e {
 		reg = <ADC5_AMUX_THM2_100K_PU>;
 		label = "quiet_temp";
 	};
 
-	adc-chan@ADC5_AMUX_THM3_100K_PU {
+	adc-chan@4f {
 		reg = <ADC5_AMUX_THM3_100K_PU>;
 		label = "lte_temp_1";
 	};
 
-	adc-chan@ADC5_AMUX_THM4_100K_PU {
+	adc-chan@50 {
 		reg = <ADC5_AMUX_THM4_100K_PU>;
 		label = "lte_temp_2";
 	};
 
-	adc-chan@ADC5_AMUX_THM5_100K_PU {
+	adc-chan@51 {
 		reg = <ADC5_AMUX_THM5_100K_PU>;
 		label = "charger_temp";
 	};
@@ -1344,5 +1353,11 @@ ap_ts_i2c: &i2c14 {
 			drive-strength = <2>;
 			output-high;
 		};
+	};
+};
+
+&venus {
+	video-firmware {
+		iommus = <&apps_smmu 0x10b2 0x0>;
 	};
 };

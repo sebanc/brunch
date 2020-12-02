@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: ((GPL-2.0 WITH Linux-syscall-note) OR BSD-3-Clause) */
+/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-3-Clause) */
 /*
  * This file is provided under a dual BSD/GPLv2 license.  When using or
  * redistributing this file, you may do so under either license.
@@ -84,7 +84,7 @@ struct sof_ipc_stream_params {
 	uint16_t sample_container_bytes;
 
 	uint32_t host_period_bytes;
-	uint16_t no_stream_position; /**< 1 means don't send stream position */
+	uint16_t no_period_irq; /* 1 means period IRQ mode OFF */
 
 	uint16_t reserved[3];
 	uint16_t chmap[SOF_IPC_MAX_CHANNELS];	/**< channel map - SOF_CHMAP_ */

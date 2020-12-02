@@ -43,7 +43,7 @@ void do_page_fault(struct pt_regs *regs)
 
 	int is_write, is_exec;
 	vm_fault_t fault;
-	unsigned int flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
+	unsigned int flags = FAULT_FLAG_DEFAULT;
 
 	code = SEGV_MAPERR;
 
@@ -110,7 +110,7 @@ good_area:
 	 */
 	fault = handle_mm_fault(vma, address, flags);
 
-	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
+	if (fault_signal_pending(fault, regs))
 		return;
 
 	if (unlikely(fault & VM_FAULT_ERROR)) {
@@ -128,7 +128,6 @@ good_area:
 		else
 			current->min_flt++;
 		if (fault & VM_FAULT_RETRY) {
-			flags &= ~FAULT_FLAG_ALLOW_RETRY;
 			flags |= FAULT_FLAG_TRIED;
 
 			 /* No need to up_read(&mm->mmap_sem) as we would
@@ -157,7 +156,7 @@ bad_area:
 	if (user_mode(regs)) {
 		current->thread.bad_vaddr = address;
 		current->thread.error_code = is_write;
-		force_sig_fault(SIGSEGV, code, (void *) address, current);
+		force_sig_fault(SIGSEGV, code, (void *) address);
 		return;
 	}
 	bad_page_fault(regs, address, SIGSEGV);
@@ -182,7 +181,7 @@ do_sigbus:
 	 * or user mode.
 	 */
 	current->thread.bad_vaddr = address;
-	force_sig_fault(SIGBUS, BUS_ADRERR, (void *) address, current);
+	force_sig_fault(SIGBUS, BUS_ADRERR, (void *) address);
 
 	/* Kernel mode? Handle exceptions or die */
 	if (!user_mode(regs))

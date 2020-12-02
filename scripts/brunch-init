@@ -7,6 +7,9 @@ busybox mount -t devtmpfs none /dev
 busybox --install -s
 ln -s /proc/mounts /etc/mtab
 
+if [ ! -z "$brunch_bootsplash" ] && [ -f /bootsplash/"$brunch_bootsplash"/main.png ]; then fbv -f -e /bootsplash/"$brunch_bootsplash"/main.png & fi
+
+haveged -w 1024 -v 1 -F > /dev/kmsg 2>&1 &
 # Wait 10s for block devices to be available by default, this can be overrided by setting "brunch_timeout" value on kernel command line
 if [ ! -z "$brunch_timeout" ]; then
 	sleep "$brunch_timeout"
@@ -14,7 +17,7 @@ else
 	sleep 10
 fi
 
-if [ -e "$img_uuid" ] && [ ! -z "$img_path" ]; then img_part=$(blkid | grep -i "$img_uuid" | awk -F: '{ print $1 }'); fi
+if [ ! -z "$img_uuid" ] && [ ! -z "$img_path" ]; then img_part=$(blkid | grep -i "$img_uuid" | awk -F: '{ print $1 }'); fi
 
 if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 	mkdir /mainroot
@@ -115,10 +118,10 @@ if [ "$rebuild" -eq 1 ]; then
 fi
 
 if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
+	if [ ! -z "$brunch_bootsplash" ] && [ -f /bootsplash/"$brunch_bootsplash"/rebuilding.png ]; then fbv -f -e /bootsplash/"$brunch_bootsplash"/rebuilding.png & fi
 	echo "brunch: rebuilding ChromeOS rootfs, it might take a few minutes..." > /dev/kmsg
 	pv "$partpath"5 > "$partpath"3
-	#printf '\000' | dd of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 2>&1 >/dev/null
-	#dd if=/dev/zero of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 2>&1 >/dev/null
+	if [ ! -z "$brunch_bootsplash" ] && [ -f /bootsplash/"$brunch_bootsplash"/patching.png ]; then fbv -f -e /bootsplash/"$brunch_bootsplash"/patching.png & fi
 	printf '\000' | dd of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 status=none
 	mount "$partpath"3 /system
 	mount -o bind /system/etc /etc
@@ -157,11 +160,20 @@ if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
 	echo "$md5sum" > /firmware/.md5sum
 fi
 
+if [ ! -z "$chromeos_bootsplash" ]; then
+	mount "$partpath"1 /data
+	if [ -d /data/unencrypted/bootsplash/"$chromeos_bootsplash" ]; then
+		mount "$partpath"3 /system
+		cp -r /data/unencrypted/bootsplash/"$chromeos_bootsplash"/* /system/usr/share/chromeos-assets/
+		umount /system
+	fi
+	umount /data
+fi
+
 umount /firmware
 e2fsck -y "$partpath"3
 mount "$partpath"3 /system
-mount -t devtmpfs none /system/dev
-umount /dev
+mount --move /dev /system/dev
 umount /sys
 umount /proc
 

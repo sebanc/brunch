@@ -51,7 +51,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "connection_server.h"
 #include "rgx_fwif_shared.h"
 #include "rgxdebug.h"
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 #include "pvr_notifier.h"
 
 #define MAX_CLIENT_CCB_NAME	30

@@ -1,12 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * Copyright 2009 Paul Mackerras, IBM Corporation.
  * Copyright 2013 Michael Ellerman, IBM Corporation.
  * Copyright 2016 Madhavan Srinivasan, IBM Corporation.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or any later version.
  */
 
 #ifndef _LINUX_POWERPC_PERF_ISA207_COMMON_H_
@@ -133,6 +129,11 @@
 
 #define CNST_SAMPLE_VAL(v)	(((v) & EVENT_SAMPLE_MASK) << 16)
 #define CNST_SAMPLE_MASK	CNST_SAMPLE_VAL(EVENT_SAMPLE_MASK)
+
+#define CNST_CACHE_GROUP_VAL(v)	(((v) & 0xffull) << 55)
+#define CNST_CACHE_GROUP_MASK	CNST_CACHE_GROUP_VAL(0xff)
+#define CNST_CACHE_PMC4_VAL	(1ull << 54)
+#define CNST_CACHE_PMC4_MASK	CNST_CACHE_PMC4_VAL
 
 /*
  * For NC we are counting up to 4 events. This requires three bits, and we need

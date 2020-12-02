@@ -1,13 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *	Bridge netlink control interface
  *
  *	Authors:
  *	Stephen Hemminger		<shemminger@osdl.org>
- *
- *	This program is free software; you can redistribute it and/or
- *	modify it under the terms of the GNU General Public License
- *	as published by the Free Software Foundation; either version
- *	2 of the License, or (at your option) any later version.
  */
 
 #include <linux/kernel.h>
@@ -102,7 +98,7 @@ static size_t br_get_link_af_size_filtered(const struct net_device *dev,
 	size_t vinfo_sz = 0;
 
 	rcu_read_lock();
-	if (br_port_exists(dev)) {
+	if (netif_is_bridge_port(dev)) {
 		p = br_port_get_rcu(dev);
 		vg = nbp_vlan_group_rcu(p);
 	} else if (dev->priv_flags & IFF_EBRIDGE) {
@@ -413,9 +409,9 @@ static int br_fill_ifinfo(struct sk_buff *skb,
 		goto nla_put_failure;
 
 	if (event == RTM_NEWLINK && port) {
-		struct nlattr *nest
-			= nla_nest_start(skb, IFLA_PROTINFO | NLA_F_NESTED);
+		struct nlattr *nest;
 
+		nest = nla_nest_start(skb, IFLA_PROTINFO);
 		if (nest == NULL || br_port_fill_attrs(skb, port) < 0)
 			goto nla_put_failure;
 		nla_nest_end(skb, nest);
@@ -439,7 +435,7 @@ static int br_fill_ifinfo(struct sk_buff *skb,
 			rcu_read_unlock();
 			goto done;
 		}
-		af = nla_nest_start(skb, IFLA_AF_SPEC);
+		af = nla_nest_start_noflag(skb, IFLA_AF_SPEC);
 		if (!af) {
 			rcu_read_unlock();
 			goto nla_put_failure;
@@ -525,7 +521,8 @@ int br_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 }
 
 static int br_vlan_info(struct net_bridge *br, struct net_bridge_port *p,
-			int cmd, struct bridge_vlan_info *vinfo, bool *changed)
+			int cmd, struct bridge_vlan_info *vinfo, bool *changed,
+			struct netlink_ext_ack *extack)
 {
 	bool curr_change;
 	int err = 0;
@@ -537,11 +534,11 @@ static int br_vlan_info(struct net_bridge *br, struct net_bridge_port *p,
 			 * per-VLAN entry as well
 			 */
 			err = nbp_vlan_add(p, vinfo->vid, vinfo->flags,
-					   &curr_change);
+					   &curr_change, extack);
 		} else {
 			vinfo->flags |= BRIDGE_VLAN_INFO_BRENTRY;
 			err = br_vlan_add(br, vinfo->vid, vinfo->flags,
-					  &curr_change);
+					  &curr_change, extack);
 		}
 		if (curr_change)
 			*changed = true;
@@ -568,7 +565,8 @@ static int br_process_vlan_info(struct net_bridge *br,
 				struct net_bridge_port *p, int cmd,
 				struct bridge_vlan_info *vinfo_curr,
 				struct bridge_vlan_info **vinfo_last,
-				bool *changed)
+				bool *changed,
+				struct netlink_ext_ack *extack)
 {
 	if (!vinfo_curr->vid || vinfo_curr->vid >= VLAN_VID_MASK)
 		return -EINVAL;
@@ -598,7 +596,8 @@ static int br_process_vlan_info(struct net_bridge *br,
 		       sizeof(struct bridge_vlan_info));
 		for (v = (*vinfo_last)->vid; v <= vinfo_curr->vid; v++) {
 			tmp_vinfo.vid = v;
-			err = br_vlan_info(br, p, cmd, &tmp_vinfo, changed);
+			err = br_vlan_info(br, p, cmd, &tmp_vinfo, changed,
+					   extack);
 			if (err)
 				break;
 		}
@@ -607,13 +606,14 @@ static int br_process_vlan_info(struct net_bridge *br,
 		return err;
 	}
 
-	return br_vlan_info(br, p, cmd, vinfo_curr, changed);
+	return br_vlan_info(br, p, cmd, vinfo_curr, changed, extack);
 }
 
 static int br_afspec(struct net_bridge *br,
 		     struct net_bridge_port *p,
 		     struct nlattr *af_spec,
-		     int cmd, bool *changed)
+		     int cmd, bool *changed,
+		     struct netlink_ext_ack *extack)
 {
 	struct bridge_vlan_info *vinfo_curr = NULL;
 	struct bridge_vlan_info *vinfo_last = NULL;
@@ -643,7 +643,8 @@ static int br_afspec(struct net_bridge *br,
 				return -EINVAL;
 			vinfo_curr = nla_data(attr);
 			err = br_process_vlan_info(br, p, cmd, vinfo_curr,
-						   &vinfo_last, changed);
+						   &vinfo_last, changed,
+						   extack);
 			if (err)
 				return err;
 			break;
@@ -850,7 +851,8 @@ static int br_setport(struct net_bridge_port *p, struct nlattr *tb[])
 }
 
 /* Change state and parameters on port. */
-int br_setlink(struct net_device *dev, struct nlmsghdr *nlh, u16 flags)
+int br_setlink(struct net_device *dev, struct nlmsghdr *nlh, u16 flags,
+	       struct netlink_ext_ack *extack)
 {
 	struct net_bridge *br = (struct net_bridge *)netdev_priv(dev);
 	struct nlattr *tb[IFLA_BRPORT_MAX + 1];
@@ -874,8 +876,10 @@ int br_setlink(struct net_device *dev, struct nlmsghdr *nlh, u16 flags)
 
 	if (p && protinfo) {
 		if (protinfo->nla_type & NLA_F_NESTED) {
-			err = nla_parse_nested(tb, IFLA_BRPORT_MAX, protinfo,
-					       br_port_policy, NULL);
+			err = nla_parse_nested_deprecated(tb, IFLA_BRPORT_MAX,
+							  protinfo,
+							  br_port_policy,
+							  NULL);
 			if (err)
 				return err;
 
@@ -897,7 +901,7 @@ int br_setlink(struct net_device *dev, struct nlmsghdr *nlh, u16 flags)
 	}
 
 	if (afspec)
-		err = br_afspec(br, p, afspec, RTM_SETLINK, &changed);
+		err = br_afspec(br, p, afspec, RTM_SETLINK, &changed, extack);
 
 	if (changed)
 		br_ifinfo_notify(RTM_NEWLINK, br, p);
@@ -923,7 +927,7 @@ int br_dellink(struct net_device *dev, struct nlmsghdr *nlh, u16 flags)
 	if (!p && !(dev->priv_flags & IFF_EBRIDGE))
 		return -EINVAL;
 
-	err = br_afspec(br, p, afspec, RTM_DELLINK, &changed);
+	err = br_afspec(br, p, afspec, RTM_DELLINK, &changed, NULL);
 	if (changed)
 		/* Send RTM_NEWLINK because userspace
 		 * expects RTM_NEWLINK for vlan dels
@@ -1034,6 +1038,9 @@ static const struct nla_policy br_policy[IFLA_BR_MAX + 1] = {
 	[IFLA_BR_MCAST_STATS_ENABLED] = { .type = NLA_U8 },
 	[IFLA_BR_MCAST_IGMP_VERSION] = { .type = NLA_U8 },
 	[IFLA_BR_MCAST_MLD_VERSION] = { .type = NLA_U8 },
+	[IFLA_BR_VLAN_STATS_PER_PORT] = { .type = NLA_U8 },
+	[IFLA_BR_MULTI_BOOLOPT] = { .type = NLA_EXACT_LEN,
+				    .len = sizeof(struct br_boolopt_multi) },
 };
 
 static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
@@ -1102,7 +1109,7 @@ static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
 	if (data[IFLA_BR_VLAN_DEFAULT_PVID]) {
 		__u16 defpvid = nla_get_u16(data[IFLA_BR_VLAN_DEFAULT_PVID]);
 
-		err = __br_vlan_set_default_pvid(br, defpvid);
+		err = __br_vlan_set_default_pvid(br, defpvid, extack);
 		if (err)
 			return err;
 	}
@@ -1111,6 +1118,14 @@ static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
 		__u8 vlan_stats = nla_get_u8(data[IFLA_BR_VLAN_STATS_ENABLED]);
 
 		err = br_vlan_set_stats(br, vlan_stats);
+		if (err)
+			return err;
+	}
+
+	if (data[IFLA_BR_VLAN_STATS_PER_PORT]) {
+		__u8 per_port = nla_get_u8(data[IFLA_BR_VLAN_STATS_PER_PORT]);
+
+		err = br_vlan_set_stats_per_port(br, per_port);
 		if (err)
 			return err;
 	}
@@ -1158,9 +1173,7 @@ static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
 	if (data[IFLA_BR_MCAST_SNOOPING]) {
 		u8 mcast_snooping = nla_get_u8(data[IFLA_BR_MCAST_SNOOPING]);
 
-		err = br_multicast_toggle(br, mcast_snooping);
-		if (err)
-			return err;
+		br_multicast_toggle(br, mcast_snooping);
 	}
 
 	if (data[IFLA_BR_MCAST_QUERY_USE_IFADDR]) {
@@ -1178,19 +1191,12 @@ static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
 			return err;
 	}
 
-	if (data[IFLA_BR_MCAST_HASH_ELASTICITY]) {
-		u32 val = nla_get_u32(data[IFLA_BR_MCAST_HASH_ELASTICITY]);
+	if (data[IFLA_BR_MCAST_HASH_ELASTICITY])
+		br_warn(br, "the hash_elasticity option has been deprecated and is always %u\n",
+			RHT_ELASTICITY);
 
-		br->hash_elasticity = val;
-	}
-
-	if (data[IFLA_BR_MCAST_HASH_MAX]) {
-		u32 hash_max = nla_get_u32(data[IFLA_BR_MCAST_HASH_MAX]);
-
-		err = br_multicast_set_hash_max(br, hash_max);
-		if (err)
-			return err;
-	}
+	if (data[IFLA_BR_MCAST_HASH_MAX])
+		br->hash_max = nla_get_u32(data[IFLA_BR_MCAST_HASH_MAX]);
 
 	if (data[IFLA_BR_MCAST_LAST_MEMBER_CNT]) {
 		u32 val = nla_get_u32(data[IFLA_BR_MCAST_LAST_MEMBER_CNT]);
@@ -1287,6 +1293,15 @@ static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
 	}
 #endif
 
+	if (data[IFLA_BR_MULTI_BOOLOPT]) {
+		struct br_boolopt_multi *bm;
+
+		bm = nla_data(data[IFLA_BR_MULTI_BOOLOPT]);
+		err = br_boolopt_multi_toggle(br, bm, extack);
+		if (err)
+			return err;
+	}
+
 	return 0;
 }
 
@@ -1327,6 +1342,7 @@ static size_t br_get_size(const struct net_device *brdev)
 	       nla_total_size(sizeof(__be16)) +	/* IFLA_BR_VLAN_PROTOCOL */
 	       nla_total_size(sizeof(u16)) +    /* IFLA_BR_VLAN_DEFAULT_PVID */
 	       nla_total_size(sizeof(u8)) +     /* IFLA_BR_VLAN_STATS_ENABLED */
+	       nla_total_size(sizeof(u8)) +	/* IFLA_BR_VLAN_STATS_PER_PORT */
 #endif
 	       nla_total_size(sizeof(u16)) +    /* IFLA_BR_GROUP_FWD_MASK */
 	       nla_total_size(sizeof(struct ifla_bridge_id)) +   /* IFLA_BR_ROOT_ID */
@@ -1364,6 +1380,7 @@ static size_t br_get_size(const struct net_device *brdev)
 	       nla_total_size(sizeof(u8)) +     /* IFLA_BR_NF_CALL_IP6TABLES */
 	       nla_total_size(sizeof(u8)) +     /* IFLA_BR_NF_CALL_ARPTABLES */
 #endif
+	       nla_total_size(sizeof(struct br_boolopt_multi)) + /* IFLA_BR_MULTI_BOOLOPT */
 	       0;
 }
 
@@ -1377,6 +1394,7 @@ static int br_fill_info(struct sk_buff *skb, const struct net_device *brdev)
 	u32 stp_enabled = br->stp_enabled;
 	u16 priority = (br->bridge_id.prio[0] << 8) | br->bridge_id.prio[1];
 	u8 vlan_enabled = br_vlan_enabled(br->dev);
+	struct br_boolopt_multi bm;
 	u64 clockval;
 
 	clockval = br_timer_value(&br->hello_timer);
@@ -1393,6 +1411,7 @@ static int br_fill_info(struct sk_buff *skb, const struct net_device *brdev)
 	if (nla_put_u64_64bit(skb, IFLA_BR_GC_TIMER, clockval, IFLA_BR_PAD))
 		return -EMSGSIZE;
 
+	br_boolopt_multi_get(br, &bm);
 	if (nla_put_u32(skb, IFLA_BR_FORWARD_DELAY, forward_delay) ||
 	    nla_put_u32(skb, IFLA_BR_HELLO_TIME, hello_time) ||
 	    nla_put_u32(skb, IFLA_BR_MAX_AGE, age_time) ||
@@ -1410,14 +1429,17 @@ static int br_fill_info(struct sk_buff *skb, const struct net_device *brdev)
 	    nla_put_u8(skb, IFLA_BR_TOPOLOGY_CHANGE, br->topology_change) ||
 	    nla_put_u8(skb, IFLA_BR_TOPOLOGY_CHANGE_DETECTED,
 		       br->topology_change_detected) ||
-	    nla_put(skb, IFLA_BR_GROUP_ADDR, ETH_ALEN, br->group_addr))
+	    nla_put(skb, IFLA_BR_GROUP_ADDR, ETH_ALEN, br->group_addr) ||
+	    nla_put(skb, IFLA_BR_MULTI_BOOLOPT, sizeof(bm), &bm))
 		return -EMSGSIZE;
 
 #ifdef CONFIG_BRIDGE_VLAN_FILTERING
 	if (nla_put_be16(skb, IFLA_BR_VLAN_PROTOCOL, br->vlan_proto) ||
 	    nla_put_u16(skb, IFLA_BR_VLAN_DEFAULT_PVID, br->default_pvid) ||
 	    nla_put_u8(skb, IFLA_BR_VLAN_STATS_ENABLED,
-		       br_opt_get(br, BROPT_VLAN_STATS_ENABLED)))
+		       br_opt_get(br, BROPT_VLAN_STATS_ENABLED)) ||
+	    nla_put_u8(skb, IFLA_BR_VLAN_STATS_PER_PORT,
+		       br_opt_get(br, BROPT_VLAN_STATS_PER_PORT)))
 		return -EMSGSIZE;
 #endif
 #ifdef CONFIG_BRIDGE_IGMP_SNOOPING
@@ -1430,8 +1452,7 @@ static int br_fill_info(struct sk_buff *skb, const struct net_device *brdev)
 		       br_opt_get(br, BROPT_MULTICAST_QUERIER)) ||
 	    nla_put_u8(skb, IFLA_BR_MCAST_STATS_ENABLED,
 		       br_opt_get(br, BROPT_MULTICAST_STATS_ENABLED)) ||
-	    nla_put_u32(skb, IFLA_BR_MCAST_HASH_ELASTICITY,
-			br->hash_elasticity) ||
+	    nla_put_u32(skb, IFLA_BR_MCAST_HASH_ELASTICITY, RHT_ELASTICITY) ||
 	    nla_put_u32(skb, IFLA_BR_MCAST_HASH_MAX, br->hash_max) ||
 	    nla_put_u32(skb, IFLA_BR_MCAST_LAST_MEMBER_CNT,
 			br->multicast_last_member_count) ||
@@ -1546,7 +1567,7 @@ static int br_fill_linkxstats(struct sk_buff *skb,
 		return -EINVAL;
 	}
 
-	nest = nla_nest_start(skb, LINK_XSTATS_TYPE_BRIDGE);
+	nest = nla_nest_start_noflag(skb, LINK_XSTATS_TYPE_BRIDGE);
 	if (!nest)
 		return -EMSGSIZE;
 

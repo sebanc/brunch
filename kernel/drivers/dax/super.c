@@ -1,18 +1,11 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright(c) 2017 Intel Corporation. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
  */
 #include <linux/pagemap.h>
 #include <linux/module.h>
 #include <linux/mount.h>
+#include <linux/pseudo_fs.h>
 #include <linux/magic.h>
 #include <linux/genhd.h>
 #include <linux/pfn_t.h>
@@ -22,6 +15,7 @@
 #include <linux/uio.h>
 #include <linux/dax.h>
 #include <linux/fs.h>
+#include "dax-private.h"
 
 static dev_t dax_devt;
 DEFINE_STATIC_SRCU(dax_srcu);
@@ -324,11 +318,15 @@ EXPORT_SYMBOL_GPL(dax_direct_access);
 bool dax_supported(struct dax_device *dax_dev, struct block_device *bdev,
 		int blocksize, sector_t start, sector_t len)
 {
+	if (!dax_dev)
+		return false;
+
 	if (!dax_alive(dax_dev))
 		return false;
 
 	return dax_dev->ops->dax_supported(dax_dev, bdev, blocksize, start, len);
 }
+EXPORT_SYMBOL_GPL(dax_supported);
 
 size_t dax_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
 		size_t bytes, struct iov_iter *i)
@@ -423,10 +421,14 @@ void kill_dax(struct dax_device *dax_dev)
 	spin_lock(&dax_host_lock);
 	hlist_del_init(&dax_dev->list);
 	spin_unlock(&dax_host_lock);
-
-	dax_dev->private = NULL;
 }
 EXPORT_SYMBOL_GPL(kill_dax);
+
+void run_dax(struct dax_device *dax_dev)
+{
+	set_bit(DAXDEV_ALIVE, &dax_dev->flags);
+}
+EXPORT_SYMBOL_GPL(run_dax);
 
 static struct inode *dax_alloc_inode(struct super_block *sb)
 {
@@ -447,11 +449,9 @@ static struct dax_device *to_dax_dev(struct inode *inode)
 	return container_of(inode, struct dax_device, inode);
 }
 
-static void dax_i_callback(struct rcu_head *head)
+static void dax_free_inode(struct inode *inode)
 {
-	struct inode *inode = container_of(head, struct inode, i_rcu);
 	struct dax_device *dax_dev = to_dax_dev(inode);
-
 	kfree(dax_dev->host);
 	dax_dev->host = NULL;
 	if (inode->i_rdev)
@@ -462,29 +462,31 @@ static void dax_i_callback(struct rcu_head *head)
 static void dax_destroy_inode(struct inode *inode)
 {
 	struct dax_device *dax_dev = to_dax_dev(inode);
-
 	WARN_ONCE(test_bit(DAXDEV_ALIVE, &dax_dev->flags),
 			"kill_dax() must be called before final iput()\n");
-	call_rcu(&inode->i_rcu, dax_i_callback);
 }
 
 static const struct super_operations dax_sops = {
 	.statfs = simple_statfs,
 	.alloc_inode = dax_alloc_inode,
 	.destroy_inode = dax_destroy_inode,
+	.free_inode = dax_free_inode,
 	.drop_inode = generic_delete_inode,
 };
 
-static struct dentry *dax_mount(struct file_system_type *fs_type,
-		int flags, const char *dev_name, void *data)
+static int dax_init_fs_context(struct fs_context *fc)
 {
-	return mount_pseudo(fs_type, "dax:", &dax_sops, NULL, DAXFS_MAGIC);
+	struct pseudo_fs_context *ctx = init_pseudo(fc, DAXFS_MAGIC);
+	if (!ctx)
+		return -ENOMEM;
+	ctx->ops = &dax_sops;
+	return 0;
 }
 
 static struct file_system_type dax_fs_type = {
-	.name = "dax",
-	.mount = dax_mount,
-	.kill_sb = kill_anon_super,
+	.name		= "dax",
+	.init_fs_context = dax_init_fs_context,
+	.kill_sb	= kill_anon_super,
 };
 
 static int dax_test(struct inode *inode, void *data)
@@ -645,6 +647,8 @@ EXPORT_SYMBOL_GPL(dax_inode);
 
 void *dax_get_private(struct dax_device *dax_dev)
 {
+	if (!test_bit(DAXDEV_ALIVE, &dax_dev->flags))
+		return NULL;
 	return dax_dev->private;
 }
 EXPORT_SYMBOL_GPL(dax_get_private);
@@ -658,7 +662,7 @@ static void init_once(void *_dax_dev)
 	inode_init_once(inode);
 }
 
-static int __dax_fs_init(void)
+static int dax_fs_init(void)
 {
 	int rc;
 
@@ -668,10 +672,6 @@ static int __dax_fs_init(void)
 			init_once);
 	if (!dax_cache)
 		return -ENOMEM;
-
-	rc = register_filesystem(&dax_fs_type);
-	if (rc)
-		goto err_register_fs;
 
 	dax_mnt = kern_mount(&dax_fs_type);
 	if (IS_ERR(dax_mnt)) {
@@ -683,42 +683,49 @@ static int __dax_fs_init(void)
 	return 0;
 
  err_mount:
-	unregister_filesystem(&dax_fs_type);
- err_register_fs:
 	kmem_cache_destroy(dax_cache);
 
 	return rc;
 }
 
-static void __dax_fs_exit(void)
+static void dax_fs_exit(void)
 {
 	kern_unmount(dax_mnt);
-	unregister_filesystem(&dax_fs_type);
 	kmem_cache_destroy(dax_cache);
 }
 
-static int __init dax_fs_init(void)
+static int __init dax_core_init(void)
 {
 	int rc;
 
-	rc = __dax_fs_init();
+	rc = dax_fs_init();
 	if (rc)
 		return rc;
 
 	rc = alloc_chrdev_region(&dax_devt, 0, MINORMASK+1, "dax");
 	if (rc)
-		__dax_fs_exit();
-	return rc;
+		goto err_chrdev;
+
+	rc = dax_bus_init();
+	if (rc)
+		goto err_bus;
+	return 0;
+
+err_bus:
+	unregister_chrdev_region(dax_devt, MINORMASK+1);
+err_chrdev:
+	dax_fs_exit();
+	return 0;
 }
 
-static void __exit dax_fs_exit(void)
+static void __exit dax_core_exit(void)
 {
 	unregister_chrdev_region(dax_devt, MINORMASK+1);
 	ida_destroy(&dax_minor_ida);
-	__dax_fs_exit();
+	dax_fs_exit();
 }
 
 MODULE_AUTHOR("Intel Corporation");
 MODULE_LICENSE("GPL v2");
-subsys_initcall(dax_fs_init);
-module_exit(dax_fs_exit);
+subsys_initcall(dax_core_init);
+module_exit(dax_core_exit);

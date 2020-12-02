@@ -267,9 +267,7 @@ int __update_load_avg_blocked_se(u64 now, struct sched_entity *se)
 {
 	if (___update_load_sum(now, &se->avg, 0, 0, 0)) {
 		___update_load_avg(&se->avg, se_weight(se), se_runnable(se));
-
-		trace_sched_load_se(se);
-
+		trace_pelt_se_tp(se);
 		return 1;
 	}
 
@@ -283,9 +281,7 @@ int __update_load_avg_se(u64 now, struct cfs_rq *cfs_rq, struct sched_entity *se
 
 		___update_load_avg(&se->avg, se_weight(se), se_runnable(se));
 		cfs_se_util_change(&se->avg);
-
-		trace_sched_load_se(se);
-
+		trace_pelt_se_tp(se);
 		return 1;
 	}
 
@@ -300,9 +296,7 @@ int __update_load_avg_cfs_rq(u64 now, struct cfs_rq *cfs_rq)
 				cfs_rq->curr != NULL)) {
 
 		___update_load_avg(&cfs_rq->avg, 1, 1);
-
-		trace_sched_load_cfs_rq(cfs_rq);
-
+		trace_pelt_cfs_tp(cfs_rq);
 		return 1;
 	}
 
@@ -328,9 +322,7 @@ int update_rt_rq_load_avg(u64 now, struct rq *rq, int running)
 				running)) {
 
 		___update_load_avg(&rq->avg_rt, 1, 1);
-
-		trace_sched_load_rt_rq(rq);
-
+		trace_pelt_rt_tp(rq);
 		return 1;
 	}
 
@@ -354,6 +346,7 @@ int update_dl_rq_load_avg(u64 now, struct rq *rq, int running)
 				running)) {
 
 		___update_load_avg(&rq->avg_dl, 1, 1);
+		trace_pelt_dl_tp(rq);
 		return 1;
 	}
 
@@ -380,7 +373,7 @@ int update_irq_load_avg(struct rq *rq, u64 running)
 	 * reflect the real amount of computation
 	 */
 	running = cap_scale(running, arch_scale_freq_capacity(cpu_of(rq)));
-	running = cap_scale(running, arch_scale_cpu_capacity(NULL, cpu_of(rq)));
+	running = cap_scale(running, arch_scale_cpu_capacity(cpu_of(rq)));
 
 	/*
 	 * We know the time that has been used by interrupt since last update
@@ -402,8 +395,10 @@ int update_irq_load_avg(struct rq *rq, u64 running)
 				1,
 				1);
 
-	if (ret)
+	if (ret) {
 		___update_load_avg(&rq->avg_irq, 1, 1);
+		trace_pelt_irq_tp(rq);
+	}
 
 	return ret;
 }

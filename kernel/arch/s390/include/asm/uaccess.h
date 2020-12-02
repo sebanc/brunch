@@ -31,7 +31,6 @@
 #define USER_DS		(2)
 #define USER_DS_SACF	(3)
 
-#define get_ds()        (KERNEL_DS)
 #define get_fs()        (current->thread.mm_segment)
 #define segment_eq(a,b) (((a) & 2) == ((b) & 2))
 
@@ -48,7 +47,7 @@ static inline int __range_ok(unsigned long addr, unsigned long size)
 	__range_ok((unsigned long)(addr), (size));	\
 })
 
-#define access_ok(type, addr, size) __access_ok(addr, size)
+#define access_ok(addr, size) __access_ok(addr, size)
 
 unsigned long __must_check
 raw_copy_from_user(void *to, const void __user *from, unsigned long n);
@@ -277,6 +276,6 @@ static inline unsigned long __must_check clear_user(void __user *to, unsigned lo
 }
 
 int copy_to_user_real(void __user *dest, void *src, unsigned long count);
-void s390_kernel_write(void *dst, const void *src, size_t size);
+void *s390_kernel_write(void *dst, const void *src, size_t size);
 
 #endif /* __S390_UACCESS_H */

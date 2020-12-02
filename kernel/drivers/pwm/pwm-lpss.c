@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Intel Low Power Subsystem PWM controller driver
  *
@@ -7,10 +8,6 @@
  * Author: Chang Rebecca Swee Fun <rebecca.swee.fun.chang@intel.com>
  * Author: Chew Chiau Ee <chiau.ee.chew@intel.com>
  * Author: Alan Cox <alan@linux.intel.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/delay.h>
@@ -31,15 +28,6 @@
 
 /* Size of each PWM register space if multiple */
 #define PWM_SIZE			0x400
-
-#define MAX_PWMS			4
-
-struct pwm_lpss_chip {
-	struct pwm_chip chip;
-	void __iomem *regs;
-	const struct pwm_lpss_boardinfo *info;
-	u32 saved_ctrl[MAX_PWMS];
-};
 
 static inline struct pwm_lpss_chip *to_lpwm(struct pwm_chip *chip)
 {
@@ -105,10 +93,12 @@ static void pwm_lpss_prepare(struct pwm_lpss_chip *lpwm, struct pwm_device *pwm,
 	 * The equation is:
 	 * base_unit = round(base_unit_range * freq / c)
 	 */
-	base_unit_range = BIT(lpwm->info->base_unit_bits) - 1;
+	base_unit_range = BIT(lpwm->info->base_unit_bits);
 	freq *= base_unit_range;
 
 	base_unit = DIV_ROUND_CLOSEST_ULL(freq, c);
+	/* base_unit must not be 0 and we also want to avoid overflowing it */
+	base_unit = clamp_val(base_unit, 1, base_unit_range - 1);
 
 	on_time_div = 255ULL * duty_ns;
 	do_div(on_time_div, period_ns);
@@ -116,8 +106,7 @@ static void pwm_lpss_prepare(struct pwm_lpss_chip *lpwm, struct pwm_device *pwm,
 
 	orig_ctrl = ctrl = pwm_lpss_read(pwm);
 	ctrl &= ~PWM_ON_TIME_DIV_MASK;
-	ctrl &= ~(base_unit_range << PWM_BASE_UNIT_SHIFT);
-	base_unit &= base_unit_range;
+	ctrl &= ~((base_unit_range - 1) << PWM_BASE_UNIT_SHIFT);
 	ctrl |= (u32) base_unit << PWM_BASE_UNIT_SHIFT;
 	ctrl |= on_time_div;
 
@@ -134,7 +123,7 @@ static inline void pwm_lpss_cond_enable(struct pwm_device *pwm, bool cond)
 }
 
 static int pwm_lpss_apply(struct pwm_chip *chip, struct pwm_device *pwm,
-			  struct pwm_state *state)
+			  const struct pwm_state *state)
 {
 	struct pwm_lpss_chip *lpwm = to_lpwm(chip);
 	int ret;
@@ -170,8 +159,42 @@ static int pwm_lpss_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	return 0;
 }
 
+/* This function gets called once from pwmchip_add to get the initial state */
+static void pwm_lpss_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
+			       struct pwm_state *state)
+{
+	struct pwm_lpss_chip *lpwm = to_lpwm(chip);
+	unsigned long base_unit_range;
+	unsigned long long base_unit, freq, on_time_div;
+	u32 ctrl;
+
+	base_unit_range = BIT(lpwm->info->base_unit_bits);
+
+	ctrl = pwm_lpss_read(pwm);
+	on_time_div = 255 - (ctrl & PWM_ON_TIME_DIV_MASK);
+	base_unit = (ctrl >> PWM_BASE_UNIT_SHIFT) & (base_unit_range - 1);
+
+	freq = base_unit * lpwm->info->clk_rate;
+	do_div(freq, base_unit_range);
+	if (freq == 0)
+		state->period = NSEC_PER_SEC;
+	else
+		state->period = NSEC_PER_SEC / (unsigned long)freq;
+
+	on_time_div *= state->period;
+	do_div(on_time_div, 255);
+	state->duty_cycle = on_time_div;
+
+	state->polarity = PWM_POLARITY_NORMAL;
+	state->enabled = !!(ctrl & PWM_ENABLE);
+
+	if (state->enabled)
+		pm_runtime_get(chip->dev);
+}
+
 static const struct pwm_ops pwm_lpss_ops = {
 	.apply = pwm_lpss_apply,
+	.get_state = pwm_lpss_get_state,
 	.owner = THIS_MODULE,
 };
 

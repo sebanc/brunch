@@ -47,7 +47,7 @@
 #include <linux/kthread.h>
 #include <linux/jiffies.h>	/* time_after() */
 #include <linux/slab.h>
-#include <linux/bootmem.h>
+#include <linux/memblock.h>
 
 #include <asm/irqdomain.h>
 #include <asm/io.h>
@@ -58,6 +58,7 @@
 #include <asm/acpi.h>
 #include <asm/dma.h>
 #include <asm/timer.h>
+#include <asm/time.h>
 #include <asm/i8259.h>
 #include <asm/setup.h>
 #include <asm/irq_remapping.h>
@@ -812,6 +813,7 @@ static int irq_polarity(int idx)
 		return IOAPIC_POL_HIGH;
 	case MP_IRQPOL_RESERVED:
 		pr_warn("IOAPIC: Invalid polarity: 2, defaulting to low\n");
+		/* fall through */
 	case MP_IRQPOL_ACTIVE_LOW:
 	default: /* Pointless default required due to do gcc stupidity */
 		return IOAPIC_POL_LOW;
@@ -859,6 +861,7 @@ static int irq_trigger(int idx)
 		return IOAPIC_EDGE;
 	case MP_IRQTRIG_RESERVED:
 		pr_warn("IOAPIC: Invalid trigger mode 2 defaulting to level\n");
+		/* fall through */
 	case MP_IRQTRIG_LEVEL:
 	default: /* Pointless default required due to do gcc stupidity */
 		return IOAPIC_LEVEL;
@@ -2130,6 +2133,9 @@ static inline void __init check_timer(void)
 	unsigned long flags;
 	int no_pin1 = 0;
 
+	if (!global_clock_event)
+		return;
+
 	local_irq_save(flags);
 
 	/*
@@ -2250,6 +2256,7 @@ static inline void __init check_timer(void)
 	legacy_pic->init(0);
 	legacy_pic->make_irq(0);
 	apic_write(APIC_LVT0, APIC_DM_EXTINT);
+	legacy_pic->unmask(0);
 
 	unlock_ExtINT_logic();
 
@@ -2638,7 +2645,9 @@ static struct resource * __init ioapic_setup_resources(void)
 	n = IOAPIC_RESOURCE_NAME_SIZE + sizeof(struct resource);
 	n *= nr_ioapics;
 
-	mem = alloc_bootmem(n);
+	mem = memblock_alloc(n, SMP_CACHE_BYTES);
+	if (!mem)
+		panic("%s: Failed to allocate %lu bytes\n", __func__, n);
 	res = (void *)mem;
 
 	mem += sizeof(struct resource) * nr_ioapics;
@@ -2681,7 +2690,11 @@ void __init io_apic_init_mappings(void)
 #ifdef CONFIG_X86_32
 fake_ioapic_page:
 #endif
-			ioapic_phys = (unsigned long)alloc_bootmem_pages(PAGE_SIZE);
+			ioapic_phys = (unsigned long)memblock_alloc(PAGE_SIZE,
+								    PAGE_SIZE);
+			if (!ioapic_phys)
+				panic("%s: Failed to allocate %lu bytes align=0x%lx\n",
+				      __func__, PAGE_SIZE, PAGE_SIZE);
 			ioapic_phys = __pa(ioapic_phys);
 		}
 		set_fixmap_nocache(idx, ioapic_phys);

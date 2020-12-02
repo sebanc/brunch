@@ -43,7 +43,33 @@
  */
 #define AMDGPU_GMC_HOLE_MASK	0x0000ffffffffffffULL
 
+/*
+ * Ring size as power of two for the log of recent faults.
+ */
+#define AMDGPU_GMC_FAULT_RING_ORDER	8
+#define AMDGPU_GMC_FAULT_RING_SIZE	(1 << AMDGPU_GMC_FAULT_RING_ORDER)
+
+/*
+ * Hash size as power of two for the log of recent faults
+ */
+#define AMDGPU_GMC_FAULT_HASH_ORDER	8
+#define AMDGPU_GMC_FAULT_HASH_SIZE	(1 << AMDGPU_GMC_FAULT_HASH_ORDER)
+
+/*
+ * Number of IH timestamp ticks until a fault is considered handled
+ */
+#define AMDGPU_GMC_FAULT_TIMEOUT	5000ULL
+
 struct firmware;
+
+/*
+ * GMC page fault information
+ */
+struct amdgpu_gmc_fault {
+	uint64_t	timestamp;
+	uint64_t	next:AMDGPU_GMC_FAULT_RING_ORDER;
+	uint64_t	key:52;
+};
 
 /*
  * VMHUB structures, functions & helpers
@@ -51,6 +77,7 @@ struct firmware;
 struct amdgpu_vmhub {
 	uint32_t	ctx0_ptb_addr_lo32;
 	uint32_t	ctx0_ptb_addr_hi32;
+	uint32_t	vm_inv_eng0_sem;
 	uint32_t	vm_inv_eng0_req;
 	uint32_t	vm_inv_eng0_ack;
 	uint32_t	vm_context0_cntl;
@@ -63,20 +90,14 @@ struct amdgpu_vmhub {
  */
 struct amdgpu_gmc_funcs {
 	/* flush the vm tlb via mmio */
-	void (*flush_gpu_tlb)(struct amdgpu_device *adev,
-			      uint32_t vmid);
+	void (*flush_gpu_tlb)(struct amdgpu_device *adev, uint32_t vmid,
+				uint32_t vmhub, uint32_t flush_type);
 	/* flush the vm tlb via ring */
 	uint64_t (*emit_flush_gpu_tlb)(struct amdgpu_ring *ring, unsigned vmid,
 				       uint64_t pd_addr);
 	/* Change the VMID -> PASID mapping */
 	void (*emit_pasid_mapping)(struct amdgpu_ring *ring, unsigned vmid,
 				   unsigned pasid);
-	/* write pte/pde updates using the cpu */
-	int (*set_pte_pde)(struct amdgpu_device *adev,
-			   void *cpu_pt_addr, /* cpu addr of page table */
-			   uint32_t gpu_page_idx, /* pte/pde to update */
-			   uint64_t addr, /* addr to write into pte/pde */
-			   uint64_t flags); /* access flags */
 	/* enable/disable PRT support */
 	void (*set_prt)(struct amdgpu_device *adev, bool enable);
 	/* set pte flags based per asic */
@@ -85,11 +106,13 @@ struct amdgpu_gmc_funcs {
 	/* get the pde for a given mc addr */
 	void (*get_vm_pde)(struct amdgpu_device *adev, int level,
 			   u64 *dst, u64 *flags);
+	/* get the amount of memory used by the vbios for pre-OS console */
+	unsigned int (*get_vbios_fb_size)(struct amdgpu_device *adev);
 };
 
 struct amdgpu_xgmi {
 	/* from psp */
-	u64 device_id;
+	u64 node_id;
 	u64 hive_id;
 	/* fixed per family */
 	u64 node_segment_size;
@@ -99,6 +122,7 @@ struct amdgpu_xgmi {
 	unsigned num_physical_nodes;
 	/* gpu list in the same hive */
 	struct list_head head;
+	bool supported;
 };
 
 struct amdgpu_gmc {
@@ -134,7 +158,11 @@ struct amdgpu_gmc {
 	uint32_t		vram_type;
 	uint32_t                srbm_soft_reset;
 	bool			prt_warning;
-	uint64_t		stolen_size;
+	uint64_t		stolen_vga_size;
+	struct amdgpu_bo	*stolen_vga_memory;
+	uint64_t		stolen_extended_size;
+	struct amdgpu_bo	*stolen_extended_memory;
+	bool			keep_stolen_vga_memory;
 	uint32_t		sdpif_register;
 	/* apertures */
 	u64			shared_aperture_start;
@@ -147,17 +175,26 @@ struct amdgpu_gmc {
 	struct kfd_vm_fault_info *vm_fault_info;
 	atomic_t		vm_fault_info_updated;
 
+	struct amdgpu_gmc_fault	fault_ring[AMDGPU_GMC_FAULT_RING_SIZE];
+	struct {
+		uint64_t	idx:AMDGPU_GMC_FAULT_RING_ORDER;
+	} fault_hash[AMDGPU_GMC_FAULT_HASH_SIZE];
+	uint64_t		last_fault:AMDGPU_GMC_FAULT_RING_ORDER;
+
 	const struct amdgpu_gmc_funcs	*gmc_funcs;
 
 	struct amdgpu_xgmi xgmi;
+	struct amdgpu_irq_src	ecc_irq;
+	struct ras_common_if    *umc_ras_if;
+	struct ras_common_if    *mmhub_ras_if;
 };
 
-#define amdgpu_gmc_flush_gpu_tlb(adev, vmid) (adev)->gmc.gmc_funcs->flush_gpu_tlb((adev), (vmid))
+#define amdgpu_gmc_flush_gpu_tlb(adev, vmid, vmhub, type) ((adev)->gmc.gmc_funcs->flush_gpu_tlb((adev), (vmid), (vmhub), (type)))
 #define amdgpu_gmc_emit_flush_gpu_tlb(r, vmid, addr) (r)->adev->gmc.gmc_funcs->emit_flush_gpu_tlb((r), (vmid), (addr))
 #define amdgpu_gmc_emit_pasid_mapping(r, vmid, pasid) (r)->adev->gmc.gmc_funcs->emit_pasid_mapping((r), (vmid), (pasid))
-#define amdgpu_gmc_set_pte_pde(adev, pt, idx, addr, flags) (adev)->gmc.gmc_funcs->set_pte_pde((adev), (pt), (idx), (addr), (flags))
 #define amdgpu_gmc_get_vm_pde(adev, level, dst, flags) (adev)->gmc.gmc_funcs->get_vm_pde((adev), (level), (dst), (flags))
 #define amdgpu_gmc_get_pte_flags(adev, flags) (adev)->gmc.gmc_funcs->get_vm_pte_flags((adev),(flags))
+#define amdgpu_gmc_get_vbios_fb_size(adev) (adev)->gmc.gmc_funcs->get_vbios_fb_size((adev))
 
 /**
  * amdgpu_gmc_vram_full_visible - Check if full VRAM is visible through the BAR
@@ -189,6 +226,9 @@ static inline uint64_t amdgpu_gmc_sign_extend(uint64_t addr)
 
 void amdgpu_gmc_get_pde_for_bo(struct amdgpu_bo *bo, int level,
 			       uint64_t *addr, uint64_t *flags);
+int amdgpu_gmc_set_pte_pde(struct amdgpu_device *adev, void *cpu_pt_addr,
+				uint32_t gpu_page_idx, uint64_t addr,
+				uint64_t flags);
 uint64_t amdgpu_gmc_pd_addr(struct amdgpu_bo *bo);
 uint64_t amdgpu_gmc_agp_addr(struct ttm_buffer_object *bo);
 void amdgpu_gmc_vram_location(struct amdgpu_device *adev, struct amdgpu_gmc *mc,
@@ -197,5 +237,8 @@ void amdgpu_gmc_gart_location(struct amdgpu_device *adev,
 			      struct amdgpu_gmc *mc);
 void amdgpu_gmc_agp_location(struct amdgpu_device *adev,
 			     struct amdgpu_gmc *mc);
+bool amdgpu_gmc_filter_faults(struct amdgpu_device *adev, uint64_t addr,
+			      uint16_t pasid, uint64_t timestamp);
+void amdgpu_gmc_get_vbios_allocations(struct amdgpu_device *adev);
 
 #endif

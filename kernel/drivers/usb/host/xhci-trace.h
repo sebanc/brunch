@@ -355,6 +355,11 @@ DEFINE_EVENT(xhci_log_ep_ctx, xhci_handle_cmd_config_ep,
 	TP_ARGS(ctx)
 );
 
+DEFINE_EVENT(xhci_log_ep_ctx, xhci_add_endpoint,
+	TP_PROTO(struct xhci_ep_ctx *ctx),
+	TP_ARGS(ctx)
+);
+
 DECLARE_EVENT_CLASS(xhci_log_slot_ctx,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx),
@@ -419,6 +424,31 @@ DEFINE_EVENT(xhci_log_slot_ctx, xhci_handle_cmd_set_deq,
 DEFINE_EVENT(xhci_log_slot_ctx, xhci_configure_endpoint,
 	TP_PROTO(struct xhci_slot_ctx *ctx),
 	TP_ARGS(ctx)
+);
+
+DECLARE_EVENT_CLASS(xhci_log_ctrl_ctx,
+	TP_PROTO(struct xhci_input_control_ctx *ctrl_ctx),
+	TP_ARGS(ctrl_ctx),
+	TP_STRUCT__entry(
+		__field(u32, drop)
+		__field(u32, add)
+	),
+	TP_fast_assign(
+		__entry->drop = le32_to_cpu(ctrl_ctx->drop_flags);
+		__entry->add = le32_to_cpu(ctrl_ctx->add_flags);
+	),
+	TP_printk("%s", xhci_decode_ctrl_ctx(__entry->drop, __entry->add)
+	)
+);
+
+DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_address_ctrl_ctx,
+	TP_PROTO(struct xhci_input_control_ctx *ctrl_ctx),
+	TP_ARGS(ctrl_ctx)
+);
+
+DEFINE_EVENT(xhci_log_ctrl_ctx, xhci_configure_endpoint_ctrl_ctx,
+	TP_PROTO(struct xhci_input_control_ctx *ctrl_ctx),
+	TP_ARGS(ctrl_ctx)
 );
 
 DECLARE_EVENT_CLASS(xhci_log_ring,
@@ -517,6 +547,32 @@ DEFINE_EVENT(xhci_log_portsc, xhci_get_port_status,
 DEFINE_EVENT(xhci_log_portsc, xhci_hub_status_data,
 	     TP_PROTO(u32 portnum, u32 portsc),
 	     TP_ARGS(portnum, portsc)
+);
+
+DECLARE_EVENT_CLASS(xhci_log_doorbell,
+	TP_PROTO(u32 slot, u32 doorbell),
+	TP_ARGS(slot, doorbell),
+	TP_STRUCT__entry(
+		__field(u32, slot)
+		__field(u32, doorbell)
+	),
+	TP_fast_assign(
+		__entry->slot = slot;
+		__entry->doorbell = doorbell;
+	),
+	TP_printk("Ring doorbell for %s",
+		xhci_decode_doorbell(__entry->slot, __entry->doorbell)
+	)
+);
+
+DEFINE_EVENT(xhci_log_doorbell, xhci_ring_ep_doorbell,
+	     TP_PROTO(u32 slot, u32 doorbell),
+	     TP_ARGS(slot, doorbell)
+);
+
+DEFINE_EVENT(xhci_log_doorbell, xhci_ring_host_doorbell,
+	     TP_PROTO(u32 slot, u32 doorbell),
+	     TP_ARGS(slot, doorbell)
 );
 
 DECLARE_EVENT_CLASS(xhci_dbc_log_request,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0-only
 // Copyright(c) 2019 Intel Corporation.
 
 /*
@@ -23,6 +23,7 @@
 #include "../../codecs/rt1011.h"
 #include "../../codecs/rt5682.h"
 #include "../../codecs/hdac_hdmi.h"
+#include "hda_dsp_common.h"
 
 /* The platform clock outputs 24Mhz clock to codec as I2S MCLK */
 #define CML_PLAT_CLK	24000000
@@ -34,7 +35,6 @@
 #define SOF_RT1011_SPEAKER_WR		BIT(1)
 #define SOF_RT1011_SPEAKER_TL		BIT(2)
 #define SOF_RT1011_SPEAKER_TR		BIT(3)
-#define SPK_CH 4
 
 /* Default: Woofer speakers  */
 static unsigned long sof_rt1011_quirk = SOF_RT1011_SPEAKER_WL |
@@ -72,6 +72,7 @@ struct card_private {
 	char codec_name[SND_ACPI_I2C_ID_LEN];
 	struct snd_soc_jack headset;
 	struct list_head hdmi_pcm_list;
+	bool common_hdmi_codec_drv;
 };
 
 static const struct snd_kcontrol_new cml_controls[] = {
@@ -112,7 +113,7 @@ static const struct snd_soc_dapm_route cml_rt1011_rt5682_map[] = {
 	{ "IN1P", NULL, "Headset Mic" },
 
 	/* DMIC */
-	{ "DMic", NULL, "SoC DMIC" },
+	{"DMic", NULL, "SoC DMIC"},
 };
 
 static const struct snd_soc_dapm_route cml_rt1011_tt_map[] = {
@@ -124,14 +125,14 @@ static const struct snd_soc_dapm_route cml_rt1011_tt_map[] = {
 static int cml_rt5682_codec_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct card_private *ctx = snd_soc_card_get_drvdata(rtd->card);
-	struct snd_soc_component *component = rtd->codec_dai->component;
+	struct snd_soc_component *component = asoc_rtd_to_codec(rtd, 0)->component;
 	struct snd_soc_jack *jack;
 	int ret;
 
 	/* need to enable ASRC function for 24MHz mclk rate */
 	rt5682_sel_asrc_clk_src(component, RT5682_DA_STEREO1_FILTER |
-				RT5682_AD_STEREO1_FILTER,
-				RT5682_CLK_SEL_I2S1_ASRC);
+					RT5682_AD_STEREO1_FILTER,
+					RT5682_CLK_SEL_I2S1_ASRC);
 
 	/*
 	 * Headset buttons map to the google Reference headset.
@@ -159,6 +160,13 @@ static int cml_rt5682_codec_init(struct snd_soc_pcm_runtime *rtd)
 
 	return ret;
 };
+
+static void cml_rt5682_codec_exit(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_component *component = asoc_rtd_to_codec(rtd, 0)->component;
+
+	snd_soc_component_set_jack(component, NULL, NULL);
+}
 
 static int cml_rt1011_spk_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -192,8 +200,8 @@ static int cml_rt1011_spk_init(struct snd_soc_pcm_runtime *rtd)
 static int cml_rt5682_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
 	int clk_id, clk_freq, pll_out, ret;
 
 	clk_id = RT5682_PLL1_S_MCLK;
@@ -225,14 +233,15 @@ static int cml_rt5682_hw_params(struct snd_pcm_substream *substream,
 static int cml_rt1011_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
 	struct snd_soc_dai *codec_dai;
 	struct snd_soc_card *card = rtd->card;
 	int srate, i, ret = 0;
 
 	srate = params_rate(params);
 
-	for_each_rtd_codec_dai(rtd, i, codec_dai) {
+	for_each_rtd_codec_dais(rtd, i, codec_dai) {
+
 		/* 100 Fs to drive 24 bit data */
 		ret = snd_soc_dai_set_pll(codec_dai, 0, RT1011_PLL1_S_BCLK,
 					  100 * srate, 256 * srate);
@@ -315,6 +324,16 @@ static int sof_card_late_probe(struct snd_soc_card *card)
 	struct hdmi_pcm *pcm;
 	int ret, i = 0;
 
+	if (list_empty(&ctx->hdmi_pcm_list))
+		return -EINVAL;
+
+	if (ctx->common_hdmi_codec_drv) {
+		pcm = list_first_entry(&ctx->hdmi_pcm_list, struct hdmi_pcm,
+				       head);
+		component = pcm->codec_dai->component;
+		return hda_dsp_hdmi_build_controls(card, component);
+	}
+
 	list_for_each_entry(pcm, &ctx->hdmi_pcm_list, head) {
 		component = pcm->codec_dai->component;
 		snprintf(jack_name, sizeof(jack_name),
@@ -332,8 +351,6 @@ static int sof_card_late_probe(struct snd_soc_card *card)
 
 		i++;
 	}
-	if (!component)
-		return -EINVAL;
 
 	return hdac_hdmi_jack_port_init(component, &card->dapm);
 }
@@ -341,7 +358,7 @@ static int sof_card_late_probe(struct snd_soc_card *card)
 static int hdmi_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct card_private *ctx = snd_soc_card_get_drvdata(rtd->card);
-	struct snd_soc_dai *dai = rtd->codec_dai;
+	struct snd_soc_dai *dai = asoc_rtd_to_codec(rtd, 0);
 	struct hdmi_pcm *pcm;
 
 	pcm = devm_kzalloc(rtd->card->dev, sizeof(*pcm), GFP_KERNEL);
@@ -366,10 +383,17 @@ SND_SOC_DAILINK_DEF(ssp0_codec,
 
 SND_SOC_DAILINK_DEF(ssp1_pin,
 	DAILINK_COMP_ARRAY(COMP_CPU("SSP1 Pin")));
-SND_SOC_DAILINK_DEF(ssp1_codec,
+SND_SOC_DAILINK_DEF(ssp1_codec_2spk,
 	DAILINK_COMP_ARRAY(
 	/* WL */ COMP_CODEC("i2c-10EC1011:00", CML_RT1011_CODEC_DAI),
 	/* WR */ COMP_CODEC("i2c-10EC1011:01", CML_RT1011_CODEC_DAI)));
+SND_SOC_DAILINK_DEF(ssp1_codec_4spk,
+	DAILINK_COMP_ARRAY(
+	/* WL */ COMP_CODEC("i2c-10EC1011:00", CML_RT1011_CODEC_DAI),
+	/* WR */ COMP_CODEC("i2c-10EC1011:01", CML_RT1011_CODEC_DAI),
+	/* TL */ COMP_CODEC("i2c-10EC1011:02", CML_RT1011_CODEC_DAI),
+	/* TR */ COMP_CODEC("i2c-10EC1011:03", CML_RT1011_CODEC_DAI)));
+
 
 SND_SOC_DAILINK_DEF(dmic_pin,
 	DAILINK_COMP_ARRAY(COMP_CPU("DMIC01 Pin")));
@@ -405,6 +429,7 @@ static struct snd_soc_dai_link cml_rt1011_rt5682_dailink[] = {
 		.name = "SSP0-Codec",
 		.id = 0,
 		.init = cml_rt5682_codec_init,
+		.exit = cml_rt5682_codec_exit,
 		.ignore_pmdown_time = 1,
 		.ops = &cml_rt5682_ops,
 		.dpcm_playback = 1,
@@ -465,24 +490,34 @@ static struct snd_soc_dai_link cml_rt1011_rt5682_dailink[] = {
 		.no_pcm = 1,
 		.init = cml_rt1011_spk_init,
 		.ops = &cml_rt1011_ops,
-		SND_SOC_DAILINK_REG(ssp1_pin, ssp1_codec, platform),
+		SND_SOC_DAILINK_REG(ssp1_pin, ssp1_codec_2spk, platform),
 	},
 };
 
 static struct snd_soc_codec_conf rt1011_conf[] = {
 	{
-		.dev_name = "i2c-10EC1011:00",
+		.dlc = COMP_CODEC_CONF("i2c-10EC1011:00"),
 		.name_prefix = "WL",
 	},
 	{
-		.dev_name = "i2c-10EC1011:01",
+		.dlc = COMP_CODEC_CONF("i2c-10EC1011:01"),
 		.name_prefix = "WR",
+	},
+	/* single configuration structure for 2 and 4 channels */
+	{
+		.dlc = COMP_CODEC_CONF("i2c-10EC1011:02"),
+		.name_prefix = "TL",
+	},
+	{
+		.dlc = COMP_CODEC_CONF("i2c-10EC1011:03"),
+		.name_prefix = "TR",
 	},
 };
 
 /* Cometlake audio machine driver for RT1011 and RT5682 */
 static struct snd_soc_card snd_soc_card_cml = {
 	.name = "cml_rt1011_rt5682",
+	.owner = THIS_MODULE,
 	.dai_link = cml_rt1011_rt5682_dailink,
 	.num_links = ARRAY_SIZE(cml_rt1011_rt5682_dailink),
 	.codec_conf = rt1011_conf,
@@ -499,85 +534,33 @@ static struct snd_soc_card snd_soc_card_cml = {
 
 static int snd_cml_rt1011_probe(struct platform_device *pdev)
 {
-	struct snd_soc_dai_link_component *rt1011_dais_components;
-	struct snd_soc_codec_conf *rt1011_dais_confs;
+	struct snd_soc_dai_link *dai_link;
 	struct card_private *ctx;
 	struct snd_soc_acpi_mach *mach;
 	const char *platform_name;
 	int ret, i;
 
-	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_ATOMIC);
+	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&ctx->hdmi_pcm_list);
-	mach = (&pdev->dev)->platform_data;
+	mach = pdev->dev.platform_data;
 	snd_soc_card_cml.dev = &pdev->dev;
 	platform_name = mach->mach_params.platform;
 
 	dmi_check_system(sof_rt1011_quirk_table);
 
-	dev_info(&pdev->dev, "sof_rt1011_quirk = %lx\n", sof_rt1011_quirk);
+	dev_dbg(&pdev->dev, "sof_rt1011_quirk = %lx\n", sof_rt1011_quirk);
 
+	/* when 4 speaker is available, update codec config */
 	if (sof_rt1011_quirk & (SOF_RT1011_SPEAKER_TL |
 				SOF_RT1011_SPEAKER_TR)) {
-		rt1011_dais_confs = devm_kzalloc(&pdev->dev,
-					sizeof(struct snd_soc_codec_conf) *
-					SPK_CH, GFP_KERNEL);
-
-		if (!rt1011_dais_confs)
-			return -ENOMEM;
-
-		rt1011_dais_components = devm_kzalloc(&pdev->dev,
-					sizeof(struct snd_soc_dai_link_component) *
-					SPK_CH, GFP_KERNEL);
-
-		if (!rt1011_dais_components)
-			return -ENOMEM;
-
-		for (i = 0; i < SPK_CH; i++) {
-			rt1011_dais_confs[i].dev_name = devm_kasprintf(&pdev->dev,
-								GFP_KERNEL,
-								"i2c-10EC1011:0%d",
-								i);
-
-			if (!rt1011_dais_confs[i].dev_name)
-				return -ENOMEM;
-
-			switch (i) {
-			case 0:
-				rt1011_dais_confs[i].name_prefix = "WL";
-				break;
-			case 1:
-				rt1011_dais_confs[i].name_prefix = "WR";
-				break;
-			case 2:
-				rt1011_dais_confs[i].name_prefix = "TL";
-				break;
-			case 3:
-				rt1011_dais_confs[i].name_prefix = "TR";
-				break;
-			default:
-				return -EINVAL;
-			}
-			rt1011_dais_components[i].name = devm_kasprintf(&pdev->dev,
-								GFP_KERNEL,
-								"i2c-10EC1011:0%d",
-								i);
-			if (!rt1011_dais_components[i].name)
-				return -ENOMEM;
-
-			rt1011_dais_components[i].dai_name = CML_RT1011_CODEC_DAI;
-		}
-
-		snd_soc_card_cml.codec_conf = rt1011_dais_confs;
-		snd_soc_card_cml.num_configs = SPK_CH;
-
-		for (i = 0; i < ARRAY_SIZE(cml_rt1011_rt5682_dailink); i++) {
-			if (!strcmp(cml_rt1011_rt5682_dailink[i].codecs->dai_name,
-					CML_RT1011_CODEC_DAI)) {
-				cml_rt1011_rt5682_dailink[i].codecs = rt1011_dais_components;
-				cml_rt1011_rt5682_dailink[i].num_codecs = SPK_CH;
+		for_each_card_prelinks(&snd_soc_card_cml, i, dai_link) {
+			if (!strcmp(dai_link->codecs[0].dai_name,
+				    CML_RT1011_CODEC_DAI)) {
+				dai_link->codecs = ssp1_codec_4spk;
+				dai_link->num_codecs = ARRAY_SIZE(ssp1_codec_4spk);
 			}
 		}
 	}
@@ -587,6 +570,9 @@ static int snd_cml_rt1011_probe(struct platform_device *pdev)
 						    platform_name);
 	if (ret)
 		return ret;
+
+	ctx->common_hdmi_codec_drv = mach->mach_params.common_hdmi_codec_drv;
+
 	snd_soc_card_set_drvdata(&snd_soc_card_cml, ctx);
 
 	return devm_snd_soc_register_card(&pdev->dev, &snd_soc_card_cml);

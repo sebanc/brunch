@@ -57,9 +57,9 @@
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/virtio.h>
+#include <linux/virtio_dma_buf.h>
 #include <linux/virtio_wl.h>
 
-#include <drm/virtio_drm.h>
 #include <uapi/linux/dma-buf.h>
 
 #ifdef CONFIG_DRM_VIRTIO_GPU
@@ -706,6 +706,17 @@ static int encode_vfd_ids(struct virtwl_vfd **vfds, size_t vfd_count,
 }
 
 #ifdef SEND_VIRTGPU_RESOURCES
+static int get_dma_buf_id(struct dma_buf *dma_buf, u32 *id)
+{
+	uuid_t uuid;
+	int ret = 0;
+
+	ret = virtio_dma_buf_get_uuid(dma_buf, &uuid);
+	*id = be32_to_cpu(*(__be32 *)(uuid.b + 12));
+
+	return ret;
+}
+
 static int encode_vfd_ids_foreign(struct virtwl_vfd **vfds,
 				  struct dma_buf **virtgpu_dma_bufs,
 				  size_t vfd_count,
@@ -719,9 +730,8 @@ static int encode_vfd_ids_foreign(struct virtwl_vfd **vfds,
 			vfd_ids[i].kind = VIRTIO_WL_CTRL_VFD_SEND_KIND_LOCAL;
 			vfd_ids[i].id = cpu_to_le32(vfds[i]->id);
 		} else if (virtgpu_dma_bufs[i]) {
-			ret = virtio_gpu_dma_buf_to_handle(virtgpu_dma_bufs[i],
-							   false,
-							   &vfd_ids[i].id);
+			ret = get_dma_buf_id(virtgpu_dma_bufs[i],
+					     &vfd_ids[i].id);
 			if (ret)
 				return ret;
 			vfd_ids[i].kind = VIRTIO_WL_CTRL_VFD_SEND_KIND_VIRTGPU;
@@ -1148,7 +1158,7 @@ static long virtwl_ioctl_send(struct file *filp, void __user *ptr)
 		return -EFAULT;
 
 	/* Early check for user error; do_send still uses copy_from_user. */
-	ret = !access_ok(VERIFY_READ, user_data, ioctl_send.len);
+	ret = !access_ok(user_data, ioctl_send.len);
 	if (ret)
 		return -EFAULT;
 
@@ -1174,7 +1184,7 @@ static long virtwl_ioctl_recv(struct file *filp, void __user *ptr)
 		return -EFAULT;
 
 	/* Early check for user error. */
-	ret = !access_ok(VERIFY_WRITE, user_data, ioctl_recv.len);
+	ret = !access_ok(user_data, ioctl_recv.len);
 	if (ret)
 		return -EFAULT;
 
@@ -1260,7 +1270,7 @@ static long virtwl_ioctl_new(struct file *filp, void __user *ptr,
 	int ret;
 
 	/* Early check for user error. */
-	ret = !access_ok(VERIFY_WRITE, ptr, size);
+	ret = !access_ok(ptr, size);
 	if (ret)
 		return -EFAULT;
 

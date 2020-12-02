@@ -51,9 +51,12 @@ int pl111_vexpress_clcd_init(struct device *dev,
 		}
 		if (of_device_is_compatible(child, "arm,hdlcd")) {
 			has_coretile_hdlcd = true;
+			of_node_put(child);
 			break;
 		}
 	}
+
+	of_node_put(root);
 
 	/*
 	 * If there is a coretile HDLCD and it has a driver,

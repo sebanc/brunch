@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * ACPI Ambient Light Sensor Driver
  *
@@ -10,20 +11,6 @@
  * Final cleanup and debugging:
  * Copyright (C) 2013-2014 Marek Vasut <marex@denx.de>
  * Copyright (C) 2015 Gabriele Mazzotta <gabriele.mzt@gmail.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2 of the License, or (at your
- * option) any later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
 #include <linux/module.h>
@@ -56,8 +43,7 @@ static const struct iio_chan_spec acpi_als_channels[] = {
 		},
 		/* _RAW is here for backward ABI compatibility */
 		.info_mask_separate	= BIT(IIO_CHAN_INFO_RAW) |
-					  BIT(IIO_CHAN_INFO_PROCESSED) |
-					  BIT(IIO_CHAN_INFO_CALIBSCALE),
+					  BIT(IIO_CHAN_INFO_PROCESSED),
 	},
 };
 
@@ -77,9 +63,6 @@ struct acpi_als {
 	struct mutex		lock;
 
 	s32			evt_buffer[ACPI_ALS_EVT_BUFFER_SIZE];
-
-	uint			als_scale;
-	uint			als_uscale;
 };
 
 /*
@@ -158,58 +141,24 @@ static int acpi_als_read_raw(struct iio_dev *indio_dev,
 	s32 temp_val;
 	int ret;
 
+	if ((mask != IIO_CHAN_INFO_PROCESSED) && (mask != IIO_CHAN_INFO_RAW))
+		return -EINVAL;
+
 	/* we support only illumination (_ALI) so far. */
 	if (chan->type != IIO_LIGHT)
 		return -EINVAL;
 
-	switch (mask) {
-	case IIO_CHAN_INFO_RAW:
-	case IIO_CHAN_INFO_PROCESSED:
-		ret = acpi_als_read_value(als, ACPI_ALS_ILLUMINANCE, &temp_val);
-		if (ret < 0)
-			return ret;
-		if (mask == IIO_CHAN_INFO_PROCESSED) {
-			/* use u64 to avoid overflow */
-			u64 ulux = (u64) temp_val * 1000000;
-			mutex_lock(&als->lock);
-			ulux = ulux * als->als_scale +
-			       div_u64(ulux * als->als_uscale, 1000000U);
-			mutex_unlock(&als->lock);
-			*val = div_u64(ulux, 1000000U);
-		} else {
-			*val = temp_val;
-		}
-		return IIO_VAL_INT;
-	case IIO_CHAN_INFO_CALIBSCALE:
-		mutex_lock(&als->lock);
-		*val = als->als_scale;
-		*val2 = als->als_uscale;
-		mutex_unlock(&als->lock);
-		return IIO_VAL_INT_PLUS_MICRO;
-	default:
-		return -EINVAL;
-	}
-}
+	ret = acpi_als_read_value(als, ACPI_ALS_ILLUMINANCE, &temp_val);
+	if (ret < 0)
+		return ret;
 
-static int acpi_als_write_raw(struct iio_dev *iio,
-			      struct iio_chan_spec const *chan, int val,
-			      int val2, long mask)
-{
-	struct acpi_als *als = iio_priv(iio);
+	*val = temp_val;
 
-	if (mask != IIO_CHAN_INFO_CALIBSCALE || chan->type != IIO_LIGHT)
-		return -EINVAL;
-
-	mutex_lock(&als->lock);
-	als->als_scale = val;
-	als->als_uscale = val2;
-	mutex_unlock(&als->lock);
-	return 0;
+	return IIO_VAL_INT;
 }
 
 static const struct iio_info acpi_als_info = {
 	.read_raw		= acpi_als_read_raw,
-	.write_raw		= acpi_als_write_raw,
 };
 
 static int acpi_als_add(struct acpi_device *device)
@@ -226,8 +175,6 @@ static int acpi_als_add(struct acpi_device *device)
 
 	device->driver_data = indio_dev;
 	als->device = device;
-	als->als_scale = 1;
-	als->als_uscale = 0;
 	mutex_init(&als->lock);
 
 	indio_dev->name = ACPI_ALS_DEVICE_NAME;

@@ -791,20 +791,3 @@ drivers/misc/lkdtm.c:331 lkdtm_do_action() error: potential null dereference 'da
 drivers/misc/lkdtm.c:331 lkdtm_do_action() error: buffer overflow 'data' 255 <= 256
 drivers/bus/arm-cci.c:254:17: error: attribute '__noclone__': unknown attribute
 drivers/mmc/host/dw_mmc.c:1059 dw_mci_tasklet_func() error: we previously assumed 'data' could be null (see line 1035)
-security/container/protos/nanopb/pb_encode.c:283 pb_check_proto3_default_value() warn: inconsistent indenting
-security/container/protos/nanopb/pb_decode.c:200 pb_decode_varint32_eof() error: uninitialized symbol 'byte'.
-security/container/protos/nanopb/pb_decode.c:221 pb_decode_varint32_eof() warn: mask and shift to zero
-security/container/protos/nanopb/pb_decode.c:240 pb_decode_varint32_eof() warn: inconsistent indenting
-security/container/protos/nanopb/pb_decode.c:264 pb_decode_varint() error: uninitialized symbol 'byte'.
-security/container/protos/nanopb/pb_decode.c:1246 pb_decode_svarint() error: uninitialized symbol 'value'.
-security/container/protos/nanopb/pb_decode.c:1304 pb_dec_varint() error: uninitialized symbol 'value'.
-security/container/protos/nanopb/pb_decode.c:1306 pb_dec_varint() error: uninitialized symbol 'value'.
-security/container/protos/nanopb/pb_decode.c:1334 pb_dec_uvarint() error: uninitialized symbol 'value'.
-security/container/protos/nanopb/pb_decode.c:1336 pb_dec_uvarint() error: uninitialized symbol 'value'.
-security/container/protos/nanopb/pb_decode.c:1338 pb_dec_uvarint() error: uninitialized symbol 'value'.
-security/container/protos/nanopb/pb_decode.c:1340 pb_dec_uvarint() error: uninitialized symbol 'value'.
-security/container/protos/event.pb.c:110:1: error: Expected ; at end of declaration
-security/container/protos/event.pb.c:110:1: error: got rt1102
-security/container/protos/event.pb.c:121:1: error: Expected ; at end of declaration
-security/container/protos/event.pb.c:121:1: error: got rt1213
-

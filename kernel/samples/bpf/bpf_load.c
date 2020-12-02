@@ -16,7 +16,6 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/types.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/ioctl.h>
@@ -41,7 +40,7 @@ int prog_cnt;
 int prog_array_fd = -1;
 
 struct bpf_map_data map_data[MAX_MAPS];
-int map_data_count = 0;
+int map_data_count;
 
 static int populate_prog_array(const char *event, int prog_fd)
 {
@@ -66,7 +65,7 @@ static int write_kprobe_events(const char *val)
 	else
 		flags = O_WRONLY | O_APPEND;
 
-	fd = open("/sys/kernel/debug/tracing/kprobe_events", flags);
+	fd = open(DEBUGFS "kprobe_events", flags);
 
 	ret = write(fd, val, strlen(val));
 	close(fd);
@@ -302,8 +301,8 @@ static int load_maps(struct bpf_map_data *maps, int nr_maps,
 							numa_node);
 		}
 		if (map_fd[i] < 0) {
-			printf("failed to create a map: %d %s\n",
-			       errno, strerror(errno));
+			printf("failed to create map %d (%s): %d %s\n",
+			       i, maps[i].name, errno, strerror(errno));
 			return 1;
 		}
 		maps[i].fd = map_fd[i];
@@ -491,8 +490,8 @@ static int load_elf_maps_section(struct bpf_map_data *maps, int maps_shndx,
 
 		/* Verify no newer features were requested */
 		if (validate_zero) {
-			addr = (unsigned char*) def + map_sz_copy;
-			end  = (unsigned char*) def + map_sz_elf;
+			addr = (unsigned char *) def + map_sz_copy;
+			end  = (unsigned char *) def + map_sz_elf;
 			for (; addr < end; addr++) {
 				if (*addr != 0) {
 					free(sym);

@@ -1,12 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * rt5514-spi.c  --  RT5514 SPI driver
  *
  * Copyright 2015 Realtek Semiconductor Corp.
  * Author: Oder Chiou <oder_chiou@realtek.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/module.h>
@@ -204,18 +201,18 @@ static irqreturn_t rt5514_spi_irq(int irq, void *data)
 }
 
 /* PCM for streaming audio from the DSP buffer */
-static int rt5514_spi_pcm_open(struct snd_pcm_substream *substream)
+static int rt5514_spi_pcm_open(struct snd_soc_component *component,
+			       struct snd_pcm_substream *substream)
 {
 	snd_soc_set_runtime_hwparams(substream, &rt5514_spi_pcm_hardware);
 
 	return 0;
 }
 
-static int rt5514_spi_hw_params(struct snd_pcm_substream *substream,
-			       struct snd_pcm_hw_params *hw_params)
+static int rt5514_spi_hw_params(struct snd_soc_component *component,
+				struct snd_pcm_substream *substream,
+				struct snd_pcm_hw_params *hw_params)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, DRV_NAME);
 	struct rt5514_dsp *rt5514_dsp =
 		snd_soc_component_get_drvdata(component);
 	int ret;
@@ -237,10 +234,9 @@ static int rt5514_spi_hw_params(struct snd_pcm_substream *substream,
 	return ret;
 }
 
-static int rt5514_spi_hw_free(struct snd_pcm_substream *substream)
+static int rt5514_spi_hw_free(struct snd_soc_component *component,
+			      struct snd_pcm_substream *substream)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, DRV_NAME);
 	struct rt5514_dsp *rt5514_dsp =
 		snd_soc_component_get_drvdata(component);
 
@@ -254,24 +250,22 @@ static int rt5514_spi_hw_free(struct snd_pcm_substream *substream)
 }
 
 static snd_pcm_uframes_t rt5514_spi_pcm_pointer(
+		struct snd_soc_component *component,
 		struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_component *component = snd_soc_rtdcom_lookup(rtd, DRV_NAME);
 	struct rt5514_dsp *rt5514_dsp =
 		snd_soc_component_get_drvdata(component);
 
 	return bytes_to_frames(runtime, rt5514_dsp->dma_offset);
 }
 
-static const struct snd_pcm_ops rt5514_spi_pcm_ops = {
-	.open		= rt5514_spi_pcm_open,
-	.hw_params	= rt5514_spi_hw_params,
-	.hw_free	= rt5514_spi_hw_free,
-	.pointer	= rt5514_spi_pcm_pointer,
-	.page		= snd_pcm_lib_get_vmalloc_page,
-};
+static struct page *rt5514_spi_pcm_page(struct snd_soc_component *component,
+					struct snd_pcm_substream *substream,
+					unsigned long offset)
+{
+	return snd_pcm_lib_get_vmalloc_page(substream, offset);
+}
 
 static int rt5514_spi_pcm_probe(struct snd_soc_component *component)
 {
@@ -305,9 +299,13 @@ static int rt5514_spi_pcm_probe(struct snd_soc_component *component)
 }
 
 static const struct snd_soc_component_driver rt5514_spi_component = {
-	.name  = DRV_NAME,
-	.probe = rt5514_spi_pcm_probe,
-	.ops = &rt5514_spi_pcm_ops,
+	.name		= DRV_NAME,
+	.probe		= rt5514_spi_pcm_probe,
+	.open		= rt5514_spi_pcm_open,
+	.hw_params	= rt5514_spi_hw_params,
+	.hw_free	= rt5514_spi_hw_free,
+	.pointer	= rt5514_spi_pcm_pointer,
+	.page		= rt5514_spi_pcm_page,
 };
 
 /**
@@ -473,9 +471,7 @@ static int __maybe_unused rt5514_suspend(struct device *dev)
 
 static int __maybe_unused rt5514_resume(struct device *dev)
 {
-	struct snd_soc_component *component = snd_soc_lookup_component(dev, DRV_NAME);
-	struct rt5514_dsp *rt5514_dsp =
-		snd_soc_component_get_drvdata(component);
+	struct rt5514_dsp *rt5514_dsp = dev_get_drvdata(dev);
 	int irq = to_spi_device(dev)->irq;
 	u8 buf[8];
 

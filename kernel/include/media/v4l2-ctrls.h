@@ -1,17 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  *  V4L2 controls support header.
  *
  *  Copyright (C) 2010  Hans Verkuil <hverkuil@xs4all.nl>
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
  */
 
 #ifndef _V4L2_CTRLS_H
@@ -27,6 +18,7 @@
  * This will move to the public headers once this API is fully stable.
  */
 #include <media/mpeg2-ctrls.h>
+#include <media/fwht-ctrls.h>
 #include <media/h264-ctrls.h>
 #include <media/vp8-ctrls.h>
 
@@ -51,6 +43,7 @@ struct poll_table_struct;
  * @p_char:			Pointer to a string.
  * @p_mpeg2_slice_params:	Pointer to a MPEG2 slice parameters structure.
  * @p_mpeg2_quantization:	Pointer to a MPEG2 quantization data structure.
+ * @p_fwht_params:		Pointer to a FWHT stateless parameters structure.
  * @p_h264_sps:			Pointer to a struct v4l2_ctrl_h264_sps.
  * @p_h264_pps:			Pointer to a struct v4l2_ctrl_h264_pps.
  * @p_h264_scaling_matrix:	Pointer to a struct v4l2_ctrl_h264_scaling_matrix.
@@ -68,6 +61,7 @@ union v4l2_ctrl_ptr {
 	char *p_char;
 	struct v4l2_ctrl_mpeg2_slice_params *p_mpeg2_slice_params;
 	struct v4l2_ctrl_mpeg2_quantization *p_mpeg2_quantization;
+	struct v4l2_ctrl_fwht_params *p_fwht_params;
 	struct v4l2_ctrl_h264_sps *p_h264_sps;
 	struct v4l2_ctrl_h264_pps *p_h264_pps;
 	struct v4l2_ctrl_h264_scaling_matrix *p_h264_scaling_matrix;
@@ -789,6 +783,22 @@ struct v4l2_ctrl *v4l2_ctrl_find(struct v4l2_ctrl_handler *hdl, u32 id);
 void v4l2_ctrl_activate(struct v4l2_ctrl *ctrl, bool active);
 
 /**
+ * __v4l2_ctrl_grab() - Unlocked variant of v4l2_ctrl_grab.
+ *
+ * @ctrl:	The control to (de)activate.
+ * @grabbed:	True if the control should become grabbed.
+ *
+ * This sets or clears the V4L2_CTRL_FLAG_GRABBED flag atomically.
+ * Does nothing if @ctrl == NULL.
+ * The V4L2_EVENT_CTRL event will be generated afterwards.
+ * This will usually be called when starting or stopping streaming in the
+ * driver.
+ *
+ * This function assumes that the control handler is locked by the caller.
+ */
+void __v4l2_ctrl_grab(struct v4l2_ctrl *ctrl, bool grabbed);
+
+/**
  * v4l2_ctrl_grab() - Mark the control as grabbed or not grabbed.
  *
  * @ctrl:	The control to (de)activate.
@@ -803,7 +813,15 @@ void v4l2_ctrl_activate(struct v4l2_ctrl *ctrl, bool active);
  * This function assumes that the control handler is not locked and will
  * take the lock itself.
  */
-void v4l2_ctrl_grab(struct v4l2_ctrl *ctrl, bool grabbed);
+static inline void v4l2_ctrl_grab(struct v4l2_ctrl *ctrl, bool grabbed)
+{
+	if (!ctrl)
+		return;
+
+	v4l2_ctrl_lock(ctrl);
+	__v4l2_ctrl_grab(ctrl, grabbed);
+	v4l2_ctrl_unlock(ctrl);
+}
 
 /**
  *__v4l2_ctrl_modify_range() - Unlocked variant of v4l2_ctrl_modify_range()
@@ -924,7 +942,7 @@ s32 v4l2_ctrl_g_ctrl(struct v4l2_ctrl *ctrl);
  * __v4l2_ctrl_s_ctrl() - Unlocked variant of v4l2_ctrl_s_ctrl().
  *
  * @ctrl:	The control.
- * @val:	TheControls name new value.
+ * @val:	The new value.
  *
  * This sets the control's new value safely by going through the control
  * framework. This function assumes the control's handler is already locked,
@@ -1029,7 +1047,7 @@ int __v4l2_ctrl_s_ctrl_string(struct v4l2_ctrl *ctrl, const char *s);
  *
  * @ctrl:	The control.
  * @s:		The new string.
- *Controls name
+ *
  * This sets the control's new string safely by going through the control
  * framework. This function will lock the control's handler, so it cannot be
  * used from within the &v4l2_ctrl_ops functions.
@@ -1250,25 +1268,28 @@ int v4l2_s_ctrl(struct v4l2_fh *fh, struct v4l2_ctrl_handler *hdl,
  *	:ref:`VIDIOC_G_EXT_CTRLS <vidioc_g_ext_ctrls>` ioctl
  *
  * @hdl: pointer to &struct v4l2_ctrl_handler
+ * @vdev: pointer to &struct video_device
  * @mdev: pointer to &struct media_device
  * @c: pointer to &struct v4l2_ext_controls
  *
  * If hdl == NULL then they will all return -EINVAL.
  */
-int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct media_device *mdev,
-		     struct v4l2_ext_controls *c);
+int v4l2_g_ext_ctrls(struct v4l2_ctrl_handler *hdl, struct video_device *vdev,
+		     struct media_device *mdev, struct v4l2_ext_controls *c);
 
 /**
  * v4l2_try_ext_ctrls - Helper function to implement
  *	:ref:`VIDIOC_TRY_EXT_CTRLS <vidioc_g_ext_ctrls>` ioctl
  *
  * @hdl: pointer to &struct v4l2_ctrl_handler
+ * @vdev: pointer to &struct video_device
  * @mdev: pointer to &struct media_device
  * @c: pointer to &struct v4l2_ext_controls
  *
  * If hdl == NULL then they will all return -EINVAL.
  */
 int v4l2_try_ext_ctrls(struct v4l2_ctrl_handler *hdl,
+		       struct video_device *vdev,
 		       struct media_device *mdev,
 		       struct v4l2_ext_controls *c);
 
@@ -1278,12 +1299,14 @@ int v4l2_try_ext_ctrls(struct v4l2_ctrl_handler *hdl,
  *
  * @fh: pointer to &struct v4l2_fh
  * @hdl: pointer to &struct v4l2_ctrl_handler
+ * @vdev: pointer to &struct video_device
  * @mdev: pointer to &struct media_device
  * @c: pointer to &struct v4l2_ext_controls
  *
  * If hdl == NULL then they will all return -EINVAL.
  */
 int v4l2_s_ext_ctrls(struct v4l2_fh *fh, struct v4l2_ctrl_handler *hdl,
+		     struct video_device *vdev,
 		     struct media_device *mdev,
 		     struct v4l2_ext_controls *c);
 

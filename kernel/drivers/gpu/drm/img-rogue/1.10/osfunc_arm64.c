@@ -225,7 +225,6 @@ void OSCPUCacheFlushRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 							IMG_CPU_PHYADDR sCPUPhysEnd)
 {
 	struct device *dev;
-	const struct dma_map_ops *dma_ops;
 
 	if (pvVirtStart)
 	{
@@ -234,10 +233,12 @@ void OSCPUCacheFlushRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 	}
 
 	dev = psDevNode->psDevConfig->pvOSDevice;
-
-	dma_ops = get_dma_ops(dev);
-	dma_ops->sync_single_for_device(dev, sCPUPhysStart.uiAddr, sCPUPhysEnd.uiAddr - sCPUPhysStart.uiAddr, DMA_TO_DEVICE);
-	dma_ops->sync_single_for_cpu(dev, sCPUPhysStart.uiAddr, sCPUPhysEnd.uiAddr - sCPUPhysStart.uiAddr, DMA_FROM_DEVICE);
+	dma_sync_single_for_device(dev, sCPUPhysStart.uiAddr,
+				   sCPUPhysEnd.uiAddr - sCPUPhysStart.uiAddr,
+				   DMA_TO_DEVICE);
+	dma_sync_single_for_cpu(dev, sCPUPhysStart.uiAddr,
+				sCPUPhysEnd.uiAddr - sCPUPhysStart.uiAddr,
+				DMA_FROM_DEVICE);
 }
 
 void OSCPUCacheCleanRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
@@ -247,7 +248,6 @@ void OSCPUCacheCleanRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 							IMG_CPU_PHYADDR sCPUPhysEnd)
 {
 	struct device *dev;
-	const struct dma_map_ops *dma_ops;
 
 	if (pvVirtStart)
 	{
@@ -256,9 +256,9 @@ void OSCPUCacheCleanRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 	}
 
 	dev = psDevNode->psDevConfig->pvOSDevice;
-
-	dma_ops = get_dma_ops(psDevNode->psDevConfig->pvOSDevice);
-	dma_ops->sync_single_for_device(dev, sCPUPhysStart.uiAddr, sCPUPhysEnd.uiAddr - sCPUPhysStart.uiAddr, DMA_TO_DEVICE);
+	dma_sync_single_for_device(dev, sCPUPhysStart.uiAddr,
+				   sCPUPhysEnd.uiAddr - sCPUPhysStart.uiAddr,
+				   DMA_TO_DEVICE);
 }
 
 void OSCPUCacheInvalidateRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
@@ -268,7 +268,6 @@ void OSCPUCacheInvalidateRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 								 IMG_CPU_PHYADDR sCPUPhysEnd)
 {
 	struct device *dev;
-	const struct dma_map_ops *dma_ops;
 
 	if (pvVirtStart)
 	{
@@ -277,9 +276,9 @@ void OSCPUCacheInvalidateRangeKM(PVRSRV_DEVICE_NODE *psDevNode,
 	}
 
 	dev = psDevNode->psDevConfig->pvOSDevice;
-
-	dma_ops = get_dma_ops(psDevNode->psDevConfig->pvOSDevice);
-	dma_ops->sync_single_for_cpu(dev, sCPUPhysStart.uiAddr, sCPUPhysEnd.uiAddr - sCPUPhysStart.uiAddr, DMA_FROM_DEVICE);
+	dma_sync_single_for_cpu(dev, sCPUPhysStart.uiAddr,
+				sCPUPhysEnd.uiAddr - sCPUPhysStart.uiAddr,
+				DMA_FROM_DEVICE);
 }
 
 PVRSRV_CACHE_OP_ADDR_TYPE OSCPUCacheOpAddressType(void)

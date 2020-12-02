@@ -268,6 +268,29 @@ free:
 	return retval;
 }
 
+static int iwl_vendor_frame_filter_cmd(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       const void *data, int data_len)
+{
+	struct nlattr **tb;
+	struct ieee80211_vif *vif = wdev_to_ieee80211_vif(wdev);
+
+	if (!vif)
+		return -EINVAL;
+
+	tb = iwl_mvm_parse_vendor_data(data, data_len);
+	if (IS_ERR(tb))
+		return PTR_ERR(tb);
+
+	vif->filter_grat_arp_unsol_na =
+		tb[IWL_MVM_VENDOR_ATTR_FILTER_ARP_NA];
+	vif->filter_gtk = tb[IWL_MVM_VENDOR_ATTR_FILTER_GTK];
+
+	kfree(tb);
+
+	return 0;
+}
+
 #ifdef CPTCFG_IWLMVM_TDLS_PEER_CACHE
 static int iwl_vendor_tdls_peer_cache_add(struct wiphy *wiphy,
 					  struct wireless_dev *wdev,
@@ -453,8 +476,7 @@ static int iwl_vendor_set_nic_txpower_limit(struct wiphy *wiphy,
 	int len;
 	int err;
 	u8 cmd_ver = iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-					   REDUCE_TX_POWER_CMD,
-					   IWL_FW_CMD_VER_UNKNOWN);
+					   REDUCE_TX_POWER_CMD);
 
 	tb = iwl_mvm_parse_vendor_data(data, data_len);
 	if (IS_ERR(tb))
@@ -1181,10 +1203,9 @@ static int iwl_mvm_vendor_add_pasn_sta(struct wiphy *wiphy,
 	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 	struct ieee80211_vif *vif = wdev_to_ieee80211_vif(wdev);
-	u8 *addr, *tk = NULL, *hltk;
-	u32 tk_len = 0, hltk_len, cipher;
-	int ret = 0;
-	struct ieee80211_sta *sta;
+	u8 *addr, *tk, *hltk;
+	u32 tk_len, hltk_len, cipher;
+	int ret;
 
 	if (!vif)
 		return -ENODEV;
@@ -1194,37 +1215,21 @@ static int iwl_mvm_vendor_add_pasn_sta(struct wiphy *wiphy,
 		return PTR_ERR(tb);
 
 	if (!tb[IWL_MVM_VENDOR_ATTR_ADDR] ||
+	    !tb[IWL_MVM_VENDOR_ATTR_STA_TK] ||
 	    !tb[IWL_MVM_VENDOR_ATTR_STA_HLTK] ||
 	    !tb[IWL_MVM_VENDOR_ATTR_STA_CIPHER])
 		return -EINVAL;
 
 	addr = nla_data(tb[IWL_MVM_VENDOR_ATTR_ADDR]);
 	cipher = nla_get_u32(tb[IWL_MVM_VENDOR_ATTR_STA_CIPHER]);
+	tk = nla_data(tb[IWL_MVM_VENDOR_ATTR_STA_TK]);
+	tk_len = nla_len(tb[IWL_MVM_VENDOR_ATTR_STA_TK]);
 	hltk = nla_data(tb[IWL_MVM_VENDOR_ATTR_STA_HLTK]);
 	hltk_len = nla_len(tb[IWL_MVM_VENDOR_ATTR_STA_HLTK]);
 
-	rcu_read_lock();
-	sta = ieee80211_find_sta(vif, addr);
-	if ((!tb[IWL_MVM_VENDOR_ATTR_STA_TK] && (!sta || !sta->mfp)) ||
-	    (tb[IWL_MVM_VENDOR_ATTR_STA_TK] && sta && sta->mfp))
-		ret = -EINVAL;
-	rcu_read_unlock();
-	if (ret)
-		return ret;
-
-	if (tb[IWL_MVM_VENDOR_ATTR_STA_TK]) {
-		tk = nla_data(tb[IWL_MVM_VENDOR_ATTR_STA_TK]);
-		tk_len = nla_len(tb[IWL_MVM_VENDOR_ATTR_STA_TK]);
-	}
-
 	mutex_lock(&mvm->mutex);
-	if (vif->bss_conf.ftm_responder)
-		ret = iwl_mvm_ftm_respoder_add_pasn_sta(mvm, vif, addr, cipher,
-							tk, tk_len, hltk,
-							hltk_len);
-	else
-		iwl_mvm_ftm_add_pasn_sta(mvm, vif, addr, cipher, tk, tk_len,
-					 hltk, hltk_len);
+	ret = iwl_mvm_ftm_respoder_add_pasn_sta(mvm, vif, addr, cipher, tk,
+						tk_len, hltk, hltk_len);
 	mutex_unlock(&mvm->mutex);
 	return ret;
 }
@@ -1297,6 +1302,21 @@ static const struct wiphy_vendor_command iwl_mvm_vendor_commands[] = {
 		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV |
 			 WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = iwl_mvm_set_country,
+#if CFG80211_VERSION >= KERNEL_VERSION(5,3,0)
+		.policy = iwl_mvm_vendor_attr_policy,
+#endif
+#if CFG80211_VERSION >= KERNEL_VERSION(5,3,0)
+		.maxattr = MAX_IWL_MVM_VENDOR_ATTR,
+#endif
+	},
+	{
+		.info = {
+			.vendor_id = INTEL_OUI,
+			.subcmd = IWL_MVM_VENDOR_CMD_PROXY_FRAME_FILTERING,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = iwl_vendor_frame_filter_cmd,
 #if CFG80211_VERSION >= KERNEL_VERSION(5,3,0)
 		.policy = iwl_mvm_vendor_attr_policy,
 #endif

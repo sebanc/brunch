@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2002 Roman Zippel <zippel@linux-m68k.org>
- * Released under the terms of the GNU GPL v2.0.
  */
 
 #include <ctype.h>
@@ -61,8 +61,6 @@ const char *sym_type_name(enum symbol_type type)
 		return "string";
 	case S_UNKNOWN:
 		return "unknown";
-	case S_OTHER:
-		break;
 	}
 	return "???";
 }
@@ -88,7 +86,7 @@ static struct property *sym_get_default_prop(struct symbol *sym)
 	return NULL;
 }
 
-static struct property *sym_get_range_prop(struct symbol *sym)
+struct property *sym_get_range_prop(struct symbol *sym)
 {
 	struct property *prop;
 
@@ -757,7 +755,6 @@ const char *sym_get_string_default(struct symbol *sym)
 		return str;
 	case S_STRING:
 		return str;
-	case S_OTHER:
 	case S_UNKNOWN:
 		break;
 	}
@@ -788,7 +785,7 @@ const char *sym_get_string_value(struct symbol *sym)
 	return (const char *)sym->curr.val;
 }
 
-bool sym_is_changable(struct symbol *sym)
+bool sym_is_changeable(struct symbol *sym)
 {
 	return sym->visible > sym->rev_dep.tri;
 }
@@ -1117,7 +1114,7 @@ static void sym_check_print_recursive(struct symbol *last_sym)
 	}
 
 	fprintf(stderr,
-		"For a resolution refer to Documentation/kbuild/kconfig-language.txt\n"
+		"For a resolution refer to Documentation/kbuild/kconfig-language.rst\n"
 		"subsection \"Kconfig recursive dependency limitations\"\n"
 		"\n");
 

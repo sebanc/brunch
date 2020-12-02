@@ -23,18 +23,20 @@
  *          Alon Levy
  */
 
+#include <linux/delay.h>
+
+#include <drm/drm.h>
+#include <drm/drm_file.h>
+#include <drm/drm_debugfs.h>
+#include <drm/qxl_drm.h>
 #include <drm/ttm/ttm_bo_api.h>
 #include <drm/ttm/ttm_bo_driver.h>
-#include <drm/ttm/ttm_placement.h>
-#include <drm/ttm/ttm_page_alloc.h>
 #include <drm/ttm/ttm_module.h>
-#include <drm/drmP.h>
-#include <drm/drm.h>
-#include <drm/qxl_drm.h>
+#include <drm/ttm/ttm_page_alloc.h>
+#include <drm/ttm/ttm_placement.h>
+
 #include "qxl_drv.h"
 #include "qxl_object.h"
-
-#include <linux/delay.h>
 
 static struct qxl_device *qxl_get_qdev(struct ttm_bo_device *bdev)
 {
@@ -63,15 +65,10 @@ static vm_fault_t qxl_ttm_fault(struct vm_fault *vmf)
 
 int qxl_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	struct drm_file *file_priv;
-	struct qxl_device *qdev;
 	int r;
+	struct drm_file *file_priv = filp->private_data;
+	struct qxl_device *qdev = file_priv->minor->dev->dev_private;
 
-	if (unlikely(vma->vm_pgoff < DRM_FILE_PAGE_OFFSET))
-		return -EINVAL;
-
-	file_priv = filp->private_data;
-	qdev = file_priv->minor->dev->dev_private;
 	if (qdev == NULL) {
 		DRM_ERROR(
 		 "filp->private_data->minor->dev->dev_private == NULL\n");
@@ -100,6 +97,11 @@ static int qxl_invalidate_caches(struct ttm_bo_device *bdev, uint32_t flags)
 static int qxl_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 			     struct ttm_mem_type_manager *man)
 {
+	struct qxl_device *qdev = qxl_get_qdev(bdev);
+	unsigned int gpu_offset_shift =
+		64 - (qdev->rom->slot_gen_bits + qdev->rom->slot_id_bits + 8);
+	struct qxl_memslot *slot;
+
 	switch (type) {
 	case TTM_PL_SYSTEM:
 		/* System memory */
@@ -110,15 +112,18 @@ static int qxl_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 	case TTM_PL_VRAM:
 	case TTM_PL_PRIV:
 		/* "On-card" video ram */
+		slot = (type == TTM_PL_VRAM) ?
+			&qdev->main_slot : &qdev->surfaces_slot;
+		slot->gpu_offset = (uint64_t)type << gpu_offset_shift;
 		man->func = &ttm_bo_manager_func;
-		man->gpu_offset = 0;
+		man->gpu_offset = slot->gpu_offset;
 		man->flags = TTM_MEMTYPE_FLAG_FIXED |
 			     TTM_MEMTYPE_FLAG_MAPPABLE;
 		man->available_caching = TTM_PL_MASK_CACHING;
 		man->default_caching = TTM_PL_FLAG_CACHED;
 		break;
 	default:
-		DRM_ERROR("Unsupported memory type %u\n", (unsigned)type);
+		DRM_ERROR("Unsupported memory type %u\n", (unsigned int)type);
 		return -EINVAL;
 	}
 	return 0;
@@ -150,7 +155,7 @@ static int qxl_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 {
 	struct qxl_bo *qbo = to_qxl_bo(bo);
 
-	return drm_vma_node_verify_access(&qbo->gem_base.vma_node,
+	return drm_vma_node_verify_access(&qbo->tbo.base.vma_node,
 					  filp->private_data);
 }
 
@@ -196,7 +201,7 @@ static void qxl_ttm_io_mem_free(struct ttm_bo_device *bdev,
  * TTM backend functions.
  */
 struct qxl_ttm_tt {
-	struct ttm_dma_tt		ttm;
+	struct ttm_tt		        ttm;
 	struct qxl_device		*qdev;
 	u64				offset;
 };
@@ -225,7 +230,7 @@ static void qxl_ttm_backend_destroy(struct ttm_tt *ttm)
 {
 	struct qxl_ttm_tt *gtt = (void *)ttm;
 
-	ttm_dma_tt_fini(&gtt->ttm);
+	ttm_tt_fini(&gtt->ttm);
 	kfree(gtt);
 }
 
@@ -245,13 +250,13 @@ static struct ttm_tt *qxl_ttm_tt_create(struct ttm_buffer_object *bo,
 	gtt = kzalloc(sizeof(struct qxl_ttm_tt), GFP_KERNEL);
 	if (gtt == NULL)
 		return NULL;
-	gtt->ttm.ttm.func = &qxl_backend_func;
+	gtt->ttm.func = &qxl_backend_func;
 	gtt->qdev = qdev;
-	if (ttm_dma_tt_init(&gtt->ttm, bo, page_flags)) {
+	if (ttm_tt_init(&gtt->ttm, bo, page_flags)) {
 		kfree(gtt);
 		return NULL;
 	}
-	return &gtt->ttm.ttm;
+	return &gtt->ttm;
 }
 
 static void qxl_move_null(struct ttm_buffer_object *bo,
@@ -275,7 +280,6 @@ static int qxl_bo_move(struct ttm_buffer_object *bo, bool evict,
 	if (ret)
 		return ret;
 
-
 	if (old_mem->mem_type == TTM_PL_SYSTEM && bo->ttm == NULL) {
 		qxl_move_null(bo, new_mem);
 		return 0;
@@ -293,7 +297,7 @@ static void qxl_bo_move_notify(struct ttm_buffer_object *bo,
 	if (!qxl_ttm_bo_is_qxl_bo(bo))
 		return;
 	qbo = to_qxl_bo(bo);
-	qdev = qbo->gem_base.dev->dev_private;
+	qdev = qbo->tbo.base.dev->dev_private;
 
 	if (bo->mem.mem_type == TTM_PL_PRIV && qbo->surface_id)
 		qxl_surface_evict(qdev, qbo, new_mem ? true : false);
@@ -341,11 +345,11 @@ int qxl_ttm_init(struct qxl_device *qdev)
 		return r;
 	}
 	DRM_INFO("qxl: %uM of VRAM memory size\n",
-		 (unsigned)qdev->vram_size / (1024 * 1024));
+		 (unsigned int)qdev->vram_size / (1024 * 1024));
 	DRM_INFO("qxl: %luM of IO pages memory ready (VRAM domain)\n",
-		 ((unsigned)num_io_pages * PAGE_SIZE) / (1024 * 1024));
+		 ((unsigned int)num_io_pages * PAGE_SIZE) / (1024 * 1024));
 	DRM_INFO("qxl: %uM of Surface memory size\n",
-		 (unsigned)qdev->surfaceram_size / (1024 * 1024));
+		 (unsigned int)qdev->surfaceram_size / (1024 * 1024));
 	return 0;
 }
 
@@ -356,7 +360,6 @@ void qxl_ttm_fini(struct qxl_device *qdev)
 	ttm_bo_device_release(&qdev->mman.bdev);
 	DRM_INFO("qxl: ttm finalized\n");
 }
-
 
 #define QXL_DEBUGFS_MEM_TYPES 2
 
@@ -382,7 +385,7 @@ int qxl_ttm_debugfs_init(struct qxl_device *qdev)
 #if defined(CONFIG_DEBUG_FS)
 	static struct drm_info_list qxl_mem_types_list[QXL_DEBUGFS_MEM_TYPES];
 	static char qxl_mem_types_names[QXL_DEBUGFS_MEM_TYPES][32];
-	unsigned i;
+	unsigned int i;
 
 	for (i = 0; i < QXL_DEBUGFS_MEM_TYPES; i++) {
 		if (i == 0)

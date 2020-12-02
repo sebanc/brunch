@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+/* SPDX-License-Identifier: GPL-2.0 */
 // Copyright (C) 2005-2017 Andes Technology Corporation
 
 #ifndef __NDS32_FUTEX_H__
@@ -40,7 +40,7 @@ futex_atomic_cmpxchg_inatomic(u32 * uval, u32 __user * uaddr,
 	int ret = 0;
 	u32 val, tmp, flags;
 
-	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
+	if (!access_ok(uaddr, sizeof(u32)))
 		return -EFAULT;
 
 	smp_mb();

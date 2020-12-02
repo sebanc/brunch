@@ -55,7 +55,7 @@ EXPORT_TRACEPOINT_SYMBOL(android_fs_dataread_end);
 static void mpage_end_io(struct bio *bio)
 {
 	struct bio_vec *bv;
-	int i;
+	struct bvec_iter_all iter_all;
 
 	if (trace_android_fs_dataread_end_enabled() &&
 	    (bio_data_dir(bio) == READ)) {
@@ -67,7 +67,7 @@ static void mpage_end_io(struct bio *bio)
 						      bio->bi_iter.bi_size);
 	}
 
-	bio_for_each_segment_all(bv, bio, i) {
+	bio_for_each_segment_all(bv, bio, iter_all) {
 		struct page *page = bv->bv_page;
 		page_endio(page, bio_op(bio),
 			   blk_status_to_errno(bio->bi_status));
@@ -98,7 +98,7 @@ static struct bio *mpage_bio_submit(int op, int op_flags, struct bio *bio)
 	}
 	bio->bi_end_io = mpage_end_io;
 	bio_set_op_attrs(bio, op, op_flags);
-	guard_bio_eod(op, bio);
+	guard_bio_eod(bio);
 	submit_bio(bio);
 	return NULL;
 }
@@ -683,7 +683,7 @@ alloc_new:
 	 * the confused fail path above (OOM) will be very confused when
 	 * it finds all bh marked clean (i.e. it will not write anything)
 	 */
-	wbc_account_io(wbc, page, PAGE_SIZE);
+	wbc_account_cgroup_owner(wbc, page, PAGE_SIZE);
 	length = first_unmapped << blkbits;
 	if (bio_add_page(bio, page, length, 0) < length) {
 		bio = mpage_bio_submit(REQ_OP_WRITE, op_flags, bio);

@@ -1,16 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
  * Copyright (C) 2011 Freescale Semiconductor, Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
  */
 
 #ifndef __DW_HDMI__
 #define __DW_HDMI__
-
-#include <sound/hdmi-codec.h>
 
 struct drm_connector;
 struct drm_display_mode;
@@ -86,14 +80,6 @@ enum {
 	DW_HDMI_RES_MAX,
 };
 
-enum {
-	DW_HDMI_HDCP_KSV_LEN = 8,
-	DW_HDMI_HDCP_SHA_LEN = 20,
-	DW_HDMI_HDCP_DPK_LEN = 280,
-	DW_HDMI_HDCP_KEY_LEN = 308,
-	DW_HDMI_HDCP_SEED_LEN = 2,
-};
-
 enum dw_hdmi_phy_type {
 	DW_HDMI_PHY_DWC_HDMI_TX_PHY = 0x00,
 	DW_HDMI_PHY_DWC_MHL_PHY_HEAC = 0xb2,
@@ -134,24 +120,6 @@ struct dw_hdmi_phy_ops {
 	void (*setup_hpd)(struct dw_hdmi *hdmi, void *data);
 };
 
-struct dw_hdmi_hdcp_key_1x {
-	union {
-		/*
-		 * These 3 fields are provided by userspace and can be
-		 * either viewed as one big blob or 3 separate pieces.
-		 */
-		struct {
-			u8 ksv[DW_HDMI_HDCP_KSV_LEN];
-			u8 device_key[DW_HDMI_HDCP_DPK_LEN];
-			u8 sha1[DW_HDMI_HDCP_SHA_LEN];
-		};
-		u8 user_provided_key[DW_HDMI_HDCP_KEY_LEN];
-	};
-
-	/* This seed is based on a per-device ID */
-	u8 seed[DW_HDMI_HDCP_SEED_LEN];
-};
-
 struct dw_hdmi_plat_data {
 	struct regmap *regm;
 	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
@@ -163,6 +131,7 @@ struct dw_hdmi_plat_data {
 	const struct dw_hdmi_phy_ops *phy_ops;
 	const char *phy_name;
 	void *phy_data;
+	unsigned int phy_force_vendor;
 
 	/* Synopsys PHY support */
 	const struct dw_hdmi_mpll_config *mpll_cfg;
@@ -185,14 +154,12 @@ void dw_hdmi_resume(struct dw_hdmi *hdmi);
 
 void dw_hdmi_setup_rx_sense(struct dw_hdmi *hdmi, bool hpd, bool rx_sense);
 
-int dw_hdmi_set_plugged_cb(struct dw_hdmi *hdmi, hdmi_codec_plugged_cb fn,
-			   struct device *codec_dev);
 void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
 void dw_hdmi_set_channel_count(struct dw_hdmi *hdmi, unsigned int cnt);
-void dw_hdmi_set_channel_status(struct dw_hdmi *hdmi, u8 *channel_status);
 void dw_hdmi_set_channel_allocation(struct dw_hdmi *hdmi, unsigned int ca);
 void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
 void dw_hdmi_audio_disable(struct dw_hdmi *hdmi);
+void dw_hdmi_set_high_tmds_clock_ratio(struct dw_hdmi *hdmi);
 
 /* PHY configuration */
 void dw_hdmi_phy_i2c_set_addr(struct dw_hdmi *hdmi, u8 address);
@@ -208,8 +175,5 @@ enum drm_connector_status dw_hdmi_phy_read_hpd(struct dw_hdmi *hdmi,
 void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
 			    bool force, bool disabled, bool rxsense);
 void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data);
-
-int dw_hdmi_config_hdcp_key(struct dw_hdmi *hdmi,
-			    const struct dw_hdmi_hdcp_key_1x *keys);
 
 #endif /* __IMX_HDMI_H__ */

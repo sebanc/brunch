@@ -1,11 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * (C) COPYRIGHT 2016 ARM Limited. All rights reserved.
  * Author: Liviu Dudau <Liviu.Dudau@arm.com>
- *
- * This program is free software and is provided to you under the terms of the
- * GNU General Public License version 2 as published by the Free Software
- * Foundation, and any use by you of this program is subject to the terms
- * of such GNU licence.
  *
  * ARM Mali DP500/DP550/DP650 KMS/DRM driver
  */
@@ -19,17 +15,19 @@
 #include <linux/pm_runtime.h>
 #include <linux/debugfs.h>
 
-#include <drm/drmP.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc.h>
-#include <drm/drm_crtc_helper.h>
-#include <drm/drm_fb_helper.h>
+#include <drm/drm_drv.h>
 #include <drm/drm_fb_cma_helper.h>
+#include <drm/drm_fb_helper.h>
+#include <drm/drm_fourcc.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_modeset_helper.h>
 #include <drm/drm_of.h>
+#include <drm/drm_probe_helper.h>
+#include <drm/drm_vblank.h>
 
 #include "malidp_drv.h"
 #include "malidp_mw.h"
@@ -275,37 +273,17 @@ static bool
 malidp_verify_afbc_framebuffer_caps(struct drm_device *dev,
 				    const struct drm_mode_fb_cmd2 *mode_cmd)
 {
-	const struct drm_format_info *info;
-
-	if ((mode_cmd->modifier[0] >> 56) != DRM_FORMAT_MOD_VENDOR_ARM) {
-		DRM_DEBUG_KMS("Unknown modifier (not Arm)\n");
+	if (malidp_format_mod_supported(dev, mode_cmd->pixel_format,
+					mode_cmd->modifier[0]) == false)
 		return false;
-	}
-
-	if (mode_cmd->modifier[0] &
-	    ~DRM_FORMAT_MOD_ARM_AFBC(AFBC_MOD_VALID_BITS)) {
-		DRM_DEBUG_KMS("Unsupported modifiers\n");
-		return false;
-	}
-
-	info = drm_get_format_info(dev, mode_cmd);
-	if (!info) {
-		DRM_DEBUG_KMS("Unable to get the format information\n");
-		return false;
-	}
-
-	if (info->num_planes != 1) {
-		DRM_DEBUG_KMS("AFBC buffers expect one plane\n");
-		return false;
-	}
 
 	if (mode_cmd->offsets[0] != 0) {
 		DRM_DEBUG_KMS("AFBC buffers' plane offset should be 0\n");
 		return false;
 	}
 
-	switch (mode_cmd->modifier[0] & AFBC_FORMAT_MOD_BLOCK_SIZE_MASK) {
-	case AFBC_FORMAT_MOD_BLOCK_SIZE_16x16:
+	switch (mode_cmd->modifier[0] & AFBC_SIZE_MASK) {
+	case AFBC_SIZE_16X16:
 		if ((mode_cmd->width % 16) || (mode_cmd->height % 16)) {
 			DRM_DEBUG_KMS("AFBC buffers must be aligned to 16 pixels\n");
 			return false;
@@ -329,9 +307,10 @@ malidp_verify_afbc_framebuffer_size(struct drm_device *dev,
 	struct drm_gem_object *objs = NULL;
 	u32 afbc_superblock_size = 0, afbc_superblock_height = 0;
 	u32 afbc_superblock_width = 0, afbc_size = 0;
+	int bpp = 0;
 
-	switch (mode_cmd->modifier[0] & AFBC_FORMAT_MOD_BLOCK_SIZE_MASK) {
-	case AFBC_FORMAT_MOD_BLOCK_SIZE_16x16:
+	switch (mode_cmd->modifier[0] & AFBC_SIZE_MASK) {
+	case AFBC_SIZE_16X16:
 		afbc_superblock_height = 16;
 		afbc_superblock_width = 16;
 		break;
@@ -345,15 +324,19 @@ malidp_verify_afbc_framebuffer_size(struct drm_device *dev,
 	n_superblocks = (mode_cmd->width / afbc_superblock_width) *
 		(mode_cmd->height / afbc_superblock_height);
 
-	afbc_superblock_size = info->cpp[0] * afbc_superblock_width *
-		afbc_superblock_height;
+	bpp = malidp_format_get_bpp(info->format);
+
+	afbc_superblock_size = (bpp * afbc_superblock_width * afbc_superblock_height)
+				/ BITS_PER_BYTE;
 
 	afbc_size = ALIGN(n_superblocks * AFBC_HEADER_SIZE, AFBC_SUPERBLK_ALIGNMENT);
 	afbc_size += n_superblocks * ALIGN(afbc_superblock_size, AFBC_SUPERBLK_ALIGNMENT);
 
-	if (mode_cmd->width * info->cpp[0] != mode_cmd->pitches[0]) {
-		DRM_DEBUG_KMS("Invalid value of pitch (=%u) should be same as width (=%u) * cpp (=%u)\n",
-			      mode_cmd->pitches[0], mode_cmd->width, info->cpp[0]);
+	if ((mode_cmd->width * bpp) != (mode_cmd->pitches[0] * BITS_PER_BYTE)) {
+		DRM_DEBUG_KMS("Invalid value of (pitch * BITS_PER_BYTE) (=%u) "
+			      "should be same as width (=%u) * bpp (=%u)\n",
+			      (mode_cmd->pitches[0] * BITS_PER_BYTE),
+			      mode_cmd->width, bpp);
 		return false;
 	}
 
@@ -366,11 +349,11 @@ malidp_verify_afbc_framebuffer_size(struct drm_device *dev,
 	if (objs->size < afbc_size) {
 		DRM_DEBUG_KMS("buffer size (%zu) too small for AFBC buffer size = %u\n",
 			      objs->size, afbc_size);
-		drm_gem_object_put_unlocked(objs);
+		drm_gem_object_put(objs);
 		return false;
 	}
 
-	drm_gem_object_put_unlocked(objs);
+	drm_gem_object_put(objs);
 
 	return true;
 }
@@ -417,6 +400,7 @@ static int malidp_init(struct drm_device *drm)
 	drm->mode_config.max_height = hwdev->max_line_size;
 	drm->mode_config.funcs = &malidp_mode_config_funcs;
 	drm->mode_config.helper_private = &malidp_mode_config_helpers;
+	drm->mode_config.allow_fb_modifiers = true;
 
 	ret = malidp_crtc_init(drm);
 	if (ret)
@@ -567,34 +551,24 @@ static const struct file_operations malidp_debugfs_fops = {
 static int malidp_debugfs_init(struct drm_minor *minor)
 {
 	struct malidp_drm *malidp = minor->dev->dev_private;
-	struct dentry *dentry = NULL;
 
 	malidp_error_stats_init(&malidp->de_errors);
 	malidp_error_stats_init(&malidp->se_errors);
 	spin_lock_init(&malidp->errors_lock);
-	dentry = debugfs_create_file("debug",
-				     S_IRUGO | S_IWUSR,
-				     minor->debugfs_root, minor->dev,
-				     &malidp_debugfs_fops);
-	if (!dentry) {
-		DRM_ERROR("Cannot create debug file\n");
-		return -ENOMEM;
-	}
+	debugfs_create_file("debug", S_IRUGO | S_IWUSR, minor->debugfs_root,
+			    minor->dev, &malidp_debugfs_fops);
 	return 0;
 }
 
 #endif //CONFIG_DEBUG_FS
 
 static struct drm_driver malidp_driver = {
-	.driver_features = DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC |
-			   DRIVER_PRIME,
+	.driver_features = DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC,
 	.gem_free_object_unlocked = drm_gem_cma_free_object,
 	.gem_vm_ops = &drm_gem_cma_vm_ops,
 	.dumb_create = malidp_dumb_create,
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
-	.gem_prime_export = drm_gem_prime_export,
-	.gem_prime_import = drm_gem_prime_import,
 	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
 	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
 	.gem_prime_vmap = drm_gem_cma_prime_vmap,

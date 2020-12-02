@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * This file is part of the Emulex Linux Device Driver for Enterprise iSCSI
  * Host Bus Adapters. Refer to the README file included with this package
@@ -6,13 +7,8 @@
  * Copyright (c) 2018 Broadcom. All Rights Reserved.
  * The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Foundation.
- *
  * Contact Information:
  * linux-drivers@broadcom.com
- *
  */
 
 #include <scsi/libiscsi.h>
@@ -679,6 +675,7 @@ int beiscsi_set_param(struct iscsi_cls_conn *cls_conn,
 	case ISCSI_PARAM_MAX_XMIT_DLENGTH:
 		if (conn->max_xmit_dlength > 65536)
 			conn->max_xmit_dlength = 65536;
+		/* fall through */
 	default:
 		return 0;
 	}
@@ -771,7 +768,7 @@ int beiscsi_get_host_param(struct Scsi_Host *shost,
 			status = beiscsi_get_initiator_name(phba, buf, false);
 			if (status < 0) {
 				beiscsi_log(phba, KERN_ERR, BEISCSI_LOG_CONFIG,
-					    "BS_%d : Retreiving Initiator Name Failed\n");
+					    "BS_%d : Retrieving Initiator Name Failed\n");
 				status = 0;
 			}
 		}
@@ -1071,9 +1068,9 @@ static int beiscsi_open_conn(struct iscsi_endpoint *ep,
 	else
 		req_memsize = sizeof(struct tcp_connect_and_offload_in_v1);
 
-	nonemb_cmd.va = pci_alloc_consistent(phba->ctrl.pdev,
+	nonemb_cmd.va = dma_alloc_coherent(&phba->ctrl.pdev->dev,
 				req_memsize,
-				&nonemb_cmd.dma);
+				&nonemb_cmd.dma, GFP_KERNEL);
 	if (nonemb_cmd.va == NULL) {
 
 		beiscsi_log(phba, KERN_ERR, BEISCSI_LOG_CONFIG,
@@ -1091,7 +1088,7 @@ static int beiscsi_open_conn(struct iscsi_endpoint *ep,
 			    "BS_%d : mgmt_open_connection Failed for cid=%d\n",
 			    beiscsi_ep->ep_cid);
 
-		pci_free_consistent(phba->ctrl.pdev, nonemb_cmd.size,
+		dma_free_coherent(&phba->ctrl.pdev->dev, nonemb_cmd.size,
 				    nonemb_cmd.va, nonemb_cmd.dma);
 		beiscsi_free_ep(beiscsi_ep);
 		return -EAGAIN;
@@ -1104,8 +1101,9 @@ static int beiscsi_open_conn(struct iscsi_endpoint *ep,
 			    "BS_%d : mgmt_open_connection Failed");
 
 		if (ret != -EBUSY)
-			pci_free_consistent(phba->ctrl.pdev, nonemb_cmd.size,
-					    nonemb_cmd.va, nonemb_cmd.dma);
+			dma_free_coherent(&phba->ctrl.pdev->dev,
+					nonemb_cmd.size, nonemb_cmd.va,
+					nonemb_cmd.dma);
 
 		beiscsi_free_ep(beiscsi_ep);
 		return ret;
@@ -1118,7 +1116,7 @@ static int beiscsi_open_conn(struct iscsi_endpoint *ep,
 	beiscsi_log(phba, KERN_INFO, BEISCSI_LOG_CONFIG,
 		    "BS_%d : mgmt_open_connection Success\n");
 
-	pci_free_consistent(phba->ctrl.pdev, nonemb_cmd.size,
+	dma_free_coherent(&phba->ctrl.pdev->dev, nonemb_cmd.size,
 			    nonemb_cmd.va, nonemb_cmd.dma);
 	return 0;
 }

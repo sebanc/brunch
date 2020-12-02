@@ -1224,7 +1224,7 @@ static int ov13858_set_ctrl(struct v4l2_ctrl *ctrl)
 					 ov13858->exposure->minimum,
 					 max, ov13858->exposure->step, max);
 		break;
-	};
+	}
 
 	/*
 	 * Applying V4L2 control value only happens
@@ -1262,7 +1262,7 @@ static int ov13858_set_ctrl(struct v4l2_ctrl *ctrl)
 			 "ctrl(id:0x%x,val:0x%x) is not handled\n",
 			 ctrl->id, ctrl->val);
 		break;
-	};
+	}
 
 	pm_runtime_put(&client->dev);
 
@@ -1737,10 +1737,9 @@ static int ov13858_probe(struct i2c_client *client,
 	 * Device is already turned on by i2c-core with ACPI domain PM.
 	 * Enable runtime PM and turn off the device.
 	 */
-	pm_runtime_get_noresume(&client->dev);
 	pm_runtime_set_active(&client->dev);
 	pm_runtime_enable(&client->dev);
-	pm_runtime_put(&client->dev);
+	pm_runtime_idle(&client->dev);
 
 	return 0;
 
@@ -1763,14 +1762,7 @@ static int ov13858_remove(struct i2c_client *client)
 	media_entity_cleanup(&sd->entity);
 	ov13858_free_controls(ov13858);
 
-	/*
-	 * Disable runtime PM but keep the device turned on.
-	 * i2c-core with ACPI domain PM will turn off the device.
-	 */
-	pm_runtime_get_sync(&client->dev);
 	pm_runtime_disable(&client->dev);
-	pm_runtime_set_suspended(&client->dev);
-	pm_runtime_put_noidle(&client->dev);
 
 	return 0;
 }

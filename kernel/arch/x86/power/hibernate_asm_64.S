@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Hibernation support for x86-64
- *
- * Distribute under GPLv2.
  *
  * Copyright 2007 Rafael J. Wysocki <rjw@sisk.pl>
  * Copyright 2005 Andi Kleen <ak@suse.de>
@@ -59,7 +58,7 @@ ENTRY(restore_image)
 	movq	restore_cr3(%rip), %r9
 
 	/* prepare to switch to temporary page tables */
-	movq	temp_level4_pgt(%rip), %rax
+	movq	temp_pgt(%rip), %rax
 	movq	mmu_cr4_features(%rip), %rbx
 
 	/* prepare to copy image data to their original locations */

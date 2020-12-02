@@ -1,9 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0
 /* Copyright 2011-2014 Autronica Fire and Security AS
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
  *
  * Author(s):
  *	2011-2014 Arvid Brodin, arvid.brodin@alten.se
@@ -28,7 +24,6 @@ static const struct nla_policy hsr_policy[IFLA_HSR_MAX + 1] = {
 	[IFLA_HSR_SEQ_NR]		= { .type = NLA_U16 },
 };
 
-
 /* Here, it seems a netdevice has already been allocated for us, and the
  * hsr_dev_setup routine has been executed. Nice!
  */
@@ -47,12 +42,14 @@ static int hsr_newlink(struct net *src_net, struct net_device *dev,
 		netdev_info(dev, "HSR: Slave1 device not specified\n");
 		return -EINVAL;
 	}
-	link[0] = __dev_get_by_index(src_net, nla_get_u32(data[IFLA_HSR_SLAVE1]));
+	link[0] = __dev_get_by_index(src_net,
+				     nla_get_u32(data[IFLA_HSR_SLAVE1]));
 	if (!data[IFLA_HSR_SLAVE2]) {
 		netdev_info(dev, "HSR: Slave2 device not specified\n");
 		return -EINVAL;
 	}
-	link[1] = __dev_get_by_index(src_net, nla_get_u32(data[IFLA_HSR_SLAVE2]));
+	link[1] = __dev_get_by_index(src_net,
+				     nla_get_u32(data[IFLA_HSR_SLAVE2]));
 
 	if (!link[0] || !link[1])
 		return -ENODEV;
@@ -125,8 +122,6 @@ static struct rtnl_link_ops hsr_link_ops __read_mostly = {
 	.fill_info	= hsr_fill_info,
 };
 
-
-
 /* attribute policy */
 static const struct nla_policy hsr_genl_policy[HSR_A_MAX + 1] = {
 	[HSR_A_NODE_ADDR] = { .len = ETH_ALEN },
@@ -144,8 +139,6 @@ static const struct genl_multicast_group hsr_mcgrps[] = {
 	{ .name = "hsr-network", },
 };
 
-
-
 /* This is called if for some node with MAC address addr, we only get frames
  * over one of the slave interfaces. This would indicate an open network ring
  * (i.e. a link has failed somewhere).
@@ -162,7 +155,8 @@ void hsr_nl_ringerror(struct hsr_priv *hsr, unsigned char addr[ETH_ALEN],
 	if (!skb)
 		goto fail;
 
-	msg_head = genlmsg_put(skb, 0, 0, &hsr_genl_family, 0, HSR_C_RING_ERROR);
+	msg_head = genlmsg_put(skb, 0, 0, &hsr_genl_family, 0,
+			       HSR_C_RING_ERROR);
 	if (!msg_head)
 		goto nla_put_failure;
 
@@ -207,7 +201,6 @@ void hsr_nl_nodedown(struct hsr_priv *hsr, unsigned char addr[ETH_ALEN])
 	if (!msg_head)
 		goto nla_put_failure;
 
-
 	res = nla_put(skb, HSR_A_NODE_ADDR, ETH_ALEN, addr);
 	if (res < 0)
 		goto nla_put_failure;
@@ -226,7 +219,6 @@ fail:
 	netdev_warn(master->dev, "Could not send HSR node down\n");
 	rcu_read_unlock();
 }
-
 
 /* HSR_C_GET_NODE_STATUS lets userspace query the internal HSR node table
  * about the status of a specific node in the network, defined by its MAC
@@ -281,8 +273,8 @@ static int hsr_get_node_status(struct sk_buff *skb_in, struct genl_info *info)
 	}
 
 	msg_head = genlmsg_put(skb_out, NETLINK_CB(skb_in).portid,
-				info->snd_seq, &hsr_genl_family, 0,
-				HSR_C_SET_NODE_STATUS);
+			       info->snd_seq, &hsr_genl_family, 0,
+			       HSR_C_SET_NODE_STATUS);
 	if (!msg_head) {
 		res = -ENOMEM;
 		goto nla_put_failure;
@@ -294,28 +286,30 @@ static int hsr_get_node_status(struct sk_buff *skb_in, struct genl_info *info)
 
 	hsr = netdev_priv(hsr_dev);
 	res = hsr_get_node_data(hsr,
-			(unsigned char *) nla_data(info->attrs[HSR_A_NODE_ADDR]),
-			hsr_node_addr_b,
-			&addr_b_ifindex,
-			&hsr_node_if1_age,
-			&hsr_node_if1_seq,
-			&hsr_node_if2_age,
-			&hsr_node_if2_seq);
+				(unsigned char *)
+				nla_data(info->attrs[HSR_A_NODE_ADDR]),
+					 hsr_node_addr_b,
+					 &addr_b_ifindex,
+					 &hsr_node_if1_age,
+					 &hsr_node_if1_seq,
+					 &hsr_node_if2_age,
+					 &hsr_node_if2_seq);
 	if (res < 0)
 		goto nla_put_failure;
 
 	res = nla_put(skb_out, HSR_A_NODE_ADDR, ETH_ALEN,
-					nla_data(info->attrs[HSR_A_NODE_ADDR]));
+		      nla_data(info->attrs[HSR_A_NODE_ADDR]));
 	if (res < 0)
 		goto nla_put_failure;
 
 	if (addr_b_ifindex > -1) {
 		res = nla_put(skb_out, HSR_A_NODE_ADDR_B, ETH_ALEN,
-								hsr_node_addr_b);
+			      hsr_node_addr_b);
 		if (res < 0)
 			goto nla_put_failure;
 
-		res = nla_put_u32(skb_out, HSR_A_ADDR_B_IFINDEX, addr_b_ifindex);
+		res = nla_put_u32(skb_out, HSR_A_ADDR_B_IFINDEX,
+				  addr_b_ifindex);
 		if (res < 0)
 			goto nla_put_failure;
 	}
@@ -406,8 +400,8 @@ restart:
 	}
 
 	msg_head = genlmsg_put(skb_out, NETLINK_CB(skb_in).portid,
-				info->snd_seq, &hsr_genl_family, 0,
-				HSR_C_SET_NODE_LIST);
+			       info->snd_seq, &hsr_genl_family, 0,
+			       HSR_C_SET_NODE_LIST);
 	if (!msg_head) {
 		res = -ENOMEM;
 		goto nla_put_failure;
@@ -459,19 +453,18 @@ fail:
 	return res;
 }
 
-
 static const struct genl_ops hsr_ops[] = {
 	{
 		.cmd = HSR_C_GET_NODE_STATUS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags = 0,
-		.policy = hsr_genl_policy,
 		.doit = hsr_get_node_status,
 		.dumpit = NULL,
 	},
 	{
 		.cmd = HSR_C_GET_NODE_LIST,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags = 0,
-		.policy = hsr_genl_policy,
 		.doit = hsr_get_node_list,
 		.dumpit = NULL,
 	},
@@ -482,6 +475,7 @@ static struct genl_family hsr_genl_family __ro_after_init = {
 	.name = "HSR",
 	.version = 1,
 	.maxattr = HSR_A_MAX,
+	.policy = hsr_genl_policy,
 	.netnsok = true,
 	.module = THIS_MODULE,
 	.ops = hsr_ops,
@@ -502,6 +496,7 @@ int __init hsr_netlink_init(void)
 	if (rc)
 		goto fail_genl_register_family;
 
+	hsr_debugfs_create_root();
 	return 0;
 
 fail_genl_register_family:

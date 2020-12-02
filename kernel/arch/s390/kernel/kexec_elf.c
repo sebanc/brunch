@@ -10,18 +10,20 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/kexec.h>
+#include <asm/ipl.h>
 #include <asm/setup.h>
 
-static int kexec_file_add_elf_kernel(struct kimage *image,
-				     struct s390_load_data *data,
-				     char *kernel, unsigned long kernel_len)
+static int kexec_file_add_kernel_elf(struct kimage *image,
+				     struct s390_load_data *data)
 {
 	struct kexec_buf buf;
 	const Elf_Ehdr *ehdr;
 	const Elf_Phdr *phdr;
 	Elf_Addr entry;
+	void *kernel;
 	int i, ret;
 
+	kernel = image->kernel_buf;
 	ehdr = (Elf_Ehdr *)kernel;
 	buf.image = image;
 	if (image->type == KEXEC_TYPE_CRASH)
@@ -38,30 +40,27 @@ static int kexec_file_add_elf_kernel(struct kimage *image,
 		buf.bufsz = phdr->p_filesz;
 
 		buf.mem = ALIGN(phdr->p_paddr, phdr->p_align);
+		if (image->type == KEXEC_TYPE_CRASH)
+			buf.mem += crashk_res.start;
 		buf.memsz = phdr->p_memsz;
+		data->memsz = ALIGN(data->memsz, phdr->p_align) + buf.memsz;
 
 		if (entry - phdr->p_paddr < phdr->p_memsz) {
 			data->kernel_buf = buf.buffer;
-			data->memsz += STARTUP_NORMAL_OFFSET;
-
-			buf.buffer += STARTUP_NORMAL_OFFSET;
-			buf.bufsz -= STARTUP_NORMAL_OFFSET;
-
-			buf.mem += STARTUP_NORMAL_OFFSET;
-			buf.memsz -= STARTUP_NORMAL_OFFSET;
+			data->kernel_mem = buf.mem;
+			data->parm = buf.buffer + PARMAREA;
 		}
 
-		if (image->type == KEXEC_TYPE_CRASH)
-			buf.mem += crashk_res.start;
-
+		ipl_report_add_component(data->report, &buf,
+					 IPL_RB_COMPONENT_FLAG_SIGNED |
+					 IPL_RB_COMPONENT_FLAG_VERIFIED,
+					 IPL_RB_CERT_UNKNOWN);
 		ret = kexec_add_buffer(&buf);
 		if (ret)
 			return ret;
-
-		data->memsz = ALIGN(data->memsz, phdr->p_align) + buf.memsz;
 	}
 
-	return 0;
+	return data->memsz ? 0 : -EINVAL;
 }
 
 static void *s390_elf_load(struct kimage *image,
@@ -69,11 +68,10 @@ static void *s390_elf_load(struct kimage *image,
 			   char *initrd, unsigned long initrd_len,
 			   char *cmdline, unsigned long cmdline_len)
 {
-	struct s390_load_data data = {0};
 	const Elf_Ehdr *ehdr;
 	const Elf_Phdr *phdr;
 	size_t size;
-	int i, ret;
+	int i;
 
 	/* image->fobs->probe already checked for valid ELF magic number. */
 	ehdr = (Elf_Ehdr *)kernel;
@@ -106,24 +104,7 @@ static void *s390_elf_load(struct kimage *image,
 	if (size > kernel_len)
 		return ERR_PTR(-EINVAL);
 
-	ret = kexec_file_add_elf_kernel(image, &data, kernel, kernel_len);
-	if (ret)
-		return ERR_PTR(ret);
-
-	if (!data.memsz)
-		return ERR_PTR(-EINVAL);
-
-	if (initrd) {
-		ret = kexec_file_add_initrd(image, &data, initrd, initrd_len);
-		if (ret)
-			return ERR_PTR(ret);
-	}
-
-	ret = kexec_file_add_purgatory(image, &data);
-	if (ret)
-		return ERR_PTR(ret);
-
-	return kexec_file_update_kernel(image, &data);
+	return kexec_file_add_components(image, kexec_file_add_kernel_elf);
 }
 
 static int s390_elf_probe(const char *buf, unsigned long len)
@@ -149,4 +130,7 @@ static int s390_elf_probe(const char *buf, unsigned long len)
 const struct kexec_file_ops s390_kexec_elf_ops = {
 	.probe = s390_elf_probe,
 	.load = s390_elf_load,
+#ifdef CONFIG_KEXEC_SIG
+	.verify_sig = s390_verify_sig,
+#endif /* CONFIG_KEXEC_SIG */
 };

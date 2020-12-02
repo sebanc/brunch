@@ -1,18 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  Port on Texas Instruments TMS320C6x architecture
  *
  *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
  *  Author: Aurelien Jacquiot <aurelien.jacquiot@ti.com>
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License version 2 as
- *  published by the Free Software Foundation.
- *
  *  DMA uncached mapping support.
  *
  *  Using code pulled from ARM
  *  Copyright (C) 2000-2004 Russell King
- *
  */
 #include <linux/slab.h>
 #include <linux/bitmap.h>
@@ -78,6 +74,7 @@ static void __free_dma_pages(u32 addr, int order)
 void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 		gfp_t gfp, unsigned long attrs)
 {
+	void *ret;
 	u32 paddr;
 	int order;
 
@@ -94,7 +91,9 @@ void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 	if (!paddr)
 		return NULL;
 
-	return phys_to_virt(paddr);
+	ret = phys_to_virt(paddr);
+	memset(ret, 0, 1 << order);
+	return ret;
 }
 
 /*
@@ -118,8 +117,6 @@ void arch_dma_free(struct device *dev, size_t size, void *vaddr,
  */
 void __init coherent_mem_init(phys_addr_t start, u32 size)
 {
-	phys_addr_t bitmap_phys;
-
 	if (!size)
 		return;
 
@@ -135,11 +132,12 @@ void __init coherent_mem_init(phys_addr_t start, u32 size)
 	if (dma_size & (PAGE_SIZE - 1))
 		++dma_pages;
 
-	bitmap_phys = memblock_alloc(BITS_TO_LONGS(dma_pages) * sizeof(long),
-				     sizeof(long));
-
-	dma_bitmap = phys_to_virt(bitmap_phys);
-	memset(dma_bitmap, 0, dma_pages * PAGE_SIZE);
+	dma_bitmap = memblock_alloc(BITS_TO_LONGS(dma_pages) * sizeof(long),
+				    sizeof(long));
+	if (!dma_bitmap)
+		panic("%s: Failed to allocate %zu bytes align=0x%zx\n",
+		      __func__, BITS_TO_LONGS(dma_pages) * sizeof(long),
+		      sizeof(long));
 }
 
 static void c6x_dma_sync(struct device *dev, phys_addr_t paddr, size_t size,

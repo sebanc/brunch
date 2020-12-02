@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *  Copyright (C) 2000, 2001, 2002 Andi Kleen, SuSE Labs
@@ -21,13 +22,14 @@
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
 #include <linux/export.h>
+#include <linux/atomic.h>
 #include <linux/sched/clock.h>
 
 #if defined(CONFIG_EDAC)
 #include <linux/edac.h>
 #endif
 
-#include <linux/atomic.h>
+#include <asm/cpu_entry_area.h>
 #include <asm/traps.h>
 #include <asm/mach_traps.h>
 #include <asm/nmi.h>
@@ -104,7 +106,6 @@ fs_initcall(nmi_warning_debugfs);
 
 static void nmi_check_duration(struct nmiaction *action, u64 duration)
 {
-	u64 whole_msecs = READ_ONCE(action->max_duration);
 	int remainder_ns, decimal_msecs;
 
 	if (duration < nmi_longest_ns || duration < action->max_duration)
@@ -112,12 +113,12 @@ static void nmi_check_duration(struct nmiaction *action, u64 duration)
 
 	action->max_duration = duration;
 
-	remainder_ns = do_div(whole_msecs, (1000 * 1000));
+	remainder_ns = do_div(duration, (1000 * 1000));
 	decimal_msecs = remainder_ns / 1000;
 
 	printk_ratelimited(KERN_INFO
 		"INFO: NMI handler (%ps) took too long to run: %lld.%03d msecs\n",
-		action->handler, whole_msecs, decimal_msecs);
+		action->handler, duration, decimal_msecs);
 }
 
 static int nmi_handle(unsigned int type, struct pt_regs *regs)
@@ -486,11 +487,31 @@ static DEFINE_PER_CPU(unsigned long, nmi_cr2);
  * switch back to the original IDT.
  */
 static DEFINE_PER_CPU(int, update_debug_stack);
+
+static bool notrace is_debug_stack(unsigned long addr)
+{
+	struct cea_exception_stacks *cs = __this_cpu_read(cea_exception_stacks);
+	unsigned long top = CEA_ESTACK_TOP(cs, DB);
+	unsigned long bot = CEA_ESTACK_BOT(cs, DB1);
+
+	if (__this_cpu_read(debug_stack_usage))
+		return true;
+	/*
+	 * Note, this covers the guard page between DB and DB1 as well to
+	 * avoid two checks. But by all means @addr can never point into
+	 * the guard page.
+	 */
+	return addr >= bot && addr < top;
+}
+NOKPROBE_SYMBOL(is_debug_stack);
 #endif
 
 dotraplinkage notrace void
 do_nmi(struct pt_regs *regs, long error_code)
 {
+	if (IS_ENABLED(CONFIG_SMP) && cpu_is_offline(smp_processor_id()))
+		return;
+
 	if (this_cpu_read(nmi_state) != NMI_NOT_RUNNING) {
 		this_cpu_write(nmi_state, NMI_LATCHED);
 		return;

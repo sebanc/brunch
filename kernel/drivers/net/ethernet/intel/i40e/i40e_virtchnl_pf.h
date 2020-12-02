@@ -13,9 +13,11 @@
 #define I40E_DEFAULT_NUM_MDD_EVENTS_ALLOWED	3
 #define I40E_DEFAULT_NUM_INVALID_MSGS_ALLOWED	10
 
-#define I40E_VLAN_PRIORITY_SHIFT	12
+#define I40E_VLAN_PRIORITY_SHIFT	13
 #define I40E_VLAN_MASK			0xFFF
-#define I40E_PRIORITY_MASK		0x7000
+#define I40E_PRIORITY_MASK		0xE000
+
+#define I40E_MAX_VF_PROMISC_FLAGS	3
 
 /* Various queue ctrls */
 enum i40e_queue_ctrl {
@@ -97,6 +99,7 @@ struct i40e_vf {
 	unsigned int tx_rate;	/* Tx bandwidth limit in Mbps */
 	bool link_forced;
 	bool link_up;		/* only valid if VF link is forced */
+	bool queues_enabled;	/* true if the VF queues are enabled */
 	bool spoofchk;
 	u16 num_mac;
 	u16 num_vlan;

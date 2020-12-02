@@ -30,9 +30,9 @@ unsigned int mtk_vcodec_fw_get_vdec_capa(struct mtk_vcodec_fw *fw);
 unsigned int mtk_vcodec_fw_get_venc_capa(struct mtk_vcodec_fw *fw);
 void *mtk_vcodec_fw_map_dm_addr(struct mtk_vcodec_fw *fw, u32 mem_addr);
 int mtk_vcodec_fw_ipi_register(struct mtk_vcodec_fw *fw, int id,
-	mtk_vcodec_ipi_handler handler, const char *name, void *priv);
-int mtk_vcodec_fw_ipi_send(struct mtk_vcodec_fw *fw,
-	int id, void *buf, unsigned int len, unsigned int wait);
+			       mtk_vcodec_ipi_handler handler,
+			       const char *name, void *priv);
+int mtk_vcodec_fw_ipi_send(struct mtk_vcodec_fw *fw, int id,
+			   void *buf, unsigned int len, unsigned int wait);
 
 #endif /* _MTK_VCODEC_FW_H_ */
-

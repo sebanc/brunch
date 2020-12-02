@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  winbond-cir.c - Driver for the Consumer IR functionality of Winbond
  *                  SuperI/O chips.
@@ -24,16 +25,6 @@
  *    o IR Transmit
  *    o Wake-On-CIR functionality
  *    o Carrier detection
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -322,11 +313,11 @@ wbcir_carrier_report(struct wbcir_data *data)
 			inb(data->ebase + WBCIR_REG_ECEIR_CNT_HI) << 8;
 
 	if (counter > 0 && counter < 0xffff) {
-		DEFINE_IR_RAW_EVENT(ev);
-
-		ev.carrier_report = 1;
-		ev.carrier = DIV_ROUND_CLOSEST(counter * 1000000u,
-						data->pulse_duration);
+		struct ir_raw_event ev = {
+			.carrier_report = 1,
+			.carrier = DIV_ROUND_CLOSEST(counter * 1000000u,
+						data->pulse_duration)
+		};
 
 		ir_raw_event_store(data->dev, &ev);
 	}
@@ -362,7 +353,7 @@ static void
 wbcir_irq_rx(struct wbcir_data *data, struct pnp_dev *device)
 {
 	u8 irdata;
-	DEFINE_IR_RAW_EVENT(rawir);
+	struct ir_raw_event rawir = {};
 	unsigned duration;
 
 	/* Since RXHDLEV is set, at least 8 bytes are in the FIFO */

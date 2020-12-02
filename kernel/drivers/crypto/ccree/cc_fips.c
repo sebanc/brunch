@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright (C) 2012-2018 ARM Limited or its affiliates. */
+/* Copyright (C) 2012-2019 ARM Limited (or its affiliates). */
 
 #include <linux/kernel.h>
 #include <linux/fips.h>
+#include <linux/notifier.h>
 
 #include "cc_driver.h"
 #include "cc_fips.h"
@@ -11,6 +12,8 @@ static void fips_dsr(unsigned long devarg);
 
 struct cc_fips_handle {
 	struct tasklet_struct tasklet;
+	struct notifier_block nb;
+	struct cc_drvdata *drvdata;
 };
 
 /* The function called once at driver entry point to check
@@ -46,6 +49,21 @@ void cc_set_ree_fips_status(struct cc_drvdata *drvdata, bool status)
 	cc_iowrite(drvdata, CC_REG(HOST_GPR0), val);
 }
 
+/* Push REE side FIPS test failure to TEE side */
+static int cc_ree_fips_failure(struct notifier_block *nb, unsigned long unused1,
+			       void *unused2)
+{
+	struct cc_fips_handle *fips_h =
+				container_of(nb, struct cc_fips_handle, nb);
+	struct cc_drvdata *drvdata = fips_h->drvdata;
+	struct device *dev = drvdata_to_dev(drvdata);
+
+	cc_set_ree_fips_status(drvdata, false);
+	dev_info(dev, "Notifying TEE of FIPS test failure...\n");
+
+	return NOTIFY_OK;
+}
+
 void cc_fips_fini(struct cc_drvdata *drvdata)
 {
 	struct cc_fips_handle *fips_h = drvdata->fips_handle;
@@ -53,10 +71,10 @@ void cc_fips_fini(struct cc_drvdata *drvdata)
 	if (drvdata->hw_rev < CC_HW_REV_712 || !fips_h)
 		return;
 
+	atomic_notifier_chain_unregister(&fips_fail_notif_chain, &fips_h->nb);
+
 	/* Kill tasklet */
 	tasklet_kill(&fips_h->tasklet);
-
-	kfree(fips_h);
 	drvdata->fips_handle = NULL;
 }
 
@@ -118,7 +136,7 @@ int cc_fips_init(struct cc_drvdata *p_drvdata)
 	if (p_drvdata->hw_rev < CC_HW_REV_712)
 		return 0;
 
-	fips_h = kzalloc(sizeof(*fips_h), GFP_KERNEL);
+	fips_h = devm_kzalloc(dev, sizeof(*fips_h), GFP_KERNEL);
 	if (!fips_h)
 		return -ENOMEM;
 
@@ -126,6 +144,9 @@ int cc_fips_init(struct cc_drvdata *p_drvdata)
 
 	dev_dbg(dev, "Initializing fips tasklet\n");
 	tasklet_init(&fips_h->tasklet, fips_dsr, (unsigned long)p_drvdata);
+	fips_h->drvdata = p_drvdata;
+	fips_h->nb.notifier_call = cc_ree_fips_failure;
+	atomic_notifier_chain_register(&fips_fail_notif_chain, &fips_h->nb);
 
 	cc_tee_handle_fips_error(p_drvdata);
 

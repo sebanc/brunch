@@ -46,7 +46,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 static inline unsigned long pvr_copy_to_user(void __user *pvTo, const void *pvFrom, unsigned long ulBytes)
 {
-    if (access_ok(VERIFY_WRITE, pvTo, ulBytes))
+    if (access_ok(pvTo, ulBytes))
     {
 		return __copy_to_user(pvTo, pvFrom, ulBytes);
     }
@@ -78,7 +78,7 @@ static inline unsigned long pvr_copy_from_user(void *pvTo, const void __user *pv
      * The compile time correctness checking introduced for copy_from_user in
      * Linux 2.6.33 isn't fully compatible with our usage of the function.
      */
-    if (access_ok(VERIFY_READ, pvFrom, ulBytes))
+    if (access_ok(pvFrom, ulBytes))
     {
 		return __copy_from_user(pvTo, pvFrom, ulBytes);
     }

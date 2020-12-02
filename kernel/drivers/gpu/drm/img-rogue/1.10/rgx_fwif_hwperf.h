@@ -45,7 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "rgx_fwif_shared.h"
 #include "rgx_hwperf.h"
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 
 
 /*****************************************************************************/

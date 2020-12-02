@@ -44,7 +44,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef __RGXHEAPCONFIG_H__
 #define __RGXHEAPCONFIG_H__
 
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 
 /*
 	RGX Device Virtual Address Space Definitions

@@ -274,7 +274,7 @@ static INLINE int _OSMMapPMR(PVRSRV_DEVICE_NODE *psDevNode,
 			 * This path is just for debugging. It should be
 			 * equivalent to the remap_pfn_range() path.
 			 */
-			iStatus = vm_insert_mixed(ps_vma,
+			iStatus = vmf_insert_mixed(ps_vma,
 									  ps_vma->vm_start + uiOffset,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0))
 									  sPFN);

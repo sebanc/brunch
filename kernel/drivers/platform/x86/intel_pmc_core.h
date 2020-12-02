@@ -30,7 +30,7 @@
 #define SPT_PMC_MPHY_CORE_STS_1			0x1142
 #define SPT_PMC_MPHY_COM_STS_0			0x1155
 #define SPT_PMC_MMIO_REG_LEN			0x1000
-#define SPT_PMC_SLP_S0_RES_COUNTER_STEP		0x64
+#define SPT_PMC_SLP_S0_RES_COUNTER_STEP		0x68
 #define PMC_BASE_ADDR_MASK			~(SPT_PMC_MMIO_REG_LEN - 1)
 #define MTPMC_MASK				0xffff0000
 #define PPFEAR_MAX_NUM_ENTRIES			12
@@ -185,6 +185,32 @@ enum ppfear_regs {
 #define ICL_PPFEAR_NUM_ENTRIES			9
 #define ICL_NUM_IP_IGN_ALLOWED			20
 #define ICL_PMC_LTR_WIGIG			0x1BFC
+#define ICL_PMC_SLP_S0_RES_COUNTER_STEP		0x64
+
+#define TGL_NUM_IP_IGN_ALLOWED			22
+#define TGL_PMC_SLP_S0_RES_COUNTER_STEP		0x7A
+
+/*
+ * Tigerlake Power Management Controller register offsets
+ */
+#define TGL_LPM_EN_OFFSET			0x1C78
+#define TGL_LPM_RESIDENCY_OFFSET		0x1C80
+
+/* Tigerlake Low Power Mode debug registers */
+#define TGL_LPM_STATUS_OFFSET			0x1C3C
+#define TGL_LPM_LIVE_STATUS_OFFSET		0x1C5C
+
+const char *tgl_lpm_modes[] = {
+	"S0i2.0",
+	"S0i2.1",
+	"S0i2.2",
+	"S0i3.0",
+	"S0i3.1",
+	"S0i3.2",
+	"S0i3.3",
+	"S0i3.4",
+	NULL
+};
 
 struct pmc_bit_map {
 	const char *name;
@@ -213,13 +239,15 @@ struct pmc_bit_map {
  * captures them to have a common implementation.
  */
 struct pmc_reg_map {
-	const struct pmc_bit_map *pfear_sts;
+	const struct pmc_bit_map **pfear_sts;
 	const struct pmc_bit_map *mphy_sts;
 	const struct pmc_bit_map *pll_sts;
 	const struct pmc_bit_map **slps0_dbg_maps;
 	const struct pmc_bit_map *ltr_show_sts;
 	const struct pmc_bit_map *msr_sts;
+	const struct pmc_bit_map **lpm_sts;
 	const u32 slp_s0_offset;
+	const int slp_s0_res_counter_step;
 	const u32 ltr_ignore_offset;
 	const int regmap_length;
 	const u32 ppfear0_offset;
@@ -229,6 +257,12 @@ struct pmc_reg_map {
 	const u32 slps0_dbg_offset;
 	const u32 ltr_ignore_max;
 	const u32 pm_vric1_offset;
+	/* Low Power Mode registers */
+	const char **lpm_modes;
+	const u32 lpm_en_offset;
+	const u32 lpm_residency_offset;
+	const u32 lpm_status_offset;
+	const u32 lpm_live_status_offset;
 };
 
 /**

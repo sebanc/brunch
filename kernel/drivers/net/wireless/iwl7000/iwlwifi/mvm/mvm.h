@@ -482,10 +482,6 @@ struct iwl_mvm_vif {
 
 	/* 26-tone RU OFDMA transmissions should be blocked */
 	bool he_ru_2mhz_block;
-
-	struct {
-		struct ieee80211_key_conf __rcu *keys[2];
-	} bcn_prot;
 };
 
 static inline struct iwl_mvm_vif *
@@ -924,7 +920,7 @@ struct iwl_mvm {
 
 	/* data related to data path */
 	struct iwl_rx_phy_info last_phy_info;
-	struct ieee80211_sta __rcu *fw_id_to_mac_id[IWL_MVM_STATION_COUNT_MAX];
+	struct ieee80211_sta __rcu *fw_id_to_mac_id[IWL_MVM_STATION_COUNT];
 	u8 rx_ba_sessions;
 
 	/* configured by mac80211 */
@@ -1167,7 +1163,6 @@ struct iwl_mvm {
 		struct {
 			struct list_head resp;
 		} smooth;
-		struct list_head pasn_list;
 	} ftm_initiator;
 
 	struct list_head resp_pasn_list;
@@ -1203,7 +1198,6 @@ struct iwl_mvm {
 		u8 csi_notif;
 #endif /* CPTCFG_IWLMVM_VENDOR_CMDS */
 		u8 d0i3_resp;
-		u8 range_resp;
 	} cmd_ver;
 
 	struct ieee80211_vif *nan_vif;
@@ -1288,7 +1282,7 @@ iwl_mvm_sta_from_staid_rcu(struct iwl_mvm *mvm, u8 sta_id)
 {
 	struct ieee80211_sta *sta;
 
-	if (sta_id >= mvm->fw->ucode_capa.num_stations)
+	if (sta_id >= ARRAY_SIZE(mvm->fw_id_to_mac_id))
 		return NULL;
 
 	sta = rcu_dereference(mvm->fw_id_to_mac_id[sta_id]);
@@ -1305,7 +1299,7 @@ iwl_mvm_sta_from_staid_protected(struct iwl_mvm *mvm, u8 sta_id)
 {
 	struct ieee80211_sta *sta;
 
-	if (sta_id >= mvm->fw->ucode_capa.num_stations)
+	if (sta_id >= ARRAY_SIZE(mvm->fw_id_to_mac_id))
 		return NULL;
 
 	sta = rcu_dereference_protected(mvm->fw_id_to_mac_id[sta_id],
@@ -1610,7 +1604,7 @@ const char *iwl_mvm_get_tx_fail_reason(u32 status);
 static inline const char *iwl_mvm_get_tx_fail_reason(u32 status) { return ""; }
 #endif
 int iwl_mvm_flush_tx_path(struct iwl_mvm *mvm, u32 tfd_msk, u32 flags);
-int iwl_mvm_flush_sta(struct iwl_mvm *mvm, void *sta, bool internal);
+int iwl_mvm_flush_sta(struct iwl_mvm *mvm, void *sta, bool internal, u32 flags);
 int iwl_mvm_flush_sta_tids(struct iwl_mvm *mvm, u32 sta_id,
 			   u16 tids, u32 flags);
 
@@ -2109,10 +2103,6 @@ int iwl_mvm_ftm_start(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 void iwl_mvm_ftm_abort(struct iwl_mvm *mvm, struct cfg80211_pmsr_request *req);
 void iwl_mvm_ftm_initiator_smooth_config(struct iwl_mvm *mvm);
 void iwl_mvm_ftm_initiator_smooth_stop(struct iwl_mvm *mvm);
-int iwl_mvm_ftm_add_pasn_sta(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
-			     u8 *addr, u32 cipher, u8 *tk, u32 tk_len,
-			     u8 *hltk, u32 hltk_len);
-void iwl_mvm_ftm_remove_pasn_sta(struct iwl_mvm *mvm, u8 *addr);
 
 /* TDLS */
 
@@ -2295,24 +2285,8 @@ iwl_mvm_set_chan_info_chandef(struct iwl_mvm *mvm,
 static inline int iwl_umac_scan_get_max_profiles(const struct iwl_fw *fw)
 {
 	u8 ver = iwl_fw_lookup_cmd_ver(fw, IWL_ALWAYS_LONG_GROUP,
-				       SCAN_OFFLOAD_UPDATE_PROFILES_CMD,
-				       IWL_FW_CMD_VER_UNKNOWN);
+				       SCAN_OFFLOAD_UPDATE_PROFILES_CMD);
 	return (ver == IWL_FW_CMD_VER_UNKNOWN || ver < 3) ?
 		IWL_SCAN_MAX_PROFILES : IWL_SCAN_MAX_PROFILES_V2;
-}
-
-static inline
-enum iwl_location_cipher iwl_mvm_cipher_to_location_cipher(u32 cipher)
-{
-	switch (cipher) {
-	case WLAN_CIPHER_SUITE_CCMP:
-		return IWL_LOCATION_CIPHER_CCMP_128;
-	case WLAN_CIPHER_SUITE_GCMP:
-		return IWL_LOCATION_CIPHER_GCMP_128;
-	case WLAN_CIPHER_SUITE_GCMP_256:
-		return IWL_LOCATION_CIPHER_GCMP_256;
-	default:
-		return IWL_LOCATION_CIPHER_INVALID;
-	}
 }
 #endif /* __IWL_MVM_H__ */

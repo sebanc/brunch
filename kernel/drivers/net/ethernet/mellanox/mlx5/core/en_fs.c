@@ -217,6 +217,9 @@ static int __mlx5e_add_vlan_rule(struct mlx5e_priv *priv,
 		break;
 	}
 
+	if (WARN_ONCE(*rule_p, "VLAN rule already exists type %d", rule_type))
+		return 0;
+
 	*rule_p = mlx5_add_flow_rules(ft, spec, &flow_act, &dest, 1);
 
 	if (IS_ERR(*rule_p)) {
@@ -397,8 +400,7 @@ static void mlx5e_add_vlan_rules(struct mlx5e_priv *priv)
 	for_each_set_bit(i, priv->fs.vlan.active_svlans, VLAN_N_VID)
 		mlx5e_add_vlan_rule(priv, MLX5E_VLAN_RULE_TYPE_MATCH_STAG_VID, i);
 
-	if (priv->fs.vlan.cvlan_filter_disabled &&
-	    !(priv->netdev->flags & IFF_PROMISC))
+	if (priv->fs.vlan.cvlan_filter_disabled)
 		mlx5e_add_any_vid_rules(priv);
 }
 
@@ -415,8 +417,12 @@ static void mlx5e_del_vlan_rules(struct mlx5e_priv *priv)
 	for_each_set_bit(i, priv->fs.vlan.active_svlans, VLAN_N_VID)
 		mlx5e_del_vlan_rule(priv, MLX5E_VLAN_RULE_TYPE_MATCH_STAG_VID, i);
 
-	if (priv->fs.vlan.cvlan_filter_disabled &&
-	    !(priv->netdev->flags & IFF_PROMISC))
+	WARN_ON_ONCE(!(test_bit(MLX5E_STATE_DESTROYING, &priv->state)));
+
+	/* must be called after DESTROY bit is set and
+	 * set_rx_mode is called and flushed
+	 */
+	if (priv->fs.vlan.cvlan_filter_disabled)
 		mlx5e_del_any_vid_rules(priv);
 }
 
@@ -747,7 +753,54 @@ static struct mlx5e_etype_proto ttc_tunnel_rules[] = {
 		.etype = ETH_P_IPV6,
 		.proto = IPPROTO_GRE,
 	},
+	[MLX5E_TT_IPV4_IPIP] = {
+		.etype = ETH_P_IP,
+		.proto = IPPROTO_IPIP,
+	},
+	[MLX5E_TT_IPV6_IPIP] = {
+		.etype = ETH_P_IPV6,
+		.proto = IPPROTO_IPIP,
+	},
+	[MLX5E_TT_IPV4_IPV6] = {
+		.etype = ETH_P_IP,
+		.proto = IPPROTO_IPV6,
+	},
+	[MLX5E_TT_IPV6_IPV6] = {
+		.etype = ETH_P_IPV6,
+		.proto = IPPROTO_IPV6,
+	},
+
 };
+
+bool mlx5e_tunnel_proto_supported(struct mlx5_core_dev *mdev, u8 proto_type)
+{
+	switch (proto_type) {
+	case IPPROTO_GRE:
+		return MLX5_CAP_ETH(mdev, tunnel_stateless_gre);
+	case IPPROTO_IPIP:
+	case IPPROTO_IPV6:
+		return MLX5_CAP_ETH(mdev, tunnel_stateless_ip_over_ip);
+	default:
+		return false;
+	}
+}
+
+bool mlx5e_any_tunnel_proto_supported(struct mlx5_core_dev *mdev)
+{
+	int tt;
+
+	for (tt = 0; tt < MLX5E_NUM_TUNNEL_TT; tt++) {
+		if (mlx5e_tunnel_proto_supported(mdev, ttc_tunnel_rules[tt].proto))
+			return true;
+	}
+	return false;
+}
+
+bool mlx5e_tunnel_inner_ft_supported(struct mlx5_core_dev *mdev)
+{
+	return (mlx5e_any_tunnel_proto_supported(mdev) &&
+		MLX5_CAP_FLOWTABLE_NIC_RX(mdev, ft_field_support.inner_ip_version));
+}
 
 static u8 mlx5e_etype_to_ipv(u16 ethertype)
 {
@@ -838,6 +891,9 @@ static int mlx5e_generate_ttc_table_rules(struct mlx5e_priv *priv,
 	dest.type = MLX5_FLOW_DESTINATION_TYPE_FLOW_TABLE;
 	dest.ft   = params->inner_ttc->ft.t;
 	for (tt = 0; tt < MLX5E_NUM_TUNNEL_TT; tt++) {
+		if (!mlx5e_tunnel_proto_supported(priv->mdev,
+						  ttc_tunnel_rules[tt].proto))
+			continue;
 		rules[tt] = mlx5e_generate_ttc_rule(priv, ft, &dest,
 						    ttc_tunnel_rules[tt].etype,
 						    ttc_tunnel_rules[tt].proto);
@@ -853,22 +909,6 @@ del_rules:
 	mlx5e_cleanup_ttc_rules(ttc);
 	return err;
 }
-
-#define MLX5E_TTC_NUM_GROUPS	3
-#define MLX5E_TTC_GROUP1_SIZE	(BIT(3) + MLX5E_NUM_TUNNEL_TT)
-#define MLX5E_TTC_GROUP2_SIZE	 BIT(1)
-#define MLX5E_TTC_GROUP3_SIZE	 BIT(0)
-#define MLX5E_TTC_TABLE_SIZE	(MLX5E_TTC_GROUP1_SIZE +\
-				 MLX5E_TTC_GROUP2_SIZE +\
-				 MLX5E_TTC_GROUP3_SIZE)
-
-#define MLX5E_INNER_TTC_NUM_GROUPS	3
-#define MLX5E_INNER_TTC_GROUP1_SIZE	BIT(3)
-#define MLX5E_INNER_TTC_GROUP2_SIZE	BIT(1)
-#define MLX5E_INNER_TTC_GROUP3_SIZE	BIT(0)
-#define MLX5E_INNER_TTC_TABLE_SIZE	(MLX5E_INNER_TTC_GROUP1_SIZE +\
-					 MLX5E_INNER_TTC_GROUP2_SIZE +\
-					 MLX5E_INNER_TTC_GROUP3_SIZE)
 
 static int mlx5e_create_ttc_table_groups(struct mlx5e_ttc_table *ttc,
 					 bool use_ipv)

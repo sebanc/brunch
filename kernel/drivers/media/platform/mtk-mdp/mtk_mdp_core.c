@@ -6,7 +6,6 @@
  */
 
 #include <linux/clk.h>
-#include <linux/component.h>
 #include <linux/device.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
@@ -18,8 +17,8 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/workqueue.h>
+#include <soc/mediatek/smi.h>
 
-#include "mtk_mdp_comp.h"
 #include "mtk_mdp_core.h"
 #include "mtk_mdp_m2m.h"
 #include "mtk_vpu.h"
@@ -33,12 +32,16 @@ module_param(mtk_mdp_dbg_level, int, 0644);
 static const struct of_device_id mtk_mdp_comp_dt_ids[] = {
 	{
 		.compatible = "mediatek,mt8173-mdp-rdma",
+		.data = (void *)MTK_MDP_RDMA
 	}, {
 		.compatible = "mediatek,mt8173-mdp-rsz",
+		.data = (void *)MTK_MDP_RSZ
 	}, {
 		.compatible = "mediatek,mt8173-mdp-wdma",
+		.data = (void *)MTK_MDP_WDMA
 	}, {
 		.compatible = "mediatek,mt8173-mdp-wrot",
+		.data = (void *)MTK_MDP_WROT
 	},
 	{ },
 };
@@ -51,18 +54,20 @@ MODULE_DEVICE_TABLE(of, mtk_mdp_of_ids);
 
 static void mtk_mdp_clock_on(struct mtk_mdp_dev *mdp)
 {
-	struct mtk_mdp_comp *comp_node;
+	struct device *dev = &mdp->pdev->dev;
+	int i;
 
-	list_for_each_entry(comp_node, &mdp->comp_list, node)
-		mtk_mdp_comp_clock_on(comp_node);
+	for (i = 0; i < ARRAY_SIZE(mdp->comp); i++)
+		mtk_mdp_comp_clock_on(dev, mdp->comp[i]);
 }
 
 static void mtk_mdp_clock_off(struct mtk_mdp_dev *mdp)
 {
-	struct mtk_mdp_comp *comp_node;
+	struct device *dev = &mdp->pdev->dev;
+	int i;
 
-	list_for_each_entry(comp_node, &mdp->comp_list, node)
-		mtk_mdp_comp_clock_off(comp_node);
+	for (i = 0; i < ARRAY_SIZE(mdp->comp); i++)
+		mtk_mdp_comp_clock_off(dev, mdp->comp[i]);
 }
 
 static void mtk_mdp_wdt_worker(struct work_struct *work)
@@ -86,83 +91,12 @@ static void mtk_mdp_reset_handler(void *priv)
 	queue_work(mdp->wdt_wq, &mdp->wdt_work);
 }
 
-static int compare_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
-
-static void release_of(struct device *dev, void *data)
-{
-	of_node_put(data);
-}
-
-static int mtk_mdp_master_bind(struct device *dev)
-{
-	int status;
-	struct mtk_mdp_dev *mdp = dev_get_drvdata(dev);
-
-	mtk_mdp_register_component(mdp, &mdp->comp_self);
-
-	status = component_bind_all(dev, mdp);
-	if (status) {
-		dev_err(dev, "Failed to bind all components: %d\n", status);
-		goto err_component_bind_all;
-	}
-
-	status = mtk_mdp_register_m2m_device(mdp);
-	if (status) {
-		dev_err(dev, "Failed to register m2m device: %d\n", status);
-		v4l2_err(&mdp->v4l2_dev, "Failed to init mem2mem device\n");
-		goto err_mtk_mdp_register_m2m_device;
-	}
-
-	pm_runtime_enable(dev);
-
-	return 0;
-
-err_mtk_mdp_register_m2m_device:
-	component_unbind_all(dev, mdp);
-
-err_component_bind_all:
-	mtk_mdp_unregister_component(mdp, &mdp->comp_self);
-
-	return status;
-}
-
-static void mtk_mdp_master_unbind(struct device *dev)
-{
-	struct mtk_mdp_dev *mdp = dev_get_drvdata(dev);
-
-	pm_runtime_disable(dev);
-	mtk_mdp_unregister_m2m_device(mdp);
-	component_unbind_all(dev, mdp);
-	mtk_mdp_unregister_component(mdp, &mdp->comp_self);
-}
-
-static const struct component_master_ops mtk_mdp_com_ops = {
-	.bind		= mtk_mdp_master_bind,
-	.unbind		= mtk_mdp_master_unbind,
-};
-
-void mtk_mdp_register_component(struct mtk_mdp_dev *mdp,
-				struct mtk_mdp_comp *comp)
-{
-	list_add(&mdp->comp_list, &comp->node);
-}
-
-void mtk_mdp_unregister_component(struct mtk_mdp_dev *mdp,
-				  struct mtk_mdp_comp *comp)
-{
-	list_del(&comp->node);
-}
-
 static int mtk_mdp_probe(struct platform_device *pdev)
 {
 	struct mtk_mdp_dev *mdp;
 	struct device *dev = &pdev->dev;
 	struct device_node *node, *parent;
 	int i, ret = 0;
-	struct component_match *match = NULL;
 
 	mdp = devm_kzalloc(dev, sizeof(*mdp), GFP_KERNEL);
 	if (!mdp)
@@ -170,7 +104,6 @@ static int mtk_mdp_probe(struct platform_device *pdev)
 
 	mdp->id = pdev->id;
 	mdp->pdev = pdev;
-	INIT_LIST_HEAD(&mdp->comp_list);
 	INIT_LIST_HEAD(&mdp->ctx_list);
 
 	mutex_init(&mdp->lock);
@@ -187,43 +120,43 @@ static int mtk_mdp_probe(struct platform_device *pdev)
 	}
 
 	/* Iterate over sibling MDP function blocks */
-	i = 0;
 	for_each_child_of_node(parent, node) {
-		struct platform_device *pdev;
+		const struct of_device_id *of_id;
+		enum mtk_mdp_comp_type comp_type;
+		int comp_id;
+		struct mtk_mdp_comp *comp;
 
-		if (!of_match_node(mtk_mdp_comp_dt_ids, node))
+		of_id = of_match_node(mtk_mdp_comp_dt_ids, node);
+		if (!of_id)
 			continue;
 
-		if (!of_device_is_available(node))
-			continue;
-
-		pdev = of_find_device_by_node(node);
-		if (!pdev) {
-			dev_warn(dev, "Unable to find comp device %s\n",
-				 node->full_name);
+		if (!of_device_is_available(node)) {
+			dev_err(dev, "Skipping disabled component %pOF\n",
+				node);
 			continue;
 		}
 
-		/*
-		 * Do not add add a match for my own (rdma0) device node.
-		 * I will be managing it directly instead using comp_self.
-		 */
-		if (&pdev->dev != dev) {
-			dev_dbg(dev, "adding match %d for: %pOF\n", i++, node);
-			component_match_add_release(dev, &match, release_of,
-						    compare_of,
-						    of_node_get(node));
+		comp_type = (enum mtk_mdp_comp_type)of_id->data;
+		comp_id = mtk_mdp_comp_get_id(dev, node, comp_type);
+		if (comp_id < 0) {
+			dev_warn(dev, "Skipping unknown component %pOF\n",
+				 node);
+			continue;
 		}
-	}
 
-	/*
-	 * Create a component for myself so that clocks can be toggled in
-	 * clock_on().
-	 */
-	ret = mtk_mdp_comp_init(&mdp->comp_self, dev);
-	if (ret) {
-		dev_err(dev, "Failed to initialize component\n");
-		goto err_comp;
+		comp = devm_kzalloc(dev, sizeof(*comp), GFP_KERNEL);
+		if (!comp) {
+			ret = -ENOMEM;
+			of_node_put(node);
+			goto err_comp;
+		}
+		mdp->comp[comp_id] = comp;
+
+		ret = mtk_mdp_comp_init(dev, node, comp, comp_id);
+		if (ret) {
+			of_node_put(node);
+			goto err_comp;
+		}
 	}
 
 	mdp->job_wq = create_singlethread_workqueue(MTK_MDP_MODULE_NAME);
@@ -248,38 +181,26 @@ static int mtk_mdp_probe(struct platform_device *pdev)
 		goto err_dev_register;
 	}
 
-	mdp->vpu_dev = vpu_get_plat_device(pdev);
-	ret = vpu_wdt_reg_handler(mdp->vpu_dev, mtk_mdp_reset_handler, mdp,
-				  VPU_RST_MDP);
+	ret = mtk_mdp_register_m2m_device(mdp);
 	if (ret) {
-		dev_err(&pdev->dev, "Failed to register reset handler\n");
-		goto err_wdt_reg;
+		v4l2_err(&mdp->v4l2_dev, "Failed to init mem2mem device\n");
+		goto err_m2m_register;
 	}
+
+	mdp->vpu_dev = vpu_get_plat_device(pdev);
+	vpu_wdt_reg_handler(mdp->vpu_dev, mtk_mdp_reset_handler, mdp,
+			    VPU_RST_MDP);
 
 	platform_set_drvdata(pdev, mdp);
 
-	ret = vb2_dma_contig_set_max_seg_size(&pdev->dev, DMA_BIT_MASK(32));
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to set vb2 dma mag seg size\n");
-		goto err_set_max_seg_size;
-	}
+	vb2_dma_contig_set_max_seg_size(&pdev->dev, DMA_BIT_MASK(32));
 
-	ret = component_master_add_with_match(dev, &mtk_mdp_com_ops, match);
-	if (ret) {
-		dev_err(dev, "Component master add failed\n");
-		goto err_component_master_add;
-	}
-
+	pm_runtime_enable(dev);
 	dev_dbg(dev, "mdp-%d registered successfully\n", mdp->id);
 
 	return 0;
 
-err_component_master_add:
-	vb2_dma_contig_clear_max_seg_size(&pdev->dev);
-
-err_set_max_seg_size:
-
-err_wdt_reg:
+err_m2m_register:
 	v4l2_device_unregister(&mdp->v4l2_dev);
 
 err_dev_register:
@@ -291,6 +212,9 @@ err_alloc_wdt_wq:
 err_alloc_job_wq:
 
 err_comp:
+	for (i = 0; i < ARRAY_SIZE(mdp->comp); i++)
+		mtk_mdp_comp_deinit(dev, mdp->comp[i]);
+
 	dev_dbg(dev, "err %d\n", ret);
 	return ret;
 }
@@ -298,20 +222,18 @@ err_comp:
 static int mtk_mdp_remove(struct platform_device *pdev)
 {
 	struct mtk_mdp_dev *mdp = platform_get_drvdata(pdev);
+	int i;
 
-	component_master_del(&pdev->dev, &mtk_mdp_com_ops);
-
+	pm_runtime_disable(&pdev->dev);
 	vb2_dma_contig_clear_max_seg_size(&pdev->dev);
+	mtk_mdp_unregister_m2m_device(mdp);
 	v4l2_device_unregister(&mdp->v4l2_dev);
-
-	flush_workqueue(mdp->wdt_wq);
-	destroy_workqueue(mdp->wdt_wq);
 
 	flush_workqueue(mdp->job_wq);
 	destroy_workqueue(mdp->job_wq);
 
-	if (!list_empty(&mdp->comp_list))
-		dev_err(&pdev->dev, "not all components removed\n");
+	for (i = 0; i < ARRAY_SIZE(mdp->comp); i++)
+		mtk_mdp_comp_deinit(&pdev->dev, mdp->comp[i]);
 
 	dev_dbg(&pdev->dev, "%s driver unloaded\n", pdev->name);
 	return 0;
@@ -366,25 +288,7 @@ static struct platform_driver mtk_mdp_driver = {
 	}
 };
 
-static struct platform_driver * const mtk_mdp_drivers[] = {
-	&mtk_mdp_driver,
-	&mtk_mdp_component_driver,
-};
-
-static int __init mtk_mdp_init(void)
-{
-	return platform_register_drivers(mtk_mdp_drivers,
-					 ARRAY_SIZE(mtk_mdp_drivers));
-}
-
-static void __exit mtk_mdp_exit(void)
-{
-	platform_unregister_drivers(mtk_mdp_drivers,
-				    ARRAY_SIZE(mtk_mdp_drivers));
-}
-
-module_init(mtk_mdp_init);
-module_exit(mtk_mdp_exit);
+module_platform_driver(mtk_mdp_driver);
 
 MODULE_AUTHOR("Houlong Wei <houlong.wei@mediatek.com>");
 MODULE_DESCRIPTION("Mediatek image processor driver");

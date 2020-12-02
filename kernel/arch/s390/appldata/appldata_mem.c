@@ -63,9 +63,6 @@ struct appldata_mem_data {
 	u64 pgalloc;		/* page allocations */
 	u64 pgfault;		/* page faults (major+minor) */
 	u64 pgmajfault;		/* page faults (major only) */
-	u64 pgmajfault_s;	/* shmem page faults (major only) */
-	u64 pgmajfault_a;	/* anonymous page faults (major only) */
-	u64 pgmajfault_f;	/* file page faults (major only) */
 // <-- New in 2.6
 
 } __packed;
@@ -97,11 +94,7 @@ static void appldata_get_mem_data(void *data)
 	mem_data->pgalloc    = ev[PGALLOC_NORMAL];
 	mem_data->pgalloc    += ev[PGALLOC_DMA];
 	mem_data->pgfault    = ev[PGFAULT];
-	mem_data->pgmajfault =
-		ev[PGMAJFAULT_S] + ev[PGMAJFAULT_A] + ev[PGMAJFAULT_F];
-	mem_data->pgmajfault_s = ev[PGMAJFAULT_S];
-	mem_data->pgmajfault_a = ev[PGMAJFAULT_A];
-	mem_data->pgmajfault_f = ev[PGMAJFAULT_F];
+	mem_data->pgmajfault = ev[PGMAJFAULT];
 
 	si_meminfo(&val);
 	mem_data->sharedram = val.sharedram;

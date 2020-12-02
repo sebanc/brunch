@@ -1,13 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *	G8BPQ compatible "AX.25 via ethernet" driver release 004
  *
  *	This code REQUIRES 2.0.0 or higher/ NET3.029
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
  *
  *	This is a "pseudo" network driver to allow AX.25 over Ethernet
  *	using G8BPQ encapsulation. It has been extracted from the protocol
@@ -112,27 +107,6 @@ struct bpqdev {
 
 static LIST_HEAD(bpq_devices);
 
-/*
- * bpqether network devices are paired with ethernet devices below them, so
- * form a special "super class" of normal ethernet devices; split their locks
- * off into a separate class since they always nest.
- */
-static struct lock_class_key bpq_netdev_xmit_lock_key;
-static struct lock_class_key bpq_netdev_addr_lock_key;
-
-static void bpq_set_lockdep_class_one(struct net_device *dev,
-				      struct netdev_queue *txq,
-				      void *_unused)
-{
-	lockdep_set_class(&txq->_xmit_lock, &bpq_netdev_xmit_lock_key);
-}
-
-static void bpq_set_lockdep_class(struct net_device *dev)
-{
-	lockdep_set_class(&dev->addr_list_lock, &bpq_netdev_addr_lock_key);
-	netdev_for_each_tx_queue(dev, bpq_set_lockdep_class_one, NULL);
-}
-
 /* ------------------------------------------------------------------------ */
 
 
@@ -153,7 +127,8 @@ static inline struct net_device *bpq_get_ax25_dev(struct net_device *dev)
 {
 	struct bpqdev *bpq;
 
-	list_for_each_entry_rcu(bpq, &bpq_devices, bpq_list) {
+	list_for_each_entry_rcu(bpq, &bpq_devices, bpq_list,
+				lockdep_rtnl_is_held()) {
 		if (bpq->ethdev == dev)
 			return bpq->axdev;
 	}
@@ -503,7 +478,6 @@ static int bpq_new_device(struct net_device *edev)
 	err = register_netdevice(ndev);
 	if (err)
 		goto error;
-	bpq_set_lockdep_class(ndev);
 
 	/* List protected by RTNL */
 	list_add_rcu(&bpq->bpq_list, &bpq_devices);

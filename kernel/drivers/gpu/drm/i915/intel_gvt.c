@@ -49,6 +49,9 @@ static bool is_supported_device(struct drm_i915_private *dev_priv)
 		return true;
 	if (IS_BROXTON(dev_priv))
 		return true;
+	if (IS_COFFEELAKE(dev_priv))
+		return true;
+
 	return false;
 }
 
@@ -64,12 +67,13 @@ void intel_gvt_sanitize_options(struct drm_i915_private *dev_priv)
 		return;
 
 	if (intel_vgpu_active(dev_priv)) {
-		DRM_INFO("GVT-g is disabled for guest\n");
+		drm_info(&dev_priv->drm, "GVT-g is disabled for guest\n");
 		goto bail;
 	}
 
 	if (!is_supported_device(dev_priv)) {
-		DRM_INFO("Unsupported device. GVT-g is disabled\n");
+		drm_info(&dev_priv->drm,
+			 "Unsupported device. GVT-g is disabled\n");
 		goto bail;
 	}
 
@@ -92,31 +96,24 @@ int intel_gvt_init(struct drm_i915_private *dev_priv)
 {
 	int ret;
 
-	if (i915_inject_load_failure())
+	if (i915_inject_probe_failure(dev_priv))
 		return -ENODEV;
 
 	if (!i915_modparams.enable_gvt) {
-		DRM_DEBUG_DRIVER("GVT-g is disabled by kernel params\n");
+		drm_dbg(&dev_priv->drm,
+			"GVT-g is disabled by kernel params\n");
 		return 0;
 	}
 
 	if (USES_GUC_SUBMISSION(dev_priv)) {
-		DRM_ERROR("i915 GVT-g loading failed due to Graphics virtualization is not yet supported with GuC submission\n");
+		drm_err(&dev_priv->drm,
+			"i915 GVT-g loading failed due to Graphics virtualization is not yet supported with GuC submission\n");
 		return -EIO;
-	}
-
-	/*
-	 * We're not in host or fail to find a MPT module, disable GVT-g
-	 */
-	ret = intel_gvt_init_host();
-	if (ret) {
-		DRM_DEBUG_DRIVER("Not in host or MPT modules not found\n");
-		goto bail;
 	}
 
 	ret = intel_gvt_init_device(dev_priv);
 	if (ret) {
-		DRM_DEBUG_DRIVER("Fail to init GVT device\n");
+		drm_dbg(&dev_priv->drm, "Fail to init GVT device\n");
 		goto bail;
 	}
 
@@ -128,13 +125,14 @@ bail:
 }
 
 /**
- * intel_gvt_cleanup - cleanup GVT components when i915 driver is unloading
+ * intel_gvt_driver_remove - cleanup GVT components when i915 driver is
+ *			     unbinding
  * @dev_priv: drm i915 private *
  *
  * This function is called at the i915 driver unloading stage, to shutdown
  * GVT components and release the related resources.
  */
-void intel_gvt_cleanup(struct drm_i915_private *dev_priv)
+void intel_gvt_driver_remove(struct drm_i915_private *dev_priv)
 {
 	if (!intel_gvt_active(dev_priv))
 		return;

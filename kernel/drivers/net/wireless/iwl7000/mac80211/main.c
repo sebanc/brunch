@@ -146,8 +146,6 @@ static u32 ieee80211_hw_conf_chan(struct ieee80211_local *local)
 			continue;
 		if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
 			continue;
-		if (sdata->vif.bss_conf.txpower == INT_MIN)
-			continue;
 		power = min(power, sdata->vif.bss_conf.txpower);
 	}
 	rcu_read_unlock();
@@ -371,6 +369,10 @@ static int ieee80211_ifa_changed(struct notifier_block *nb,
 
 	sdata_unlock(sdata);
 
+#ifdef CPTCFG_IWLMVM_VENDOR_CMDS
+	ieee80211_check_fast_rx_iface(sdata);
+#endif
+
 	return NOTIFY_OK;
 }
 #endif
@@ -576,7 +578,7 @@ struct ieee80211_hw *ieee80211_alloc_hw_nm(size_t priv_data_len,
 			WIPHY_FLAG_REPORTS_OBSS |
 			WIPHY_FLAG_OFFCHAN_TX;
 
-	if (!use_chanctx || ops->remain_on_channel)
+	if (ops->remain_on_channel)
 		wiphy->flags |= WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL;
 
 	wiphy->features |= NL80211_FEATURE_SK_TX_STATUS |
@@ -591,8 +593,6 @@ struct ieee80211_hw *ieee80211_alloc_hw_nm(size_t priv_data_len,
 #endif
 	wiphy_ext_feature_set(wiphy,
 			      NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211);
-	wiphy_ext_feature_set(wiphy,
-			      NL80211_EXT_FEATURE_CONTROL_PORT_NO_PREAUTH);
 
 	if (!ops->hw_scan) {
 		wiphy->features |= NL80211_FEATURE_LOW_PRIORITY_SCAN |
@@ -1101,10 +1101,6 @@ int ieee80211_register_hw(struct ieee80211_hw *hw)
 		wiphy_ext_feature_set(local->hw.wiphy,
 				      NL80211_EXT_FEATURE_EXT_KEY_ID);
 	}
-
-	if (local->hw.wiphy->interface_modes & BIT(NL80211_IFTYPE_ADHOC))
-		wiphy_ext_feature_set(local->hw.wiphy,
-				      NL80211_EXT_FEATURE_DEL_IBSS_STA);
 
 	/*
 	 * Calculate scan IE length -- we need this to alloc

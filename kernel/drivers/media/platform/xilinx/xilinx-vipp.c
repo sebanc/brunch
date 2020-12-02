@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Xilinx Video IP Composite Device
  *
@@ -6,10 +7,6 @@
  *
  * Contacts: Hyun Kwon <hyun.kwon@xilinx.com>
  *           Laurent Pinchart <laurent.pinchart@ideasonboard.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 
 #include <linux/list.h>
@@ -388,9 +385,9 @@ static int xvip_graph_parse_one(struct xvip_composite_device *xdev,
 		asd = v4l2_async_notifier_add_fwnode_subdev(
 			&xdev->notifier, remote,
 			sizeof(struct xvip_graph_entity));
+		fwnode_handle_put(remote);
 		if (IS_ERR(asd)) {
 			ret = PTR_ERR(asd);
-			fwnode_handle_put(remote);
 			goto err_notifier_cleanup;
 		}
 	}

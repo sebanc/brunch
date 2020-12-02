@@ -1,10 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (C) 2016 STMicroelectronics (R&D) Limited.
  * Author: Patrice Chotard <patrice.chotard@st.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 /dts-v1/;
 #include "stih410.dtsi"
@@ -61,8 +58,11 @@
 		compatible = "simple-audio-card";
 		simple-audio-card,name = "STI-B2260";
 		status = "okay";
+		#address-cells = <1>;
+		#size-cells = <0>;
 
-		simple-audio-card,dai-link0 {
+		simple-audio-card,dai-link@0 {
+			reg = <0>;
 			/* DAC */
 			format = "i2s";
 			mclk-fs = <128>;

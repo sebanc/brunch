@@ -46,8 +46,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 /* Our own interface */
 #include "mmu_common.h"
 
-#include "rgx_bvnc_defs_km.h"
-#include "rgxmmudefs_km.h"
+#include "km/rgx_bvnc_defs_km.h"
+#include "km/rgxmmudefs_km.h"
 /*
 Interfaces to other modules:
 

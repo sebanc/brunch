@@ -70,7 +70,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxtimerquery.h"
 #include "htbuffer.h"
 
-#include "rgxdefs_km.h"
+#include "km/rgxdefs_km.h"
 #include "rgx_fwif_km.h"
 #include "physmem.h"
 #include "sync_server.h"

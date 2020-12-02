@@ -6,7 +6,7 @@
  * GPL LICENSE SUMMARY
  *
  * Copyright(c) 2015-2017 Intel Deutschland GmbH
- * Copyright(c) 2018, 2020     Intel Corporation
+ * Copyright(c) 2018        Intel Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU General Public License as
@@ -27,7 +27,7 @@
  * BSD LICENSE
  *
  * Copyright(c) 2015-2017 Intel Deutschland GmbH
- * Copyright(c) 2018, 2020     Intel Corporation
+ * Copyright(c) 2018        Intel Corporation
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -147,10 +147,6 @@ int iwl_mvm_start_nan(struct ieee80211_hw *hw,
 	if (WARN_ON(ieee80211_nan_bands(conf) && !(ieee80211_nan_has_band(conf, NL80211_BAND_2GHZ))))
 		return -EINVAL;
 
-	/* This function should not be called when using ADD_STA ver >=12 */
-	WARN_ON_ONCE(iwl_fw_lookup_cmd_ver(mvm->fw, LONG_GROUP,
-					   ADD_STA, 0) >= 12);
-
 	ieee80211_nan_set_band(conf, NL80211_BAND_2GHZ);
 	cmd = kzalloc(iwl_mvm_nan_cfg_cmd_len(hw), GFP_KERNEL);
 	if (!cmd)
@@ -179,6 +175,7 @@ int iwl_mvm_start_nan(struct ieee80211_hw *hw,
 		}
 
 		tb_cfg->chan24 = NAN_CHANNEL_24;
+		cdw |= nan_conf_cdw_2g(conf);
 	}
 
 	if (ieee80211_nan_has_band(conf, NL80211_BAND_5GHZ)) {
@@ -190,6 +187,7 @@ int iwl_mvm_start_nan(struct ieee80211_hw *hw,
 		}
 
 		tb_cfg->chan52 = NAN_CHANNEL_52;
+		cdw |= nan_conf_cdw_5g(conf) << 3;
 	}
 
 	tb_cfg->warmup_timer = cpu_to_le32(NAN_WARMUP_TIMEOUT_USEC);

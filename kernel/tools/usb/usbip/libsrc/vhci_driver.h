@@ -13,12 +13,6 @@
 
 #define USBIP_VHCI_BUS_TYPE "platform"
 #define USBIP_VHCI_DEVICE_NAME "vhci_hcd.0"
-#define USBIP_VHCI_DEVICE_NAME_OLD "vhci_hcd"
-
-#define OLD_STATUS_HEADER "prt sta spd dev      sockfd local_busid"
-#define NEW_STATUS_HEADER "hub port sta spd dev      sockfd local_busid"
-
-#define STATUS_HEADER_MAX 64
 
 enum hub_speed {
 	HUB_SPEED_HIGH = 0,

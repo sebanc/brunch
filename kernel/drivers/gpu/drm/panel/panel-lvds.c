@@ -16,13 +16,12 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 
-#include <drm/drmP.h>
-#include <drm/drm_crtc.h>
-#include <drm/drm_panel.h>
-
 #include <video/display_timing.h>
 #include <video/of_display_timing.h>
 #include <video/videomode.h>
+
+#include <drm/drm_crtc.h>
+#include <drm/drm_panel.h>
 
 struct panel_lvds {
 	struct drm_panel panel;
@@ -40,6 +39,8 @@ struct panel_lvds {
 
 	struct gpio_desc *enable_gpio;
 	struct gpio_desc *reset_gpio;
+
+	enum drm_panel_orientation orientation;
 };
 
 static inline struct panel_lvds *to_panel_lvds(struct drm_panel *panel)
@@ -107,10 +108,10 @@ static int panel_lvds_enable(struct drm_panel *panel)
 	return 0;
 }
 
-static int panel_lvds_get_modes(struct drm_panel *panel)
+static int panel_lvds_get_modes(struct drm_panel *panel,
+				struct drm_connector *connector)
 {
 	struct panel_lvds *lvds = to_panel_lvds(panel);
-	struct drm_connector *connector = lvds->panel.connector;
 	struct drm_display_mode *mode;
 
 	mode = drm_mode_create(lvds->panel.drm);
@@ -128,6 +129,7 @@ static int panel_lvds_get_modes(struct drm_panel *panel)
 	connector->display_info.bus_flags = lvds->data_mirror
 					  ? DRM_BUS_FLAG_DATA_LSB_TO_MSB
 					  : DRM_BUS_FLAG_DATA_MSB_TO_LSB;
+	drm_connector_set_panel_orientation(connector, lvds->orientation);
 
 	return 1;
 }
@@ -146,6 +148,12 @@ static int panel_lvds_parse_dt(struct panel_lvds *lvds)
 	struct display_timing timing;
 	const char *mapping;
 	int ret;
+
+	ret = of_drm_get_panel_orientation(np, &lvds->orientation);
+	if (ret < 0) {
+		dev_err(lvds->dev, "%pOF: failed to get orientation %d\n", np, ret);
+		return ret;
+	}
 
 	ret = of_get_display_timing(np, "panel-timing", &timing);
 	if (ret < 0) {
@@ -255,9 +263,8 @@ static int panel_lvds_probe(struct platform_device *pdev)
 	 */
 
 	/* Register the panel. */
-	drm_panel_init(&lvds->panel);
-	lvds->panel.dev = lvds->dev;
-	lvds->panel.funcs = &panel_lvds_funcs;
+	drm_panel_init(&lvds->panel, lvds->dev, &panel_lvds_funcs,
+		       DRM_MODE_CONNECTOR_LVDS);
 
 	ret = drm_panel_add(&lvds->panel);
 	if (ret < 0)

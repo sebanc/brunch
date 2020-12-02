@@ -26,6 +26,26 @@
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_atomic.h>
 
+#if IS_ENABLED(CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS)
+#include <linux/stackdepot.h>
+#include <linux/timekeeping.h>
+
+enum drm_dp_mst_topology_ref_type {
+	DRM_DP_MST_TOPOLOGY_REF_GET,
+	DRM_DP_MST_TOPOLOGY_REF_PUT,
+};
+
+struct drm_dp_mst_topology_ref_history {
+	struct drm_dp_mst_topology_ref_entry {
+		enum drm_dp_mst_topology_ref_type type;
+		int count;
+		ktime_t ts_nsec;
+		depot_stack_handle_t backtrace;
+	} *entries;
+	int len;
+};
+#endif /* IS_ENABLED(CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS) */
+
 struct drm_dp_mst_branch;
 
 /**
@@ -61,7 +81,7 @@ struct drm_dp_vcpi {
  * &drm_dp_mst_topology_mgr.base.lock.
  * @num_sdp_stream_sinks: Number of stream sinks. Protected by
  * &drm_dp_mst_topology_mgr.base.lock.
- * @full_pbn: Max possible bandwidth for this port. Protected by
+ * @available_pbn: Available bandwidth for this port. Protected by
  * &drm_dp_mst_topology_mgr.base.lock.
  * @next: link to next port on this branch device
  * @aux: i2c aux transport to talk to device connected to this port, protected
@@ -89,6 +109,14 @@ struct drm_dp_mst_port {
 	 */
 	struct kref malloc_kref;
 
+#if IS_ENABLED(CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS)
+	/**
+	 * @topology_ref_history: A history of each topology
+	 * reference/dereference. See CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS.
+	 */
+	struct drm_dp_mst_topology_ref_history topology_ref_history;
+#endif
+
 	u8 port_num;
 	bool input;
 	bool mcs;
@@ -98,7 +126,7 @@ struct drm_dp_mst_port {
 	u8 dpcd_rev;
 	u8 num_sdp_streams;
 	u8 num_sdp_stream_sinks;
-	uint16_t full_pbn;
+	uint16_t available_pbn;
 	struct list_head next;
 	/**
 	 * @mstb: the branch device connected to this port, if there is one.
@@ -132,38 +160,16 @@ struct drm_dp_mst_port {
 	bool fec_capable;
 };
 
-/* sideband msg header - not bit struct */
-struct drm_dp_sideband_msg_hdr {
-	u8 lct;
-	u8 lcr;
-	u8 rad[8];
-	bool broadcast;
-	bool path_msg;
-	u8 msg_len;
-	bool somt;
-	bool eomt;
-	bool seqno;
-};
-
-struct drm_dp_sideband_msg_rx {
-	u8 chunk[48];
-	u8 msg[256];
-	u8 curchunk_len;
-	u8 curchunk_idx; /* chunk we are parsing now */
-	u8 curchunk_hdrlen;
-	u8 curlen; /* total length of the msg */
-	bool have_somt;
-	bool have_eomt;
-	struct drm_dp_sideband_msg_hdr initial_hdr;
-};
-
 /**
  * struct drm_dp_mst_branch - MST branch device.
  * @rad: Relative Address to talk to this branch device.
  * @lct: Link count total to talk to this branch device.
  * @num_ports: number of ports on the branch.
+ * @msg_slots: one bit per transmitted msg slot.
  * @port_parent: pointer to the port parent, NULL if toplevel.
  * @mgr: topology manager for this branch device.
+ * @tx_slots: transmission slots for this device.
+ * @last_seqno: last sequence number used to talk to this.
  * @link_address_sent: if a link address message has been sent to this device yet.
  * @guid: guid for DP 1.2 branch device. port under this branch can be
  * identified by port #.
@@ -186,6 +192,14 @@ struct drm_dp_mst_branch {
 	 */
 	struct kref malloc_kref;
 
+#if IS_ENABLED(CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS)
+	/**
+	 * @topology_ref_history: A history of each topology
+	 * reference/dereference. See CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS.
+	 */
+	struct drm_dp_mst_topology_ref_history topology_ref_history;
+#endif
+
 	/**
 	 * @destroy_next: linked-list entry used by
 	 * drm_dp_delayed_destroy_work()
@@ -196,6 +210,7 @@ struct drm_dp_mst_branch {
 	u8 lct;
 	int num_ports;
 
+	int msg_slots;
 	/**
 	 * @ports: the list of ports on this branch device. This should be
 	 * considered protected for reading by &drm_dp_mst_topology_mgr.lock.
@@ -208,15 +223,32 @@ struct drm_dp_mst_branch {
 	 */
 	struct list_head ports;
 
+	/* list of tx ops queue for this port */
 	struct drm_dp_mst_port *port_parent;
 	struct drm_dp_mst_topology_mgr *mgr;
 
+	/* slots are protected by mstb->mgr->qlock */
+	struct drm_dp_sideband_msg_tx *tx_slots[2];
+	int last_seqno;
 	bool link_address_sent;
 
 	/* global unique identifier to identify branch devices */
 	u8 guid[16];
 };
 
+
+/* sideband msg header - not bit struct */
+struct drm_dp_sideband_msg_hdr {
+	u8 lct;
+	u8 lcr;
+	u8 rad[8];
+	bool broadcast;
+	bool path_msg;
+	u8 msg_len;
+	bool somt;
+	bool eomt;
+	bool seqno;
+};
 
 struct drm_dp_nak_reply {
 	u8 guid[16];
@@ -273,6 +305,46 @@ struct drm_dp_remote_i2c_write_ack_reply {
 	u8 port_number;
 };
 
+struct drm_dp_query_stream_enc_status_ack_reply {
+	/* Bit[23:16]- Stream Id */
+	u8 stream_id;
+
+	/* Bit[15]- Signed */
+	bool reply_signed;
+
+	/* Bit[10:8]- Stream Output Sink Type */
+	bool unauthorizable_device_present;
+	bool legacy_device_present;
+	bool query_capable_device_present;
+
+	/* Bit[12:11]- Stream Output CP Type */
+	bool hdcp_1x_device_present;
+	bool hdcp_2x_device_present;
+
+	/* Bit[4]- Stream Authentication */
+	bool auth_completed;
+
+	/* Bit[3]- Stream Encryption */
+	bool encryption_enabled;
+
+	/* Bit[2]- Stream Repeater Function Present */
+	bool repeater_present;
+
+	/* Bit[1:0]- Stream State */
+	u8 state;
+};
+
+struct drm_dp_sideband_msg_rx {
+	u8 chunk[48];
+	u8 msg[256];
+	u8 curchunk_len;
+	u8 curchunk_idx; /* chunk we are parsing now */
+	u8 curchunk_hdrlen;
+	u8 curlen; /* total length of the msg */
+	bool have_somt;
+	bool have_eomt;
+	struct drm_dp_sideband_msg_hdr initial_hdr;
+};
 
 #define DRM_DP_MAX_SDP_STREAMS 16
 struct drm_dp_allocate_payload {
@@ -334,6 +406,15 @@ struct drm_dp_remote_i2c_write {
 	u8 *bytes;
 };
 
+struct drm_dp_query_stream_enc_status {
+	u8 stream_id;
+	u8 client_id[7];	/* 56-bit nonce */
+	u8 stream_event;
+	bool valid_stream_event;
+	u8 stream_behavior;
+	u8 valid_stream_behavior;
+};
+
 /* this covers ENUM_RESOURCES, POWER_DOWN_PHY, POWER_UP_PHY */
 struct drm_dp_port_number_req {
 	u8 port_number;
@@ -362,19 +443,6 @@ struct drm_dp_resource_status_notify {
 	u16 available_pbn;
 };
 
-#define DP_SINK_EVENT_PANEL_REPLAY_ACTIVE_FRAME_CRC_ERROR	BIT(0)
-#define DP_SINK_EVENT_PANEL_REPLAY_RFB_STORAGE_ERROR		BIT(1)
-#define DP_SINK_EVENT_DSC_RC_BUFFER_UNDER_RUN			BIT(2)
-#define DP_SINK_EVENT_DSC_RC_BUFFER_OVERFLOW			BIT(3)
-#define DP_SINK_EVENT_DSC_CHUNK_LENGTH_ERROR			BIT(4)
-#define DP_SINK_EVENT_CEC_IRQ_EVENT				BIT(5)
-
-struct drm_dp_sink_event_notify {
-	u8 port_number;
-	u8 guid[16];
-	u16 event_id;
-};
-
 struct drm_dp_query_payload_ack_reply {
 	u8 port_number;
 	u16 allocated_pbn;
@@ -386,7 +454,6 @@ struct drm_dp_sideband_msg_req_body {
 		struct drm_dp_connection_status_notify conn_stat;
 		struct drm_dp_port_number_req port_num;
 		struct drm_dp_resource_status_notify resource_stat;
-		struct drm_dp_sink_event_notify sink_event;
 
 		struct drm_dp_query_payload query_payload;
 		struct drm_dp_allocate_payload allocate_payload;
@@ -396,6 +463,8 @@ struct drm_dp_sideband_msg_req_body {
 
 		struct drm_dp_remote_i2c_read i2c_read;
 		struct drm_dp_remote_i2c_write i2c_write;
+
+		struct drm_dp_query_stream_enc_status enc_status;
 	} u;
 };
 
@@ -418,6 +487,8 @@ struct drm_dp_sideband_msg_reply_body {
 		struct drm_dp_remote_i2c_read_ack_reply remote_i2c_read_ack;
 		struct drm_dp_remote_i2c_read_nak_reply remote_i2c_read_nack;
 		struct drm_dp_remote_i2c_write_ack_reply remote_i2c_write_ack;
+
+		struct drm_dp_query_stream_enc_status_ack_reply enc_status;
 	} u;
 };
 
@@ -449,6 +520,15 @@ struct drm_dp_mst_topology_mgr;
 struct drm_dp_mst_topology_cbs {
 	/* create a connector for a port */
 	struct drm_connector *(*add_connector)(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp_mst_port *port, const char *path);
+	/*
+	 * Checks for any pending MST interrupts, passing them to MST core for
+	 * processing, the same way an HPD IRQ pulse handler would do this.
+	 * If provided MST core calls this callback from a poll-waiting loop
+	 * when waiting for MST down message replies. The driver is expected
+	 * to guard against a race between this callback and the driver's HPD
+	 * IRQ pulse handler.
+	 */
+	void (*poll_hpd_irq)(struct drm_dp_mst_topology_mgr *mgr);
 };
 
 #define DP_MAX_PAYLOAD (sizeof(unsigned long) * 8)
@@ -469,7 +549,6 @@ struct drm_dp_payload {
 struct drm_dp_vcpi_allocation {
 	struct drm_dp_mst_port *port;
 	int vcpi;
-	int pbn;
 	struct list_head next;
 };
 
@@ -523,15 +602,13 @@ struct drm_dp_mst_topology_mgr {
 	int conn_base_id;
 
 	/**
+	 * @down_rep_recv: Message receiver state for down replies.
+	 */
+	struct drm_dp_sideband_msg_rx down_rep_recv;
+	/**
 	 * @up_req_recv: Message receiver state for up requests.
 	 */
 	struct drm_dp_sideband_msg_rx up_req_recv;
-
-	/**
-	 * @down_rep_recv: Message receiver state for replies to down
-	 * requests.
-	 */
-	struct drm_dp_sideband_msg_rx down_rep_recv;
 
 	/**
 	 * @lock: protects @mst_state, @mst_primary, @dpcd, and
@@ -582,12 +659,12 @@ struct drm_dp_mst_topology_mgr {
 	const struct drm_private_state_funcs *funcs;
 
 	/**
-	 * @qlock: protects @tx_msg_downq and &drm_dp_sideband_msg_tx.state
+	 * @qlock: protects @tx_msg_downq, the &drm_dp_mst_branch.txslost and
+	 * &drm_dp_sideband_msg_tx.state once they are queued
 	 */
 	struct mutex qlock;
-
 	/**
-	 * @tx_msg_downq: List of pending down requests
+	 * @tx_msg_downq: List of pending down replies.
 	 */
 	struct list_head tx_msg_downq;
 
@@ -672,6 +749,15 @@ struct drm_dp_mst_topology_mgr {
 	 * transmissions.
 	 */
 	struct work_struct up_req_work;
+
+#if IS_ENABLED(CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS)
+	/**
+	 * @topology_ref_history_lock: protects
+	 * &drm_dp_mst_port.topology_ref_history and
+	 * &drm_dp_mst_branch.topology_ref_history.
+	 */
+	struct mutex topology_ref_history_lock;
+#endif
 };
 
 int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
@@ -696,16 +782,10 @@ drm_dp_mst_detect_port(struct drm_connector *connector,
 
 bool drm_dp_mst_port_has_audio(struct drm_dp_mst_topology_mgr *mgr,
 					struct drm_dp_mst_port *port);
-
-struct drm_dp_mst_port *drm_dp_mst_topology_get_port_validated
-(struct drm_dp_mst_topology_mgr *mgr, struct drm_dp_mst_port *port);
-void drm_dp_mst_topology_put_port(struct drm_dp_mst_port *port);
-
 struct edid *drm_dp_mst_get_edid(struct drm_connector *connector, struct drm_dp_mst_topology_mgr *mgr, struct drm_dp_mst_port *port);
 
 
-int drm_dp_calc_pbn_mode(int clock, int bpp);
-
+int drm_dp_calc_pbn_mode(int clock, int bpp, bool dsc);
 
 bool drm_dp_mst_allocate_vcpi(struct drm_dp_mst_topology_mgr *mgr,
 			      struct drm_dp_mst_port *port, int pbn, int slots);
@@ -735,7 +815,8 @@ void drm_dp_mst_dump_topology(struct seq_file *m,
 			      struct drm_dp_mst_topology_mgr *mgr);
 
 void drm_dp_mst_topology_mgr_suspend(struct drm_dp_mst_topology_mgr *mgr);
-int drm_dp_mst_topology_mgr_resume(struct drm_dp_mst_topology_mgr *mgr,
+int __must_check
+drm_dp_mst_topology_mgr_resume(struct drm_dp_mst_topology_mgr *mgr,
 			       bool sync);
 
 ssize_t drm_dp_mst_dpcd_read(struct drm_dp_aux *aux,
@@ -760,10 +841,15 @@ drm_dp_atomic_release_vcpi_slots(struct drm_atomic_state *state,
 				 struct drm_dp_mst_port *port);
 int drm_dp_send_power_updown_phy(struct drm_dp_mst_topology_mgr *mgr,
 				 struct drm_dp_mst_port *port, bool power_up);
+int drm_dp_send_query_stream_enc_status(struct drm_dp_mst_topology_mgr *mgr,
+		struct drm_dp_mst_port *port,
+		struct drm_dp_query_stream_enc_status_ack_reply *status);
 int __must_check drm_dp_mst_atomic_check(struct drm_atomic_state *state);
 
 void drm_dp_mst_get_port_malloc(struct drm_dp_mst_port *port);
 void drm_dp_mst_put_port_malloc(struct drm_dp_mst_port *port);
+
+struct drm_dp_aux *drm_dp_mst_dsc_aux_for_port(struct drm_dp_mst_port *port);
 
 extern const struct drm_private_state_funcs drm_dp_mst_topology_state_funcs;
 

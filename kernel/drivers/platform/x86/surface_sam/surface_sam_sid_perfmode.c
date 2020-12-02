@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Surface Performance Mode Driver.
  * Allows to change cooling capabilities based on user preference.
@@ -11,7 +12,7 @@
 #include "surface_sam_ssh.h"
 
 
-#define SID_PARAM_PERM		(S_IRUGO | S_IWUSR)
+#define SID_PARAM_PERM		0644
 
 enum sam_perf_mode {
 	SAM_PERF_MODE_NORMAL   = 1,
@@ -57,13 +58,11 @@ static int surface_sam_perf_mode_get(void)
 	};
 
 	status = surface_sam_ssh_rqst(&rqst, &result);
-	if (status) {
+	if (status)
 		return status;
-	}
 
-	if (result.len != 8) {
+	if (result.len != 8)
 		return -EFAULT;
-	}
 
 	return get_unaligned_le32(&result.data[0]);
 }
@@ -82,9 +81,8 @@ static int surface_sam_perf_mode_set(int perf_mode)
 		.pld = payload,
 	};
 
-	if (perf_mode < __SAM_PERF_MODE__START || perf_mode > __SAM_PERF_MODE__END) {
+	if (perf_mode < __SAM_PERF_MODE__START || perf_mode > __SAM_PERF_MODE__END)
 		return -EINVAL;
-	}
 
 	put_unaligned_le32(perf_mode, &rqst.pld[0]);
 	return surface_sam_ssh_rqst(&rqst, NULL);
@@ -97,13 +95,11 @@ static int param_perf_mode_set(const char *val, const struct kernel_param *kp)
 	int status;
 
 	status = kstrtoint(val, 0, &perf_mode);
-	if (status) {
+	if (status)
 		return status;
-	}
 
-	if (perf_mode < __SID_PARAM_PERF_MODE__START || perf_mode > __SID_PARAM_PERF_MODE__END) {
+	if (perf_mode < __SID_PARAM_PERF_MODE__START || perf_mode > __SID_PARAM_PERF_MODE__END)
 		return -EINVAL;
-	}
 
 	return param_set_int(val, kp);
 }
@@ -137,20 +133,18 @@ static ssize_t perf_mode_show(struct device *dev, struct device_attribute *attr,
 }
 
 static ssize_t perf_mode_store(struct device *dev, struct device_attribute *attr,
-                               const char *data, size_t count)
+			       const char *data, size_t count)
 {
 	int perf_mode;
 	int status;
 
 	status = kstrtoint(data, 0, &perf_mode);
-	if (status) {
+	if (status)
 		return status;
-	}
 
 	status = surface_sam_perf_mode_set(perf_mode);
-	if (status) {
+	if (status)
 		return status;
-	}
 
 	// TODO: Should we notify ACPI here?
 	//
@@ -177,23 +171,20 @@ static int surface_sam_sid_perfmode_probe(struct platform_device *pdev)
 
 	// link to ec
 	status = surface_sam_ssh_consumer_register(&pdev->dev);
-	if (status) {
+	if (status)
 		return status == -ENXIO ? -EPROBE_DEFER : status;
-	}
 
 	// set initial perf_mode
 	if (param_perf_mode_init != SID_PARAM_PERF_MODE_AS_IS) {
 		status = surface_sam_perf_mode_set(param_perf_mode_init);
-		if (status) {
+		if (status)
 			return status;
-		}
 	}
 
 	// register perf_mode attribute
 	status = sysfs_create_file(&pdev->dev.kobj, &dev_attr_perf_mode.attr);
-	if (status) {
+	if (status)
 		goto err_sysfs;
-	}
 
 	return 0;
 

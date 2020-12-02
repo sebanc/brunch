@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  *  Matt Wu <Matt_Wu@acersoftech.com.cn>
  *  Apr 26, 2001
@@ -8,21 +9,6 @@
  *
  *  TODO:
  *    --
- *
- *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the GNU General Public Lcodecnse as published by
- *   the Free Software Foundation; either version 2 of the Lcodecnse, or
- *   (at your option) any later version.
- *
- *   This program is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public Lcodecnse for more details.
- *
- *   You should have received a copy of the GNU General Public Lcodecnse
- *   along with this program; if not, write to the Free Software
- *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
- *
  */
 
 #include <linux/io.h>
@@ -2049,9 +2035,7 @@ static void snd_ali_proc_read(struct snd_info_entry *entry,
 
 static void snd_ali_proc_init(struct snd_ali *codec)
 {
-	struct snd_info_entry *entry;
-	if (!snd_card_proc_new(codec->card, "ali5451", &entry))
-		snd_info_set_text_ops(entry, codec, snd_ali_proc_read);
+	snd_card_ro_proc_new(codec->card, "ali5451", codec, snd_ali_proc_read);
 }
 
 static int snd_ali_resources(struct snd_ali *codec)

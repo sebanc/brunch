@@ -8,7 +8,6 @@
 /dts-v1/;
 
 #include "rk3288-veyron-chromebook.dtsi"
-#include "rk3288-veyron-ddr3.dtsi"
 #include "cros-ec-sbs.dtsi"
 
 / {
@@ -73,21 +72,6 @@
 				regulator-off-in-suspend;
 			};
 		};
-	};
-};
-
-&sdio0 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-
-	btmrvl: btmrvl@2 {
-		compatible = "marvell,sd8897-bt";
-		reg = <2>;
-		interrupt-parent = <&gpio4>;
-		interrupts = <RK_PD7 IRQ_TYPE_LEVEL_LOW>;
-		marvell,wakeup-pin = /bits/ 16 <13>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&bt_host_wake_l>;
 	};
 };
 
@@ -320,47 +304,25 @@
 };
 
 &pinctrl {
-	pinctrl-names = "default", "sleep";
-	pinctrl-0 = <
-		/* Common for sleep and wake, but no owners */
-		&ddr0_retention
-		&ddrio_pwroff
-		&global_pwroff
-
-		/* Wake only */
-		&suspend_l_wake
-		&bt_dev_wake_awake
-	>;
-	pinctrl-1 = <
-		/* Common for sleep and wake, but no owners */
-		&ddr0_retention
-		&ddrio_pwroff
-		&global_pwroff
-
-		/* Sleep only */
-		&suspend_l_sleep
-		&bt_dev_wake_sleep
-	>;
-
 	buck-5v {
 		drv_5v: drv-5v {
-			rockchip,pins = <7 21 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <7 RK_PC5 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
 	hdmi {
 		vcc50_hdmi_en: vcc50-hdmi-en {
-			rockchip,pins = <5 19 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <5 RK_PC3 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
 	pmic {
 		dvs_1: dvs-1 {
-			rockchip,pins = <7 12 RK_FUNC_GPIO &pcfg_pull_down>;
+			rockchip,pins = <7 RK_PB4 RK_FUNC_GPIO &pcfg_pull_down>;
 		};
 
 		dvs_2: dvs-2 {
-			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_down>;
+			rockchip,pins = <7 RK_PB7 RK_FUNC_GPIO &pcfg_pull_down>;
 		};
 	};
 };

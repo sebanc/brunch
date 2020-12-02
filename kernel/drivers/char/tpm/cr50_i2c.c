@@ -1,19 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright 2016 Google Inc.
  *
  * Based on Linux Kernel TPM driver by
  * Peter Huewe <peter.huewe@infineon.com>
  * Copyright (C) 2011 Infineon Technologies
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, version 2 of the
- * License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  */
 
 /*
@@ -29,7 +20,6 @@
  *   instead of just reading header and determining the remainder
  */
 
-#include <asm/byteorder.h>
 #include <linux/acpi.h>
 #include <linux/completion.h>
 #include <linux/i2c.h>
@@ -38,7 +28,8 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/wait.h>
-#include "cr50.h"
+#include "tpm.h"
+#include "tpm_tis_core.h"
 
 #define CR50_MAX_BUFSIZE	63
 #define CR50_TIMEOUT_SHORT_MS	2	/* Short timeout during transactions */
@@ -47,12 +38,6 @@
 #define CR50_I2C_MAX_RETRIES	3	/* Max retries due to I2C errors */
 #define CR50_I2C_RETRY_DELAY_LO	55	/* Min usecs between retries on I2C */
 #define CR50_I2C_RETRY_DELAY_HI	65	/* Max usecs between retries on I2C */
-
-static unsigned short rng_quality = 1022;
-
-module_param(rng_quality, ushort, 0644);
-MODULE_PARM_DESC(rng_quality,
-		 "Estimation of true entropy, in bits per 1024 bits.");
 
 struct priv_data {
 	int irq;
@@ -97,10 +82,10 @@ static int cr50_i2c_wait_tpm_ready(struct tpm_chip *chip)
 	rc = wait_for_completion_timeout(&priv->tpm_ready,
 		msecs_to_jiffies(chip->timeout_a));
 
-	if (rc == 0) {
+	if (rc == 0)
 		dev_warn(&chip->dev, "Timeout waiting for TPM ready\n");
-	}
-	return (int)rc;
+
+	return rc;
 }
 
 static void cr50_i2c_enable_tpm_irq(struct tpm_chip *chip)
@@ -203,10 +188,10 @@ out:
 
 	if (rc < 0)
 		return rc;
-	else if (rc == 0)
+	if (rc == 0)
 		return -EIO; /* No i2c segments transferred */
-	else
-		return 0;
+
+	return 0;
 }
 
 /*
@@ -261,31 +246,16 @@ out:
 
 	if (rc < 0)
 		return rc;
-	else if (rc == 0)
+	if (rc == 0)
 		return -EIO; /* No i2c segments transferred */
-	else
-		return 0;
+
+	return 0;
 }
 
-enum tis_access {
-	TPM_ACCESS_VALID = 0x80,
-	TPM_ACCESS_ACTIVE_LOCALITY = 0x20,
-	TPM_ACCESS_REQUEST_PENDING = 0x04,
-	TPM_ACCESS_REQUEST_USE = 0x02,
-};
-
-enum tis_status {
-	TPM_STS_VALID = 0x80,
-	TPM_STS_COMMAND_READY = 0x40,
-	TPM_STS_GO = 0x20,
-	TPM_STS_DATA_AVAIL = 0x10,
-	TPM_STS_DATA_EXPECT = 0x08,
-};
-
-enum tis_defaults {
-	TIS_SHORT_TIMEOUT = 750,	/* ms */
-	TIS_LONG_TIMEOUT = 2000,	/* 2 sec */
-};
+#undef	TPM_ACCESS
+#undef	TPM_STS
+#undef	TPM_DATA_FIFO
+#undef	TPM_DID_VID
 
 #define	TPM_ACCESS(l)			(0x0000 | ((l) << 4))
 #define	TPM_STS(l)			(0x0001 | ((l) << 4))
@@ -592,12 +562,13 @@ static int cr50_i2c_init(struct i2c_client *client)
 	if (IS_ERR(chip))
 		return PTR_ERR(chip);
 
-	priv = devm_kzalloc(dev, sizeof(struct priv_data), GFP_KERNEL);
+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
 	/* cr50 is a TPM 2.0 chip */
 	chip->flags |= TPM_CHIP_FLAG_TPM2;
+	chip->flags |= TPM_CHIP_FLAG_FIRMWARE_POWER_MANAGED;
 
 	/* Default timeouts */
 	chip->timeout_a = msecs_to_jiffies(TIS_SHORT_TIMEOUT);
@@ -648,26 +619,19 @@ static int cr50_i2c_init(struct i2c_client *client)
 	dev_info(dev, "cr50 TPM 2.0 (i2c 0x%02x irq %d id 0x%x)\n",
 		 client->addr, client->irq, vendor >> 16);
 
-	chip->hwrng.quality = rng_quality;
-
-	rc = tpm_chip_register(chip);
-	if (rc)
-		return rc;
-
-	return 0;
+	return tpm_chip_register(chip);
 }
 
 static const struct i2c_device_id cr50_i2c_table[] = {
 	{"cr50_i2c", 0},
-	{},
+	{}
 };
-
 MODULE_DEVICE_TABLE(i2c, cr50_i2c_table);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id cr50_i2c_acpi_id[] = {
 	{ "GOOG0005", 0 },
-	{},
+	{}
 };
 MODULE_DEVICE_TABLE(acpi, cr50_i2c_acpi_id);
 #endif
@@ -699,7 +663,7 @@ static int cr50_i2c_remove(struct i2c_client *client)
 	return 0;
 }
 
-static SIMPLE_DEV_PM_OPS(cr50_i2c_pm, cr50_suspend, cr50_resume);
+static SIMPLE_DEV_PM_OPS(cr50_i2c_pm, tpm_pm_suspend, tpm_pm_resume);
 
 static struct i2c_driver cr50_i2c_driver = {
 	.id_table = cr50_i2c_table,

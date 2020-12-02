@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
 #
 # TPM device configuration
 #
@@ -5,7 +6,7 @@
 menuconfig TCG_TPM
 	tristate "TPM Hardware Support"
 	depends on HAS_IOMEM
-	select SECURITYFS
+	imply SECURITYFS
 	select CRYPTO
 	select CRYPTO_HASH_INFO
 	---help---
@@ -66,6 +67,13 @@ config TCG_TIS_SPI
 	  within Linux. To compile this driver as a module, choose  M here;
 	  the module will be called tpm_tis_spi.
 
+config TCG_TIS_SPI_CR50
+	bool "Cr50 SPI Interface"
+	depends on TCG_TIS_SPI
+	help
+	  If you have a H1 secure module running Cr50 firmware on SPI bus,
+	  say Yes and it will be accessible from within Linux.
+
 config TCG_TIS_I2C_ATMEL
 	tristate "TPM Interface Specification 1.2 Interface (I2C - Atmel)"
 	depends on I2C
@@ -113,31 +121,14 @@ config TCG_ATMEL
 	  will be accessible from within Linux.  To compile this driver 
 	  as a module, choose M here; the module will be called tpm_atmel.
 
-config TCG_CR50
-	bool
-	---help---
-	  Common routines shared by drivers for Cr50-based devices.
-
 config TCG_CR50_I2C
 	tristate "Cr50 I2C Interface"
-	depends on I2C=y
-	select TCG_CR50
+	depends on I2C
 	---help---
 	  If you have a H1 secure module running Cr50 firmware on I2C bus,
 	  say Yes and it will be accessible from within Linux. To compile
 	  this driver as a module, choose M here; the module will be called
 	  cr50_i2c.
-
-config TCG_CR50_SPI
-	tristate "Cr50 SPI Interface"
-	depends on SPI
-	select TCG_TIS_CORE
-	select TCG_CR50
-	---help---
-	  If you have a H1 secure module running Cr50 firmware on SPI bus,
-	  say Yes and it will be accessible from within Linux. To compile
-	  this driver as a module, choose M here; the module will be called
-	  cr50_spi.
 
 config TCG_INFINEON
 	tristate "Infineon Technologies TPM Interface"
@@ -183,12 +174,17 @@ config TCG_CRB
 config TCG_VTPM_PROXY
 	tristate "VTPM Proxy Interface"
 	depends on TCG_TPM
-	select ANON_INODES
 	---help---
 	  This driver proxies for an emulated TPM (vTPM) running in userspace.
 	  A device /dev/vtpmx is provided that creates a device pair
 	  /dev/vtpmX and a server-side file descriptor on which the vTPM
 	  can receive commands.
+
+config TCG_FTPM_TEE
+	tristate "TEE based fTPM Interface"
+	depends on TEE && OPTEE
+	help
+	  This driver proxies for firmware TPM running in TEE.
 
 config TCG_VIRTIO_VTPM
 	tristate "Virtio vTPM"
@@ -198,7 +194,6 @@ config TCG_VIRTIO_VTPM
 	  you are building Linux to run inside of a hypervisor that supports
 	  TPM over Virtio, say Yes and the virtualized TPM will be
 	  accessible from the guest.
-
 
 source "drivers/char/tpm/st33zp24/Kconfig"
 endif # TCG_TPM

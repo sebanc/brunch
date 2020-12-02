@@ -15,15 +15,14 @@
 #include <linux/err.h>
 #include <linux/crypto.h>
 #include <linux/delay.h>
-#include <linux/hardirq.h>
+#include <asm/simd.h>
 #include <asm/switch_to.h>
 #include <crypto/aes.h>
 #include <crypto/ghash.h>
 #include <crypto/scatterwalk.h>
 #include <crypto/internal/hash.h>
+#include <crypto/internal/simd.h>
 #include <crypto/b128ops.h>
-
-#define IN_INTERRUPT in_interrupt()
 
 void gcm_init_p8(u128 htable[16], const u64 Xi[2]);
 void gcm_gmult_p8(u64 Xi[2], const u128 htable[16]);
@@ -76,7 +75,7 @@ static int p8_ghash_setkey(struct crypto_shash *tfm, const u8 *key,
 static inline void __ghash_block(struct p8_ghash_ctx *ctx,
 				 struct p8_ghash_desc_ctx *dctx)
 {
-	if (!IN_INTERRUPT) {
+	if (crypto_simd_usable()) {
 		preempt_disable();
 		pagefault_disable();
 		enable_kernel_vsx();
@@ -95,7 +94,7 @@ static inline void __ghash_blocks(struct p8_ghash_ctx *ctx,
 				  struct p8_ghash_desc_ctx *dctx,
 				  const u8 *src, unsigned int srclen)
 {
-	if (!IN_INTERRUPT) {
+	if (crypto_simd_usable()) {
 		preempt_disable();
 		pagefault_disable();
 		enable_kernel_vsx();

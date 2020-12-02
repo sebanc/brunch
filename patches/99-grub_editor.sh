@@ -15,10 +15,20 @@ else
 	partsource="\$source"
 fi
 
+if [[ "\$source" =~ .*"loop".* ]] ; then 
+cat <<DUALBOOT
+┌──────────────────────────────────────────────────────────────┐
+│ edit-grub-config does not work with dual boot installations. │
+│ In dual boot, you have to modify the grub config that was    │
+│ created at the end of the image file installation process.   │
+└──────────────────────────────────────────────────────────────┘
+DUALBOOT
+else
 mkdir -p /root/tmpgrub
 mount "\$partsource"12 /root/tmpgrub
 \$EDITOR /root/tmpgrub/efi/boot/grub.cfg
 umount /root/tmpgrub
+fi
 EDITGRUB
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
 chmod 0755 /system/usr/sbin/edit-grub-config

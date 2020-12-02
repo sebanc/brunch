@@ -70,7 +70,7 @@ Efuse_Write1ByteToFakeContent(
 	}
 	if (fakeEfuseBank == 0)
 		fakeEfuseContent[Offset] = Value;
-	else{
+	else {
 		fakeBTEfuseContent[fakeEfuseBank-1][Offset] = Value;
 	}
 	return true;
@@ -125,11 +125,8 @@ Efuse_GetCurrentSize(
 	u8 	efuseType,
 	bool		bPseudoTest)
 {
-	u16 ret = 0;
-
-	ret = padapter->HalFunc.EfuseGetCurrentSize(padapter, efuseType, bPseudoTest);
-
-	return ret;
+	return padapter->HalFunc.EfuseGetCurrentSize(padapter, efuseType,
+						     bPseudoTest);
 }
 
 /*  11/16/2008 MH Add description. Get current efuse area enabled word!!. */
@@ -221,7 +218,6 @@ EFUSE_Read1Byte(
 struct adapter *Adapter,
 u16 	Address)
 {
-	u8 data;
 	u8 Bytetemp = {0x00};
 	u8 temp = {0x00};
 	u32 k = 0;
@@ -253,8 +249,7 @@ u16 	Address)
 				break;
 			}
 		}
-		data = rtw_read8(Adapter, EFUSE_CTRL);
-		return data;
+		return rtw_read8(Adapter, EFUSE_CTRL);
 	} else
 		return 0xFF;
 
@@ -303,7 +298,7 @@ bool		bPseudoTest)
 	if (tmpidx < 100) {
 		*data = rtw_read8(padapter, EFUSE_CTRL);
 		bResult = true;
-	} else{
+	} else {
 		*data = 0xff;
 		bResult = false;
 		DBG_871X("%s: [ERROR] addr = 0x%x bResult =%d time out 1s !!!\n", __func__, addr, bResult);
@@ -359,7 +354,7 @@ bool		bPseudoTest)
 
 	if (tmpidx < 100) {
 		bResult = true;
-	} else{
+	} else {
 		bResult = false;
 		DBG_871X("%s: [ERROR] addr = 0x%x , efuseValue = 0x%x , bResult =%d time out 1s !!!\n",
 					__func__, addr, efuseValue, bResult);
@@ -378,11 +373,8 @@ Efuse_PgPacketRead(struct adapter *padapter,
 				u8 	*data,
 				bool		bPseudoTest)
 {
-	int	ret = 0;
-
-	ret =  padapter->HalFunc.Efuse_PgPacketRead(padapter, offset, data, bPseudoTest);
-
-	return ret;
+	return padapter->HalFunc.Efuse_PgPacketRead(padapter, offset, data,
+						    bPseudoTest);
 }
 
 int
@@ -392,11 +384,8 @@ Efuse_PgPacketWrite(struct adapter *padapter,
 				u8 	*data,
 				bool		bPseudoTest)
 {
-	int ret;
-
-	ret =  padapter->HalFunc.Efuse_PgPacketWrite(padapter, offset, word_en, data, bPseudoTest);
-
-	return ret;
+	return padapter->HalFunc.Efuse_PgPacketWrite(padapter, offset, word_en,
+						     data, bPseudoTest);
 }
 
 /*-----------------------------------------------------------------------------
@@ -447,11 +436,9 @@ Efuse_WordEnableDataWrite(struct adapter *padapter,
 						u8 *data,
 						bool		bPseudoTest)
 {
-	u8 ret = 0;
-
-	ret =  padapter->HalFunc.Efuse_WordEnableDataWrite(padapter, efuse_addr, word_en, data, bPseudoTest);
-
-	return ret;
+	return padapter->HalFunc.Efuse_WordEnableDataWrite(padapter, efuse_addr,
+							   word_en, data,
+							   bPseudoTest);
 }
 
 /*-----------------------------------------------------------------------------

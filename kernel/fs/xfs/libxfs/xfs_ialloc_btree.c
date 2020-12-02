@@ -11,14 +11,12 @@
 #include "xfs_trans_resv.h"
 #include "xfs_bit.h"
 #include "xfs_mount.h"
-#include "xfs_inode.h"
 #include "xfs_btree.h"
 #include "xfs_ialloc.h"
 #include "xfs_ialloc_btree.h"
 #include "xfs_alloc.h"
 #include "xfs_error.h"
 #include "xfs_trace.h"
-#include "xfs_cksum.h"
 #include "xfs_trans.h"
 #include "xfs_rmap.h"
 
@@ -28,7 +26,7 @@ xfs_inobt_get_minrecs(
 	struct xfs_btree_cur	*cur,
 	int			level)
 {
-	return cur->bc_mp->m_inobt_mnr[level != 0];
+	return M_IGEO(cur->bc_mp)->inobt_mnr[level != 0];
 }
 
 STATIC struct xfs_btree_cur *
@@ -84,7 +82,7 @@ __xfs_inobt_alloc_block(
 	memset(&args, 0, sizeof(args));
 	args.tp = cur->bc_tp;
 	args.mp = cur->bc_mp;
-	xfs_rmap_ag_owner(&args.oinfo, XFS_RMAP_OWN_INOBT);
+	args.oinfo = XFS_RMAP_OINFO_INOBT;
 	args.fsbno = XFS_AGB_TO_FSB(args.mp, cur->bc_private.a.agno, sbno);
 	args.minlen = 1;
 	args.maxlen = 1;
@@ -136,12 +134,9 @@ __xfs_inobt_free_block(
 	struct xfs_buf		*bp,
 	enum xfs_ag_resv_type	resv)
 {
-	struct xfs_owner_info	oinfo;
-
-	xfs_rmap_ag_owner(&oinfo, XFS_RMAP_OWN_INOBT);
 	return xfs_free_extent(cur->bc_tp,
 			XFS_DADDR_TO_FSB(cur->bc_mp, XFS_BUF_ADDR(bp)), 1,
-			&oinfo, resv);
+			&XFS_RMAP_OINFO_INOBT, resv);
 }
 
 STATIC int
@@ -167,7 +162,7 @@ xfs_inobt_get_maxrecs(
 	struct xfs_btree_cur	*cur,
 	int			level)
 {
-	return cur->bc_mp->m_inobt_mxr[level != 0];
+	return M_IGEO(cur->bc_mp)->inobt_mxr[level != 0];
 }
 
 STATIC void
@@ -258,10 +253,13 @@ static xfs_failaddr_t
 xfs_inobt_verify(
 	struct xfs_buf		*bp)
 {
-	struct xfs_mount	*mp = bp->b_target->bt_mount;
+	struct xfs_mount	*mp = bp->b_mount;
 	struct xfs_btree_block	*block = XFS_BUF_TO_BLOCK(bp);
 	xfs_failaddr_t		fa;
 	unsigned int		level;
+
+	if (!xfs_verify_magic(bp, block->bb_magic))
+		return __this_address;
 
 	/*
 	 * During growfs operations, we can't verify the exact owner as the
@@ -273,26 +271,19 @@ xfs_inobt_verify(
 	 * but beware of the landmine (i.e. need to check pag->pagi_init) if we
 	 * ever do.
 	 */
-	switch (block->bb_magic) {
-	case cpu_to_be32(XFS_IBT_CRC_MAGIC):
-	case cpu_to_be32(XFS_FIBT_CRC_MAGIC):
+	if (xfs_sb_version_hascrc(&mp->m_sb)) {
 		fa = xfs_btree_sblock_v5hdr_verify(bp);
 		if (fa)
 			return fa;
-		/* fall through */
-	case cpu_to_be32(XFS_IBT_MAGIC):
-	case cpu_to_be32(XFS_FIBT_MAGIC):
-		break;
-	default:
-		return __this_address;
 	}
 
 	/* level verification */
 	level = be16_to_cpu(block->bb_level);
-	if (level >= mp->m_in_maxlevels)
+	if (level >= M_IGEO(mp)->inobt_maxlevels)
 		return __this_address;
 
-	return xfs_btree_sblock_verify(bp, mp->m_inobt_mxr[level != 0]);
+	return xfs_btree_sblock_verify(bp,
+			M_IGEO(mp)->inobt_mxr[level != 0]);
 }
 
 static void
@@ -331,6 +322,16 @@ xfs_inobt_write_verify(
 
 const struct xfs_buf_ops xfs_inobt_buf_ops = {
 	.name = "xfs_inobt",
+	.magic = { cpu_to_be32(XFS_IBT_MAGIC), cpu_to_be32(XFS_IBT_CRC_MAGIC) },
+	.verify_read = xfs_inobt_read_verify,
+	.verify_write = xfs_inobt_write_verify,
+	.verify_struct = xfs_inobt_verify,
+};
+
+const struct xfs_buf_ops xfs_finobt_buf_ops = {
+	.name = "xfs_finobt",
+	.magic = { cpu_to_be32(XFS_FIBT_MAGIC),
+		   cpu_to_be32(XFS_FIBT_CRC_MAGIC) },
 	.verify_read = xfs_inobt_read_verify,
 	.verify_write = xfs_inobt_write_verify,
 	.verify_struct = xfs_inobt_verify,
@@ -392,7 +393,7 @@ static const struct xfs_btree_ops xfs_finobt_ops = {
 	.init_rec_from_cur	= xfs_inobt_init_rec_from_cur,
 	.init_ptr_from_cur	= xfs_finobt_init_ptr_from_cur,
 	.key_diff		= xfs_inobt_key_diff,
-	.buf_ops		= &xfs_inobt_buf_ops,
+	.buf_ops		= &xfs_finobt_buf_ops,
 	.diff_two_keys		= xfs_inobt_diff_two_keys,
 	.keys_inorder		= xfs_inobt_keys_inorder,
 	.recs_inorder		= xfs_inobt_recs_inorder,
@@ -538,15 +539,57 @@ xfs_inobt_rec_check_count(
 
 static xfs_extlen_t
 xfs_inobt_max_size(
-	struct xfs_mount	*mp)
+	struct xfs_mount	*mp,
+	xfs_agnumber_t		agno)
 {
+	xfs_agblock_t		agblocks = xfs_ag_block_count(mp, agno);
+
 	/* Bail out if we're uninitialized, which can happen in mkfs. */
-	if (mp->m_inobt_mxr[0] == 0)
+	if (M_IGEO(mp)->inobt_mxr[0] == 0)
 		return 0;
 
-	return xfs_btree_calc_size(mp->m_inobt_mnr,
-		(uint64_t)mp->m_sb.sb_agblocks * mp->m_sb.sb_inopblock /
-				XFS_INODES_PER_CHUNK);
+	/*
+	 * The log is permanently allocated, so the space it occupies will
+	 * never be available for the kinds of things that would require btree
+	 * expansion.  We therefore can pretend the space isn't there.
+	 */
+	if (mp->m_sb.sb_logstart &&
+	    XFS_FSB_TO_AGNO(mp, mp->m_sb.sb_logstart) == agno)
+		agblocks -= mp->m_sb.sb_logblocks;
+
+	return xfs_btree_calc_size(M_IGEO(mp)->inobt_mnr,
+				(uint64_t)agblocks * mp->m_sb.sb_inopblock /
+					XFS_INODES_PER_CHUNK);
+}
+
+/* Read AGI and create inobt cursor. */
+int
+xfs_inobt_cur(
+	struct xfs_mount	*mp,
+	struct xfs_trans	*tp,
+	xfs_agnumber_t		agno,
+	xfs_btnum_t		which,
+	struct xfs_btree_cur	**curpp,
+	struct xfs_buf		**agi_bpp)
+{
+	struct xfs_btree_cur	*cur;
+	int			error;
+
+	ASSERT(*agi_bpp == NULL);
+	ASSERT(*curpp == NULL);
+
+	error = xfs_ialloc_read_agi(mp, tp, agno, agi_bpp);
+	if (error)
+		return error;
+
+	cur = xfs_inobt_init_cursor(mp, tp, *agi_bpp, agno, which);
+	if (!cur) {
+		xfs_trans_brelse(tp, *agi_bpp);
+		*agi_bpp = NULL;
+		return -ENOMEM;
+	}
+	*curpp = cur;
+	return 0;
 }
 
 static int
@@ -557,15 +600,14 @@ xfs_inobt_count_blocks(
 	xfs_btnum_t		btnum,
 	xfs_extlen_t		*tree_blocks)
 {
-	struct xfs_buf		*agbp;
-	struct xfs_btree_cur	*cur;
+	struct xfs_buf		*agbp = NULL;
+	struct xfs_btree_cur	*cur = NULL;
 	int			error;
 
-	error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
+	error = xfs_inobt_cur(mp, tp, agno, btnum, &cur, &agbp);
 	if (error)
 		return error;
 
-	cur = xfs_inobt_init_cursor(mp, tp, agbp, agno, btnum);
 	error = xfs_btree_count_blocks(cur, tree_blocks);
 	xfs_btree_del_cursor(cur, error);
 	xfs_trans_brelse(tp, agbp);
@@ -594,7 +636,7 @@ xfs_finobt_calc_reserves(
 	if (error)
 		return error;
 
-	*ask += xfs_inobt_max_size(mp);
+	*ask += xfs_inobt_max_size(mp, agno);
 	*used += tree_len;
 	return 0;
 }
@@ -605,5 +647,5 @@ xfs_iallocbt_calc_size(
 	struct xfs_mount	*mp,
 	unsigned long long	len)
 {
-	return xfs_btree_calc_size(mp->m_inobt_mnr, len);
+	return xfs_btree_calc_size(M_IGEO(mp)->inobt_mnr, len);
 }

@@ -25,11 +25,14 @@
  */
 
 #include <acpi/video.h>
-#include <drm/drmP.h>
+
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fb_helper.h>
+#include <drm/drm_fourcc.h>
+#include <drm/drm_probe_helper.h>
+#include <drm/drm_vblank.h>
 
 #include "nouveau_fbcon.h"
 #include "nouveau_crtc.h"
@@ -200,7 +203,7 @@ nouveau_user_framebuffer_destroy(struct drm_framebuffer *drm_fb)
 	struct nouveau_framebuffer *fb = nouveau_framebuffer(drm_fb);
 
 	if (fb->nvbo)
-		drm_gem_object_put_unlocked(&fb->nvbo->gem);
+		drm_gem_object_put(&fb->nvbo->bo.base);
 
 	drm_framebuffer_cleanup(drm_fb);
 	kfree(fb);
@@ -213,7 +216,7 @@ nouveau_user_framebuffer_create_handle(struct drm_framebuffer *drm_fb,
 {
 	struct nouveau_framebuffer *fb = nouveau_framebuffer(drm_fb);
 
-	return drm_gem_handle_create(file_priv, &fb->nvbo->gem, handle);
+	return drm_gem_handle_create(file_priv, &fb->nvbo->bo.base, handle);
 }
 
 static const struct drm_framebuffer_funcs nouveau_framebuffer_funcs = {
@@ -282,7 +285,7 @@ nouveau_user_framebuffer_create(struct drm_device *dev,
 	if (ret == 0)
 		return &fb->base;
 
-	drm_gem_object_put_unlocked(gem);
+	drm_gem_object_put(gem);
 	return ERR_PTR(ret);
 }
 
@@ -357,15 +360,6 @@ nouveau_display_hpd_work(struct work_struct *work)
 
 #ifdef CONFIG_ACPI
 
-/*
- * Hans de Goede: This define belongs in acpi/video.h, I've submitted a patch
- * to the acpi subsys to move it there from drivers/acpi/acpi_video.c .
- * This should be dropped once that is merged.
- */
-#ifndef ACPI_VIDEO_NOTIFY_PROBE
-#define ACPI_VIDEO_NOTIFY_PROBE			0x81
-#endif
-
 static int
 nouveau_display_acpi_ntfy(struct notifier_block *nb, unsigned long val,
 			  void *data)
@@ -413,6 +407,17 @@ nouveau_display_init(struct drm_device *dev, bool resume, bool runtime)
 	struct drm_connector_list_iter conn_iter;
 	int ret;
 
+	/*
+	 * Enable hotplug interrupts (done as early as possible, since we need
+	 * them for MST)
+	 */
+	drm_connector_list_iter_begin(dev, &conn_iter);
+	nouveau_for_each_non_mst_connector_iter(connector, &conn_iter) {
+		struct nouveau_connector *conn = nouveau_connector(connector);
+		nvif_notify_get(&conn->hpd);
+	}
+	drm_connector_list_iter_end(&conn_iter);
+
 	ret = disp->init(dev, resume, runtime);
 	if (ret)
 		return ret;
@@ -421,14 +426,6 @@ nouveau_display_init(struct drm_device *dev, bool resume, bool runtime)
 	 * support
 	 */
 	drm_kms_helper_poll_enable(dev);
-
-	/* enable hotplug interrupts */
-	drm_connector_list_iter_begin(dev, &conn_iter);
-	nouveau_for_each_non_mst_connector_iter(connector, &conn_iter) {
-		struct nouveau_connector *conn = nouveau_connector(connector);
-		nvif_notify_get(&conn->hpd);
-	}
-	drm_connector_list_iter_end(&conn_iter);
 
 	return ret;
 }
@@ -445,7 +442,7 @@ nouveau_display_fini(struct drm_device *dev, bool suspend, bool runtime)
 		if (drm_drv_uses_atomic_modeset(dev))
 			drm_atomic_helper_shutdown(dev);
 		else
-			drm_crtc_force_disable_all(dev);
+			drm_helper_force_disable_all(dev);
 	}
 
 	/* disable hotplug interrupts */
@@ -668,8 +665,8 @@ nouveau_display_dumb_create(struct drm_file *file_priv, struct drm_device *dev,
 	if (ret)
 		return ret;
 
-	ret = drm_gem_handle_create(file_priv, &bo->gem, &args->handle);
-	drm_gem_object_put_unlocked(&bo->gem);
+	ret = drm_gem_handle_create(file_priv, &bo->bo.base, &args->handle);
+	drm_gem_object_put(&bo->bo.base);
 	return ret;
 }
 
@@ -683,8 +680,8 @@ nouveau_display_dumb_map_offset(struct drm_file *file_priv,
 	gem = drm_gem_object_lookup(file_priv, handle);
 	if (gem) {
 		struct nouveau_bo *bo = nouveau_gem_object(gem);
-		*poffset = drm_vma_node_offset_addr(&bo->bo.vma_node);
-		drm_gem_object_put_unlocked(gem);
+		*poffset = drm_vma_node_offset_addr(&bo->bo.base.vma_node);
+		drm_gem_object_put(gem);
 		return 0;
 	}
 

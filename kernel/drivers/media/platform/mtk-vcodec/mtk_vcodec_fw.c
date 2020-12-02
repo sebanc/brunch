@@ -10,9 +10,9 @@ struct mtk_vcodec_fw_ops {
 	unsigned int (*get_venc_capa)(struct mtk_vcodec_fw *fw);
 	void * (*map_dm_addr)(struct mtk_vcodec_fw *fw, u32 dtcm_dmem_addr);
 	int (*ipi_register)(struct mtk_vcodec_fw *fw, int id,
-		mtk_vcodec_ipi_handler handler, const char *name, void *priv);
+			    mtk_vcodec_ipi_handler handler, const char *name, void *priv);
 	int (*ipi_send)(struct mtk_vcodec_fw *fw, int id, void *buf,
-		unsigned int len, unsigned int wait);
+			unsigned int len, unsigned int wait);
 };
 
 struct mtk_vcodec_fw {
@@ -44,13 +44,22 @@ static void *mtk_vcodec_vpu_map_dm_addr(struct mtk_vcodec_fw *fw,
 }
 
 static int mtk_vcodec_vpu_set_ipi_register(struct mtk_vcodec_fw *fw, int id,
-		mtk_vcodec_ipi_handler handler, const char *name, void *priv)
+					   mtk_vcodec_ipi_handler handler,
+					   const char *name, void *priv)
 {
-	return vpu_ipi_register(fw->pdev, id, handler, name, priv);
+	/*
+	 * The handler we receive takes a void * as its first argument. We
+	 * cannot change this because it needs to be passed down to the rproc
+	 * subsystem when SCP is used. VPU takes a const argument, which is
+	 * more constrained, so the conversion below is safe.
+	 */
+	ipi_handler_t handler_const = (ipi_handler_t)handler;
+
+	return vpu_ipi_register(fw->pdev, id, handler_const, name, priv);
 }
 
 static int mtk_vcodec_vpu_ipi_send(struct mtk_vcodec_fw *fw, int id, void *buf,
-		unsigned int len, unsigned int wait)
+				   unsigned int len, unsigned int wait)
 {
 	return vpu_ipi_send(fw->pdev, id, buf, len);
 }
@@ -86,13 +95,14 @@ static void *mtk_vcodec_vpu_scp_dm_addr(struct mtk_vcodec_fw *fw,
 }
 
 static int mtk_vcodec_scp_set_ipi_register(struct mtk_vcodec_fw *fw, int id,
-		mtk_vcodec_ipi_handler handler, const char *name, void *priv)
+					   mtk_vcodec_ipi_handler handler,
+					   const char *name, void *priv)
 {
 	return scp_ipi_register(fw->scp, id, handler, priv);
 }
 
 static int mtk_vcodec_scp_ipi_send(struct mtk_vcodec_fw *fw, int id, void *buf,
-		unsigned int len, unsigned int wait)
+				   unsigned int len, unsigned int wait)
 {
 	return scp_ipi_send(fw->scp, id, buf, len, wait);
 }
@@ -117,7 +127,7 @@ static void mtk_vcodec_reset_handler(void *priv)
 	list_for_each_entry(ctx, &dev->ctx_list, list) {
 		ctx->state = MTK_STATE_ABORT;
 		mtk_v4l2_debug(0, "[%d] Change to state MTK_STATE_ABORT",
-				ctx->id);
+			       ctx->id);
 	}
 	mutex_unlock(&dev->dev_mutex);
 }
@@ -206,14 +216,15 @@ void *mtk_vcodec_fw_map_dm_addr(struct mtk_vcodec_fw *fw, u32 mem_addr)
 EXPORT_SYMBOL_GPL(mtk_vcodec_fw_map_dm_addr);
 
 int mtk_vcodec_fw_ipi_register(struct mtk_vcodec_fw *fw, int id,
-	mtk_vcodec_ipi_handler handler, const char *name, void *priv)
+			       mtk_vcodec_ipi_handler handler,
+			       const char *name, void *priv)
 {
 	return fw->ops->ipi_register(fw, id, handler, name, priv);
 }
 EXPORT_SYMBOL_GPL(mtk_vcodec_fw_ipi_register);
 
-int mtk_vcodec_fw_ipi_send(struct mtk_vcodec_fw *fw,
-	int id, void *buf, unsigned int len, unsigned int wait)
+int mtk_vcodec_fw_ipi_send(struct mtk_vcodec_fw *fw, int id, void *buf,
+			   unsigned int len, unsigned int wait)
 {
 	return fw->ops->ipi_send(fw, id, buf, len, wait);
 }

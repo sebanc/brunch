@@ -22,6 +22,7 @@
 #include <linux/tick.h>
 #include <linux/nmi.h>
 #include <linux/cpuhotplug.h>
+#include <linux/stackprotector.h>
 
 #include <asm/paravirt.h>
 #include <asm/desc.h>
@@ -57,6 +58,7 @@ static void cpu_bringup(void)
 {
 	int cpu;
 
+	cr4_init();
 	cpu_init();
 	touch_softlockup_watchdog();
 	preempt_disable();
@@ -88,6 +90,7 @@ static void cpu_bringup(void)
 asmlinkage __visible void cpu_bringup_and_idle(void)
 {
 	cpu_bringup();
+	boot_init_stack_canary();
 	cpu_startup_entry(CPUHP_AP_ONLINE_IDLE);
 	prevent_tail_call_optimization();
 }
@@ -250,6 +253,7 @@ static void __init xen_pv_smp_prepare_cpus(unsigned int max_cpus)
 	for_each_possible_cpu(i) {
 		zalloc_cpumask_var(&per_cpu(cpu_sibling_map, i), GFP_KERNEL);
 		zalloc_cpumask_var(&per_cpu(cpu_core_map, i), GFP_KERNEL);
+		zalloc_cpumask_var(&per_cpu(cpu_die_map, i), GFP_KERNEL);
 		zalloc_cpumask_var(&per_cpu(cpu_llc_shared_map, i), GFP_KERNEL);
 	}
 	set_cpu_sibling_map(0);
@@ -360,7 +364,9 @@ static int xen_pv_cpu_up(unsigned int cpu, struct task_struct *idle)
 {
 	int rc;
 
-	common_cpu_up(cpu, idle);
+	rc = common_cpu_up(cpu, idle);
+	if (rc)
+		return rc;
 
 	xen_setup_runstate_info(cpu);
 

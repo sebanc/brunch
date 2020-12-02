@@ -1,13 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * bpf_jit.h: BPF JIT compiler for PPC
  *
  * Copyright 2011 Matt Evans <matt@ozlabs.org>, IBM Corporation
  * 	     2016 Naveen N. Rao <naveen.n.rao@linux.vnet.ibm.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; version 2
- * of the License.
  */
 #ifndef _BPF_JIT_H
 #define _BPF_JIT_H
@@ -145,6 +141,10 @@
 				     ___PPC_RS(a) | ___PPC_RB(s))
 #define PPC_SRW(d, a, s)	EMIT(PPC_INST_SRW | ___PPC_RA(d) |	      \
 				     ___PPC_RS(a) | ___PPC_RB(s))
+#define PPC_SRAW(d, a, s)	EMIT(PPC_INST_SRAW | ___PPC_RA(d) |	      \
+				     ___PPC_RS(a) | ___PPC_RB(s))
+#define PPC_SRAWI(d, a, i)	EMIT(PPC_INST_SRAWI | ___PPC_RA(d) |	      \
+				     ___PPC_RS(a) | __PPC_SH(i))
 #define PPC_SRD(d, a, s)	EMIT(PPC_INST_SRD | ___PPC_RA(d) |	      \
 				     ___PPC_RS(a) | ___PPC_RB(s))
 #define PPC_SRAD(d, a, s)	EMIT(PPC_INST_SRAD | ___PPC_RA(d) |	      \
@@ -154,6 +154,10 @@
 #define PPC_RLWINM(d, a, i, mb, me)	EMIT(PPC_INST_RLWINM | ___PPC_RA(d) | \
 					___PPC_RS(a) | __PPC_SH(i) |	      \
 					__PPC_MB(mb) | __PPC_ME(me))
+#define PPC_RLWINM_DOT(d, a, i, mb, me)	EMIT(PPC_INST_RLWINM_DOT |	      \
+					___PPC_RA(d) | ___PPC_RS(a) |	      \
+					__PPC_SH(i) | __PPC_MB(mb) |	      \
+					__PPC_ME(me))
 #define PPC_RLWIMI(d, a, i, mb, me)	EMIT(PPC_INST_RLWIMI | ___PPC_RA(d) | \
 					___PPC_RS(a) | __PPC_SH(i) |	      \
 					__PPC_MB(mb) | __PPC_ME(me))

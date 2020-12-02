@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
 menuconfig POWER_AVS
 	bool "Adaptive Voltage Scaling class support"
 	help
@@ -22,7 +23,7 @@ config ROCKCHIP_IODOMAIN
 config MTK_SVS
 	bool "MediaTek Smart Voltage Scaling(SVS)"
 	depends on POWER_AVS && MTK_EFUSE
-	depends on THERMAL!=m
+	depends on THERMAL = y || THERMAL = n
 	help
 	  The SVS engine is a piece of hardware which is used to calculate
 	  optimized voltage values of several power domains, e.g.

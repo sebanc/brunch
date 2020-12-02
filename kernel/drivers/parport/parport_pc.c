@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /* Low-level parallel-port routines for 8255-based PC-style hardware.
  *
  * Authors: Phil Blundell <philb@gnu.org>
@@ -1667,7 +1668,7 @@ static int parport_ECP_supported(struct parport *pb)
 	default:
 		printk(KERN_WARNING "0x%lx: Unknown implementation ID\n",
 			pb->base);
-		/* Assume 1 */
+		/* Fall through - Assume 1 */
 	case 1:
 		pword = 1;
 	}

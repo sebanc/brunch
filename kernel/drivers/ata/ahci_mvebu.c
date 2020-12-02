@@ -30,6 +30,7 @@
 
 struct ahci_mvebu_plat_data {
 	int (*plat_config)(struct ahci_host_priv *hpriv);
+	unsigned int flags;
 };
 
 static void ahci_mvebu_mbus_config(struct ahci_host_priv *hpriv,
@@ -80,6 +81,19 @@ static int ahci_mvebu_armada_380_config(struct ahci_host_priv *hpriv)
 	ahci_mvebu_regret_option(hpriv);
 
 	return rc;
+}
+
+static int ahci_mvebu_armada_3700_config(struct ahci_host_priv *hpriv)
+{
+	u32 reg;
+
+	writel(0, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_ADDR);
+
+	reg = readl(hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
+	reg |= BIT(6);
+	writel(reg, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
+
+	return 0;
 }
 
 /**
@@ -148,8 +162,7 @@ static int ahci_mvebu_resume(struct platform_device *pdev)
 	struct ahci_host_priv *hpriv = host->private_data;
 	const struct ahci_mvebu_plat_data *pdata = hpriv->plat_data;
 
-	if (pdata->plat_config)
-		pdata->plat_config(hpriv);
+	pdata->plat_config(hpriv);
 
 	return ahci_platform_resume_host(&pdev->dev);
 }
@@ -183,6 +196,7 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 	if (IS_ERR(hpriv))
 		return PTR_ERR(hpriv);
 
+	hpriv->flags |= pdata->flags;
 	hpriv->plat_data = (void *)pdata;
 
 	rc = ahci_platform_enable_resources(hpriv);
@@ -191,12 +205,9 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 
 	hpriv->stop_engine = ahci_mvebu_stop_engine;
 
-	pdata = hpriv->plat_data;
-	if (pdata->plat_config) {
-		rc = pdata->plat_config(hpriv);
-		if (rc)
-			goto disable_resources;
-	}
+	rc = pdata->plat_config(hpriv);
+	if (rc)
+		goto disable_resources;
 
 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
 				     &ahci_platform_sht);
@@ -215,7 +226,8 @@ static const struct ahci_mvebu_plat_data ahci_mvebu_armada_380_plat_data = {
 };
 
 static const struct ahci_mvebu_plat_data ahci_mvebu_armada_3700_plat_data = {
-	.plat_config = NULL,
+	.plat_config = ahci_mvebu_armada_3700_config,
+	.flags = AHCI_HFLAG_SUSPEND_PHYS | AHCI_HFLAG_IGN_NOTSUPP_POWER_ON,
 };
 
 static const struct of_device_id ahci_mvebu_of_match[] = {
@@ -231,11 +243,6 @@ static const struct of_device_id ahci_mvebu_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, ahci_mvebu_of_match);
 
-/*
- * We currently don't provide power management related operations,
- * since there is no suspend/resume support at the platform level for
- * Armada 38x for the moment.
- */
 static struct platform_driver ahci_mvebu_driver = {
 	.probe = ahci_mvebu_probe,
 	.remove = ata_platform_remove_one,

@@ -2,6 +2,7 @@
 #define _PKGLIST_H_
 
 #include <linux/dcache.h>
+#include <linux/uidgid.h>
 
 #define QSTR_LITERAL(string) QSTR_INIT(string, sizeof(string)-1)
 

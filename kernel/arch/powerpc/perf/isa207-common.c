@@ -1,14 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Common Performance counter support functions for PowerISA v2.07 processors.
  *
  * Copyright 2009 Paul Mackerras, IBM Corporation.
  * Copyright 2013 Michael Ellerman, IBM Corporation.
  * Copyright 2016 Madhavan Srinivasan, IBM Corporation.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  */
 #include "isa207-common.h"
 
@@ -273,6 +269,15 @@ int isa207_get_constraint(u64 event, unsigned long *maskp, unsigned long *valp)
 
 		mask  |= CNST_PMC_MASK(pmc);
 		value |= CNST_PMC_VAL(pmc);
+
+		/*
+		 * PMC5 and PMC6 are used to count cycles and instructions and
+		 * they do not support most of the constraint bits. Add a check
+		 * to exclude PMC5/6 from most of the constraints except for
+		 * EBB/BHRB.
+		 */
+		if (pmc >= 5)
+			goto ebb_bhrb;
 	}
 
 	if (pmc <= 4) {
@@ -287,17 +292,25 @@ int isa207_get_constraint(u64 event, unsigned long *maskp, unsigned long *valp)
 	}
 
 	if (unit >= 6 && unit <= 9) {
-		/*
-		 * L2/L3 events contain a cache selector field, which is
-		 * supposed to be programmed into MMCRC. However MMCRC is only
-		 * HV writable, and there is no API for guest kernels to modify
-		 * it. The solution is for the hypervisor to initialise the
-		 * field to zeroes, and for us to only ever allow events that
-		 * have a cache selector of zero. The bank selector (bit 3) is
-		 * irrelevant, as long as the rest of the value is 0.
-		 */
-		if (!cpu_has_feature(CPU_FTR_ARCH_300) && (cache & 0x7))
+		if (cpu_has_feature(CPU_FTR_ARCH_300)) {
+			mask  |= CNST_CACHE_GROUP_MASK;
+			value |= CNST_CACHE_GROUP_VAL(event & 0xff);
+
+			mask |= CNST_CACHE_PMC4_MASK;
+			if (pmc == 4)
+				value |= CNST_CACHE_PMC4_VAL;
+		} else if (cache & 0x7) {
+			/*
+			 * L2/L3 events contain a cache selector field, which is
+			 * supposed to be programmed into MMCRC. However MMCRC is only
+			 * HV writable, and there is no API for guest kernels to modify
+			 * it. The solution is for the hypervisor to initialise the
+			 * field to zeroes, and for us to only ever allow events that
+			 * have a cache selector of zero. The bank selector (bit 3) is
+			 * irrelevant, as long as the rest of the value is 0.
+			 */
 			return -1;
+		}
 
 	} else if (cpu_has_feature(CPU_FTR_ARCH_300) || (event & EVENT_IS_L1)) {
 		mask  |= CNST_L1_QUAL_MASK;
@@ -331,6 +344,7 @@ int isa207_get_constraint(u64 event, unsigned long *maskp, unsigned long *valp)
 		}
 	}
 
+ebb_bhrb:
 	if (!pmc && ebb)
 		/* EBB events must specify the PMC */
 		return -1;

@@ -1,4 +1,11 @@
-.. -*- coding: utf-8; mode: rst -*-
+.. Permission is granted to copy, distribute and/or modify this
+.. document under the terms of the GNU Free Documentation License,
+.. Version 1.1 or any later version published by the Free Software
+.. Foundation, with no Invariant Sections, no Front-Cover Texts
+.. and no Back-Cover Texts. A copy of the license is included at
+.. Documentation/media/uapi/fdl-appendix.rst.
+..
+.. TODO: replace it to GFDL-1.1-or-later WITH no-invariant-sections
 
 .. _CEC_TRANSMIT:
 .. _CEC_RECEIVE:
@@ -216,6 +223,18 @@ View On' messages from initiator 0xf ('Unregistered') to destination 0 ('TV').
 	result of the :ref:`ioctl CEC_TRANSMIT <CEC_TRANSMIT>`, and once via
 	:ref:`ioctl CEC_RECEIVE <CEC_RECEIVE>`.
 
+    * .. _`CEC-MSG-FL-RAW`:
+
+      - ``CEC_MSG_FL_RAW``
+      - 2
+      - Normally CEC messages are validated before transmitting them. If this
+        flag is set when :ref:`ioctl CEC_TRANSMIT <CEC_TRANSMIT>` is called,
+	then no validation takes place and the message is transmitted as-is.
+	This is useful when debugging CEC issues.
+	This flag is only allowed if the process has the ``CAP_SYS_RAWIO``
+	capability. If that is not set, then the ``EPERM`` error code is
+	returned.
+
 
 .. tabularcolumns:: |p{5.6cm}|p{0.9cm}|p{11.0cm}|
 
@@ -351,7 +370,8 @@ ENOTTY
 
 EPERM
     The CEC adapter is not configured, i.e. :ref:`ioctl CEC_ADAP_S_LOG_ADDRS <CEC_ADAP_S_LOG_ADDRS>`
-    has never been called.
+    has never been called, or ``CEC_MSG_FL_RAW`` was used from a process that
+    did not have the ``CAP_SYS_RAWIO`` capability.
 
 ENONET
     The CEC adapter is not configured, i.e. :ref:`ioctl CEC_ADAP_S_LOG_ADDRS <CEC_ADAP_S_LOG_ADDRS>`

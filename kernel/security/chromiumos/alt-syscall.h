@@ -84,67 +84,11 @@ static struct alt_sys_call_table default_table;
         }
 #define COMPAT_SYSCALL_ENTRY(name) COMPAT_SYSCALL_ENTRY_ALT(name, NULL)
 
-
-#ifdef CONFIG_ALT_SYSCALL_CHROMIUMOS_LEGACY_API
-#define ALT_SYS_ARG(n)	arg ## n
-#else
-#define ALT_SYS_ARG(n)	args[n - 1]
-#endif
-
-#define ALT_SYS_ARGS1_CALL(dt1) \
-	(dt1)ALT_SYS_ARG(1)
-#define ALT_SYS_ARGS2_CALL(dt1, dt2) \
-	ALT_SYS_ARGS1_CALL(dt1), (dt2)ALT_SYS_ARG(2)
-#define ALT_SYS_ARGS3_CALL(dt1, dt2, dt3) \
-	ALT_SYS_ARGS2_CALL(dt1, dt2), (dt3)ALT_SYS_ARG(3)
-#define ALT_SYS_ARGS4_CALL(dt1, dt2, dt3, dt4) \
-	ALT_SYS_ARGS3_CALL(dt1, dt2, dt3), (dt4)ALT_SYS_ARG(4)
-#define ALT_SYS_ARGS5_CALL(dt1, dt2, dt3, dt4, dt5) \
-	ALT_SYS_ARGS4_CALL(dt1, dt2, dt3, dt4), (dt5)ALT_SYS_ARG(5)
-#define ALT_SYS_ARGS6_CALL(dt1, dt2, dt3, dt4, dt5, dt6) \
-	ALT_SYS_ARGS5_CALL(dt1, dt2, dt3, dt4, dt5), (dt6)ALT_SYS_ARG(6)
-
-#ifdef CONFIG_ALT_SYSCALL_CHROMIUMOS_LEGACY_API
-
-#define ALT_SYS_ARGS1_HDR	unsigned long arg1
-#define ALT_SYS_ARGS2_HDR	ALT_SYS_ARGS1_HDR, unsigned long arg2
-#define ALT_SYS_ARGS3_HDR	ALT_SYS_ARGS2_HDR, unsigned long arg3
-#define ALT_SYS_ARGS4_HDR	ALT_SYS_ARGS3_HDR, unsigned long arg4
-#define ALT_SYS_ARGS5_HDR	ALT_SYS_ARGS4_HDR, unsigned long arg5
-#define ALT_SYS_ARGS6_HDR	ALT_SYS_ARGS5_HDR, unsigned long arg6
-
-#define DEF_ALT_SYS(func_name, nargs, ...)					\
-static asmlinkage long func_name(ALT_SYS_ARGS ## nargs ## _HDR)			\
-{										\
-	return do_##func_name(ALT_SYS_ARGS ## nargs ## _CALL(__VA_ARGS__));	\
-}
-
-#define DECL_ALT_SYS(func_name, nargs) \
-static asmlinkage long func_name(ALT_SYS_ARGS ## nargs ## _HDR)
-
-#else
-
-#define DEF_ALT_SYS(func_name, nargs, ...)			\
-static asmlinkage long func_name(struct pt_regs *regs)		\
-{								\
-	struct task_struct *task = current;			\
-	unsigned long args[nargs];				\
-								\
-	syscall_get_arguments(task, regs, 0, nargs, args);	\
-								\
-	return do_##func_name(ALT_SYS_ARGS ## nargs ## _CALL(__VA_ARGS__));	\
-}
-
-#define DECL_ALT_SYS(func_name, nargs)			\
-static asmlinkage long func_name(struct pt_regs *regs)
-
-#endif /* CONFIG_ALT_SYSCALL_CHROMIUMOS_LEGACY_API */
-
 /*
  * If an alt_syscall table allows prctl(), override it to prevent a process
  * from changing its syscall table.
  */
-DECL_ALT_SYS(alt_sys_prctl, 5);
+static asmlinkage long alt_sys_prctl(struct pt_regs *regs);
 
 #ifdef CONFIG_COMPAT
 #define SYSCALL_WHITELIST_COMPAT(x)                                     \

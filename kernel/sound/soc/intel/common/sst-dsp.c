@@ -1,17 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Intel Smart Sound Technology (SST) DSP Core Driver
  *
  * Copyright (C) 2013, Intel Corporation. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License version
- * 2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
  */
 
 #include <linux/slab.h>
@@ -19,7 +10,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/io.h>
+#include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/delay.h>
 
 #include "sst-dsp.h"
@@ -43,16 +34,13 @@ EXPORT_SYMBOL_GPL(sst_shim32_read);
 
 void sst_shim32_write64(void __iomem *addr, u32 offset, u64 value)
 {
-	memcpy_toio(addr + offset, &value, sizeof(value));
+	writeq(value, addr + offset);
 }
 EXPORT_SYMBOL_GPL(sst_shim32_write64);
 
 u64 sst_shim32_read64(void __iomem *addr, u32 offset)
 {
-	u64 val;
-
-	memcpy_fromio(&val, addr + offset, sizeof(val));
-	return val;
+	return readq(addr + offset);
 }
 EXPORT_SYMBOL_GPL(sst_shim32_read64);
 

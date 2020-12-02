@@ -158,7 +158,7 @@ static const char **gb_generate_enum_strings(struct gbaudio_module_info *gb,
 }
 
 static int gbcodec_mixer_ctl_info(struct snd_kcontrol *kcontrol,
-		     struct snd_ctl_elem_info *uinfo)
+				  struct snd_ctl_elem_info *uinfo)
 {
 	unsigned int max;
 	const char *name;
@@ -209,7 +209,7 @@ static int gbcodec_mixer_ctl_info(struct snd_kcontrol *kcontrol,
 }
 
 static int gbcodec_mixer_ctl_get(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
+				 struct snd_ctl_elem_value *ucontrol)
 {
 	int ret;
 	struct gb_audio_ctl_elem_info *info;
@@ -271,7 +271,7 @@ static int gbcodec_mixer_ctl_get(struct snd_kcontrol *kcontrol,
 }
 
 static int gbcodec_mixer_ctl_put(struct snd_kcontrol *kcontrol,
-			      struct snd_ctl_elem_value *ucontrol)
+				 struct snd_ctl_elem_value *ucontrol)
 {
 	int ret = 0;
 	struct gb_audio_ctl_elem_info *info;
@@ -347,7 +347,7 @@ static int gbcodec_mixer_ctl_put(struct snd_kcontrol *kcontrol,
  * of DAPM related sequencing, etc.
  */
 static int gbcodec_mixer_dapm_ctl_info(struct snd_kcontrol *kcontrol,
-		     struct snd_ctl_elem_info *uinfo)
+				       struct snd_ctl_elem_info *uinfo)
 {
 	int platform_max, platform_min;
 	struct gbaudio_ctl_pvt *data;
@@ -378,7 +378,7 @@ static int gbcodec_mixer_dapm_ctl_info(struct snd_kcontrol *kcontrol,
 }
 
 static int gbcodec_mixer_dapm_ctl_get(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
+				      struct snd_ctl_elem_value *ucontrol)
 {
 	int ret;
 	struct gb_audio_ctl_elem_info *info;
@@ -427,7 +427,7 @@ static int gbcodec_mixer_dapm_ctl_get(struct snd_kcontrol *kcontrol,
 }
 
 static int gbcodec_mixer_dapm_ctl_put(struct snd_kcontrol *kcontrol,
-			      struct snd_ctl_elem_value *ucontrol)
+				      struct snd_ctl_elem_value *ucontrol)
 {
 	int ret, wi, max, connect;
 	unsigned int mask, val;
@@ -502,7 +502,7 @@ exit:
 	.private_value = (unsigned long)data}
 
 static int gbcodec_event_spk(struct snd_soc_dapm_widget *w,
-					struct snd_kcontrol *k, int event)
+			     struct snd_kcontrol *k, int event)
 {
 	/* Ensure GB speaker is connected */
 
@@ -510,7 +510,7 @@ static int gbcodec_event_spk(struct snd_soc_dapm_widget *w,
 }
 
 static int gbcodec_event_hp(struct snd_soc_dapm_widget *w,
-					struct snd_kcontrol *k, int event)
+			    struct snd_kcontrol *k, int event)
 {
 	/* Ensure GB module supports jack slot */
 
@@ -518,7 +518,7 @@ static int gbcodec_event_hp(struct snd_soc_dapm_widget *w,
 }
 
 static int gbcodec_event_int_mic(struct snd_soc_dapm_widget *w,
-					struct snd_kcontrol *k, int event)
+				 struct snd_kcontrol *k, int event)
 {
 	/* Ensure GB module supports jack slot */
 
@@ -665,7 +665,7 @@ static int gbaudio_tplg_create_enum_kctl(struct gbaudio_module_info *gb,
 
 	/* debug enum info */
 	dev_dbg(gb->dev, "Max:%d, name_length:%d\n", gbe->max,
-		 le16_to_cpu(gb_enum->names_length));
+		le16_to_cpu(gb_enum->names_length));
 	for (i = 0; i < gbe->max; i++)
 		dev_dbg(gb->dev, "src[%d]: %s\n", i, gbe->texts[i]);
 
@@ -874,7 +874,7 @@ static int gbaudio_tplg_create_enum_ctl(struct gbaudio_module_info *gb,
 
 	/* debug enum info */
 	dev_dbg(gb->dev, "Max:%d, name_length:%d\n", gbe->max,
-		 le16_to_cpu(gb_enum->names_length));
+		le16_to_cpu(gb_enum->names_length));
 	for (i = 0; i < gbe->max; i++)
 		dev_dbg(gb->dev, "src[%d]: %s\n", i, gbe->texts[i]);
 
@@ -885,8 +885,8 @@ static int gbaudio_tplg_create_enum_ctl(struct gbaudio_module_info *gb,
 }
 
 static int gbaudio_tplg_create_mixer_ctl(struct gbaudio_module_info *gb,
-					     struct snd_kcontrol_new *kctl,
-					     struct gb_audio_control *ctl)
+					 struct snd_kcontrol_new *kctl,
+					 struct gb_audio_control *ctl)
 {
 	struct gbaudio_ctl_pvt *ctldata;
 
@@ -906,8 +906,8 @@ static int gbaudio_tplg_create_mixer_ctl(struct gbaudio_module_info *gb,
 }
 
 static int gbaudio_tplg_create_wcontrol(struct gbaudio_module_info *gb,
-					     struct snd_kcontrol_new *kctl,
-					     struct gb_audio_control *ctl)
+					struct snd_kcontrol_new *kctl,
+					struct gb_audio_control *ctl)
 {
 	int ret;
 
@@ -924,7 +924,6 @@ static int gbaudio_tplg_create_wcontrol(struct gbaudio_module_info *gb,
 		break;
 	default:
 		return -EINVAL;
-
 	}
 
 	dev_dbg(gb->dev, "%s:%d DAPM control created, ret:%d\n", ctl->name,
@@ -1087,9 +1086,10 @@ static int gbaudio_tplg_create_widget(struct gbaudio_module_info *module,
 	case snd_soc_dapm_switch:
 		*dw = (struct snd_soc_dapm_widget)
 			SND_SOC_DAPM_SWITCH_E(w->name, SND_SOC_NOPM, 0, 0,
-					    widget_kctls, gbaudio_widget_event,
-					    SND_SOC_DAPM_PRE_PMU |
-					    SND_SOC_DAPM_POST_PMD);
+					      widget_kctls,
+					      gbaudio_widget_event,
+					      SND_SOC_DAPM_PRE_PMU |
+					      SND_SOC_DAPM_POST_PMD);
 		break;
 	case snd_soc_dapm_pga:
 		*dw = (struct snd_soc_dapm_widget)
@@ -1101,16 +1101,16 @@ static int gbaudio_tplg_create_widget(struct gbaudio_module_info *module,
 	case snd_soc_dapm_mixer:
 		*dw = (struct snd_soc_dapm_widget)
 			SND_SOC_DAPM_MIXER_E(w->name, SND_SOC_NOPM, 0, 0, NULL,
-					   0, gbaudio_widget_event,
-					   SND_SOC_DAPM_PRE_PMU |
-					   SND_SOC_DAPM_POST_PMD);
+					     0, gbaudio_widget_event,
+					     SND_SOC_DAPM_PRE_PMU |
+					     SND_SOC_DAPM_POST_PMD);
 		break;
 	case snd_soc_dapm_mux:
 		*dw = (struct snd_soc_dapm_widget)
 			SND_SOC_DAPM_MUX_E(w->name, SND_SOC_NOPM, 0, 0,
-					 widget_kctls, gbaudio_widget_event,
-					 SND_SOC_DAPM_PRE_PMU |
-					 SND_SOC_DAPM_POST_PMD);
+					   widget_kctls, gbaudio_widget_event,
+					   SND_SOC_DAPM_PRE_PMU |
+					   SND_SOC_DAPM_POST_PMD);
 		break;
 	case snd_soc_dapm_aif_in:
 		*dw = (struct snd_soc_dapm_widget)
@@ -1146,7 +1146,7 @@ error:
 }
 
 static int gbaudio_tplg_process_kcontrols(struct gbaudio_module_info *module,
-				   struct gb_audio_control *controls)
+					  struct gb_audio_control *controls)
 {
 	int i, csize, ret;
 	struct snd_kcontrol_new *dapm_kctls;
@@ -1216,7 +1216,7 @@ error:
 }
 
 static int gbaudio_tplg_process_widgets(struct gbaudio_module_info *module,
-				   struct gb_audio_widget *widgets)
+					struct gb_audio_widget *widgets)
 {
 	int i, ret, w_size;
 	struct snd_soc_dapm_widget *dapm_widgets;
@@ -1265,7 +1265,7 @@ error:
 }
 
 static int gbaudio_tplg_process_routes(struct gbaudio_module_info *module,
-				   struct gb_audio_route *routes)
+				       struct gb_audio_route *routes)
 {
 	int i, ret;
 	struct snd_soc_dapm_route *dapm_routes;
@@ -1301,8 +1301,8 @@ static int gbaudio_tplg_process_routes(struct gbaudio_module_info *module,
 		}
 		dapm_routes->control =
 			gbaudio_map_controlid(module,
-						      curr->control_id,
-						      curr->index);
+					      curr->control_id,
+					      curr->index);
 		if ((curr->control_id !=  GBAUDIO_INVALID_ID) &&
 		    !dapm_routes->control) {
 			dev_err(module->dev, "%d:%d:%d:%d - Invalid control\n",
@@ -1326,7 +1326,7 @@ error:
 }
 
 static int gbaudio_tplg_process_header(struct gbaudio_module_info *module,
-				 struct gb_audio_topology *tplg_data)
+				       struct gb_audio_topology *tplg_data)
 {
 	/* fetch no. of kcontrols, widgets & routes */
 	module->num_controls = tplg_data->num_controls;
@@ -1352,7 +1352,7 @@ static int gbaudio_tplg_process_header(struct gbaudio_module_info *module,
 }
 
 int gbaudio_tplg_parse_data(struct gbaudio_module_info *module,
-			       struct gb_audio_topology *tplg_data)
+			    struct gb_audio_topology *tplg_data)
 {
 	int ret;
 	struct gb_audio_control *controls;

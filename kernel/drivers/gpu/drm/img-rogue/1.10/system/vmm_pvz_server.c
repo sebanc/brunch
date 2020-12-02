@@ -48,9 +48,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "vz_vm.h"
 #include "vmm_impl.h"
 #include "vz_vmm_pvz.h"
-#include "vz_support.h"
+#include "system/vz_support.h"
 #include "vmm_pvz_server.h"
-#include "vz_physheap.h"
+#include "system/vz_physheap.h"
 
 
 static inline void

@@ -42,4 +42,7 @@ struct kstatfs {
 #define ST_RELATIME	0x1000	/* update atime relative to mtime/ctime */
 #define ST_NOSYMFOLLOW	0x2000	/* do not follow symlinks */
 
+struct dentry;
+extern int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid);
+
 #endif

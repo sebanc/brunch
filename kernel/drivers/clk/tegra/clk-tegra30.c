@@ -1,17 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <linux/io.h>
@@ -1148,9 +1137,9 @@ static bool tegra30_cpu_rail_off_ready(void)
 
 	cpu_rst_status = readl(clk_base +
 				TEGRA30_CLK_RST_CONTROLLER_CPU_CMPLX_STATUS);
-	cpu_pwr_status = tegra_powergate_is_powered(TEGRA_POWERGATE_CPU1) ||
-			 tegra_powergate_is_powered(TEGRA_POWERGATE_CPU2) ||
-			 tegra_powergate_is_powered(TEGRA_POWERGATE_CPU3);
+	cpu_pwr_status = tegra_pmc_cpu_is_powered(1) ||
+			 tegra_pmc_cpu_is_powered(2) ||
+			 tegra_pmc_cpu_is_powered(3);
 
 	if (((cpu_rst_status & 0xE) != 0xE) || cpu_pwr_status)
 		return false;

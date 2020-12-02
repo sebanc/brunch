@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Microsofs Surface HID (VHF) driver for HID input events via SAM.
  * Used for keyboard input events on the 7th generation Surface Laptops.
@@ -121,19 +122,18 @@ static int vhf_get_metadata(u8 iid, struct vhf_device_metadata *meta)
 		.pri = 0x02,
 		.snc = 0x01,
 		.cdl = sizeof(struct surface_sam_sid_vhf_meta_rqst),
-		.pld = (u8*)&resp.rqst,
+		.pld = (u8 *)&resp.rqst,
 	};
 
 	struct surface_sam_ssh_buf result = {
 		.cap  = sizeof(struct surface_sam_sid_vhf_meta_resp),
 		.len  = 0,
-		.data = (u8*)&resp,
+		.data = (u8 *)&resp,
 	};
 
 	status = surface_sam_ssh_rqst(&rqst, &result);
-	if (status) {
+	if (status)
 		return status;
-	}
 
 	*meta = resp.data.meta;
 
@@ -161,20 +161,19 @@ static int vhf_get_hid_descriptor(struct hid_device *hid, u8 iid, u8 **desc, int
 		.pri = 0x02,
 		.snc = 0x01,
 		.cdl = sizeof(struct surface_sam_sid_vhf_meta_rqst),
-		.pld = (u8*)&resp.rqst,
+		.pld = (u8 *)&resp.rqst,
 	};
 
 	struct surface_sam_ssh_buf result = {
 		.cap  = sizeof(struct surface_sam_sid_vhf_meta_resp),
 		.len  = 0,
-		.data = (u8*)&resp,
+		.data = (u8 *)&resp,
 	};
 
 	// first fetch 00 to get the total length
 	status = surface_sam_ssh_rqst(&rqst, &result);
-	if (status) {
+	if (status)
 		return status;
-	}
 
 	len = resp.data.info.hid_len;
 
@@ -271,8 +270,8 @@ static int sid_vhf_hid_raw_request(struct hid_device *hid, unsigned char
 	rqst.pri = SURFACE_SAM_PRIORITY_HIGH;
 	rqst.iid = 0x00; // windows tends to distinguish iids, but EC will take it
 	rqst.cid = cid;
-	rqst.snc = HID_REQ_GET_REPORT == reqtype ? 0x01 : 0x00;
-	rqst.cdl = HID_REQ_GET_REPORT == reqtype ? 0x01 : len;
+	rqst.snc = reqtype == HID_REQ_GET_REPORT ? 0x01 : 0x00;
+	rqst.cdl = reqtype == HID_REQ_GET_REPORT ? 0x01 : len;
 	rqst.pld = buf;
 
 	result.cap = len;
@@ -284,13 +283,11 @@ static int sid_vhf_hid_raw_request(struct hid_device *hid, unsigned char
 	status = surface_sam_ssh_rqst(&rqst, &result);
 	hid_dbg(hid, "%s: status %i\n", __func__, status);
 
-	if (status) {
+	if (status)
 		return status;
-	}
 
-	if (result.len > 0) {
+	if (result.len > 0)
 		print_hex_dump_debug("response:", DUMP_PREFIX_OFFSET, 16, 1, result.data, result.len, false);
-	}
 
 	return result.len;
 }
@@ -310,9 +307,8 @@ static struct hid_device *sid_vhf_create_hid_device(struct platform_device *pdev
 	struct hid_device *hid;
 
 	hid = hid_allocate_device();
-	if (IS_ERR(hid)) {
+	if (IS_ERR(hid))
 		return hid;
-	}
 
 	hid->dev.parent = &pdev->dev;
 
@@ -332,13 +328,11 @@ static int sid_vhf_event_handler(struct surface_sam_ssh_event *event, void *data
 	struct sid_vhf_evtctx *ctx = (struct sid_vhf_evtctx *)data;
 
 	// skip if HID hasn't started yet
-	if (!test_bit(VHF_HID_STARTED, &ctx->flags)) {
+	if (!test_bit(VHF_HID_STARTED, &ctx->flags))
 		return 0;
-	}
 
-	if (event->tc == SAM_EVENT_SID_VHF_TC && (event->cid == 0x00 || event->cid == 0x03 || event->cid == 0x04)) {
+	if (event->tc == SAM_EVENT_SID_VHF_TC && (event->cid == 0x00 || event->cid == 0x03 || event->cid == 0x04))
 		return hid_input_report(ctx->hid, HID_INPUT_REPORT, event->pld, event->len, 1);
-	}
 
 	dev_warn(ctx->dev, "unsupported event (tc = %d, cid = %d)\n", event->tc, event->cid);
 	return 0;
@@ -353,19 +347,16 @@ static int surface_sam_sid_vhf_probe(struct platform_device *pdev)
 
 	// add device link to EC
 	status = surface_sam_ssh_consumer_register(&pdev->dev);
-	if (status) {
+	if (status)
 		return status == -ENXIO ? -EPROBE_DEFER : status;
-	}
 
 	drvdata = kzalloc(sizeof(struct sid_vhf_drvdata), GFP_KERNEL);
-	if (!drvdata) {
+	if (!drvdata)
 		return -ENOMEM;
-	}
 
 	status = vhf_get_metadata(0x00, &meta);
-	if (status) {
+	if (status)
 		goto err_create_hid;
-	}
 
 	hid = sid_vhf_create_hid_device(pdev, &meta);
 	if (IS_ERR(hid)) {
@@ -382,19 +373,16 @@ static int surface_sam_sid_vhf_probe(struct platform_device *pdev)
 			SAM_EVENT_SID_VHF_RQID,
 			sid_vhf_event_handler,
 			&drvdata->event_ctx);
-	if (status) {
+	if (status)
 		goto err_event_handler;
-	}
 
 	status = surface_sam_ssh_enable_event_source(SAM_EVENT_SID_VHF_TC, 0x01, SAM_EVENT_SID_VHF_RQID);
-	if (status) {
+	if (status)
 		goto err_event_source;
-	}
 
 	status = hid_add_device(hid);
-	if (status) {
+	if (status)
 		goto err_add_hid;
-	}
 
 	return 0;
 

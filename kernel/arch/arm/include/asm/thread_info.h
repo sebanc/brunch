@@ -1,11 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  arch/arm/include/asm/thread_info.h
  *
  *  Copyright (C) 2002 Russell King.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
  */
 #ifndef __ASM_ARM_THREAD_INFO_H
 #define __ASM_ARM_THREAD_INFO_H
@@ -53,6 +50,9 @@ struct thread_info {
 	struct task_struct	*task;		/* main task structure */
 	__u32			cpu;		/* cpu */
 	__u32			cpu_domain;	/* cpu domain */
+#ifdef CONFIG_STACKPROTECTOR_PER_TASK
+	unsigned long		stack_canary;
+#endif
 	struct cpu_context_save	cpu_context;	/* cpu context */
 	__u32			syscall;	/* syscall number */
 	__u8			used_cp[16];	/* thread used copro */
@@ -65,19 +65,7 @@ struct thread_info {
 #ifdef CONFIG_ARM_THUMBEE
 	unsigned long		thumbee_state;	/* ThumbEE Handler Base register */
 #endif
-#ifdef CONFIG_ALT_SYSCALL
-	unsigned int		nr_syscalls;
-	const void		*sys_call_table;
-#endif
 };
-
-#ifdef CONFIG_ALT_SYSCALL
-#define INIT_THREAD_INFO_SYSCALL					\
-	.nr_syscalls	= __NR_syscalls,				\
-	.sys_call_table	= &sys_call_table,
-#else
-#define INIT_THREAD_INFO_SYSCALL
-#endif
 
 #define INIT_THREAD_INFO(tsk)						\
 {									\
@@ -85,7 +73,6 @@ struct thread_info {
 	.flags		= 0,						\
 	.preempt_count	= INIT_PREEMPT_COUNT,				\
 	.addr_limit	= KERNEL_DS,					\
-	INIT_THREAD_INFO_SYSCALL					\
 }
 
 /*

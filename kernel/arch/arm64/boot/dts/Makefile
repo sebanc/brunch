@@ -7,11 +7,13 @@ subdir-y += amd
 subdir-y += amlogic
 subdir-y += apm
 subdir-y += arm
+subdir-y += bitmain
 subdir-y += broadcom
 subdir-y += cavium
 subdir-y += exynos
 subdir-y += freescale
 subdir-y += hisilicon
+subdir-y += intel
 subdir-y += lg
 subdir-y += marvell
 subdir-y += mediatek
@@ -26,17 +28,3 @@ subdir-y += synaptics
 subdir-y += ti
 subdir-y += xilinx
 subdir-y += zte
-
-targets += dtbs
-
-DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES))
-ifneq ($(DTB_NAMES),)
-DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
-else
-DTB_LIST := $(dtb-y)
-endif
-targets += $(DTB_LIST)
-
-dtbs: $(addprefix $(obj)/, $(DTB_LIST))
-
-clean-files := dts/*.dtb *.dtb

@@ -36,22 +36,21 @@
  * Note that the prio returned by getpriority has been offset by 20.
  * (returns 40..1 instead of -20..19)
  */
-DECL_ALT_SYS(android_getpriority, 2);
+static asmlinkage long android_getpriority(struct pt_regs *regs);
 /* Android does not get to call keyctl. */
-DECL_ALT_SYS(android_keyctl, 5);
+static asmlinkage long android_keyctl(struct pt_regs *regs);
 /* Make sure nothing sets a nice value more favorable than -10. */
-DECL_ALT_SYS(android_setpriority, 3);
-DECL_ALT_SYS(android_sched_setscheduler, 3);
-DECL_ALT_SYS(android_sched_setparam, 2);
-DECL_ALT_SYS(android_socket, 3);
-DECL_ALT_SYS(android_perf_event_open, 5);
-DECL_ALT_SYS(android_adjtimex, 1);
-DECL_ALT_SYS(android_clock_adjtime, 2);
-DECL_ALT_SYS(android_getcpu, 3);
-
+static asmlinkage long android_setpriority(struct pt_regs *regs);
+static asmlinkage long android_sched_setscheduler(struct pt_regs *regs);
+static asmlinkage long android_sched_setparam(struct pt_regs *regs);
+static asmlinkage long __maybe_unused android_socket(struct pt_regs *regs);
+static asmlinkage long android_perf_event_open(struct pt_regs *regs);
+static asmlinkage long android_adjtimex(struct pt_regs *regs);
+static asmlinkage long android_clock_adjtime(struct pt_regs *regs);
+static asmlinkage long android_getcpu(struct pt_regs *regs);
 #ifdef CONFIG_COMPAT
-DECL_ALT_SYS(android_compat_adjtimex, 1);
-DECL_ALT_SYS(android_compat_clock_adjtime, 2);
+static asmlinkage long android_compat_adjtimex(struct pt_regs *regs);
+static asmlinkage long android_compat_clock_adjtime(struct pt_regs *regs);
 #endif /* CONFIG_COMPAT */
 
 static struct syscall_whitelist_entry android_whitelist[] = {
@@ -59,6 +58,7 @@ static struct syscall_whitelist_entry android_whitelist[] = {
 	SYSCALL_ENTRY(accept4),
 	SYSCALL_ENTRY_ALT(adjtimex, android_adjtimex),
 	SYSCALL_ENTRY(bind),
+	SYSCALL_ENTRY(bpf),
 	SYSCALL_ENTRY(brk),
 	SYSCALL_ENTRY(capget),
 	SYSCALL_ENTRY(capset),
@@ -107,6 +107,7 @@ static struct syscall_whitelist_entry android_whitelist[] = {
 	SYSCALL_ENTRY(getppid),
 	SYSCALL_ENTRY_ALT(getpriority, android_getpriority),
         SYSCALL_ENTRY(getrandom),
+	SYSCALL_ENTRY(getrlimit),
 	SYSCALL_ENTRY(getrusage),
 	SYSCALL_ENTRY(getsid),
 	SYSCALL_ENTRY(getsockname),
@@ -276,35 +277,17 @@ static struct syscall_whitelist_entry android_whitelist[] = {
 	SYSCALL_ENTRY(rmdir),
 	SYSCALL_ENTRY(stat),
 	SYSCALL_ENTRY(symlink),
+	SYSCALL_ENTRY(time),
 	SYSCALL_ENTRY(unlink),
 	SYSCALL_ENTRY(ustat),
 	SYSCALL_ENTRY(utimes),
 	SYSCALL_ENTRY(vfork),
 #endif
 
-	/*
-	 * recv(2)/send(2) are officially deprecated, but their entry-points
-	 * still exist on ARM.
-	 */
-#ifdef CONFIG_ARM
-	SYSCALL_ENTRY(recv),
-	SYSCALL_ENTRY(send),
-#endif
-
-	/*
-	 * posix_fadvise(2) and sync_file_range(2) have ARM-specific wrappers
-	 * to deal with register alignment.
-	 */
-#ifdef CONFIG_ARM
-	SYSCALL_ENTRY(arm_fadvise64_64),
-	SYSCALL_ENTRY(sync_file_range2),
-#else
 	SYSCALL_ENTRY(fadvise64),
 	SYSCALL_ENTRY(sync_file_range),
-#endif
 
 	/* 64-bit only syscalls. */
-#if defined(CONFIG_X86_64) || defined(CONFIG_ARM64)
 	SYSCALL_ENTRY(fchown),
 	SYSCALL_ENTRY(getegid),
 	SYSCALL_ENTRY(geteuid),
@@ -312,7 +295,6 @@ static struct syscall_whitelist_entry android_whitelist[] = {
 	SYSCALL_ENTRY(getgroups),
 	SYSCALL_ENTRY(getresgid),
 	SYSCALL_ENTRY(getresuid),
-	SYSCALL_ENTRY(getrlimit),
 	SYSCALL_ENTRY(getuid),
 	SYSCALL_ENTRY(newfstatat),
 	SYSCALL_ENTRY(mmap),
@@ -324,62 +306,20 @@ static struct syscall_whitelist_entry android_whitelist[] = {
 	SYSCALL_ENTRY(setreuid),
 	SYSCALL_ENTRY(setuid),
 	/*
-	 * chown(2) and lchown(2) are deprecated and not wired up
+	 * chown(2), lchown(2), and select(2) are deprecated and not wired up
 	 * on ARM64.
 	 */
 #ifndef CONFIG_ARM64
 	SYSCALL_ENTRY(chown),
 	SYSCALL_ENTRY(lchown),
-#endif
-#endif
-
-	/* ARM32 only syscalls. */
-#if defined(CONFIG_ARM)
-	SYSCALL_ENTRY(chown32),
-	SYSCALL_ENTRY(fchown32),
-	SYSCALL_ENTRY(fcntl64),
-	SYSCALL_ENTRY(fstat64),
-	SYSCALL_ENTRY(fstatat64),
-	SYSCALL_ENTRY(fstatfs64),
-	SYSCALL_ENTRY(ftruncate64),
-	SYSCALL_ENTRY(getegid32),
-	SYSCALL_ENTRY(geteuid32),
-	SYSCALL_ENTRY(getgid32),
-	SYSCALL_ENTRY(getgroups32),
-	SYSCALL_ENTRY(getresgid32),
-	SYSCALL_ENTRY(getresuid32),
-	SYSCALL_ENTRY(getuid32),
-	SYSCALL_ENTRY(lchown32),
-	SYSCALL_ENTRY(lstat64),
-	SYSCALL_ENTRY(mmap2),
-	SYSCALL_ENTRY(_newselect),
-	SYSCALL_ENTRY(_llseek),
-	SYSCALL_ENTRY(sigaction),
-	SYSCALL_ENTRY(sigpending),
-	SYSCALL_ENTRY(sigprocmask),
-	SYSCALL_ENTRY(sigreturn),
-	SYSCALL_ENTRY(sigsuspend),
-	SYSCALL_ENTRY(sendfile64),
-	SYSCALL_ENTRY(setgid32),
-	SYSCALL_ENTRY(setgroups32),
-	SYSCALL_ENTRY(setregid32),
-	SYSCALL_ENTRY(setresgid32),
-	SYSCALL_ENTRY(setresuid32),
-	SYSCALL_ENTRY(setreuid32),
-	SYSCALL_ENTRY(setuid32),
-	SYSCALL_ENTRY(stat64),
-	SYSCALL_ENTRY(statfs64),
-	SYSCALL_ENTRY(truncate64),
-	SYSCALL_ENTRY(ugetrlimit),
+	SYSCALL_ENTRY(select),
 #endif
 
 	/* X86_64-specific syscalls. */
 #ifdef CONFIG_X86_64
 	SYSCALL_ENTRY(arch_prctl),
 	SYSCALL_ENTRY(modify_ldt),
-	SYSCALL_ENTRY(select),
 	SYSCALL_ENTRY(set_thread_area),
-	SYSCALL_ENTRY(time),
 #endif
 
 }; /* end android_whitelist */

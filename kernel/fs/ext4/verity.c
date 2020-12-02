@@ -358,10 +358,8 @@ static void ext4_merkle_tree_readahead(struct address_space *mapping,
 	struct blk_plug plug;
 
 	for (index = start_index; index < start_index + count; index++) {
-		rcu_read_lock();
-		page = radix_tree_lookup(&mapping->i_pages, index);
-		rcu_read_unlock();
-		if (!page || radix_tree_exceptional_entry(page)) {
+		page = xa_load(&mapping->i_pages, index);
+		if (!page || xa_is_value(page)) {
 			page = __page_cache_alloc(readahead_gfp_mask(mapping));
 			if (!page)
 				break;

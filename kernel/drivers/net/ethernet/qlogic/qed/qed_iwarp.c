@@ -63,7 +63,12 @@ struct mpa_v2_hdr {
 #define MPA_REV2(_mpa_rev) ((_mpa_rev) == MPA_NEGOTIATION_TYPE_ENHANCED)
 
 #define QED_IWARP_INVALID_TCP_CID	0xffffffff
-#define QED_IWARP_RCV_WND_SIZE_DEF	(256 * 1024)
+
+#define QED_IWARP_RCV_WND_SIZE_DEF_BB_2P (200 * 1024)
+#define QED_IWARP_RCV_WND_SIZE_DEF_BB_4P (100 * 1024)
+#define QED_IWARP_RCV_WND_SIZE_DEF_AH_2P (150 * 1024)
+#define QED_IWARP_RCV_WND_SIZE_DEF_AH_4P (90 * 1024)
+
 #define QED_IWARP_RCV_WND_SIZE_MIN	(0xffff)
 #define TIMESTAMP_HEADER_SIZE		(12)
 #define QED_IWARP_MAX_FIN_RT_DEFAULT	(2)
@@ -377,7 +382,7 @@ qed_iwarp2roce_state(enum qed_iwarp_qp_state state)
 	}
 }
 
-const static char *iwarp_state_names[] = {
+static const char * const iwarp_state_names[] = {
 	"IDLE",
 	"RTS",
 	"TERMINATE",
@@ -936,9 +941,8 @@ qed_iwarp_return_ep(struct qed_hwfn *p_hwfn, struct qed_iwarp_ep *ep)
 	}
 	spin_lock_bh(&p_hwfn->p_rdma_info->iwarp.iw_lock);
 
-	list_del(&ep->list_entry);
-	list_add_tail(&ep->list_entry,
-		      &p_hwfn->p_rdma_info->iwarp.ep_free_list);
+	list_move_tail(&ep->list_entry,
+		       &p_hwfn->p_rdma_info->iwarp.ep_free_list);
 
 	spin_unlock_bh(&p_hwfn->p_rdma_info->iwarp.iw_lock);
 }
@@ -2282,8 +2286,8 @@ static void qed_iwarp_process_pending_pkts(struct qed_hwfn *p_hwfn)
 		if (rc == -EBUSY)
 			break;
 
-		list_del(&mpa_buf->list_entry);
-		list_add_tail(&mpa_buf->list_entry, &iwarp_info->mpa_buf_list);
+		list_move_tail(&mpa_buf->list_entry,
+			       &iwarp_info->mpa_buf_list);
 
 		if (rc) {	/* different error, don't continue */
 			DP_NOTICE(p_hwfn, "process pkts failed rc=%d\n", rc);
@@ -2532,7 +2536,7 @@ qed_iwarp_ll2_slowpath(void *cxt,
 		memset(fpdu, 0, sizeof(*fpdu));
 }
 
-static int qed_iwarp_ll2_stop(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
+static int qed_iwarp_ll2_stop(struct qed_hwfn *p_hwfn)
 {
 	struct qed_iwarp_info *iwarp_info = &p_hwfn->p_rdma_info->iwarp;
 	int rc = 0;
@@ -2567,8 +2571,9 @@ static int qed_iwarp_ll2_stop(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
 		iwarp_info->ll2_mpa_handle = QED_IWARP_HANDLE_INVAL;
 	}
 
-	qed_llh_remove_mac_filter(p_hwfn,
-				  p_ptt, p_hwfn->p_rdma_info->iwarp.mac_addr);
+	qed_llh_remove_mac_filter(p_hwfn->cdev, 0,
+				  p_hwfn->p_rdma_info->iwarp.mac_addr);
+
 	return rc;
 }
 
@@ -2613,7 +2618,7 @@ qed_iwarp_ll2_alloc_buffers(struct qed_hwfn *p_hwfn,
 static int
 qed_iwarp_ll2_start(struct qed_hwfn *p_hwfn,
 		    struct qed_rdma_start_in_params *params,
-		    struct qed_ptt *p_ptt)
+		    u32 rcv_wnd_size)
 {
 	struct qed_iwarp_info *iwarp_info;
 	struct qed_ll2_acquire_data data;
@@ -2632,7 +2637,7 @@ qed_iwarp_ll2_start(struct qed_hwfn *p_hwfn,
 
 	ether_addr_copy(p_hwfn->p_rdma_info->iwarp.mac_addr, params->mac_addr);
 
-	rc = qed_llh_add_mac_filter(p_hwfn, p_ptt, params->mac_addr);
+	rc = qed_llh_add_mac_filter(p_hwfn->cdev, 0, params->mac_addr);
 	if (rc)
 		return rc;
 
@@ -2658,7 +2663,7 @@ qed_iwarp_ll2_start(struct qed_hwfn *p_hwfn,
 	rc = qed_ll2_acquire_connection(p_hwfn, &data);
 	if (rc) {
 		DP_NOTICE(p_hwfn, "Failed to acquire LL2 connection\n");
-		qed_llh_remove_mac_filter(p_hwfn, p_ptt, params->mac_addr);
+		qed_llh_remove_mac_filter(p_hwfn->cdev, 0, params->mac_addr);
 		return rc;
 	}
 
@@ -2680,7 +2685,7 @@ qed_iwarp_ll2_start(struct qed_hwfn *p_hwfn,
 	data.input.conn_type = QED_LL2_TYPE_OOO;
 	data.input.mtu = params->max_mtu;
 
-	n_ooo_bufs = (QED_IWARP_MAX_OOO * QED_IWARP_RCV_WND_SIZE_DEF) /
+	n_ooo_bufs = (QED_IWARP_MAX_OOO * rcv_wnd_size) /
 		     iwarp_info->max_mtu;
 	n_ooo_bufs = min_t(u32, n_ooo_bufs, QED_IWARP_LL2_OOO_MAX_RX_SIZE);
 
@@ -2764,21 +2769,35 @@ qed_iwarp_ll2_start(struct qed_hwfn *p_hwfn,
 			      &iwarp_info->mpa_buf_list);
 	return rc;
 err:
-	qed_iwarp_ll2_stop(p_hwfn, p_ptt);
+	qed_iwarp_ll2_stop(p_hwfn);
 
 	return rc;
 }
 
-int qed_iwarp_setup(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt,
+static struct {
+	u32 two_ports;
+	u32 four_ports;
+} qed_iwarp_rcv_wnd_size[MAX_CHIP_IDS] = {
+	{QED_IWARP_RCV_WND_SIZE_DEF_BB_2P, QED_IWARP_RCV_WND_SIZE_DEF_BB_4P},
+	{QED_IWARP_RCV_WND_SIZE_DEF_AH_2P, QED_IWARP_RCV_WND_SIZE_DEF_AH_4P}
+};
+
+int qed_iwarp_setup(struct qed_hwfn *p_hwfn,
 		    struct qed_rdma_start_in_params *params)
 {
+	struct qed_dev *cdev = p_hwfn->cdev;
 	struct qed_iwarp_info *iwarp_info;
+	enum chip_ids chip_id;
 	u32 rcv_wnd_size;
 
 	iwarp_info = &p_hwfn->p_rdma_info->iwarp;
 
 	iwarp_info->tcp_flags = QED_IWARP_TS_EN;
-	rcv_wnd_size = QED_IWARP_RCV_WND_SIZE_DEF;
+
+	chip_id = QED_IS_BB(cdev) ? CHIP_BB : CHIP_K2;
+	rcv_wnd_size = (qed_device_num_ports(cdev) == 4) ?
+		qed_iwarp_rcv_wnd_size[chip_id].four_ports :
+		qed_iwarp_rcv_wnd_size[chip_id].two_ports;
 
 	/* value 0 is used for ilog2(QED_IWARP_RCV_WND_SIZE_MIN) */
 	iwarp_info->rcv_wnd_scale = ilog2(rcv_wnd_size) -
@@ -2801,10 +2820,10 @@ int qed_iwarp_setup(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt,
 				  qed_iwarp_async_event);
 	qed_ooo_setup(p_hwfn);
 
-	return qed_iwarp_ll2_start(p_hwfn, params, p_ptt);
+	return qed_iwarp_ll2_start(p_hwfn, params, rcv_wnd_size);
 }
 
-int qed_iwarp_stop(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
+int qed_iwarp_stop(struct qed_hwfn *p_hwfn)
 {
 	int rc;
 
@@ -2813,9 +2832,7 @@ int qed_iwarp_stop(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
 	if (rc)
 		return rc;
 
-	qed_spq_unregister_async_cb(p_hwfn, PROTOCOLID_IWARP);
-
-	return qed_iwarp_ll2_stop(p_hwfn, p_ptt);
+	return qed_iwarp_ll2_stop(p_hwfn);
 }
 
 static void qed_iwarp_qp_in_error(struct qed_hwfn *p_hwfn,

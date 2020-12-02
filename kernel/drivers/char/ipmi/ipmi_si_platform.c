@@ -5,6 +5,10 @@
  * Handling for platform devices in IPMI (ACPI, OF, and things
  * coming from the platform.
  */
+
+#define pr_fmt(fmt) "ipmi_platform: " fmt
+#define dev_fmt pr_fmt
+
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -15,8 +19,7 @@
 #include "ipmi_si.h"
 #include "ipmi_dmi.h"
 
-#define PFX "ipmi_platform: "
-
+static bool platform_registered;
 static bool si_tryplatform = true;
 #ifdef CONFIG_ACPI
 static bool          si_tryacpi = true;
@@ -105,11 +108,11 @@ ipmi_get_info_from_resources(struct platform_device *pdev,
 
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
 	if (res) {
-		io->addr_type = IPMI_IO_ADDR_SPACE;
+		io->addr_space = IPMI_IO_ADDR_SPACE;
 	} else {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 		if (res)
-			io->addr_type = IPMI_MEM_ADDR_SPACE;
+			io->addr_space = IPMI_MEM_ADDR_SPACE;
 	}
 	if (!res) {
 		dev_err(&pdev->dev, "no I/O or memory address\n");
@@ -119,7 +122,7 @@ ipmi_get_info_from_resources(struct platform_device *pdev,
 
 	io->regspacing = DEFAULT_REGSPACING;
 	res_second = platform_get_resource(pdev,
-			       (io->addr_type == IPMI_IO_ADDR_SPACE) ?
+			       (io->addr_space == IPMI_IO_ADDR_SPACE) ?
 					IORESOURCE_IO : IORESOURCE_MEM,
 			       1);
 	if (res_second) {
@@ -156,7 +159,7 @@ static int platform_ipmi_probe(struct platform_device *pdev)
 
 	memset(&io, 0, sizeof(io));
 	io.addr_source = addr_source;
-	dev_info(&pdev->dev, PFX "probing via %s\n",
+	dev_info(&pdev->dev, "probing via %s\n",
 		 ipmi_addr_src_to_str(addr_source));
 
 	switch (type) {
@@ -186,14 +189,12 @@ static int platform_ipmi_probe(struct platform_device *pdev)
 		return -EINVAL;
 
 	rv = device_property_read_u8(&pdev->dev, "slave-addr", &slave_addr);
-	if (rv) {
-		dev_warn(&pdev->dev, "device has no slave-addr property\n");
+	if (rv)
 		io.slave_addr = 0x20;
-	} else {
+	else
 		io.slave_addr = slave_addr;
-	}
 
-	io.irq = platform_get_irq(pdev, 0);
+	io.irq = platform_get_irq_optional(pdev, 0);
 	if (io.irq > 0)
 		io.irq_setup = ipmi_std_irq_setup;
 	else
@@ -203,7 +204,7 @@ static int platform_ipmi_probe(struct platform_device *pdev)
 
 	pr_info("ipmi_si: %s: %s %#lx regsize %d spacing %d irq %d\n",
 		ipmi_addr_src_to_str(addr_source),
-		(io.addr_type == IPMI_IO_ADDR_SPACE) ? "io" : "mem",
+		(io.addr_space == IPMI_IO_ADDR_SPACE) ? "io" : "mem",
 		io.addr_data, io.regsize, io.regspacing, io.irq);
 
 	ipmi_si_add_smi(&io);
@@ -247,25 +248,25 @@ static int of_ipmi_probe(struct platform_device *pdev)
 
 	ret = of_address_to_resource(np, 0, &resource);
 	if (ret) {
-		dev_warn(&pdev->dev, PFX "invalid address from OF\n");
+		dev_warn(&pdev->dev, "invalid address from OF\n");
 		return ret;
 	}
 
 	regsize = of_get_property(np, "reg-size", &proplen);
 	if (regsize && proplen != 4) {
-		dev_warn(&pdev->dev, PFX "invalid regsize from OF\n");
+		dev_warn(&pdev->dev, "invalid regsize from OF\n");
 		return -EINVAL;
 	}
 
 	regspacing = of_get_property(np, "reg-spacing", &proplen);
 	if (regspacing && proplen != 4) {
-		dev_warn(&pdev->dev, PFX "invalid regspacing from OF\n");
+		dev_warn(&pdev->dev, "invalid regspacing from OF\n");
 		return -EINVAL;
 	}
 
 	regshift = of_get_property(np, "reg-shift", &proplen);
 	if (regshift && proplen != 4) {
-		dev_warn(&pdev->dev, PFX "invalid regshift from OF\n");
+		dev_warn(&pdev->dev, "invalid regshift from OF\n");
 		return -EINVAL;
 	}
 
@@ -275,9 +276,9 @@ static int of_ipmi_probe(struct platform_device *pdev)
 	io.irq_setup	= ipmi_std_irq_setup;
 
 	if (resource.flags & IORESOURCE_IO)
-		io.addr_type = IPMI_IO_ADDR_SPACE;
+		io.addr_space = IPMI_IO_ADDR_SPACE;
 	else
-		io.addr_type = IPMI_MEM_ADDR_SPACE;
+		io.addr_space = IPMI_MEM_ADDR_SPACE;
 
 	io.addr_data	= resource.start;
 
@@ -305,15 +306,10 @@ static int of_ipmi_probe(struct platform_device *dev)
 static int find_slave_address(struct si_sm_io *io, int slave_addr)
 {
 #ifdef CONFIG_IPMI_DMI_DECODE
-	if (!slave_addr) {
-		u32 flags = IORESOURCE_IO;
-
-		if (io->addr_type == IPMI_MEM_ADDR_SPACE)
-			flags = IORESOURCE_MEM;
-
-		slave_addr = ipmi_dmi_get_slave_addr(io->si_type, flags,
+	if (!slave_addr)
+		slave_addr = ipmi_dmi_get_slave_addr(io->si_type,
+						     io->addr_space,
 						     io->addr_data);
-	}
 #endif
 
 	return slave_addr;
@@ -337,7 +333,7 @@ static int acpi_ipmi_probe(struct platform_device *pdev)
 
 	memset(&io, 0, sizeof(io));
 	io.addr_source = SI_ACPI;
-	dev_info(&pdev->dev, PFX "probing via ACPI\n");
+	dev_info(&pdev->dev, "probing via ACPI\n");
 
 	io.addr_info.acpi_info.acpi_handle = handle;
 
@@ -382,7 +378,7 @@ static int acpi_ipmi_probe(struct platform_device *pdev)
 		io.irq = tmp;
 		io.irq_setup = acpi_gpe_irq_setup;
 	} else {
-		int irq = platform_get_irq(pdev, 0);
+		int irq = platform_get_irq_optional(pdev, 0);
 
 		if (irq > 0) {
 			io.irq = irq;
@@ -431,14 +427,37 @@ static int ipmi_remove(struct platform_device *pdev)
 	return ipmi_si_remove_by_dev(&pdev->dev);
 }
 
+static int pdev_match_name(struct device *dev, const void *data)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	const char *name = data;
+
+	return strcmp(pdev->name, name) == 0;
+}
+
+void ipmi_remove_platform_device_by_name(char *name)
+{
+	struct device *dev;
+
+	while ((dev = bus_find_device(&platform_bus_type, NULL, name,
+				      pdev_match_name))) {
+		struct platform_device *pdev = to_platform_device(dev);
+
+		platform_device_unregister(pdev);
+		put_device(dev);
+	}
+}
+
 static const struct platform_device_id si_plat_ids[] = {
-    { "hardcode-ipmi-si", 0 },
-    { }
+	{ "dmi-ipmi-si", 0 },
+	{ "hardcode-ipmi-si", 0 },
+	{ "hotmod-ipmi-si", 0 },
+	{ }
 };
 
 struct platform_driver ipmi_platform_driver = {
 	.driver = {
-		.name = DEVICE_NAME,
+		.name = SI_DEVICE_NAME,
 		.of_match_table = of_ipmi_match,
 		.acpi_match_table = ACPI_PTR(acpi_ipmi_match),
 	},
@@ -451,10 +470,13 @@ void ipmi_si_platform_init(void)
 {
 	int rv = platform_driver_register(&ipmi_platform_driver);
 	if (rv)
-		pr_err(PFX "Unable to register driver: %d\n", rv);
+		pr_err("Unable to register driver: %d\n", rv);
+	else
+		platform_registered = true;
 }
 
 void ipmi_si_platform_shutdown(void)
 {
-	platform_driver_unregister(&ipmi_platform_driver);
+	if (platform_registered)
+		platform_driver_unregister(&ipmi_platform_driver);
 }

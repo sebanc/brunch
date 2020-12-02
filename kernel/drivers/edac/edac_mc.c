@@ -55,8 +55,6 @@ static LIST_HEAD(mc_devices);
  */
 static const char *edac_mc_owner;
 
-static struct bus_type mc_bus[EDAC_MAX_MCS];
-
 int edac_get_report_status(void)
 {
 	return edac_report;
@@ -116,8 +114,8 @@ static const struct kernel_param_ops edac_report_ops = {
 
 module_param_cb(edac_report, &edac_report_ops, &edac_report, 0644);
 
-unsigned edac_dimm_info_location(struct dimm_info *dimm, char *buf,
-			         unsigned len)
+unsigned int edac_dimm_info_location(struct dimm_info *dimm, char *buf,
+				     unsigned int len)
 {
 	struct mem_ctl_info *mci = dimm->mci;
 	int i, n, count = 0;
@@ -238,9 +236,9 @@ EXPORT_SYMBOL_GPL(edac_mem_types);
  * At return, the pointer 'p' will be incremented to be used on a next call
  * to this function.
  */
-void *edac_align_ptr(void **p, unsigned size, int n_elems)
+void *edac_align_ptr(void **p, unsigned int size, int n_elems)
 {
-	unsigned align, r;
+	unsigned int align, r;
 	void *ptr = *p;
 
 	*p += size * n_elems;
@@ -277,38 +275,37 @@ void *edac_align_ptr(void **p, unsigned size, int n_elems)
 
 static void _edac_mc_free(struct mem_ctl_info *mci)
 {
-	int i, chn, row;
 	struct csrow_info *csr;
-	const unsigned int tot_dimms = mci->tot_dimms;
-	const unsigned int tot_channels = mci->num_cschannel;
-	const unsigned int tot_csrows = mci->nr_csrows;
+	int i, chn, row;
 
 	if (mci->dimms) {
-		for (i = 0; i < tot_dimms; i++)
+		for (i = 0; i < mci->tot_dimms; i++)
 			kfree(mci->dimms[i]);
 		kfree(mci->dimms);
 	}
+
 	if (mci->csrows) {
-		for (row = 0; row < tot_csrows; row++) {
+		for (row = 0; row < mci->nr_csrows; row++) {
 			csr = mci->csrows[row];
-			if (csr) {
-				if (csr->channels) {
-					for (chn = 0; chn < tot_channels; chn++)
-						kfree(csr->channels[chn]);
-					kfree(csr->channels);
-				}
-				kfree(csr);
+			if (!csr)
+				continue;
+
+			if (csr->channels) {
+				for (chn = 0; chn < mci->num_cschannel; chn++)
+					kfree(csr->channels[chn]);
+				kfree(csr->channels);
 			}
+			kfree(csr);
 		}
 		kfree(mci->csrows);
 	}
 	kfree(mci);
 }
 
-struct mem_ctl_info *edac_mc_alloc(unsigned mc_num,
-				   unsigned n_layers,
+struct mem_ctl_info *edac_mc_alloc(unsigned int mc_num,
+				   unsigned int n_layers,
 				   struct edac_mc_layer *layers,
-				   unsigned sz_pvt)
+				   unsigned int sz_pvt)
 {
 	struct mem_ctl_info *mci;
 	struct edac_mc_layer *layer;
@@ -316,9 +313,9 @@ struct mem_ctl_info *edac_mc_alloc(unsigned mc_num,
 	struct rank_info *chan;
 	struct dimm_info *dimm;
 	u32 *ce_per_layer[EDAC_MAX_LAYERS], *ue_per_layer[EDAC_MAX_LAYERS];
-	unsigned pos[EDAC_MAX_LAYERS];
-	unsigned size, tot_dimms = 1, count = 1;
-	unsigned tot_csrows = 1, tot_channels = 1, tot_errcount = 0;
+	unsigned int pos[EDAC_MAX_LAYERS];
+	unsigned int size, tot_dimms = 1, count = 1;
+	unsigned int tot_csrows = 1, tot_channels = 1, tot_errcount = 0;
 	void *pvt, *p, *ptr = NULL;
 	int i, j, row, chn, n, len, off;
 	bool per_rank = false;
@@ -506,16 +503,10 @@ void edac_mc_free(struct mem_ctl_info *mci)
 {
 	edac_dbg(1, "\n");
 
-	/* If we're not yet registered with sysfs free only what was allocated
-	 * in edac_mc_alloc().
-	 */
-	if (!device_is_registered(&mci->dev)) {
-		_edac_mc_free(mci);
-		return;
-	}
+	if (device_is_registered(&mci->dev))
+		edac_unregister_sysfs(mci);
 
-	/* the mci instance is freed here, when the sysfs object is dropped */
-	edac_unregister_sysfs(mci);
+	_edac_mc_free(mci);
 }
 EXPORT_SYMBOL_GPL(edac_mc_free);
 
@@ -712,11 +703,6 @@ int edac_mc_add_mc_with_groups(struct mem_ctl_info *mci,
 	int ret = -EINVAL;
 	edac_dbg(0, "\n");
 
-	if (mci->mc_idx >= EDAC_MAX_MCS) {
-		pr_warn_once("Too many memory controllers: %d\n", mci->mc_idx);
-		return -ENODEV;
-	}
-
 #ifdef CONFIG_EDAC_DEBUG
 	if (edac_debug_level >= 3)
 		edac_mc_dump_mci(mci);
@@ -756,7 +742,7 @@ int edac_mc_add_mc_with_groups(struct mem_ctl_info *mci,
 	/* set load time so that error rate can be tracked */
 	mci->start_time = jiffies;
 
-	mci->bus = &mc_bus[mci->mc_idx];
+	mci->bus = edac_get_sysfs_subsys();
 
 	if (edac_create_sysfs_mci_device(mci, groups)) {
 		edac_mc_printk(mci, KERN_WARNING,

@@ -429,6 +429,10 @@ static int lan743x_ptp_perout(struct lan743x_adapter *adapter, int on,
 	int pulse_width = 0;
 	int perout_bit = 0;
 
+	/* Reject requests with unsupported flags */
+	if (perout->flags)
+		return -EOPNOTSUPP;
+
 	if (!on) {
 		lan743x_ptp_perout_off(adapter);
 		return 0;
@@ -963,8 +967,7 @@ void lan743x_ptp_close(struct lan743x_adapter *adapter)
 		index++) {
 		struct sk_buff *skb = ptp->tx_ts_skb_queue[index];
 
-		if (skb)
-			dev_kfree_skb(skb);
+		dev_kfree_skb(skb);
 		ptp->tx_ts_skb_queue[index] = NULL;
 		ptp->tx_ts_seconds_queue[index] = 0;
 		ptp->tx_ts_nseconds_queue[index] = 0;
@@ -977,8 +980,8 @@ void lan743x_ptp_close(struct lan743x_adapter *adapter)
 	lan743x_ptp_disable(adapter);
 }
 
-void lan743x_ptp_set_sync_ts_insert(struct lan743x_adapter *adapter,
-				    bool ts_insert_enable)
+static void lan743x_ptp_set_sync_ts_insert(struct lan743x_adapter *adapter,
+					   bool ts_insert_enable)
 {
 	u32 ptp_tx_mod = lan743x_csr_read(adapter, PTP_TX_MOD);
 

@@ -219,6 +219,7 @@ Some options can be passed through the kernel command lines to activate specific
 - "rtl8812au": enable this option if you have a rtl8812au wireless card,
 - "rtl8821ce": enable this option if you have a rtl8821ce wireless card,
 - "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
+- "ipts": enable support for Surface devices touchscreen with kernel 5.4 (thanks go to the linux-surface team, especially StollD)
 - "acpi_power_button": try this option if long pressing the power button does not display the power menu,
 - "alt_touchpad_config": try this option if you have touchpad issues,
 - "alt_touchpad_config2": another option to try if you have touchpad issues,

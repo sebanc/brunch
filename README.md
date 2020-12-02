@@ -27,7 +27,7 @@ Specific hardware support:
 
 Additional features:
 - nano text editor
-- qemu (with spice support)
+- efibootmgr
 
 ## ChromeOS recovery images
 
@@ -216,6 +216,7 @@ Some options can be passed through the kernel command lines to activate specific
 - "rtl8188eu": enable this option if you have a rtl8188eu wireless card,
 - "rtl8723bu": enable this option if you have a rtl8723bu wireless card,
 - "rtl8723de": enable this option if you have a rtl8723de wireless card,
+- "rtl8812au": enable this option if you have a rtl8812au wireless card,
 - "rtl8821ce": enable this option if you have a rtl8821ce wireless card,
 - "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
 - "acpi_power_button": try this option if long pressing the power button does not display the power menu,
@@ -223,6 +224,7 @@ Some options can be passed through the kernel command lines to activate specific
 - "alt_touchpad_config2": another option to try if you have touchpad issues,
 - "disable_intel_hda": some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
 - "internal_mic_fix": allows to forcefully enable internal mic on some devices,
+- "mbp2018": enable T2-based macbooks bridge and spi drivers
 - "asus_c302": applies asus c302 specific firmwares and fixes,
 - "baytrail_chromebook": applies baytrail chromebooks specific audio fixes,
 - "sysfs_tablet_mode": allow to control tablet mode from sysfs (`echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to acivate it or use 0 to disable it),

@@ -19,7 +19,9 @@ Base hardware compatibility:
 - AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU and Ryzen models are not yet supported),
 - Nvidia graphic cards are also not supported.
 
-Note: Some Intel 10th Gen devices do not seem to be compatible with the android container.
+Notes: 
+- Intel Gen 1 graphics do not work with ChromeOS versions above r81 (it might still change with a future ChromeOS update).
+- Some Intel 10th Gen devices do not seem to be compatible with the android container.
 
 Specific procedure for BIOS/MBR devices: Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the "mbr_suport.tar.gz" package that you will find in this branch (master).
 

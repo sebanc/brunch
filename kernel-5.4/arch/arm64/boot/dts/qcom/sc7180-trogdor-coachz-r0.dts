@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Google CoachZ board device tree source
+ *
+ * Copyright 2020 Google LLC.
+ */
+
+/dts-v1/;
+
+#include "sc7180-trogdor-coachz.dtsi"
+
+/ {
+	model = "Google CoachZ (rev0)";
+	compatible = "google,coachz-rev0", "qcom,sc7180";
+};
+
+&usb_hub {
+	 vdd-supply = <&pp3300_l7c>;
+};

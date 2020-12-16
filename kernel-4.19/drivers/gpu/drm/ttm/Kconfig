@@ -1,0 +1,7 @@
+config DRM_TTM_BO_WAIT_TIMEOUT
+	int "Default timeout for ttm bo wait (in seconds)"
+	depends on DRM_TTM
+	default 15
+	help
+	  This option controls the default timeout (in seconds) used in
+	  ttm_bo_wait

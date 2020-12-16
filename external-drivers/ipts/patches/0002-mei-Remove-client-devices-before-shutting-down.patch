@@ -1,0 +1,28 @@
+From 063c9a183aedf8dc4f18d24b0b41ed4ae07bc4ed Mon Sep 17 00:00:00 2001
+From: Dorian Stoll <dorian.stoll@tmsp.io>
+Date: Fri, 25 Sep 2020 18:06:05 +0200
+Subject: [PATCH 2/2] mei: Remove client devices before shutting down
+
+---
+ drivers/misc/mei/init.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/misc/mei/init.c b/drivers/misc/mei/init.c
+index bcee77768b91..21ed765003e1 100644
+--- a/drivers/misc/mei/init.c
++++ b/drivers/misc/mei/init.c
+@@ -302,10 +302,10 @@ void mei_stop(struct mei_device *dev)
+ {
+ 	dev_dbg(dev->dev, "stopping the device.\n");
+ 
++	mei_cl_bus_remove_devices(dev);
+ 	mutex_lock(&dev->device_lock);
+ 	mei_set_devstate(dev, MEI_DEV_POWER_DOWN);
+ 	mutex_unlock(&dev->device_lock);
+-	mei_cl_bus_remove_devices(dev);
+ 
+ 	mei_cancel_work(dev);
+ 
+-- 
+2.26.2
+

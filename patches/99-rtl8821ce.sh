@@ -9,6 +9,10 @@ done
 ret=0
 if [ "$rtl8821ce" -eq 1 ]; then
 	echo "brunch: $0 rtl8821ce enabled" > /dev/kmsg
+	cat >/roota/etc/modprobe.d/rtl8821ce.conf <<MODPROBE
+blacklist rtw88_8821ce
+MODPROBE
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
 	cat >/roota/etc/init/rtl8821ce.conf <<INSMOD
 start on stopped udev-trigger
 
@@ -17,6 +21,6 @@ script
 	insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/rtl8821ce.ko
 end script
 INSMOD
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 fi
 exit $ret

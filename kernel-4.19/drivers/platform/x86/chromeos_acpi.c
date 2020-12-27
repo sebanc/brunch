@@ -790,6 +790,9 @@ static ssize_t fakehwid_store(struct device *dev, struct device_attribute *attr,
 	if (!strncmp(board, "OCTOPUS", 7))
 		strlcpy(board, "BOBBA", 6);
 
+	if (!strncmp(board, "ZORK", 4))
+		strlcpy(board, "MORPHIUS", 9);
+
 	snprintf(serial, sizeof(serial), "%s %s", board, "B2BB2BB2BB2BB2BB");
 
 	crc32_val = crc32(0 ^ 0xffffffff, serial, strlen(serial)) ^ 0xffffffff;

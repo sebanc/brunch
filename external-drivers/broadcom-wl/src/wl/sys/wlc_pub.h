@@ -24,6 +24,7 @@
 
 #include <wlc_types.h>
 #include <wlc_utils.h>
+#include <siutils.h>
 #include "proto/802.11.h"
 #include "proto/bcmevent.h"
 

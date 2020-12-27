@@ -1300,11 +1300,14 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 
 	if (usage->hid == (HID_UP_DIGITIZER | 0x0032)) { /* InRange */
 		if (value) {
+                       if ((*quirks & HID_QUIRK_INVERT))
+                           input_event(input, usage->type, BTN_TOOL_PEN, 0);
 			input_event(input, usage->type, (*quirks & HID_QUIRK_INVERT) ? BTN_TOOL_RUBBER : usage->code, 1);
 			return;
 		}
 		input_event(input, usage->type, usage->code, 0);
 		input_event(input, usage->type, BTN_TOOL_RUBBER, 0);
+               input_event(input, usage->type, BTN_TOOL_PEN, 0);
 		return;
 	}
 

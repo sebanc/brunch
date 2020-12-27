@@ -1,0 +1,12 @@
+--- a/src/wl/sys/wl_linux.c	2014-06-26 12:42:08.000000000 +0200
++++ b/src/wl/sys/wl_linux.c	2015-01-22 01:44:58.580453805 +0100
+@@ -2157,8 +2159,8 @@
+ 	wlif = WL_DEV_IF(dev);
+ 	wl = WL_INFO(dev);
+ 
++	skb->prev = NULL;
+ 	if (WL_ALL_PASSIVE_ENAB(wl) || (WL_RTR() && WL_CONFIG_SMP())) {
+-		skb->prev = NULL;
+ 
+ 		TXQ_LOCK(wl);
+ 

@@ -2191,37 +2191,32 @@ static void gpiochip_irq_relres(struct irq_data *d)
 	gpiochip_relres_irq(chip, d->hwirq);
 }
 
-static void gpiochip_irq_mask(struct irq_data *d)
-{
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-
-	if (gc->irq.irq_mask)
-		gc->irq.irq_mask(d);
-	gpiochip_disable_irq(gc, d->hwirq);
-}
-
-static void gpiochip_irq_unmask(struct irq_data *d)
-{
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-
-	gpiochip_enable_irq(gc, d->hwirq);
-	if (gc->irq.irq_unmask)
-		gc->irq.irq_unmask(d);
-}
-
 static void gpiochip_irq_enable(struct irq_data *d)
 {
 	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
 
 	gpiochip_enable_irq(chip, d->hwirq);
-	chip->irq.irq_enable(d);
+	if (chip->irq.irq_enable)
+		chip->irq.irq_enable(d);
+	else
+		chip->irq.chip->irq_unmask(d);
 }
 
 static void gpiochip_irq_disable(struct irq_data *d)
 {
 	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
 
-	chip->irq.irq_disable(d);
+	/*
+	 * Since we override .irq_disable() we need to mimic the
+	 * behaviour of __irq_disable() in irq/chip.c.
+	 * First call .irq_disable() if it exists, else mimic the
+	 * behaviour of mask_irq() which calls .irq_mask() if
+	 * it exists.
+	 */
+	if (chip->irq.irq_disable)
+		chip->irq.irq_disable(d);
+	else if (chip->irq.chip->irq_mask)
+		chip->irq.chip->irq_mask(d);
 	gpiochip_disable_irq(chip, d->hwirq);
 }
 
@@ -2246,21 +2241,10 @@ static void gpiochip_set_irq_hooks(struct gpio_chip *gpiochip)
 			  "detected irqchip that is shared with multiple gpiochips: please fix the driver.\n");
 		return;
 	}
-	if (irqchip->irq_disable) {
-		gpiochip->irq.irq_disable = irqchip->irq_disable;
-		irqchip->irq_disable = gpiochip_irq_disable;
-	} else {
-		gpiochip->irq.irq_mask = irqchip->irq_mask;
-		irqchip->irq_mask = gpiochip_irq_mask;
-	}
-
-	if (irqchip->irq_enable) {
-		gpiochip->irq.irq_enable = irqchip->irq_enable;
-		irqchip->irq_enable = gpiochip_irq_enable;
-	} else {
-		gpiochip->irq.irq_unmask = irqchip->irq_unmask;
-		irqchip->irq_unmask = gpiochip_irq_unmask;
-	}
+	gpiochip->irq.irq_enable = irqchip->irq_enable;
+	gpiochip->irq.irq_disable = irqchip->irq_disable;
+	irqchip->irq_enable = gpiochip_irq_enable;
+	irqchip->irq_disable = gpiochip_irq_disable;
 }
 
 /**

@@ -20,10 +20,6 @@
 
 ifneq ($(KERNELRELEASE),)
 
-  VERSION := $(shell echo $(KERNELRELEASE) | sed -e 's/\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\(.*\)/\1/')
-  PATCHLEVEL := $(shell echo $(KERNELRELEASE) | sed -e 's/\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\(.*\)/\2/')
-  SUBLEVEL := $(shell echo $(KERNELRELEASE) | sed -e 's/\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\(.*\)/\3/')
-
   LINUXVER_GOODFOR_CFG80211:=$(strip $(shell \
     if [ "$(VERSION)" -ge "2" -a "$(PATCHLEVEL)" -ge "6" -a "$(SUBLEVEL)" -ge "32" -o "$(VERSION)" -ge "3" ]; then \
       echo TRUE; \
@@ -149,31 +145,14 @@ ifeq "$(GE_49)" "1"
 EXTRA_CFLAGS       += -Wno-date-time
 endif
 
-# Look for kernel architecture.
-# Check for a config symbol that should always be defined, so we don't
-# fail on 'make clean' which doesn't include .config
-ifeq ($(CONFIG_NET),y)
-    ifeq ($(CONFIG_X86_32),y)
-        SHIPPED=wlc_hybrid.o_i386
-        $(info Kernel architecture is X86_32)
-    else
-        ifeq ($(CONFIG_X86_64),y)
-            SHIPPED=wlc_hybrid.o_amd64
-            $(info Kernel architecture is X86_64)
-        else # Error!
-            $(error Unsupported kernel architecture)
-        endif
-    endif
-endif
+EXTRA_CFLAGS       += -Wno-date-time
 
-EXTRA_LDFLAGS      := $(src)/lib/$(SHIPPED)
+EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped
 
-#KVER               ?= $(shell uname -r)
-#KBASE              ?= /lib/modules/$(KVER)
 KBASE              ?= ../kernel
 #KBUILD_DIR         ?= $(KBASE)/build
 KBUILD_DIR         ?= $(KBASE)
-MDEST_DIR          ?= $(KBASE)/kernel/drivers/net/wireless
+MDEST_DIR          ?= ${D}$(KBASE)/kernel/drivers/net/wireless
 
 # Cross compile setup.  Tool chain and kernel tree, replace with your own.
 CROSS_TOOLS        = /path/to/tools

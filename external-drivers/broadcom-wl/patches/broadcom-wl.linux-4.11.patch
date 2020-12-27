@@ -1,0 +1,23 @@
+--- a/src/wl/sys/wl_linux.c
++++ b/src/wl/sys/wl_linux.c
+@@ -2915,7 +2915,6 @@ wl_monitor(wl_info_t *wl, wl_rxsts_t *rx
+ 	if (skb == NULL) return;
+ 
+ 	skb->dev = wl->monitor_dev;
+-	skb->dev->last_rx = jiffies;
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 22)
+ 	skb_reset_mac_header(skb);
+ #else
+--- a/src/include/linuxver.h
++++ b/src/include/linuxver.h
+@@ -67,6 +67,10 @@
+ #include <linux/pci.h>
+ #include <linux/interrupt.h>
+ #include <linux/netdevice.h>
++#include <linux/signal.h>
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
++#include <linux/sched/signal.h>
++#endif
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
+ #include <linux/semaphore.h>
+ #else

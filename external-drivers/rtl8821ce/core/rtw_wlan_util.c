@@ -1543,7 +1543,7 @@ void WMMOnAssocRsp(_adapter *padapter)
 #ifdef CONFIG_WMMPS_STA
 	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
 	struct qos_priv	*pqospriv = &pmlmepriv->qospriv;
-#endif /* CONFIG_WMMPS_STA */	
+#endif /* CONFIG_WMMPS_STA */
 
 	acm_mask = 0;
 
@@ -1669,7 +1669,7 @@ void WMMOnAssocRsp(_adapter *padapter)
 			pxmitpriv->wmm_para_seq[i] = inx[i];
 			RTW_INFO("wmm_para_seq(%d): %d\n", i, pxmitpriv->wmm_para_seq[i]);
 		}
-		
+
 #ifdef CONFIG_WMMPS_STA
 		/* if AP supports UAPSD function, driver must set each uapsd TID to coresponding mac register 0x693 */
 		if (pmlmeinfo->WMM_param.QoS_info & AP_SUPPORTED_UAPSD) {
@@ -2319,11 +2319,11 @@ inline bool match_ranges(u16 EID, u32 value)
 /*
  * rtw_validate_value: validate the IE contain.
  *
- *	Input : 
+ *	Input :
  *		EID : Element ID
  *		p	: IE buffer (without EID & length)
  *		len	: IE length
- *	return: 
+ *	return:
  * 		_TRUE	: All Values are validated.
  *		_FALSE	: At least one value is NOT validated.
  */
@@ -2350,7 +2350,7 @@ bool rtw_validate_value(u16 EID, u8 *p, u16 len)
 
 inline bool hidden_ssid_ap(WLAN_BSSID_EX *snetwork)
 {
-	return ((snetwork->Ssid.SsidLength == 0) ||  
+	return ((snetwork->Ssid.SsidLength == 0) ||
 		is_all_null(snetwork->Ssid.Ssid, snetwork->Ssid.SsidLength) == _TRUE);
 }
 
@@ -2388,7 +2388,7 @@ void rtw_absorb_ssid_ifneed(_adapter *padapter, WLAN_BSSID_EX *bssid, u8 *pframe
 			ie_offset = _FIXED_IE_LENGTH_;
 		}
 	}
-	
+
 	_enter_critical_bh(&padapter->mlmepriv.scanned_queue.lock, &irqL);
 	scanned = _rtw_find_network(&padapter->mlmepriv.scanned_queue, mac);
 	if (!scanned) {
@@ -3169,7 +3169,7 @@ unsigned char check_assoc_AP(u8 *pframe, uint len)
 void get_assoc_AP_Vendor(char *vendor, u8 assoc_AP_vendor)
 {
 	switch (assoc_AP_vendor) {
-	
+
 	case HT_IOT_PEER_UNKNOWN:
 	sprintf(vendor, "%s", "unknown");
 	break;
@@ -4751,8 +4751,10 @@ int rtw_dev_nlo_info_set(struct pno_nlo_info *nlo_info, pno_ssid_t *ssid,
 		return 0;
 	}
 
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 0))
 	fs = get_fs();
 	set_fs(KERNEL_DS);
+#endif
 
 	source = rtw_zmalloc(2048);
 
@@ -4762,7 +4764,9 @@ int rtw_dev_nlo_info_set(struct pno_nlo_info *nlo_info, pno_ssid_t *ssid,
 		rtw_mfree(source, 2048);
 	}
 
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 0))
 	set_fs(fs);
+#endif
 	filp_close(fp, NULL);
 
 	RTW_INFO("-%s-\n", __func__);

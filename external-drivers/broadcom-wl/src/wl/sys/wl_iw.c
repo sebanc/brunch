@@ -37,6 +37,7 @@ typedef const struct si_pub	si_t;
 
 #include <wl_dbg.h>
 #include <wl_iw.h>
+#include <wl_linux.h>
 
 extern bool wl_iw_conn_status_str(uint32 event_type, uint32 status,
 	uint32 reason, char* stringBuf, uint buflen);
@@ -61,6 +62,9 @@ typedef struct priv_link {
 	wl_iw_t *wliw;
 } priv_link_t;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0)
+#define get_ds() (KERNEL_DS)
+#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
 #define WL_DEV_LINK(dev)       (priv_link_t*)(dev->priv)
 #else
@@ -103,29 +107,7 @@ dev_wlc_ioctl(
 	int len
 )
 {
-	struct ifreq ifr;
-	wl_ioctl_t ioc;
-	mm_segment_t fs;
-	int ret;
-
-	memset(&ioc, 0, sizeof(ioc));
-	ioc.cmd = cmd;
-	ioc.buf = arg;
-	ioc.len = len;
-
-	strcpy(ifr.ifr_name, dev->name);
-	ifr.ifr_data = (caddr_t) &ioc;
-
-	fs = get_fs();
-	set_fs(get_ds());
-#if defined(WL_USE_NETDEV_OPS)
-	ret = dev->netdev_ops->ndo_do_ioctl(dev, &ifr, SIOCDEVPRIVATE);
-#else
-	ret = dev->do_ioctl(dev, &ifr, SIOCDEVPRIVATE);
-#endif
-	set_fs(fs);
-
-	return ret;
+	return wlc_ioctl_internal(dev, cmd, arg, len);
 }
 
 static int

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-kernels="4.19 5.4"
+kernels="4.19 5.4 5.10"
 
 for kernel in $kernels; do
 
@@ -75,6 +75,8 @@ cd ../../..
 
 if [ "$2" != "skip" ]; then
 
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ]; then
+
 cp -r ./chroot/home/chronos/kernel/lib/modules ./chroot/home/chronos/kernel/lib/orig
 cp -r ./external-drivers/backport-iwlwifi-core56 ./chroot/tmp/backport-iwlwifi
 cd ./chroot/tmp/backport-iwlwifi
@@ -89,12 +91,20 @@ mv ./chroot/home/chronos/kernel/lib/modules/"$kernel_version" ./chroot/home/chro
 rm -r ./chroot/home/chronos/kernel/lib/modules
 mv ./chroot/home/chronos/kernel/lib/orig ./chroot/home/chronos/kernel/lib/modules
 
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
+
 cp -r ./external-drivers/rtbth ./chroot/tmp/
 cd ./chroot/tmp/rtbth
 make -j$(($(nproc)-1))
 cp ./rtbth.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtbth.ko
 cd ../../..
 rm -r ./chroot/tmp/rtbth
+
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ]; then
 
 cp -r ./external-drivers/rtl8188eu ./chroot/tmp/
 cd ./chroot/tmp/rtl8188eu
@@ -103,12 +113,20 @@ cp ./8188eu.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"
 cd ../../..
 rm -r ./chroot/tmp/rtl8188eu
 
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ]; then
+
 cp -r ./external-drivers/rtl8723bu ./chroot/tmp/
 cd ./chroot/tmp/rtl8723bu
 make -j$(($(nproc)-1)) modules
 cp ./8723bu.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl8723bu.ko
 cd ../../..
 rm -r ./chroot/tmp/rtl8723bu
+
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
 
 cp -r ./external-drivers/rtl8723de ./chroot/tmp/
 cd ./chroot/tmp/rtl8723de
@@ -117,12 +135,20 @@ cp ./rtl8723de.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_versi
 cd ../../..
 rm -r ./chroot/tmp/rtl8723de
 
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ]; then
+
 cp -r ./external-drivers/rtl8812au ./chroot/tmp/
 cd ./chroot/tmp/rtl8812au
 make -j$(($(nproc)-1)) modules
 cp ./88XXau.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl8812au.ko
 cd ../../..
 rm -r ./chroot/tmp/rtl8812au
+
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
 
 cp -r ./external-drivers/rtl8821ce ./chroot/tmp/
 cd ./chroot/tmp/rtl8821ce
@@ -131,12 +157,31 @@ cp ./8821ce.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"
 cd ../../..
 rm -r ./chroot/tmp/rtl8821ce
 
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
+
+cp -r ./external-drivers/rtl88x2bu ./chroot/tmp/
+cd ./chroot/tmp/rtl88x2bu
+make -j$(($(nproc)-1)) modules
+cp ./88x2bu.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl88x2bu.ko
+cd ../../..
+rm -r ./chroot/tmp/rtl88x2bu
+
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
+
 cp -r ./external-drivers/broadcom-wl ./chroot/tmp/
 cd ./chroot/tmp/broadcom-wl
 make -j$(($(nproc)-1))
 cp ./wl.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/broadcom_wl.ko
 cd ../../..
 rm -r ./chroot/tmp/broadcom-wl
+
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
 
 cp -r ./external-drivers/acpi_call ./chroot/tmp/
 cd ./chroot/tmp/acpi_call
@@ -145,7 +190,9 @@ cp ./acpi_call.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_versi
 cd ../../..
 rm -r ./chroot/tmp/acpi_call
 
-if [ "$kernel" == "5.4" ]; then
+fi
+
+if [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
 
 cp -r ./external-drivers/ipts ./chroot/tmp/
 cd ./chroot/tmp/ipts
@@ -154,23 +201,23 @@ cp ./ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/i
 cd ../../..
 rm -r ./chroot/tmp/ipts
 
-cp -r ./external-drivers/mbp2018-bridge ./chroot/tmp/
-cd ./chroot/tmp/mbp2018-bridge
-make -j$(($(nproc)-1))
-cp ./bce.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/bce.ko
-cd ../../..
-rm -r ./chroot/tmp/mbp2018-bridge
-
-cp -r ./external-drivers/mbp2018-spi ./chroot/tmp/
-cd ./chroot/tmp/mbp2018-spi
-make -j$(($(nproc)-1))
-cp ./apple-ibridge.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/apple-ibridge.ko
-cp ./apple-ib-tb.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/apple-ib-tb.ko
-cp ./apple-ib-als.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/apple-ib-als.ko
-cd ../../..
-rm -r ./chroot/tmp/mbp2018-spi
-
 fi
+
+#cp -r ./external-drivers/mbp2018-bridge ./chroot/tmp/
+#cd ./chroot/tmp/mbp2018-bridge
+#make -j$(($(nproc)-1))
+#cp ./bce.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/bce.ko
+#cd ../../..
+#rm -r ./chroot/tmp/mbp2018-bridge
+
+#cp -r ./external-drivers/mbp2018-spi ./chroot/tmp/
+#cd ./chroot/tmp/mbp2018-spi
+#make -j$(($(nproc)-1))
+#cp ./apple-ibridge.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/apple-ibridge.ko
+#cp ./apple-ib-tb.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/apple-ib-tb.ko
+#cp ./apple-ib-als.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/apple-ib-als.ko
+#cd ../../..
+#rm -r ./chroot/tmp/mbp2018-spi
 
 fi
 

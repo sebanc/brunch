@@ -21,6 +21,7 @@
 #ifndef _wl_iw_h_
 #define _wl_iw_h_
 
+#include <linux/semaphore.h>
 #include <linux/wireless.h>
 
 #include <typedefs.h>

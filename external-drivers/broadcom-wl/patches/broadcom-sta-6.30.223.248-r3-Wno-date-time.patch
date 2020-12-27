@@ -1,0 +1,13 @@
+Index: broadcom-wl-6.30.223.271/Makefile
+===================================================================
+--- broadcom-wl-6.30.223.271.orig/Makefile
++++ broadcom-wl-6.30.223.271/Makefile
+@@ -145,6 +145,8 @@ ifeq "$(GE_49)" "1"
+ EXTRA_CFLAGS       += -Wno-date-time
+ endif
+ 
++EXTRA_CFLAGS       += -Wno-date-time
++
+ EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped
+ 
+ KBASE              ?= /lib/modules/${KV_FULL}

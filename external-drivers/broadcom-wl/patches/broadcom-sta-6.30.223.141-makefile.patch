@@ -1,0 +1,14 @@
+--- a/Makefile.orig
++++ b/Makefile
+@@ -147,9 +147,9 @@ endif
+ 
+ EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped
+ 
+-KBASE              ?= /lib/modules/`uname -r`
++KBASE              ?= /lib/modules/${KV_FULL}
+ KBUILD_DIR         ?= $(KBASE)/build
+-MDEST_DIR          ?= $(KBASE)/kernel/drivers/net/wireless
++MDEST_DIR          ?= ${D}$(KBASE)/kernel/drivers/net/wireless
+ 
+ # Cross compile setup.  Tool chain and kernel tree, replace with your own.
+ CROSS_TOOLS        = /path/to/tools

@@ -30,7 +30,7 @@ Install [rtl8821ce-dkms-git](https://aur.archlinux.org/packages/rtl8821ce-dkms-g
 
 #### Dependencies for manual installation on Arch Linux
 ```
-sudo pacman -Syu linux-headers dkms
+sudo pacman -Syu linux-headers dkms bc
 ```
 If you are running a non-vanilla kernel then install the headers to match the kernel package. Proceed to the section below.
 
@@ -120,3 +120,37 @@ sudo modprobe -r ideapad_laptop
 ### BlueTooth is not working
 
 This may be due to the Kernel loading up the wrong firmware file for this card. Please take a look at [@wahsot](https://github.com/wahsot)'s tutorial at https://github.com/tomaspinho/rtl8821ce/issues/19#issuecomment-452196840 to see if that helps you out.
+
+### Secure Boot
+
+If your system uses Secure Boot, disable it via BIOS settings, otherwise the kernel will not accept user-supplied modules.
+
+### Unstable connection - slowdowns or dropouts
+
+The problem may be due to the periodic scanning of access points by the network applet.
+
+> This fix worked helpful on Pop! _OS/Ubuntu 20.10 and Fedora 33. Both with GNOME and NetworkManager. [#179](https://github.com/tomaspinho/rtl8821ce/issues/179)
+
+Set the BSSID from your network applet. In GNOME this can be done in `WiFi Settings > Your profile > Identity > BSSID`.
+
+We are going to disable the *Connectivity Check* option in NetworkManager. This by editing the file in `/var/lib/NetworkManager/NetworkManager-intern.conf` and adding the following instructions at the end:
+
+```
+[connectivity]
+.set.enabled=false
+```
+
+Then, just reboot or restart the NetworkManager unit to fix the problem.
+
+### Wi-Fi not working for kernel >= 5.9
+The Linux Kernel 5.9 version comes with a broken `rtw88` module developed by Realtek that has poor compatibility with most revision of the 8821ce chip.
+
+You must disable it by adding the following to your module blacklists (`/etc/modprobe.d/blacklist.conf`):
+
+```
+blacklist rtw88_8821ce
+``` 
+
+Then, make sure you have the rtl8821ce module correctly installed. 
+
+Turn off your computer, wait a few seconds (to force firmware reload) and then turn it on again.

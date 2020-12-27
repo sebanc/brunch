@@ -1,7 +1,0 @@
---- drivers/platform/x86/Makefile	2020-03-20 06:38:18.000000000 +0100
-+++ drivers/platform/x86/Makefile	2020-03-23 10:14:21.911383330 +0100
-@@ -94,3 +95,4 @@
- obj-$(CONFIG_I2C_MULTI_INSTANTIATE)	+= i2c-multi-instantiate.o
- obj-$(CONFIG_INTEL_ATOMISP2_PM)	+= intel_atomisp2_pm.o
- obj-$(CONFIG_SURFACE_SAM)	+= surface_sam/
-+obj-m				+= yoga-usage-mode.o

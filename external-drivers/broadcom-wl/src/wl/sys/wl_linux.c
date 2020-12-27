@@ -164,8 +164,6 @@ static void wl_report_radio_state(wl_info_t *wl);
 
 MODULE_LICENSE("MIXED/Proprietary");
 
-MODULE_LICENSE("MIXED/Proprietary");
-
 static struct pci_device_id wl_id_table[] =
 {
 	{ PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
@@ -590,17 +588,10 @@ wl_attach(uint16 vendor, uint16 device, ulong regs,
 	}
 	wl->bcm_bustype = bustype;
 
-	#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
 	if ((wl->regsva = ioremap(dev->base_addr, PCI_BAR0_WINSZ)) == NULL) {
 		WL_ERROR(("wl%d: ioremap() failed\n", unit));
 		goto fail;
 	}
-	#else
-	if ((wl->regsva = ioremap_nocache(dev->base_addr, PCI_BAR0_WINSZ)) == NULL) {
-		WL_ERROR(("wl%d: ioremap() failed\n", unit));
-		goto fail;
-	}
-	#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0) */
 
 	wl->bar1_addr = bar1_addr;
 	wl->bar1_size = bar1_size;
@@ -739,7 +730,7 @@ wl_attach(uint16 vendor, uint16 device, ulong regs,
 		WL_ALL_PASSIVE_ENAB(wl) ?  ", Passive Mode" : "", EPI_VERSION_STR);
 
 #ifdef BCMDBG
-	printf(" (Compiled in " SRCBASE);
+	printf(" (Compiled in " SRCBASE " at " __TIME__ " on " __DATE__ ")");
 #endif 
 	printf("\n");
 
@@ -786,14 +777,9 @@ wl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pci_read_config_dword(pdev, 0x40, &val);
 	if ((val & 0x0000ff00) != 0)
 		pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
-		bar1_size = pci_resource_len(pdev, 2);
-		#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
-		bar1_addr = (uchar *)ioremap(pci_resource_start(pdev, 2),
-			bar1_size);
-		#else
-		bar1_addr = (uchar *)ioremap_nocache(pci_resource_start(pdev, 2),
-			bar1_size);
-		#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0) */
+	bar1_size = pci_resource_len(pdev, 2);
+	bar1_addr = (uchar *)ioremap(pci_resource_start(pdev, 2),
+		bar1_size);
 	wl = wl_attach(pdev->vendor, pdev->device, pci_resource_start(pdev, 0), PCI_BUS, pdev,
 		pdev->irq, bar1_addr, bar1_size);
 
@@ -1663,10 +1649,7 @@ wl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		goto done2;
 	}
 
-	if (segment_eq(get_fs(), KERNEL_DS))
-		buf = ioc.buf;
-
-	else if (ioc.buf) {
+	if (ioc.buf) {
 		if (!(buf = (void *) MALLOC(wl->osh, MAX(ioc.len, WLC_IOCTL_MAXLEN)))) {
 			bcmerror = BCME_NORESOURCE;
 			goto done2;
@@ -1679,17 +1662,54 @@ wl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 
 	WL_LOCK(wl);
-	bcmerror = wlc_ioctl(wl->wlc, ioc.cmd, buf, ioc.len, wlif->wlcif);
+	if (!capable(CAP_NET_ADMIN)) {
+		bcmerror = BCME_EPERM;
+	} else {
+		bcmerror = wlc_ioctl(wl->wlc, ioc.cmd, buf, ioc.len, wlif->wlcif);
+	}
 	WL_UNLOCK(wl);
 
 done1:
-	if (ioc.buf && (ioc.buf != buf)) {
+	if (ioc.buf) {
 		if (copy_to_user(ioc.buf, buf, ioc.len))
 			bcmerror = BCME_BADADDR;
 		MFREE(wl->osh, buf, MAX(ioc.len, WLC_IOCTL_MAXLEN));
 	}
 
 done2:
+	ASSERT(VALID_BCMERROR(bcmerror));
+	if (bcmerror != 0)
+		wl->pub->bcmerror = bcmerror;
+	return (OSL_ERROR(bcmerror));
+}
+
+int
+wlc_ioctl_internal(struct net_device *dev, int cmd, void *buf, int len)
+{
+	wl_info_t *wl;
+	wl_if_t *wlif;
+	int bcmerror;
+
+	if (!dev)
+		return -ENETDOWN;
+
+	wl = WL_INFO(dev);
+	wlif = WL_DEV_IF(dev);
+	if (wlif == NULL || wl == NULL || wl->dev == NULL)
+		return -ENETDOWN;
+
+	bcmerror = 0;
+
+	WL_TRACE(("wl%d: wlc_ioctl_internal: cmd 0x%x\n", wl->pub->unit, cmd));
+
+	WL_LOCK(wl);
+	if (!capable(CAP_NET_ADMIN)) {
+		bcmerror = BCME_EPERM;
+	} else {
+		bcmerror = wlc_ioctl(wl->wlc, cmd, buf, len, wlif->wlcif);
+	}
+	WL_UNLOCK(wl);
+
 	ASSERT(VALID_BCMERROR(bcmerror));
 	if (bcmerror != 0)
 		wl->pub->bcmerror = bcmerror;
@@ -2069,7 +2089,8 @@ wl_osl_pcie_rc(struct wl_info *wl, uint op, int param)
 void
 wl_dump_ver(wl_info_t *wl, struct bcmstrbuf *b)
 {
-	bcm_bprintf(b, "wl%d: version %s\n", wl->pub->unit, EPI_VERSION_STR);
+	bcm_bprintf(b, "wl%d: %s %s version %s\n", wl->pub->unit,
+		__DATE__, __TIME__, EPI_VERSION_STR);
 }
 
 #if defined(BCMDBG)
@@ -2944,9 +2965,6 @@ wl_monitor(wl_info_t *wl, wl_rxsts_t *rxsts, void *p)
 	if (skb == NULL) return;
 
 	skb->dev = wl->monitor_dev;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
-	skb->dev->last_rx = jiffies;
-#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 22)
 	skb_reset_mac_header(skb);
 #else
@@ -3367,9 +3385,9 @@ wl_proc_write(struct file *filp, const char __user *buff, size_t length, loff_t 
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
-static const struct proc_ops wl_fops = {
-	.proc_read	= wl_proc_read,
-	.proc_write	= wl_proc_write,
+static struct proc_ops wl_fops = {
+        .proc_read     = wl_proc_read,
+        .proc_write    = wl_proc_write,
 };
 #else
 static const struct file_operations wl_fops = {
@@ -3377,8 +3395,8 @@ static const struct file_operations wl_fops = {
 	.read	= wl_proc_read,
 	.write	= wl_proc_write,
 };
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0) */
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) */
+#endif
+#endif
 
 static int
 wl_reg_proc_entry(wl_info_t *wl)

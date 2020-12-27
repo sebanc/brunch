@@ -22,6 +22,7 @@ Base hardware compatibility:
 Notes: 
 - Intel Gen 1 graphics do not work with ChromeOS versions above r81 (it might still change with a future ChromeOS update).
 - Some Intel 10th Gen devices do not seem to be compatible with the android container.
+- Intel 11th Gen devices are not supported for now.
 
 Specific procedure for BIOS/MBR devices: Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the "mbr_suport.tar.gz" package that you will find in this branch (master).
 
@@ -217,11 +218,12 @@ Some options can be passed through the kernel command lines to activate specific
 - "mount_internal_drives": allows automatic mounting of HDD partitions in ChromeOS (android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data), partition label will be used if it exists,
 - "broadcom_wl": enable this option if you need the broadcom_wl module,
 - "iwlwifi_backport": enable this option if your intel wireless card is not supported natively in the kernel,
-- "rtl8188eu": enable this option if you have a rtl8188eu wireless card,
-- "rtl8723bu": enable this option if you have a rtl8723bu wireless card,
-- "rtl8723de": enable this option if you have a rtl8723de wireless card,
-- "rtl8812au": enable this option if you have a rtl8812au wireless card,
-- "rtl8821ce": enable this option if you have a rtl8821ce wireless card,
+- "rtl8188eu": enable this option if you have a rtl8188eu wireless card/adapter,
+- "rtl8723bu": enable this option if you have a rtl8723bu wireless card/adapter,
+- "rtl8723de": enable this option if you have a rtl8723de wireless card/adapter,
+- "rtl8812au": enable this option if you have a rtl8812au wireless card/adapter,
+- "rtl8821ce": enable this option if you have a rtl8821ce wireless card/adapter,
+- "rtl88x2bu": enable this option if you have a rtl88x2bu wireless card/adapter,
 - "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
 - "ipts": enable support for Surface devices touchscreen with kernel 5.4 (thanks go to the linux-surface team, especially StollD)
 - "acpi_power_button": try this option if long pressing the power button does not display the power menu,

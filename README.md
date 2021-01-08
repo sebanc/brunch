@@ -1,17 +1,18 @@
-# Brunch framework
+# Brunch Framework
 
 ## Overview
 
-First of all, thanks goes to project Croissant, the swtpm maintainer and the Chromebrew framework for their work which was actively used when creating this project.
+First of all, thanks goes to Project Croissant, the swtpm maintainer and the Chromebrew Framework for their work which was actively used when creating this project.
 
-The Brunch framework purpose is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
+The purpose of the Brunch Framework is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches, and config files) with a specific EFI partition to boot from it.
 
-**Warning: As Brunch is not the intended way for ChromeOS to work, at some point a ChromeOS script could potentially behave badly with Brunch and delete data unexpectedly (even on non-ChromeOS partitions). Also, ChromeOS recovery images include device firmware updates that a close enough device might potentially accept and get flashed with the wrong firmware. By installing Brunch you agree to take those risks and I cannot be held responsible for anything bad that would happen to your device including data loss.
+**Warning: As Brunch is not the intended way for ChromeOS to work, at some point a ChromeOS script could potentially behave badly with Brunch and delete data unexpectedly (even on non-ChromeOS partitions). Also, ChromeOS recovery images include device firmware updates that a close enough device might potentially accept and get flashed with the wrong firmware. By installing Brunch you agree to take those risks and I cannot be held responsible for anything bad that would happen to your device including data loss. Additionally, the Brunch Frameworks makes several modifications to ChromeOS which worsen its security. This framework is not recommended for threat models who require adequate security.
+
 It is therefore highly recommended to only use this framework on a device which does not contain any sensitive data and to keep non-sensitive data synced with a cloud service.**
 
 ## Hardware support and added features
 
-Hardware support is highly dependent on the general Linux kernel hardware compatibility. As such only Linux supported hardware will work and the same specific kernel command line options recommended for your device should be passed through the GRUB bootloader (see "Modify the GRUB bootloader" section).
+Hardware support is highly dependent on your hardware's compatibility with the Linux kernel. As such, only Linux-supported hardware will work; the same specific kernel command line options recommendedation for your device should be passed through the GRUB bootloader (see "Modify the GRUB bootloader" section).
 
 Base hardware compatibility:
 - x86_64 computers with UEFI boot support,
@@ -40,14 +41,14 @@ Additional features:
 - non-unibuild images: configured for single device configurations like eve (Google Pixelbook) and nocturne (Google Pixel Slate) for example.
 - unibuild images: intended to manage multiple devices through the use of the CrosConfig tool.
 
-Contrarily to the Croissant framework which mostly supports non-unibuilds images (configuration and access to android apps), Brunch should work with both but will provide better hardware support for unibuild images.
+Contrarily to the Croissant Framework which mostly supports non-unibuilds images (configuration and access to android apps), Brunch should work with both, but will provide better hardware support for unibuild images.
 
 Currently:
 - "rammus" is the recommended image for devices with 4th generation Intel CPU and newer.
 - "samus" is the recommended image for devices with 3rd generation Intel CPU and older.
 - "grunt" is the image to use if you have supported AMD hardware.
 
-If you have a doubt on the recovery image to use, the "brunch-toolkit" from WesBosch has a compatibility check feature which detects the recovery image to use:
+If you are uncertain about which recovery image to use, the "brunch-toolkit" from WesBosch has a compatibility check feature which detects the recovery image to use:
 https://github.com/WesBosch/brunch-toolkit
 
 ChromeOS recovery images can be downloaded from: https://cros-updates-serving.appspot.com/ or https://cros.tech/
@@ -63,7 +64,7 @@ You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an 
 - root access.
 - `pv`, `tar` and `cgpt` packages/binaries.
 
-### Install ChromeOS on a USB flash drive / SD card / HDD (full disk install / single boot)
+### Install ChromeOS on a USB flash drive/SD card/HDD (full disk install/single boot)
 
 1. Download the ChromeOS recovery image and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery image version you have downloaded (from the GitHub release section).
@@ -72,21 +73,28 @@ You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an 
 ```
 tar zxvf brunch_< version >.tar.gz
 ```
-5. Identify your USB flash drive / SD card / HDD device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive)
-6. Install ChromeOS on the USB flash drive / SD card / HDD:
+5. Identify your USB flash drive/SD card/HDD device name using the `lsblk` command. Here is a table of the most common up-to-date device names:
+
+|Type of device | Default device handle | Editorial notes and considerations |
+|---|---|---|
+| NVM Express (NVMe) |/dev/nvme0n1 | Latest SSDs, systems from around 2014 and newer may have support for NVMe hardware. |
+| SATA, SAS, SCSI, or USB flash | /dev/sda	| Found from hardware from ~2007 and present. |
+| MMC, eMMC, and SD | /dev/mmcblk0	| Embedded MMC devices, SD cards, and other types of memory cards can be useful for data storage. |
+
+6. Install ChromeOS on the USB flash drive/SD card/HDD:
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < your USB flash drive / SD card device. e.g. /dev/sdX >
 ```
-7. Reboot your computer and boot from the USB flash drive / SD card / HDD (refer to your computer manufacturer's online resources).
+7. Reboot your computer and boot from the USB flash drive/SD card/HDD (refer to your computer manufacturer's online resources).
 8. (Secure Boot only) A blue screen saying "Verfification failed: (15) Access Denied" will appear upon boot and you will have to enroll the secure boot key by selecting "OK->Enroll key from disk->EFI-SYSTEM->brunch.der->Continue". Reboot your computer and boot again from the USB flash drive / SD card.
 
-The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS.
+The GRUB menu should appear. Select ChromeOS, and the Brunch Framework will begin building itself during the first boot which will take a few minutes. Once it has built, you will be greeted by the ChromeOS startup screen. You can now start using ChromeOS.
 
 ### Dual Boot ChromeOS from your HDD
 
 ChromeOS partition scheme is very specific which makes it difficult to dual boot. One solution to circumvent that is to keep ChromeOS in a disk image on the hard drive and run it from there.
 
-Make sure you have an ext4 (recommended) or NTFS partition with at least 14gb of free space available and no encryption or create one (refer to online resources).
+Make sure you have an ext4 (recommended) or NTFS partition with at least 14GB of free space available and no encryption or create one (refer to online resources).
 
 1. Download the ChromeOS recovery image and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery image version you have downloaded (from the GitHub release section).
@@ -113,13 +121,13 @@ sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst 
 ```
 sudo umount ~/tmpmount
 ```
-9. (secure boot only) Download the secure boot key "brunch.der" in this branch (master) of the repository and enroll it by running the command:
+9. (Secure Boot only) Download the Secure Boot key "brunch.der" in this branch (master) of the repository and enroll it by running the command:
 ```
 sudo mokutil --import brunch.der
 ```
 10. Reboot your computer and boot to the bootloader with the modified GRUB config.
 
-The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
+The GRUB menu should appear; select "ChromeOS (boot from disk image)" and after a few minutes (the Brunch Framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
 
 ## Install ChromeOS from Windows
 
@@ -131,8 +139,8 @@ The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after 
 
 1. Download the ChromeOS recovery image and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery version you have downloaded (from the GitHub release section).
-3. Install the Ubuntu WSL from the Microsoft store (refer to online resources).
-4. Launch Ubuntu WSL and install pv, tar and cgpt packages:
+3. [Install the Ubuntu(/your distribution of choice) WSL](https://docs.microsoft.com/en-us/windows/wsl/install-win10) from the Microsoft store.
+4. Launch Ubuntu WSL; afterwards install pv, tar and cgpt packages:
 ```
 sudo apt update && sudo apt install pv tar cgpt
 ```
@@ -144,12 +152,12 @@ cd /mnt/c/Users/< username >/Downloads/
 ```
 sudo tar zxvf brunch_< version >.tar.gz
 ```
-7. Make sure you have at least 14gb of free space available
+7. Make sure you have at least 14gGB of free space available
 8. Create a ChromeOS image:
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img
 ```
-9. Use "Rufus" (https://rufus.ie/) to write the chromeos.img to the USB flash drive / SD card.
+9. Use "Rufus" (https://rufus.ie/) to write the chromeos.img to the USB flash drive/SD card.
 10. Reboot your computer and boot from the USB flash drive / SD card (refer to your computer manufacturer's online resources).
 11. (Secure Boot only) A blue screen saying "Verfification failed: (15) Access Denied" will appear upon boot and you will have to enroll the secure boot key by selecting "OK->Enroll key from disk->EFI-SYSTEM->brunch.der->Continue". Reboot your computer and boot again from the USB flash drive / SD card.
 12. The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen.

@@ -6,7 +6,7 @@ First of all, thanks goes to Project Croissant, the swtpm maintainer and the Chr
 
 The purpose of the Brunch Framework is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches, and config files) with a specific EFI partition to boot from it.
 
-**Warning: As Brunch is not the intended way for ChromeOS to work, at some point a ChromeOS script could potentially behave badly with Brunch and delete data unexpectedly (even on non-ChromeOS partitions). Also, ChromeOS recovery images include device firmware updates that a close enough device might potentially accept and get flashed with the wrong firmware. By installing Brunch you agree to take those risks and I cannot be held responsible for anything bad that would happen to your device including data loss. Additionally, the Brunch Frameworks makes several modifications to ChromeOS which worsen its security. This framework is not recommended for threat models who require adequate security.
+**Warning: As Brunch is not the intended way for ChromeOS to work, at some point a ChromeOS script could potentially behave badly with Brunch and delete data unexpectedly (even on non-ChromeOS partitions). Also, ChromeOS recovery images include device firmware updates that a close enough device might potentially accept and get flashed with the wrong firmware. By installing Brunch you agree to take those risks and I cannot be held responsible for anything bad that would happen to your device including data loss. Additionally, the Brunch Frameworks makes several modifications to ChromeOS which worsen its security. This framework is not recommended for threat models that require adequate security.
 
 It is therefore highly recommended to only use this framework on a device which does not contain any sensitive data and to keep non-sensitive data synced with a cloud service.**
 
@@ -152,7 +152,7 @@ cd /mnt/c/Users/< username >/Downloads/
 ```
 sudo tar zxvf brunch_< version >.tar.gz
 ```
-7. Make sure you have at least 14gGB of free space available
+7. Make sure you have at least 14GB of free space available
 8. Create a ChromeOS image:
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img

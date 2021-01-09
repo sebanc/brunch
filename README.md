@@ -109,7 +109,7 @@ sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst 
 - Run `sudo cp /etc/grub.d/40_custom /etc/grub.d/99_brunch`
 - Then run `sudo nano /etc/grub.d/99_brunch`, paste the grub config at the end of the file. Save the changes and exit nano (CTRL-X).
 - Lastly, run `sudo update-grub`.
-8. Unmout the destination partition
+8. Unmount the destination partition
 ```
 sudo umount ~/tmpmount
 ```
@@ -151,7 +151,7 @@ sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst 
 ```
 9. Use "Rufus" (https://rufus.ie/) to write the chromeos.img to the USB flash drive / SD card.
 10. Reboot your computer and boot from the USB flash drive / SD card (refer to your computer manufacturer's online resources).
-11. (Secure Boot only) A blue screen saying "Verfification failed: (15) Access Denied" will appear upon boot and you will have to enroll the secure boot key by selecting "OK->Enroll key from disk->EFI-SYSTEM->brunch.der->Continue". Reboot your computer and boot again from the USB flash drive / SD card.
+11. (Secure Boot only) A blue screen saying "Verification failed: (15) Access Denied" will appear upon boot and you will have to enroll the secure boot key by selecting "OK->Enroll key from disk->EFI-SYSTEM->brunch.der->Continue". Reboot your computer and boot again from the USB flash drive / SD card.
 12. The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen.
 At this stage, your USB flash drive / SD card is incorrectly recognized as 14GB regardless of its actual capacity. To fix this:
 13. At the ChromeOS startup screen, press CTRL+ALT+F2 to go into a shell session.
@@ -178,7 +178,7 @@ sudo bash chromeos-install -dst ~/tmpmount/chromeos.img -s < size you want to gi
 ```
 6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C).
 7. Run `sudo nano ~/tmpmount/chromeos.grub.txt` and paste the config there (CTRL°SHIFT+V to paste and then CTRL-X to exit)
-8. Unmout the destination partition
+8. Unmount the destination partition
 ```
 sudo umount ~/tmpmount
 ```
@@ -328,7 +328,7 @@ You can visit wiki https://github.com/sebanc/brunch/wiki
 
 1) The instructions are difficult to follow as I am not familiar with Linux commands.
 
-I cannot not go much deeper into details here for now but I will try to clarify the install process once I see the main pain points. Nevertheless, ChromeOS is based on Linux and it would probably be interesting for you to read online resources on Linux basics before attempting this.
+I can not go much deeper into details here for now but I will try to clarify the install process once I see the main pain points. Nevertheless, ChromeOS is based on Linux and it would probably be interesting for you to read online resources on Linux basics before attempting this.
 
 2) My computer will not boot the created USB flash drive / SD card whereas it normally can (and I have correctly followed the instructions).
 

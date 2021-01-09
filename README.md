@@ -78,7 +78,7 @@ tar zxvf brunch_< version >.tar.gz
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < your USB flash drive / SD card device. e.g. /dev/sdX >
 ```
 7. Reboot your computer and boot from the USB flash drive / SD card / HDD (refer to your computer manufacturer's online resources).
-8. (Secure Boot only) A blue screen saying "Verfification failed: (15) Access Denied" will appear upon boot and you will have to enroll the secure boot key by selecting "OK->Enroll key from disk->EFI-SYSTEM->brunch.der->Continue". Reboot your computer and boot again from the USB flash drive / SD card.
+8. (Secure Boot only) A blue screen saying "Verification failed: (15) Access Denied" will appear upon boot and you will have to enroll the secure boot key by selecting "OK->Enroll key from disk->EFI-SYSTEM->brunch.der->Continue". Reboot your computer and boot again from the USB flash drive / SD card.
 
 The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS.
 
@@ -105,7 +105,7 @@ sudo mount < the destination partition (ext4 or ntfs) which will contain the dis
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
 7. Create a GRUB configuration file for brunch in your linux install:
-- Copŷ the grub config which appeared in the terminal at the end of the process (the text between lines with stars)
+- Copy the grub config which appeared in the terminal at the end of the process (the text between lines with stars)
 - Run `sudo cp /etc/grub.d/40_custom /etc/grub.d/99_brunch`
 - Then run `sudo nano /etc/grub.d/99_brunch`, paste the grub config at the end of the file. Save the changes and exit nano (CTRL-X).
 - Lastly, run `sudo update-grub`.

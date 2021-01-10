@@ -266,6 +266,12 @@ cat /etc/brunch_version
 
 It is currently recommended to only update ChromeOS when the matching version of the Brunch framework has been released.
 
+You can update both ChromeOS and brunch at the same time using a script from [BiteDasher](https://github.com/BiteDasher) (use at your own risk!). It can automatically detect the version of the Chrome OS image and receive available updates. You can install it by running
+
+`curl -L -o - https://git.io/JLh1V | sudo bash; brcr-update`
+
+Or, manually update ChromeOS
+
 1. Download the new ChromeOS recovery image version and extract it.
 2. Download the Brunch release corresponding to the ChromeOS recovery version (from the GitHub release section).
 3. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)

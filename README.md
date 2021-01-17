@@ -4,7 +4,7 @@
 
 First of all, thanks goes to project Croissant, the swtpm maintainer and the Chromebrew framework for their work which was actively used when creating this project.
 
-The Brunch framework purpose is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
+The purpose of the Brunch framework is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
 
 **Warning: As Brunch is not the intended way for ChromeOS to work, at some point a ChromeOS script could potentially behave badly with Brunch and delete data unexpectedly (even on non-ChromeOS partitions). Also, ChromeOS recovery images include device firmware updates that a close enough device might potentially accept and get flashed with the wrong firmware. By installing Brunch you agree to take those risks and I cannot be held responsible for anything bad that would happen to your device including data loss.
 It is therefore highly recommended to only use this framework on a device which does not contain any sensitive data and to keep non-sensitive data synced with a cloud service.**
@@ -208,6 +208,13 @@ Note: Even if you boot from GRUB on your HDD, if you have a ChromeOS USB flash d
 
 The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS.
 
+# Support
+
+Below are the main places where you can find support for Brunch:
+- On Discord: https://discord.gg/x2EgK2M
+- On Telegram: https://t.me/chromeosforpc
+- On Reddit: https://www.reddit.com/r/Brunchbook
+
 # Optional steps
 
 ## Framework options
@@ -225,13 +232,12 @@ Some options can be passed through the kernel command lines to activate specific
 - "rtl8821ce": enable this option if you have a rtl8821ce wireless card/adapter,
 - "rtl88x2bu": enable this option if you have a rtl88x2bu wireless card/adapter,
 - "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
-- "ipts": enable support for Surface devices touchscreen with kernel 5.4 (thanks go to the linux-surface team, especially StollD)
+- "ipts": enable support for Surface devices touchscreen with kernel 5.4 / 5.10 (thanks go to the linux-surface team, especially StollD)
 - "acpi_power_button": try this option if long pressing the power button does not display the power menu,
 - "alt_touchpad_config": try this option if you have touchpad issues,
 - "alt_touchpad_config2": another option to try if you have touchpad issues,
 - "disable_intel_hda": some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
 - "internal_mic_fix": allows to forcefully enable internal mic on some devices,
-- "mbp2018": enable T2-based macbooks bridge and spi drivers
 - "asus_c302": applies asus c302 specific firmwares and fixes,
 - "baytrail_chromebook": applies baytrail chromebooks specific audio fixes,
 - "sysfs_tablet_mode": allow to control tablet mode from sysfs (`echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to acivate it or use 0 to disable it),
@@ -254,6 +260,7 @@ Those are not options, just add them on the kernel command line after "cros_debu
 
 like this: 
 ![](https://user-images.githubusercontent.com/69226625/97113026-9fec2880-170d-11eb-930f-972f0b38af4f.png)
+
 ## Identify the installed Brunch framework version
 
 1. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
@@ -274,6 +281,8 @@ It is currently recommended to only update ChromeOS when the matching version of
 sudo chromeos-update -r < path to the ChromeOS recovery image > -f < path to the Brunch release archive >
 ```
 5. Restart ChromeOS
+
+Note: BiteDasher created a script which updates both Brunch and ChromeOS with a single command: https://github.com/BiteDasher/brcr-update
 
 ## Update only the Brunch framework
 

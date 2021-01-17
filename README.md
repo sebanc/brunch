@@ -250,6 +250,12 @@ you can add it after cros_debug and before loop.max.....
 
 For example: booting with "options=enable_updates,advanced_als" will activate both options.
 
+## Changing kernel version
+
+Currently Brunch uses ChromiumOS kernel 5.4 by default as it is considered to be the most stable, however kernel 4.19 and an experimental kernel 5.10 are also included. If you want to try another kernel, you can replace "/kernel" in the grub configuration by "/kernel-4.19" or "/kernel-5.10".
+
+WARNING: Changing kernel can prevent you from logging into your ChromeOS account, in which case the a powerwash is the only solution (CTRL+ALT+SHIFT+R at the login screen). Therefore, before switching to a different kernel, make sure you have a backup of all your data.
+
 ## Kernel command line parameters
 
 Those are not options, just add them on the kernel command line after "cros_debug" and before "options=...." if any:

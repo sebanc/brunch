@@ -65,6 +65,13 @@ Features available when used within a brunch install:
 - Update ChromeOS and/or Brunch.
 - Modify the ChromeOS start up animation.
 
+# Support
+
+In case you run into issues while installing / using Brunch, below are the main places where you can find support:
+- Discord: https://discord.gg/x2EgK2M
+- Telegram: https://t.me/chromeosforpc
+- Reddit: https://www.reddit.com/r/Brunchbook
+
 # Install instructions
 
 You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an image on your hard disk for dual booting (14GB of free space needed).
@@ -221,13 +228,6 @@ Note: Even if you boot from GRUB on your HDD, if you have a ChromeOS USB flash d
 
 The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS.
 
-# Support
-
-Below are the main places where you can find support for Brunch:
-- On Discord: https://discord.gg/x2EgK2M
-- On Telegram: https://t.me/chromeosforpc
-- On Reddit: https://www.reddit.com/r/Brunchbook
-
 # Optional steps
 
 ## Framework options
@@ -317,7 +317,7 @@ sudo chromeos-update -f < path to the Brunch release archive >
 
 *WARNING*: Do not update brunch with unfinished OTA update as it may make chromeOS unbootable.
 
-## Modify the GRUB bootloader
+## Modify the GRUB configuration
 
 ### From Windows
 

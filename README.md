@@ -16,8 +16,9 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 Base hardware compatibility:
 - x86_64 computers with UEFI boot support,
 - Intel hardware (CPU and GPU) starting from 1st generation "Nehalem" (refer to https://en.wikipedia.org/wiki/Intel_Core),
-- AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU and Ryzen models are not yet supported),
-- Nvidia graphic cards are also not supported.
+- AMD Ryzen 3XXX (CPU and GPU), only with "zork" recovery image (newer Ryzen models are not yet supported),
+- AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU are not supported),
+- Devices having only a Nvidia graphic card are not supported.
 
 Notes: 
 - Intel Gen 1 graphics do not work with ChromeOS versions above r81 (it might still change with a future ChromeOS update).
@@ -45,12 +46,24 @@ Contrarily to the Croissant framework which mostly supports non-unibuilds images
 Currently:
 - "rammus" is the recommended image for devices with 4th generation Intel CPU and newer.
 - "samus" is the recommended image for devices with 3rd generation Intel CPU and older.
-- "grunt" is the image to use if you have supported AMD hardware.
-
-If you have a doubt on the recovery image to use, the "brunch-toolkit" from WesBosch has a compatibility check feature which detects the recovery image to use:
-https://github.com/WesBosch/brunch-toolkit
+- "zork" is the image to use for AMD Ryzen 3XXX.
+- "grunt" is the image to use for AMD Stoney Ridge.
 
 ChromeOS recovery images can be downloaded from: https://cros-updates-serving.appspot.com/ or https://cros.tech/
+
+# Brunch toolkit
+
+If you are not comfortable with the linux commands in the below instructions, the "brunch-toolkit" provided by WesBosch has been designed to make installing and updating brunch easy:
+https://github.com/WesBosch/brunch-toolkit
+
+General features (available within Brunch, Linux & WSL):
+- Check user's CPU for Brunch compatibility.
+- Suggest usable recoveries based on user's hardware.
+- Install Brunch to disk or partition.
+
+Features available when used within a brunch install:
+- Update ChromeOS and/or Brunch.
+- Modify the ChromeOS start up animation.
 
 # Install instructions
 
@@ -254,7 +267,7 @@ For example: booting with "options=enable_updates,advanced_als" will activate bo
 
 Currently Brunch uses ChromiumOS kernel 5.4 by default as it is considered to be the most stable, however kernel 4.19 and an experimental kernel 5.10 are also included. If you want to try another kernel, you can replace "/kernel" in the grub configuration by "/kernel-4.19" or "/kernel-5.10".
 
-WARNING: Changing kernel can prevent you from logging into your ChromeOS account, in which case the a powerwash is the only solution (CTRL+ALT+SHIFT+R at the login screen). Therefore, before switching to a different kernel, make sure you have a backup of all your data.
+WARNING: Changing kernel can prevent you from logging into your ChromeOS account, in which case a powerwash is the only solution (CTRL+ALT+SHIFT+R at the login screen). Therefore, before switching to a different kernel, make sure you have a backup of all your data.
 
 ## Kernel command line parameters
 

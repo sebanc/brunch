@@ -274,6 +274,7 @@ WARNING: Changing kernel can prevent you from logging into your ChromeOS account
 Those are not options, just add them on the kernel command line after "cros_debug" and before "options=...." if any:
 - "enforce_hyperthreading=1": improve performance by disabling a ChromeOS security feature and forcing hyperthreading everywhere (even in crositini).
 - "i915.enable_fbc=0 i915.enable_psr=0": if you want to use crouton (needed with kernel 5.4).
+- "psmouse.elantech_smbus=1": fix needed for some elantech touchpads.
 - "psmouse.synaptics_intertouch=1": enables gestures with more than 2 fingers on some touchpad models.
 - "console=": No text will be displayed on boot (it will not make boot faster).
 

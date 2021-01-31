@@ -1,0 +1,187 @@
+#!/bin/busybox sh
+export PATH=/sbin:/bin
+
+busybox mount -t proc none /proc
+busybox mount -t sysfs none /sys
+busybox mount -t devtmpfs none /dev
+busybox --install -s
+ln -s /proc/mounts /etc/mtab
+
+if [ ! -z "$brunch_bootsplash" ] && [ -f /bootsplash/"$brunch_bootsplash"/main.png ]; then fbv -f /bootsplash/"$brunch_bootsplash"/main.png & fi
+
+haveged -w 1024 -v 1 -F > /dev/kmsg 2>&1 &
+# Wait 10s for block devices to be available by default, this can be overrided by setting "brunch_timeout" value on kernel command line
+if [ ! -z "$brunch_timeout" ]; then
+	sleep "$brunch_timeout"
+else
+	sleep 10
+fi
+
+if [ ! -z "$img_uuid" ] && [ ! -z "$img_path" ]; then img_part=$(blkid | grep -i "$img_uuid" | awk -F: '{ print $1 }'); fi
+
+if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
+	mkdir /mainroot
+	fstype=$(blkid -s TYPE -o value "$img_part")
+	if [ "$fstype" == "ntfs" ]; then
+		ntfs-3g "$img_part" /mainroot
+	else
+		mount -n "$img_part" /mainroot
+	fi
+	if [ -f /mainroot/"$img_path" ]; then
+		mknod -m660 /dev/loop15 b 7 480
+		losetup -P /dev/loop15 /mainroot"$img_path"
+		bootdevice=/dev/loop15
+		partpath=/dev/loop15p
+	else
+		echo "brunch: ChromeOS loopfile $img_path not found on device $img_part..." > /dev/kmsg
+	fi
+else
+	for sysblock in /sys/block/*; do
+		if [ "${sysblock/\/sys\/block\/fd/}" == "$sysblock" ] && [ "${sysblock/\/sys\/block\/loop/}" == "$sysblock" ]; then
+			device=${sysblock/\/sys\/block\//\/dev\/}
+			if (expr match "$device" ".*[0-9]$" >/dev/null); then
+				devicepart="$device"p
+			else
+				devicepart="$device"
+			fi
+			echo "brunch: Scanning device $device" > /dev/kmsg
+			if [ -b "$devicepart"1 ] && [ -b "$devicepart"3 ] && [ "$(blkid -s PARTLABEL -o value "$devicepart"1)" == "STATE" ] && [ "$(blkid -s PARTLABEL -o value "$devicepart"3)" == "ROOT-A" ]; then
+				bootdevice="$device"
+				partpath="$devicepart"
+				if [ "$(cat $sysblock/removable)" -eq 1 ]; then
+					echo "brunch: ChromeOS found on removable device, booting it !" > /dev/kmsg
+					echo "0" > "$sysblock"/removable
+					break
+				else
+					echo "brunch: ChromeOS found on fixed device $bootdevice, keep scanning for removable devices..." > /dev/kmsg
+				fi
+			fi
+		fi
+	done
+fi
+if [ -z "$bootdevice" ] || [ -z "$partpath" ]; then echo "brunch: ChromeOS was not found on any device, falling back to shell..." > /dev/kmsg; exec sh; fi
+
+if [ ! -z "$brunch_debug" ] && [ "$brunch_debug" -eq 1 ]; then
+echo 0 0 0 0 > /proc/sys/kernel/printk
+exec sh
+fi
+
+mkdir -p /roota /rootc
+e2fsck -y "$partpath"7
+mount "$partpath"7 /rootc
+
+rebuild=0
+rootb_is_valid=0
+current_debug="$(grep -o cros_debug /proc/cmdline)"
+current_kernel="$(cat /proc/version |  cut -d' ' -f3)"
+current_md5sum="$(ls --full-time -lR /rootc/* | md5sum)"
+if [ $(cgpt show -i 4 -P "$bootdevice") -ge $(cgpt show -i 2 -P "$bootdevice") ]; then
+	rebuild=1
+	echo "brunch: update detected" > /dev/kmsg
+else
+	if [ ! -f "/rootc/.md5sum" ] || [ ! -f "/rootc/debug" ] || [ ! -f "/rootc/kernel_version" ] || [ ! -f "/rootc/options" ]; then
+		rebuild=1
+		echo "brunch: new install detected" > /dev/kmsg
+	else
+		stored_debug="$(cat /rootc/debug)"
+		stored_kernel="$(cat /rootc/kernel_version)"
+		stored_md5sum="$(cat /rootc/.md5sum)"
+		stored_options="$(cat /rootc/options)"
+		if [ ! "$stored_debug" == "$current_debug" ] || [ ! "$stored_kernel" == "$current_kernel" ] || [ ! "$stored_md5sum" == "$current_md5sum" ] || [ ! "$stored_options" == "$options" ]; then
+			rebuild=1
+			echo "brunch: framework change detected" > /dev/kmsg
+		else
+			echo "brunch: rebuilding ChromeOS rootfs not necessary" > /dev/kmsg
+		fi
+	fi
+fi
+
+if [ ! -z "$brunch_debug" ] && [ "$brunch_debug" -eq 2 ]; then
+umount /rootc
+echo 0 0 0 0 > /proc/sys/kernel/printk
+exec sh
+fi
+
+if [ "$rebuild" -eq 1 ]; then
+	mkdir /tmp/testfs
+	mount -o,ro "$partpath"5 /tmp/testfs > /dev/null 2>&1
+	if [ "$?" -eq 0 ]; then
+		ls -lR /tmp/testfs > /dev/null 2>&1
+		if [ "$?" -eq 0 ]; then
+			rootb_is_valid=1
+			umount /tmp/testfs
+		else
+			echo "brunch: Partition ROOT-B is currently corrupt by an unfinished update, the framework will not be rebuilt until the update is fully applied." > /dev/kmsg
+			umount /tmp/testfs
+		fi
+	else
+		echo "brunch: Partition ROOT-B is currently corrupt by an unfinished update, the framework will not be rebuilt until the update is fully applied." > /dev/kmsg
+	fi
+fi
+
+if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
+	if [ ! -z "$brunch_bootsplash" ] && [ -f /bootsplash/"$brunch_bootsplash"/rebuilding.png ]; then fbv -f /bootsplash/"$brunch_bootsplash"/rebuilding.png & fi
+	echo "brunch: rebuilding ChromeOS rootfs, it might take a few minutes..." > /dev/kmsg
+	pv "$partpath"5 > "$partpath"3
+	if [ ! -z "$brunch_bootsplash" ] && [ -f /bootsplash/"$brunch_bootsplash"/patching.png ]; then fbv -f /bootsplash/"$brunch_bootsplash"/patching.png & fi
+	printf '\000' | dd of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 status=none
+	mount "$partpath"3 /roota
+	mount -o bind /roota/etc /etc
+	mount -o bind /roota/lib64 /lib64
+	mount -o bind /roota/usr /usr
+	export PATH=/roota/sbin:/roota/bin:/roota/usr/sbin:/roota/usr/bin:/sbin:/bin
+	resize2fs -f "$partpath"3
+	rm -r /roota/lib/modules/*
+	tar zxf /rootc/packages/kernel-"$(cat /proc/version |  cut -d' ' -f3)".tar.gz -C /roota
+	for patch in /rootc/patches/*.sh
+	do
+		"$patch" "$options"
+		ret="$?"
+		if [ "$ret" -eq 0 ]; then
+			echo "brunch: $patch success" > /dev/kmsg
+		else
+			echo "brunch: $patch failed with ret=$ret" > /dev/kmsg
+		fi
+	done
+	if [ $(blkid -s TYPE -o value "$partpath"1) == "ext2" ]; then
+		mkfs.ext4 -F -b 4096 -L "H-STATE" "$partpath"1
+	fi
+	export PATH=/sbin:/bin
+	umount /usr
+	umount /lib64
+	umount /etc
+	umount /roota
+	cgpt add -i 2 -P 15 -T 15 -S 0 "$bootdevice"
+	cgpt add -i 4 -P 0 -T 15 -S 0 "$bootdevice"
+	echo "$(grep -o cros_debug /proc/cmdline)" > /rootc/debug
+	echo "$(cat /proc/version |  cut -d' ' -f3)" > /rootc/kernel_version
+	echo "$options" > /rootc/options
+	md5sum=$(ls --full-time -lR /rootc/* | md5sum)
+	echo "$md5sum" > /rootc/.md5sum
+fi
+
+if [ ! -z "$chromeos_bootsplash" ]; then
+	mount "$partpath"1 /data
+	if [ -d /data/unencrypted/bootsplash/"$chromeos_bootsplash" ]; then
+		mount "$partpath"3 /roota
+		cp -r /data/unencrypted/bootsplash/"$chromeos_bootsplash"/* /roota/usr/share/chromeos-assets/
+		umount /roota
+	fi
+	umount /data
+fi
+
+if [ ! -z "$brunch_debug" ] && [ "$brunch_debug" -eq 3 ]; then
+echo 0 0 0 0 > /proc/sys/kernel/printk
+exec sh
+fi
+
+umount /rootc
+e2fsck -y "$partpath"3
+mount "$partpath"3 /roota
+mount --move /dev /roota/dev
+umount /sys
+umount /proc
+
+sync
+
+exec switch_root /roota /sbin/init "$@"

@@ -1,0 +1,12 @@
+diff -urN a/src/wl/sys/wl_linux.c b/src/wl/sys/wl_linux.c
+--- a/src/wl/sys/wl_linux.c	2013-08-01 09:52:22.000000000 +0300
++++ b/src/wl/sys/wl_linux.c	2013-09-27 09:20:11.495023471 +0300
+@@ -235,7 +235,7 @@
+ #define to_str(s) #s
+ #define quote_str(s) to_str(s)
+ 
+-#define BRCM_WLAN_IFNAME eth%d
++#define BRCM_WLAN_IFNAME wlan%d
+ 
+ static char intf_name[IFNAMSIZ] = quote_str(BRCM_WLAN_IFNAME);
+ 

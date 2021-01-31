@@ -1,0 +1,99 @@
+config DRM_BRIDGE
+	def_bool y
+	depends on DRM
+	help
+	  Bridge registration and lookup framework.
+
+config DRM_PANEL_BRIDGE
+	def_bool y
+	depends on DRM_BRIDGE
+	depends on DRM_KMS_HELPER
+	select DRM_PANEL
+	help
+	  DRM bridge wrapper of DRM panels
+
+menu "Display Interface Bridges"
+	depends on DRM && DRM_BRIDGE
+
+config DRM_ANALOGIX_ANX78XX
+	tristate "Analogix ANX78XX bridge"
+	select DRM_KMS_HELPER
+	select REGMAP_I2C
+	---help---
+	  ANX78XX is an ultra-low Full-HD SlimPort transmitter
+	  designed for portable devices. The ANX78XX transforms
+	  the HDMI output of an application processor to MyDP
+	  or DisplayPort.
+
+config DRM_DW_HDMI
+	tristate
+	select DRM_KMS_HELPER
+
+config DRM_DW_HDMI_AHB_AUDIO
+	tristate "Synopsis Designware AHB Audio interface"
+	depends on DRM_DW_HDMI && SND
+	select SND_PCM
+	select SND_PCM_ELD
+	select SND_PCM_IEC958
+	help
+	  Support the AHB Audio interface which is part of the Synopsis
+	  Designware HDMI block.  This is used in conjunction with
+	  the i.MX6 HDMI driver.
+
+
+config DRM_NXP_PTN3460
+	tristate "NXP PTN3460 DP/LVDS bridge"
+	depends on OF
+	select DRM_KMS_HELPER
+	select DRM_PANEL
+	---help---
+	  NXP PTN3460 eDP-LVDS bridge chip driver.
+
+config DRM_PARADE_PS8622
+	tristate "Parade eDP/LVDS bridge"
+	depends on OF
+	select DRM_PANEL
+	select DRM_KMS_HELPER
+	select BACKLIGHT_LCD_SUPPORT
+	select BACKLIGHT_CLASS_DEVICE
+	---help---
+	  Parade eDP-LVDS bridge chip driver.
+
+config DRM_GENERIC_GPIO_MUX
+	tristate "Generic GPIO-controlled mux"
+	depends on DRM
+	depends on OF
+	depends on GPIOLIB
+	select DRM_KMS_HELPER
+	---help---
+	  This bridge driver models a GPIO-controlled display mux with one
+	  input, 2 outputs (e.g. an HDMI mux). The hardware decides which output
+	  is active, reports it as a GPIO, and the driver redirects calls to the
+	  appropriate downstream bridge (if any).
+
+config DRM_PARADE_PS8640
+	tristate "Parade PS8640 MIPI DSI to eDP Converter"
+	depends on DRM
+	depends on OF
+	select DRM_KMS_HELPER
+	select DRM_MIPI_DSI
+	select DRM_PANEL
+	---help---
+	  Choose this option if you have PS8640 for display
+	  The PS8640 is a high-performance and low-power
+	  MIPI DSI to eDP converter
+
+source "drivers/gpu/drm/bridge/analogix/Kconfig"
+
+config DRM_ANALOGIX_ANX7688
+	tristate "Analogix ANX7688 bridge"
+	depends on DRM
+	select DRM_KMS_HELPER
+	---help---
+	  ANX7688 is a transmitter to support DisplayPort over USB-C for
+	  smartphone and tablets.
+	  This driver only supports the HDMI to DP component of the chip.
+
+source "drivers/gpu/drm/bridge/synopsys/Kconfig"
+
+endmenu

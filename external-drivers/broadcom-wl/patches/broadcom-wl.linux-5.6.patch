@@ -1,0 +1,57 @@
+diff -rup a/src/shared/linux_osl.c b/src/shared/linux_osl.c
+--- a/src/shared/linux_osl.c	2020-04-21 08:30:44.872033927 +0200
++++ b/src/shared/linux_osl.c	2020-04-21 08:33:31.744546100 +0200
+@@ -946,7 +946,7 @@ osl_getcycles(void)
+ void *
+ osl_reg_map(uint32 pa, uint size)
+ {
+-	return (ioremap_nocache((unsigned long)pa, (unsigned long)size));
++	return (ioremap((unsigned long)pa, (unsigned long)size));
+ }
+ 
+ void
+diff -rup a/src/wl/sys/wl_linux.c b/src/wl/sys/wl_linux.c
+--- a/src/wl/sys/wl_linux.c	2020-04-21 08:30:44.876033940 +0200
++++ b/src/wl/sys/wl_linux.c	2020-04-21 08:33:31.744546100 +0200
+@@ -588,7 +588,7 @@ wl_attach(uint16 vendor, uint16 device,
+ 	}
+ 	wl->bcm_bustype = bustype;
+ 
+-	if ((wl->regsva = ioremap_nocache(dev->base_addr, PCI_BAR0_WINSZ)) == NULL) {
++	if ((wl->regsva = ioremap(dev->base_addr, PCI_BAR0_WINSZ)) == NULL) {
+ 		WL_ERROR(("wl%d: ioremap() failed\n", unit));
+ 		goto fail;
+ 	}
+@@ -777,9 +777,9 @@ wl_pci_probe(struct pci_dev *pdev, const
+ 	pci_read_config_dword(pdev, 0x40, &val);
+ 	if ((val & 0x0000ff00) != 0)
+ 		pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
+-		bar1_size = pci_resource_len(pdev, 2);
+-		bar1_addr = (uchar *)ioremap_nocache(pci_resource_start(pdev, 2),
+-			bar1_size);
++	bar1_size = pci_resource_len(pdev, 2);
++	bar1_addr = (uchar *)ioremap(pci_resource_start(pdev, 2),
++		bar1_size);
+ 	wl = wl_attach(pdev->vendor, pdev->device, pci_resource_start(pdev, 0), PCI_BUS, pdev,
+ 		pdev->irq, bar1_addr, bar1_size);
+ 
+@@ -3354,12 +3354,19 @@ wl_proc_write(struct file *filp, const c
+ }
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
++static struct proc_ops wl_fops = {
++        .proc_read     = wl_proc_read,
++        .proc_write    = wl_proc_write,
++};
++#else
+ static const struct file_operations wl_fops = {
+ 	.owner	= THIS_MODULE,
+ 	.read	= wl_proc_read,
+ 	.write	= wl_proc_write,
+ };
+ #endif
++#endif
+ 
+ static int
+ wl_reg_proc_entry(wl_info_t *wl)

@@ -1,0 +1,16 @@
+diff -ruN a/src/shared/linux_osl.c b/src/shared/linux_osl.c
+--- a/src/shared/linux_osl.c	2015-11-26 12:16:23.343091098 -0800
++++ b/src/shared/linux_osl.c	2015-11-26 12:17:08.657092739 -0800
+@@ -932,7 +932,11 @@
+ 	uint cycles;
+ 
+ #if defined(__i386__)
+-	rdtscl(cycles);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
++	cycles = (u32)rdtsc();
++#else
++	rdtscl(cycles);
++#endif
+ #else
+ 	cycles = 0;
+ #endif 

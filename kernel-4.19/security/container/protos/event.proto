@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package schema;
+
+message Overlay {
+  bool lower_layer = 1;
+  bool upper_layer = 2;
+}
+
+message File {
+  bytes fullpath = 1;
+  oneof filesystem {
+    Overlay overlayfs = 2;
+  }
+}
+
+message ProcessArguments {
+  repeated bytes argv = 1;    // process arguments
+  uint32 argv_truncated = 2;  // number of characters truncated from argv
+  repeated bytes envp = 3;    // process environment variables
+  uint32 envp_truncated = 4;  // number of characters truncated from envp
+}
+
+message Descriptor {
+  uint32 mode = 1;  // file mode (stat st_mode)
+}
+
+message Streams {
+  Descriptor stdin = 1;
+  Descriptor stdout = 2;
+  Descriptor stderr = 3;
+}
+
+message Process {
+  uint64 creation_timestamp = 1;  // In nanoseconds
+  bytes uuid = 2;
+  uint32 pid = 3;
+  File binary = 4;
+  uint32 parent_pid = 5;
+  bytes parent_uuid = 6;
+  uint64 container_id = 7;          // unique id of process's container
+  uint32 container_pid = 8;         // pid inside the container namespace pid
+  uint32 container_parent_pid = 9;  // optional
+  ProcessArguments args = 10;
+  Streams streams = 11;
+}
+
+message Container {
+  uint64 creation_timestamp = 1;  // container create time in ns
+  bytes pod_namespace = 2;
+  bytes pod_name = 3;
+  uint64 container_id = 4;  // unique across lifetime of Node
+  bytes container_name = 5;
+  bytes container_image_uri = 6;
+  repeated bytes labels = 7;
+  bytes init_uuid = 8;
+}
+
+// A binary being executed.
+// e.g., execve()
+message ExecuteEvent {
+  Process proc = 1;
+}
+
+// Associate the following container information with all processes
+// that have the indicated container_id.
+message ContainerInfoEvent {
+  Container container = 1;
+}
+
+// The process with the indicated pid has exited.
+message ExitEvent {
+  bytes process_uuid = 1;
+}
+
+message Event {
+  oneof event {
+    ExecuteEvent execute = 1;
+    ContainerInfoEvent container = 2;
+    ExitEvent exit = 3;
+  }
+}
+
+// Message sent by the daemonset to the LSM for container enlightenment.
+message ContainerReport {
+  uint32 pid = 1;           // Top pid of the running container.
+  Container container = 2;  // Information collected about the container.
+}

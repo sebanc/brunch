@@ -1,0 +1,228 @@
+/*
+ * Copyright 2016 MediaTek Inc.
+ * Author: Eddie Huang <eddie.huang@mediatek.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "mt8173-oak.dtsi"
+
+/ {
+	hdmicon: connector {
+		compatible = "hdmi-connector";
+		label = "hdmi";
+		type = "a";
+
+		port {
+			hdmi_connector_in: endpoint {
+				remote-endpoint = <&hdmi_mux_out_hdmi>;
+			};
+		};
+	};
+
+	hdmi_mux: hdmi_mux {
+		compatible = "gpio-display-mux";
+		status = "okay";
+		detect-gpios = <&pio 36 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&hdmi_mux_pins>;
+		ddc-i2c-bus = <&hdmiddc0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 { /* input */
+				reg = <0>;
+
+				hdmi_mux_in: endpoint {
+					remote-endpoint = <&hdmi0_out>;
+				};
+			};
+
+			port@1 { /* output */
+				reg = <1>;
+
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				hdmi_mux_out_anx: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&anx7688_in>;
+				};
+
+				hdmi_mux_out_hdmi: endpoint@1 {
+					reg = <1>;
+					remote-endpoint = <&hdmi_connector_in>;
+				};
+			};
+		};
+	};
+};
+
+&aud_i2s2 {
+	pins1 {
+		pinmux = <MT8173_PIN_128_I2S0_LRCK__FUNC_I2S1_WS>,
+			 <MT8173_PIN_129_I2S0_BCK__FUNC_I2S1_BCK>,
+			 <MT8173_PIN_130_I2S0_MCK__FUNC_I2S1_MCK>,
+			 <MT8173_PIN_131_I2S0_DATA0__FUNC_I2S1_DO_1>,
+			 <MT8173_PIN_12_EINT12__FUNC_I2S2_WS>,
+			 <MT8173_PIN_13_EINT13__FUNC_I2S2_BCK>,
+			 <MT8173_PIN_132_I2S0_DATA1__FUNC_I2S2_DI_2>;
+		bias-pull-down;
+	};
+};
+
+&cpu_thermal {
+	sustainable-power = <4500>; /* milliwatts */
+	trips {
+		threshold: trip-point@0 {
+			temperature = <60000>;
+		};
+
+		target: trip-point@1 {
+			temperature = <65000>;
+		};
+	};
+};
+
+&cros_ec {
+	i2c_tunnel_b: i2c-tunnel@1 {
+		compatible = "google,cros-ec-i2c-tunnel";
+		google,remote-bus = <1>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		anx7688: anx7688@2c {
+			compatible = "analogix,anx7688";
+			status = "okay";
+			reg = <0x2c>;
+
+			port {
+				anx7688_in: endpoint {
+					remote-endpoint = <&hdmi_mux_out_anx>;
+				};
+			};
+		};
+	};
+};
+
+&hdmi0 {
+	ports {
+		port@1 {
+			hdmi0_out: endpoint {
+				remote-endpoint = <&hdmi_mux_in>;
+			};
+		};
+	};
+};
+
+&hdmi_phy {
+	status = "okay";
+	mediatek,ibias = <0xc>;
+};
+
+&i2c_tunnel {
+	/delete-node/thermal@4c;
+};
+
+&i2c0 {
+	/delete-node/audio-codec@57;
+
+	ps8640: edp-bridge@8 {
+		compatible = "parade,ps8640";
+		reg = <0x8>;
+		sleep-gpios = <&pio 127 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
+		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&ps8640_pins>;
+		vdd12-supply = <&ps8640_fixed_1v2>;
+		vdd33-supply = <&mt6397_vgp2_reg>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			ps8640_in: endpoint {
+				remote-endpoint = <&dsi0_out>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+
+			ps8640_out: endpoint {
+				remote-endpoint = <&panel_in>;
+			};
+		};
+	};
+};
+
+&i2c3 {
+	/delete-node/anx7814@72;
+};
+
+&i2c4 {
+	/delete-node/edp-bridge@18;
+};
+
+&gpio_keys {
+	lid {
+		gpios = <&pio 69 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&mmc1 {
+	/delete-property/wp-gpios;
+};
+
+&mmc1_pins_default {
+	/delete-node/pins_wp;
+};
+
+&mt6397_vgp6_reg {
+	regulator-always-on;
+};
+
+&pio {
+	/delete-node/anx7814_pins;
+	/delete-node/rt5514_irq;
+
+	hdmi_mux_pins: hdmi_mux_pins {
+		pins1 {
+			pinmux = <MT8173_PIN_36_DAISYNC__FUNC_GPIO36>;
+		};
+	};
+};
+
+&ps8640_fixed_1v2 {
+	regulator-enable-ramp-delay = <2000>;
+};
+
+&rt5650 {
+	#sound-dai-cells = <1>;
+	realtek,dmic1-data-pin = <2>;
+	realtek,jd-mode = <2>;
+};
+
+&sound {
+	compatible = "mediatek,mt8173-rt5650";
+	mediatek,mclk = <1>;
+	mediatek,audio-codec = <&rt5650 &hdmi0>;
+	codec-capture {
+		sound-dai = <&rt5650 1>;
+	};
+};
+
+&trackpad {
+	vcc-supply = <&mt6397_vgp6_reg>;
+};

@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+config MISC_IPTS
+	tristate "Intel Precise Touch & Stylus"
+	depends on INTEL_MEI
+	help
+	  Say Y here if your system has a touchscreen using Intels
+	  Precise Touch & Stylus (IPTS) technology.
+
+	  If unsure say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ipts.
+
+	  Building this driver alone will not give you a working touchscreen.
+	  It only exposed a userspace API that can be used by a daemon to
+	  receive and process data from the touchscreen hardware.

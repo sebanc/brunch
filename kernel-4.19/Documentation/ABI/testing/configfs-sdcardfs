@@ -1,0 +1,53 @@
+What:		/config/sdcardfs/
+Date:		Nov 2017
+KernelVersion:	--
+Description:	This presents a configfs interface for Android's emulated
+		sdcard layer. It relates the names of packages to their
+		package ids, so that they can be given access to their app
+		specific folders. It also allows you to set information used
+		to track data usage for specific sorts of files by their
+		extension.
+
+		The attributes:
+
+		remove_userid		- Removes an Android user from all
+					package exclude lists
+		packages_gid.list	- Displays the first page worth of
+					packages, for debugging purposes
+
+What:		/config/sdcardfs/<package>/
+Date:		Nov 2017
+KernelVersion:	--
+Description:	This is where package specific information is set. A package
+		is associated with an id, and is accessible only to Android
+		users that are not on the excluded_userids list.
+
+		The attributes:
+
+		appid			- The package's id.
+		excluded_userids	- Write an Android user id here to
+					not have that user see permissions
+					that would indicate that app is
+					installed.
+		clear_userid		- Remove a user from the excluded
+					list
+
+What:		/config/sdcardfs/extensions/
+Date:		Nov 2017
+KernelVersion:	--
+Description:	Configure what extensions have tracked storage. This is done
+		using the quota feature of the underlying filesystem if
+		supported. Create a directory for each group of extensions
+		you wish to track together
+
+What:		/config/sdcardfs/extensions/<group>/
+Date:		Nov 2017
+KernelVersion:	--
+Description:	This group represents a set of extensions whose storage usage
+		are tracked as a unit. Create a directory for every extension
+		you wish to include in the group.
+
+		The attributes:
+
+		ext_gid			- Value to set the gid of files in the
+					lower filesystem with the given gid to

@@ -1,0 +1,14 @@
+ARM Secure Monitor Call based watchdog
+
+Required properties:
+- compatible: must be "arm,smc-watchdog".
+
+Optional properties:
+- timeout-sec: initial watchdog timeout in seconds.
+	If unset, will select maximum possible timeout.
+
+Example:
+	watchdog {
+		compatible = "arm,smc-watchdog";
+		timeout-sec = <15>;
+	};

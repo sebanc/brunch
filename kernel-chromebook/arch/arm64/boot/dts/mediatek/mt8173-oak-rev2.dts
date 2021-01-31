@@ -1,0 +1,197 @@
+/*
+ * Copyright 2015 MediaTek Inc.
+ * Author: Eddie Huang <eddie.huang@mediatek.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+#include "mt8173-oak.dtsi"
+
+/ {
+	model = "Mediatek Oak rev2 board";
+	compatible = "google,oak-rev2", "google,oak", "mediatek,mt8173";
+};
+
+&anx7814 {
+	reset-gpios = <&pio 98 GPIO_ACTIVE_LOW>;
+};
+
+&anx7814_pins {
+	pins1 {
+		pinmux = <MT8173_PIN_33_DAICLK__FUNC_GPIO33>,
+			 <MT8173_PIN_35_DAIPCMOUT__FUNC_GPIO35>,
+			 <MT8173_PIN_36_DAISYNC__FUNC_GPIO36>,
+			 <MT8173_PIN_98_URTS1__FUNC_GPIO98>;
+	};
+};
+
+&aud_i2s2 {
+	pins1 {
+		pinmux = <MT8173_PIN_128_I2S0_LRCK__FUNC_I2S1_WS>,
+			 <MT8173_PIN_129_I2S0_BCK__FUNC_I2S1_BCK>,
+			 <MT8173_PIN_130_I2S0_MCK__FUNC_I2S1_MCK>,
+			 <MT8173_PIN_131_I2S0_DATA0__FUNC_I2S1_DO_1>,
+			 <MT8173_PIN_132_I2S0_DATA1__FUNC_I2S2_DI_2>;
+		bias-pull-down;
+	};
+};
+
+&backlight_lcd {
+	power-supply = <&mt6397_vio18_reg>;
+};
+
+&bl_fixed_reg {
+	status = "disabled";
+};
+
+&cpu0 {
+	operating-points = <
+		507000  859000
+		702000  908000
+		1001000 983000
+		1105000 1009000
+		1183000 1028000
+		1404000 1083000
+	>;
+	sched-energy-costs = <&MT8173_CPU_COST_0 &MT8173_CLUSTER_COST_0>;
+};
+
+&cpu1 {
+	operating-points = <
+		507000  859000
+		702000  908000
+		1001000 983000
+		1105000 1009000
+		1183000 1028000
+		1404000 1083000
+	>;
+	sched-energy-costs = <&MT8173_CPU_COST_0 &MT8173_CLUSTER_COST_0>;
+};
+
+&cpu2 {
+	operating-points = <
+		507000  828000
+		702000  867000
+		1001000 927000
+		1209000 968000
+		1404000 1007000
+		1612000 1049000
+		1807000 1089000
+	>;
+	sched-energy-costs = <&MT8173_CPU_COST_1 &MT8173_CLUSTER_COST_1>;
+};
+
+&cpu3 {
+	operating-points = <
+		507000  828000
+		702000  867000
+		1001000 927000
+		1209000 968000
+		1404000 1007000
+		1612000 1049000
+		1807000 1089000
+	>;
+	sched-energy-costs = <&MT8173_CPU_COST_1 &MT8173_CLUSTER_COST_1>;
+};
+
+&gpio_keys {
+	/delete-property/pinctrl-names;
+	/delete-property/pinctrl-0;
+
+	/delete-node/tablet_mode;
+	/delete-node/volume_down;
+	/delete-node/volume_up;
+};
+
+&gpu {
+	operating-points = <
+		253500 1000000
+		299000 1000000
+		396500 1000000
+		455000 1000000
+		494000 1130000
+	>;
+};
+
+&i2c0 {
+	rt5676: audio-codec@2c {
+		compatible = "realtek,rt5676";
+		reg = <0x2c>;
+		interrupt-parent = <&pio>;
+		interrupts = <2 IRQ_TYPE_EDGE_BOTH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&rt5676_irq>;
+	};
+};
+
+&i2c3 {
+	/delete-node/touchscreen@10;
+};
+
+&mmc1 {
+	/delete-property/wp-gpios;
+};
+
+&mmc1_pins_default {
+	/delete-node/pins_wp;
+};
+
+&mmc3_pins_default {
+	pins_pdn {
+		pinmux = <MT8173_PIN_100_MSDC2_DAT0__FUNC_GPIO100>;
+		output-high;
+	};
+};
+
+&panel {
+	compatible = "innolux,n116bge";
+};
+
+&pio {
+	/delete-node/gpio_keys_node;
+
+	rt5676_irq: rt5676_irq {
+		pins1 {
+			pinmux = <MT8173_PIN_2_EINT2__FUNC_GPIO2>;
+			bias-pull-down;
+		};
+	};
+};
+
+&ps8640_pins {
+	pins1 {
+		pinmux = <MT8173_PIN_92_PCM_CLK__FUNC_GPIO92>,
+			 <MT8173_PIN_115_URTS0__FUNC_GPIO115>,
+			 <MT8173_PIN_116_UCTS0__FUNC_GPIO116>;
+	};
+};
+
+&ps8640 {
+	sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
+};
+
+/delete-node/&rt5514;
+
+/delete-node/&rt5514_irq;
+
+&sdio_fixed_3v3 {
+	gpio = <&pio 100 GPIO_ACTIVE_HIGH>;
+	enable-active-high;
+};
+
+&sound {
+	compatible = "mediatek,mt8173-rt5650-rt5676";
+	mediatek,audio-codec = <&rt5650 &rt5676>;
+};
+
+&trackpad {
+	interrupts = <124 IRQ_TYPE_LEVEL_LOW>;
+};

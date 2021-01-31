@@ -1,0 +1,56 @@
+--- a/src/wl/sys/wl_cfg80211_hybrid.c
++++ b/src/wl/sys/wl_cfg80211_hybrid.c
+@@ -49,8 +49,6 @@ u32 wl_dbg_level = WL_DBG_ERR | WL_DBG_I
+ u32 wl_dbg_level = WL_DBG_ERR;
+ #endif
+ 
+-static s32 wl_cfg80211_change_iface(struct wiphy *wiphy, struct net_device *ndev,
+-           enum nl80211_iftype type, u32 *flags, struct vif_params *params);
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)
+ static s32
+ wl_cfg80211_scan(struct wiphy *wiphy,
+@@ -461,10 +459,15 @@ wl_dev_ioctl(struct net_device *dev, u32
+ 	return err;
+ }
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+ static s32
+ wl_cfg80211_change_iface(struct wiphy *wiphy, struct net_device *ndev,
++                         enum nl80211_iftype type, struct vif_params *params)
++#else
++wl_cfg80211_change_iface(struct wiphy *wiphy, struct net_device *ndev,
+                          enum nl80211_iftype type, u32 *flags,
+    struct vif_params *params)
++#endif
+ {
+ 	struct wl_cfg80211_priv *wl = wiphy_to_wl(wiphy);
+ 	struct wireless_dev *wdev;
+@@ -2364,6 +2367,7 @@ wl_bss_roaming_done(struct wl_cfg80211_p
+ 	memcpy(wl->profile->bssid, &e->addr, ETHER_ADDR_LEN);
+ 	memcpy(&wl->bssid, &e->addr, ETHER_ADDR_LEN);
+ 	wl_update_bss_info(wl);
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+ 	cfg80211_roamed(ndev,
+ #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)
+ 			&wl->conf->channel,	 
+@@ -2371,6 +2375,20 @@ wl_bss_roaming_done(struct wl_cfg80211_p
+ 			(u8 *)&wl->bssid,
+ 			conn_info->req_ie, conn_info->req_ie_len,
+ 			conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
++#else
++	{
++		struct cfg80211_roam_info r = {
++			.channel = &wl->conf->channel,
++			.bssid = (u8 *)&wl->bssid,
++			.req_ie = conn_info->req_ie,
++			.req_ie_len = conn_info->req_ie_len,
++			.resp_ie = conn_info->resp_ie,
++			.resp_ie_len = conn_info->resp_ie_len,
++		};
++		cfg80211_roamed(ndev, &r, GFP_KERNEL);
++
++	}
++#endif
+ 	WL_DBG(("Report roaming result\n"));
+ 
+ 	set_bit(WL_STATUS_CONNECTED, &wl->status);

@@ -1,0 +1,11 @@
+diff -urN a/src/wl/sys/wl_iw.h b/src/wl/sys/wl_iw.h
+--- a/src/wl/sys/wl_iw.h	2013-08-01 09:52:22.000000000 +0300
++++ b/src/wl/sys/wl_iw.h	2013-09-27 09:36:07.808067913 +0300
+@@ -21,6 +21,7 @@
+ #ifndef _wl_iw_h_
+ #define _wl_iw_h_
+ 
++#include <linux/semaphore.h>
+ #include <linux/wireless.h>
+ 
+ #include <typedefs.h>

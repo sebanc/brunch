@@ -243,6 +243,7 @@ Some options can be passed through the kernel command lines to activate specific
 - "rtl8723de": enable this option if you have a rtl8723de wireless card/adapter,
 - "rtl8812au": enable this option if you have a rtl8812au wireless card/adapter,
 - "rtl8821ce": enable this option if you have a rtl8821ce wireless card/adapter,
+- "rtl8821cu": enable this option if you have a rtl8821cu wireless card/adapter,
 - "rtl88x2bu": enable this option if you have a rtl88x2bu wireless card/adapter,
 - "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
 - "ipts": enable support for Surface devices touchscreen with kernel 5.4 / 5.10 (thanks go to the linux-surface team, especially StollD)
@@ -315,8 +316,6 @@ If you chose to use the "enable_updates" option and have updated to a new Chrome
 sudo chromeos-update -f < path to the Brunch release archive >
 ```
 4. Restart ChromeOS
-
-*WARNING*: Do not update brunch with unfinished OTA update as it may make chromeOS unbootable.
 
 ## Modify the GRUB configuration
 

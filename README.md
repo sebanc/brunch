@@ -254,7 +254,7 @@ Some options can be passed through the kernel command lines to activate specific
 - "internal_mic_fix": allows to forcefully enable internal mic on some devices,
 - "asus_c302": applies asus c302 specific firmwares and fixes,
 - "baytrail_chromebook": applies baytrail chromebooks specific audio fixes,
-- "sysfs_tablet_mode": allow to control tablet mode from sysfs (`echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to acivate it or use 0 to disable it),
+- "sysfs_tablet_mode": allow to control tablet mode from sysfs (`echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to activate it or use 0 to disable it),
 - "force_tablet_mode": same as above except tablet mode is enabled by default on boot,
 - "suspend_s3": disable suspend to idle (S0ix) and use S3 suspend instead,
 - "advanced_als": default ChromeOS auto-brightness is very basic (https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md). This option activates more auto-brightness levels (based on the Google Pixel Slate implementation).

@@ -14,7 +14,7 @@ It is therefore highly recommended to only use this framework on a device which 
 Hardware support is highly dependent on the general Linux kernel hardware compatibility. As such only Linux supported hardware will work and the same specific kernel command line options recommended for your device should be passed through the GRUB bootloader (see "Modify the GRUB bootloader" section).
 
 Base hardware compatibility:
-- x86_64 computers with UEFI boot support,
+- x86_64 computers with UEFI boot support (BIOS/MBR devices have limited support through a specific procedure detailled in "Limited support for MBR/BIOS devices" section),
 - Intel hardware (CPU and GPU) starting from 1st generation "Nehalem" (refer to https://en.wikipedia.org/wiki/Intel_Core),
 - AMD Ryzen 3XXX (CPU and GPU), only with "zork" recovery image (newer Ryzen models are not yet supported),
 - AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU are not supported),
@@ -24,8 +24,6 @@ Notes:
 - Intel Gen 1 graphics do not work with ChromeOS versions above r81 (it might still change with a future ChromeOS update).
 - Some Intel 10th Gen devices do not seem to be compatible with the android container.
 - Intel 11th Gen devices are not supported for now.
-
-Specific procedure for BIOS/MBR devices: Follow the same procedure as described below but after extracting the brunch release, extract in the same folder the "mbr_suport.tar.gz" package that you will find in this branch (master).
 
 Specific hardware support:
 - sensors: an experimental patch aims to allow intel ISH accelerometer and light sensors through a custom kernel module,
@@ -227,6 +225,20 @@ sudo chromeos-install -dst < your HDD device. e.g. /dev/sdX >
 Note: Even if you boot from GRUB on your HDD, if you have a ChromeOS USB flash drive / SD card inserted, the initramfs will boot from it in priority.
 
 The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS.
+
+## Limited support for MBR/BIOS devices
+
+The mbr_support.tar.gz patch present in the this branch (master) allows booting Brunch on BIOS/MBR devices with a few limitations:
+- Brunch can only be installed from linux.
+- The dual boot method is not supported.
+
+Installation procedure:
+1) Verify that your device cpu/gpu is supported according to the "base hardware compatibility" requirements.
+2) Verify that `pv`, `tar`,`cgpt` and `sgdisk` packages/binaries are installed.
+3) Extract the brunch release archive to your working directory.
+4) Extract the mbr_support.tar.gz patch present in the this branch (master) of the Brunch repo in the same directory (overwriting files when requested)
+5) Download the ChromeOS recovery image and extract it.
+6) Follow the linux "Install ChromeOS on a USB flash drive / SD card / HDD (full disk install / single boot)" instructions from step 5.
 
 # Optional steps
 

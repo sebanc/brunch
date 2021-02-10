@@ -6,6 +6,9 @@ First of all, thanks goes to project Croissant, the swtpm maintainer and the Chr
 
 The purpose of the Brunch framework is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
 
+**Attention: It is recommended to install Chrome OS on an EXT4 partition on an SSD (solid state drives) for system stability. Support MAY NOT be provided if Chrome OS is run on a hard drive (HDD) or a thumb drive (USB).
+Reason: Chrome OS is designed to only run on SSDs or NVMes. Many critical features (Android apps for example) will BREAK when executing this software on a portable USB or an HDD (hard disk drive) or any slower storage technologies, as you will generally log in before such features finish preloading.
+
 **Warning: As Brunch is not the intended way for ChromeOS to work, at some point a ChromeOS script could potentially behave badly with Brunch and delete data unexpectedly (even on non-ChromeOS partitions). Also, ChromeOS recovery images include device firmware updates that a close enough device might potentially accept and get flashed with the wrong firmware. By installing Brunch you agree to take those risks and I cannot be held responsible for anything bad that would happen to your device including data loss.
 It is therefore highly recommended to only use this framework on a device which does not contain any sensitive data and to keep non-sensitive data synced with a cloud service.**
 

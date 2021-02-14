@@ -164,7 +164,7 @@ cd /mnt/c/Users/< username >/Downloads/
 ```
 sudo tar zxvf brunch_< version >.tar.gz
 ```
-7. Make sure you have at least 14gb of free space available
+7. Make sure you have at least 14GB of free space available
 8. Create a ChromeOS image:
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst chromeos.img
@@ -184,33 +184,22 @@ sudo resize-data
 
 ### Dual Boot ChromeOS from your HDD
 
-1. Make sure you have a NTFS partition with at least 14gb of free space available and no BitLocker encryption or create one (refer to online resources).
-2. Make a ChromeOS USB flashdrive / SD card (see above) and boot it.
-3. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite).
-4. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
+1. Make sure you have a NTFS partition with at least 14GB of free space available and no BitLocker encryption or create one (refer to online resources).
+2. Follow step 1-7 on *Install ChromeOS on a USB flash drive / SD card* chapter.
+3. Assuming you are in a WSL terminal now, create a ChromeOS image:
 ```
-mkdir -p ~/tmpmount
-sudo mount < the destination partition (ext4 or ntfs) which will contain the disk image > ~/tmpmount
+sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst /mnt/< disk drive you want to install to >/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
-5. Create the ChromeOS disk image:
-```
-sudo bash chromeos-install -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
-```
-6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C).
-7. Run `sudo nano ~/tmpmount/chromeos.grub.txt` and paste the config there (CTRL°SHIFT+V to paste and then CTRL-X to exit)
-8. Unmount the destination partition
-```
-sudo umount ~/tmpmount
-```
-9. Reboot to Windows, Install grub 2 win (https://sourceforge.net/projects/grub2win/) and launch the application.
-10. Click on `Manage Boot Menu` button, then `Add A New Entry`.
-11. Select `submenu` in the 'Type' section and input "Chrome OS" as title.
-12. Now, click `Edit Custom Code` this will open a text file. Open the chromeos.grub.txt file we saved in step 7 and copy the grub configuration in grub2win.
-#### Then remove the "rmmod tpm" line.
-13. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
-14. Important: Disable "Fast startup" in Windows (refer to online resources).
-15. Reboot.
-16. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient. You should be greeted by ChromeOS startup screen once the process completes.
+4. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C).
+5. Install grub 2 win (https://sourceforge.net/projects/grub2win/) and launch the application.
+6. Click on `Manage Boot Menu` button, then `Add A New Entry`.
+7. Select `submenu` in the 'Type' section and input "Chrome OS" as title.
+8. Now, click `Edit Custom Code` this will open a text file. Paste the GRUB configuration in grub2win.
+9. **Then remove the "rmmod tpm" line.**
+10. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
+11. Important: Disable "Fast startup" in Windows (refer to online resources).
+12. Reboot.
+13. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient. You should be greeted by ChromeOS startup screen once the process completes.
 You can now start using ChromeOS from your HDD.
 
 ## Install ChromeOS on HDD from ChromeOS

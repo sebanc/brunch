@@ -2,7 +2,7 @@
 
 ## Overview
 
-First of all, thanks goes to [project Croissant](https://github.com/imperador/chromefy), the swtpm maintainer and the [Chromebrew framework](https://github.com/skycocker/chromebrew) for their work which was actively used when creating this project.
+First of all, thanks goes to [project Croissant](https://github.com/imperador/chromefy), the [swtpm maintainer](https://github.com/stefanberger/swtpm) and the [Chromebrew framework](https://github.com/skycocker/chromebrew) for their work which was actively used when creating this project.
 
 The purpose of the Brunch framework is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
 

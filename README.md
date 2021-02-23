@@ -246,7 +246,7 @@ Installation procedure:
 
 Some options can be passed through the kernel command lines to activate specific features which might be dangerous or not work from everyone:
 - "enable_updates": allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
-- "android_init_fix": alternative init to support devices on which the android container fails to start with the standard init.
+- "android_init_fix": alternative init to support devices on which the android container fails to start with the standard init,
 - "mount_internal_drives": allows automatic mounting of HDD partitions in ChromeOS (android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data), partition label will be used if it exists,
 - "broadcom_wl": enable this option if you need the broadcom_wl module,
 - "iwlwifi_backport": enable this option if your intel wireless card is not supported natively in the kernel,
@@ -254,11 +254,13 @@ Some options can be passed through the kernel command lines to activate specific
 - "rtl8723bu": enable this option if you have a rtl8723bu wireless card/adapter,
 - "rtl8723de": enable this option if you have a rtl8723de wireless card/adapter,
 - "rtl8812au": enable this option if you have a rtl8812au wireless card/adapter,
+- "rtl8814au": enable this option if you have a rtl8814au wireless card/adapter,
 - "rtl8821ce": enable this option if you have a rtl8821ce wireless card/adapter,
 - "rtl8821cu": enable this option if you have a rtl8821cu wireless card/adapter,
 - "rtl88x2bu": enable this option if you have a rtl88x2bu wireless card/adapter,
 - "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
-- "ipts": enable support for Surface devices touchscreen with kernel 5.4 / 5.10 (thanks go to the linux-surface team, especially StollD)
+- "ipts": enable support for Surface devices touchscreen with kernel 5.4 / 5.10 (thanks go to the linux-surface team, especially StollD),
+- "oled_display": enable this option if you have an oled display (use with kernel 5.10),
 - "acpi_power_button": try this option if long pressing the power button does not display the power menu,
 - "alt_touchpad_config": try this option if you have touchpad issues,
 - "alt_touchpad_config2": another option to try if you have touchpad issues,

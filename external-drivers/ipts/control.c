@@ -13,8 +13,8 @@
 #include "resources.h"
 #include "uapi.h"
 
-int ipts_control_send(struct ipts_context *ipts,
-		u32 code, void *payload, size_t size)
+int ipts_control_send(struct ipts_context *ipts, u32 code, void *payload,
+		      size_t size)
 {
 	int ret;
 	struct ipts_command cmd;
@@ -59,6 +59,10 @@ int ipts_control_stop(struct ipts_context *ipts)
 
 	ipts_uapi_unlink();
 	ipts_resources_free(ipts);
+
+	if (!mei_cldev_enabled(ipts->cldev))
+		return 0;
+
 	return ipts_control_send(ipts, IPTS_CMD_CLEAR_MEM_WINDOW, NULL, 0);
 }
 
@@ -70,4 +74,3 @@ int ipts_control_restart(struct ipts_context *ipts)
 	ipts->restart = true;
 	return ipts_control_stop(ipts);
 }
-

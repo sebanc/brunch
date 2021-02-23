@@ -36,7 +36,6 @@
  */
 #define TP_RECALIB		0x51	/* Recalibrate */
 #define TP_POWER_DOWN		0x44	/* Can only be undone through HW reset */
-#define TP_ELAN_POWER_UP	0xBB
 #define TP_EXT_DEV		0x21	/* Determines if external device is connected (RO) */
 #define TP_EXT_BTN		0x4B	/* Read extended button status */
 #define TP_POR			0x7F	/* Execute Power on Reset */
@@ -111,6 +110,7 @@
 					   external device will be forced to 1 */
 #define TP_MASK_EXT_TAG			0x04
 #define TP_TOGGLE_ELAN_SLEEP	0x8
+
 
 /* Power on Self Test Results */
 #define TP_POR_SUCCESS		0x3B

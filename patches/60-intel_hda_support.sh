@@ -16,6 +16,11 @@ ret=0
 
 if [ ! "$(ls /roota/etc/modprobe.d | grep 'alsa-.*\.conf' | wc -l)" -eq 0 ]; then rm /roota/etc/modprobe.d/alsa-*.conf; fi
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
-if [ "$disable_intel_hda" -eq 1 ]; then echo "blacklist snd_hda_intel" > /roota/etc/modprobe.d/alsa-hda.conf; fi
+cat >/roota/etc/modprobe.d/alsa-order.conf <<SNDCARDORDER
+options snd-hda-intel id=HDMI index=1
+options snd-hdmi-lpe-audio index=1
+SNDCARDORDER
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
+if [ "$disable_intel_hda" -eq 1 ]; then echo "blacklist snd_hda_intel" > /roota/etc/modprobe.d/alsa-hda.conf; fi
+if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 exit $ret

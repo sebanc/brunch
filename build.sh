@@ -150,6 +150,17 @@ fi
 
 if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
 
+cp -r ./external-drivers/rtl8814au ./chroot/tmp/
+cd ./chroot/tmp/rtl8814au
+make -j$(($(nproc)-1)) modules
+cp ./8814au.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl8814au.ko
+cd ../../..
+rm -r ./chroot/tmp/rtl8814au
+
+fi
+
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
+
 cp -r ./external-drivers/rtl8821ce ./chroot/tmp/
 cd ./chroot/tmp/rtl8821ce
 make -j$(($(nproc)-1)) modules
@@ -214,21 +225,17 @@ rm -r ./chroot/tmp/ipts
 
 fi
 
-#cp -r ./external-drivers/mbp2018-bridge ./chroot/tmp/
-#cd ./chroot/tmp/mbp2018-bridge
-#make -j$(($(nproc)-1))
-#cp ./bce.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/bce.ko
-#cd ../../..
-#rm -r ./chroot/tmp/mbp2018-bridge
+if [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
 
-#cp -r ./external-drivers/mbp2018-spi ./chroot/tmp/
-#cd ./chroot/tmp/mbp2018-spi
-#make -j$(($(nproc)-1))
-#cp ./apple-ibridge.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/apple-ibridge.ko
-#cp ./apple-ib-tb.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/apple-ib-tb.ko
-#cp ./apple-ib-als.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/apple-ib-als.ko
-#cd ../../..
-#rm -r ./chroot/tmp/mbp2018-spi
+cd ./chroot/tmp/kernel
+patch -p1 --no-backup-if-mismatch -N < ../../../external-drivers/oled/oled-"$kernel".patch
+if [ "$kernel" == "5.4" ]; then cec="drivers/media/cec/cec.ko"; else cec="drivers/media/cec/core/cec.ko"; fi
+make -j$(($(nproc)-1)) O=out drivers/acpi/video.ko drivers/char/agp/intel-gtt.ko drivers/gpu/drm/drm.ko drivers/gpu/drm/drm_kms_helper.ko drivers/gpu/drm/i915/i915.ko drivers/i2c/algos/i2c-algo-bit.ko "$cec"
+cp ./out/drivers/gpu/drm/drm_kms_helper.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/drm_kms_helper-oled.ko
+cp ./out/drivers/gpu/drm/i915/i915.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/i915-oled.ko
+cd ../../..
+
+fi
 
 fi
 
@@ -240,8 +247,9 @@ rm -r ./chroot/tmp/kernel
 
 done
 
-mkdir -p ./chroot/home/chronos/rootc/lib ./chroot/home/chronos/rootc/usr/share/alsa
-cp -r ./alsa-ucm-mods ./chroot/home/chronos/rootc/usr/share/alsa/ucm
+mkdir -p ./chroot/home/chronos/rootc/usr/share
+cp -r ./alsa-ucm-mods ./chroot/home/chronos/rootc/usr/share/alsa
+mkdir -p ./chroot/home/chronos/rootc/lib
 cd ./chroot/home/chronos/rootc/lib
 git clone --depth=1 -b master git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git firmware
 cd ./firmware
@@ -254,6 +262,8 @@ rm -rf ./netronome
 rm -rf ./qcom
 rm -rf ./qed
 rm -rf ./ti-connectivity
+curl -L https://git.kernel.org/pub/scm/linux/kernel/git/sforshee/wireless-regdb.git/plain/regulatory.db -o ./regulatory.db
+curl -L https://git.kernel.org/pub/scm/linux/kernel/git/sforshee/wireless-regdb.git/plain/regulatory.db.p7s -o ./regulatory.db.p7s
 cd ../../../../../..
 cp -r ./firmware-mods/* ./chroot/home/chronos/rootc/lib/firmware/
 chown -R 1000:1000 ./chroot/home/chronos/rootc

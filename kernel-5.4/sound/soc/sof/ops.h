@@ -37,6 +37,14 @@ static inline int snd_sof_remove(struct snd_sof_dev *sdev)
 	return 0;
 }
 
+static inline int snd_sof_shutdown(struct snd_sof_dev *sdev)
+{
+	if (sof_ops(sdev)->shutdown)
+		return sof_ops(sdev)->shutdown(sdev);
+
+	return 0;
+}
+
 /* control */
 
 /*
@@ -198,11 +206,16 @@ static inline int
 snd_sof_dsp_set_power_state(struct snd_sof_dev *sdev,
 			    const struct sof_dsp_power_state *target_state)
 {
-	if (sof_ops(sdev)->set_power_state)
-		return sof_ops(sdev)->set_power_state(sdev, target_state);
+	int ret = 0;
 
-	/* D0 substate is not supported, do nothing here. */
-	return 0;
+	mutex_lock(&sdev->power_state_access);
+
+	if (sof_ops(sdev)->set_power_state)
+		ret = sof_ops(sdev)->set_power_state(sdev, target_state);
+
+	mutex_unlock(&sdev->power_state_access);
+
+	return ret;
 }
 
 /* debug */

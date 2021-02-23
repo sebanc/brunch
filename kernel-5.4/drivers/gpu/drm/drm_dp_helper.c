@@ -1794,8 +1794,6 @@ static const struct dpcd_quirk dpcd_quirk_list[] = {
 	{ OUI(0x00, 0x10, 0xfa), DEVICE_ID_ANY, false, BIT(DP_DPCD_QUIRK_NO_PSR) },
 	/* CH7511 seems to leave SINK_COUNT zeroed */
 	{ OUI(0x00, 0x00, 0x00), DEVICE_ID('C', 'H', '7', '5', '1', '1'), false, BIT(DP_DPCD_QUIRK_NO_SINK_COUNT) },
-	/* Samsung eDP panel */
-	{ OUI(0xba, 0x41, 0x59), DEVICE_ID_ANY, false, BIT(DP_DPCD_QUIRK_CUSTOMIZE_BRIGHTNESS_CONTROL) },
 	/* Synaptics DP1.4 MST hubs can support DSC without virtual DPCD */
 	{ OUI(0x90, 0xCC, 0x24), DEVICE_ID_ANY, true, BIT(DP_DPCD_QUIRK_DSC_WITHOUT_VIRTUAL_DPCD) },
 };
@@ -1811,7 +1809,7 @@ static const struct dpcd_quirk dpcd_quirk_list[] = {
  * to device identification string and hardware/firmware revisions later.
  */
 static u32
-drm_dp_get_quirks(const struct drm_dp_dpcd_ident *ident, bool is_branch, u8 *tcon_cap)
+drm_dp_get_quirks(const struct drm_dp_dpcd_ident *ident, bool is_branch)
 {
 	const struct dpcd_quirk *quirk;
 	u32 quirks = 0;
@@ -1829,11 +1827,6 @@ drm_dp_get_quirks(const struct drm_dp_dpcd_ident *ident, bool is_branch, u8 *tco
 
 		if (memcmp(quirk->device_id, any_device, sizeof(any_device)) != 0 &&
 		    memcmp(quirk->device_id, ident->device_id, sizeof(ident->device_id)) != 0)
-			continue;
-
-		if (quirk->quirks == DP_DPCD_QUIRK_CUSTOMIZE_BRIGHTNESS_CONTROL &&
-		    (!(tcon_cap[1] & DP_BRIGHTNESS_CONTROL_NITS) ||
-		    !(tcon_cap[2] & DP_BRIGHTNESS_CONTROL_BY_AUX)))
 			continue;
 
 		quirks |= quirk->quirks;
@@ -1941,19 +1934,12 @@ int drm_dp_read_desc(struct drm_dp_aux *aux, struct drm_dp_desc *desc,
 	struct drm_dp_dpcd_ident *ident = &desc->ident;
 	unsigned int offset = is_branch ? DP_BRANCH_OUI : DP_SINK_OUI;
 	int ret, dev_id_len;
-	u8 tcon_cap[4] = {0};
 
 	ret = drm_dp_dpcd_read(aux, offset, ident, sizeof(*ident));
 	if (ret < 0)
 		return ret;
 
-	if (offset == DP_SINK_OUI) {
-		ret = drm_dp_dpcd_read(aux, DP_EDP_TCON_CAPABILITY_BYTE0, tcon_cap, sizeof(tcon_cap));
-		if (ret < 0)
-			return ret;
-	}
-
-	desc->quirks = drm_dp_get_quirks(ident, is_branch, tcon_cap);
+	desc->quirks = drm_dp_get_quirks(ident, is_branch);
 
 	dev_id_len = strnlen(ident->device_id, sizeof(ident->device_id));
 

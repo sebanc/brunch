@@ -407,38 +407,6 @@ static void trackpoint_cleanup(struct psmouse *psmouse)
 	}
 }
 
-static int trackpoint_inhibit(struct psmouse *psmouse)
-{
-	struct trackpoint_data *tp = psmouse->private;
-	u8 param[1] = { TP_POWER_DOWN };
-
-	if (tp->variant_id == TP_VARIANT_ELAN) {
-		if (ps2_command(&psmouse->ps2dev, param,
-				MAKE_PS2_CMD(1, 0, TP_COMMAND))) {
-			psmouse_err(psmouse,
-				    "failed to inhibit trackpoint.\n");
-			return -1;
-		}
-	}
-	return 0;
-}
-
-static int trackpoint_uninhibit(struct psmouse *psmouse)
-{
-	struct trackpoint_data *tp = psmouse->private;
-	u8 param[1] = { TP_ELAN_POWER_UP };
-
-	if (tp->variant_id == TP_VARIANT_ELAN) {
-		if (ps2_command(&psmouse->ps2dev, param,
-				MAKE_PS2_CMD(1, 0, TP_COMMAND))) {
-			psmouse_err(psmouse,
-				    "failed to uninhibit trackpoint.\n");
-			return -1;
-		}
-	}
-	return 0;
-}
-
 int trackpoint_detect(struct psmouse *psmouse, bool set_properties)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
@@ -472,8 +440,6 @@ int trackpoint_detect(struct psmouse *psmouse, bool set_properties)
 	psmouse->disconnect = trackpoint_disconnect;
 
 	psmouse->cleanup = trackpoint_cleanup;
-	psmouse->inhibit = trackpoint_inhibit;
-	psmouse->uninhibit = trackpoint_uninhibit;
 
 	if (variant_id != TP_VARIANT_IBM) {
 		/* Newer variants do not support extended button query. */

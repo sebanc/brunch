@@ -30,6 +30,9 @@
 #include <linux/kthread.h>
 #include <linux/netdevice.h>
 #include <linux/ieee80211.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#include <linux/sched/signal.h>
+#endif
 #include <net/cfg80211.h>
 #include <linux/nl80211.h>
 #include <net/rtnetlink.h>
@@ -44,15 +47,18 @@
 #define EVENT_FLAGS(e) dtoh16((e)->flags)
 #define EVENT_STATUS(e) dtoh32((e)->status)
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0)
-#define get_ds() (KERNEL_DS)
-#endif
 #ifdef BCMDBG
 u32 wl_dbg_level = WL_DBG_ERR | WL_DBG_INFO;
 #else
 u32 wl_dbg_level = WL_DBG_ERR;
 #endif
 
+static s32 wl_cfg80211_change_iface(struct wiphy *wiphy, struct net_device *ndev,
+           enum nl80211_iftype type,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+           u32 *flags,
+#endif
+	   struct vif_params *params);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)
 static s32
 wl_cfg80211_scan(struct wiphy *wiphy,
@@ -238,7 +244,7 @@ static s8 wl_dbg_estr[][WL_DBG_ESTR_MAX] = {
 #endif				
 
 #define CHAN2G(_channel, _freq, _flags) {			\
-	.band			= NL80211_BAND_2GHZ,		\
+	.band			= IEEE80211_BAND_2GHZ,		\
 	.center_freq		= (_freq),			\
 	.hw_value		= (_channel),			\
 	.flags			= (_flags),			\
@@ -247,7 +253,7 @@ static s8 wl_dbg_estr[][WL_DBG_ESTR_MAX] = {
 }
 
 #define CHAN5G(_channel, _flags) {				\
-	.band			= NL80211_BAND_5GHZ,		\
+	.band			= IEEE80211_BAND_5GHZ,		\
 	.center_freq		= 5000 + (5 * (_channel)),	\
 	.hw_value		= (_channel),			\
 	.flags			= (_flags),			\
@@ -381,7 +387,7 @@ static struct ieee80211_channel __wl_5ghz_n_channels[] = {
 };
 
 static struct ieee80211_supported_band __wl_band_2ghz = {
-	.band = NL80211_BAND_2GHZ,
+	.band = IEEE80211_BAND_2GHZ,
 	.channels = __wl_2ghz_channels,
 	.n_channels = ARRAY_SIZE(__wl_2ghz_channels),
 	.bitrates = wl_g_rates,
@@ -389,7 +395,7 @@ static struct ieee80211_supported_band __wl_band_2ghz = {
 };
 
 static struct ieee80211_supported_band __wl_band_5ghz_a = {
-	.band = NL80211_BAND_5GHZ,
+	.band = IEEE80211_BAND_5GHZ,
 	.channels = __wl_5ghz_a_channels,
 	.n_channels = ARRAY_SIZE(__wl_5ghz_a_channels),
 	.bitrates = wl_a_rates,
@@ -397,7 +403,7 @@ static struct ieee80211_supported_band __wl_band_5ghz_a = {
 };
 
 static struct ieee80211_supported_band __wl_band_5ghz_n = {
-	.band = NL80211_BAND_5GHZ,
+	.band = IEEE80211_BAND_5GHZ,
 	.channels = __wl_5ghz_n_channels,
 	.n_channels = ARRAY_SIZE(__wl_5ghz_n_channels),
 	.bitrates = wl_a_rates,
@@ -441,15 +447,13 @@ wl_dev_ioctl(struct net_device *dev, u32 cmd, void *arg, u32 len)
 	return wlc_ioctl_internal(dev, cmd, arg, len);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 static s32
 wl_cfg80211_change_iface(struct wiphy *wiphy, struct net_device *ndev,
-                         enum nl80211_iftype type, struct vif_params *params)
-#else
-wl_cfg80211_change_iface(struct wiphy *wiphy, struct net_device *ndev,
-                         enum nl80211_iftype type, u32 *flags,
-   struct vif_params *params)
+                         enum nl80211_iftype type,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+                         u32 *flags,
 #endif
+                         struct vif_params *params)
 {
 	struct wl_cfg80211_priv *wl = wiphy_to_wl(wiphy);
 	struct wireless_dev *wdev;
@@ -786,6 +790,7 @@ wl_set_auth_type(struct net_device *dev, struct cfg80211_connect_params *sme)
 		break;
 	case NL80211_AUTHTYPE_NETWORK_EAP:
 		WL_DBG(("network eap\n"));
+		// fallthrough
 	default:
 		val = 2;
 		WL_ERR(("invalid auth type (%d)\n", sme->auth_type));
@@ -1861,8 +1866,8 @@ static s32 wl_alloc_wdev(struct device *dev, struct wireless_dev **rwdev)
 	wdev->wiphy->max_num_pmkids = WL_NUM_PMKIDS_MAX;
 #endif
 	wdev->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_ADHOC);
-	wdev->wiphy->bands[NL80211_BAND_2GHZ] = &__wl_band_2ghz;
-	wdev->wiphy->bands[NL80211_BAND_5GHZ] = &__wl_band_5ghz_a; 
+	wdev->wiphy->bands[IEEE80211_BAND_2GHZ] = &__wl_band_2ghz;
+	wdev->wiphy->bands[IEEE80211_BAND_5GHZ] = &__wl_band_5ghz_a; 
 	wdev->wiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
 	wdev->wiphy->cipher_suites = __wl_cipher_suites;
 	wdev->wiphy->n_cipher_suites = ARRAY_SIZE(__wl_cipher_suites);
@@ -1953,7 +1958,7 @@ static s32 wl_inform_single_bss(struct wl_cfg80211_priv *wl, struct wl_bss_info 
 
 	if (dtoh32(bi->length) > WL_BSS_INFO_MAX) {
 		WL_DBG(("Beacon is larger than buffer. Discarding\n"));
-		return err;
+		return -E2BIG;
 	}
 	notif_bss_info = kzalloc(sizeof(*notif_bss_info) + sizeof(*mgmt) - sizeof(u8) +
 	                         WL_BSS_INFO_MAX, GFP_KERNEL);
@@ -1977,28 +1982,34 @@ static s32 wl_inform_single_bss(struct wl_cfg80211_priv *wl, struct wl_bss_info 
 	beacon_proberesp->capab_info = cpu_to_le16(bi->capability);
 	wl_rst_ie(wl);
 
-	wl_mrg_ie(wl, ((u8 *) bi) + bi->ie_offset, bi->ie_length);
-	wl_cp_ie(wl, beacon_proberesp->variable, WL_BSS_INFO_MAX -
+	err = wl_mrg_ie(wl, ((u8 *) bi) + bi->ie_offset, bi->ie_length);
+	if (err)
+		goto inform_single_bss_out;
+
+	err = wl_cp_ie(wl, beacon_proberesp->variable, WL_BSS_INFO_MAX -
 	         offsetof(struct wl_cfg80211_bss_info, frame_buf));
+	if (err)
+		goto inform_single_bss_out;
+
 	notif_bss_info->frame_len = offsetof(struct ieee80211_mgmt, u.beacon.variable) +
 	                            wl_get_ielen(wl);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	freq = ieee80211_channel_to_frequency(notif_bss_info->channel,
 		(notif_bss_info->channel <= CH_MAX_2G_CHANNEL) ?
-		NL80211_BAND_2GHZ : NL80211_BAND_5GHZ);
+		IEEE80211_BAND_2GHZ : IEEE80211_BAND_5GHZ);
 #else
 	freq = ieee80211_channel_to_frequency(notif_bss_info->channel);
 #endif
 	if (freq == 0) {
 		WL_ERR(("Invalid channel, fail to chcnage channel to freq\n"));
-		kfree(notif_bss_info);
-		return -EINVAL;
+		err = -EINVAL;
+		goto inform_single_bss_out;
 	}
 	channel = ieee80211_get_channel(wiphy, freq);
 	if (unlikely(!channel)) {
 		WL_ERR(("ieee80211_get_channel error\n"));
-		kfree(notif_bss_info);
-		return -EINVAL;
+		err = -EINVAL;
+		goto inform_single_bss_out;
 	}
 
 	WL_DBG(("SSID : \"%s\", rssi %d, channel %d, capability : 0x04%x, bssid %pM\n",
@@ -2006,28 +2017,37 @@ static s32 wl_inform_single_bss(struct wl_cfg80211_priv *wl, struct wl_bss_info 
 		mgmt->u.beacon.capab_info, &bi->BSSID));
 
 	signal = notif_bss_info->rssi * 100;
-	cbss = cfg80211_inform_bss_frame(wiphy, channel, mgmt,
-	    le16_to_cpu(notif_bss_info->frame_len), signal, GFP_KERNEL);
-	if (unlikely(!cbss)) {
-		WL_ERR(("cfg80211_inform_bss_frame error\n"));
-		kfree(notif_bss_info);
-		return -EINVAL;
-	}
 
-	notify_ie = (u8 *)bi + le16_to_cpu(bi->ie_offset);
-	notify_ielen = le32_to_cpu(bi->ie_length);
+	if (!wl->scan_request) {
+		cbss = cfg80211_inform_bss_frame(wiphy, channel, mgmt,
+			le16_to_cpu(notif_bss_info->frame_len), signal, GFP_KERNEL);
+		if (unlikely(!cbss)) {
+			WL_ERR(("cfg80211_inform_bss_frame error\n"));
+			err = -ENOMEM;
+			goto inform_single_bss_out;
+		}
+	} else {
+		notify_ie = (u8 *)bi + le16_to_cpu(bi->ie_offset);
+		notify_ielen = le32_to_cpu(bi->ie_length);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 18, 0)
-	cbss = cfg80211_inform_bss(wiphy, channel, (const u8 *)(bi->BSSID.octet),
-		0, beacon_proberesp->capab_info, beacon_proberesp->beacon_int,
-		(const u8 *)notify_ie, notify_ielen, signal, GFP_KERNEL);
+		cbss = cfg80211_inform_bss(wiphy, channel, (const u8 *)(bi->BSSID.octet),
+			0, beacon_proberesp->capab_info, beacon_proberesp->beacon_int,
+			(const u8 *)notify_ie, notify_ielen, signal, GFP_KERNEL);
 #else
-	cbss = cfg80211_inform_bss(wiphy, channel, CFG80211_BSS_FTYPE_UNKNOWN, (const u8 *)(bi->BSSID.octet),
-		0, beacon_proberesp->capab_info, beacon_proberesp->beacon_int,
-		(const u8 *)notify_ie, notify_ielen, signal, GFP_KERNEL);
+		cbss = cfg80211_inform_bss(wiphy, channel,
+				wl->active_scan ?
+				CFG80211_BSS_FTYPE_PRESP : CFG80211_BSS_FTYPE_BEACON,
+				(const u8 *)(bi->BSSID.octet), 0,
+				beacon_proberesp->capab_info,
+				beacon_proberesp->beacon_int,
+				(const u8 *)notify_ie, notify_ielen, signal, GFP_KERNEL);
 #endif
-
-	if (unlikely(!cbss))
-		return -ENOMEM;
+		if (unlikely(!cbss)) {
+			WL_ERR(("cfg80211_inform_bss error\n"));
+			err = -ENOMEM;
+			goto inform_single_bss_out;
+		}
+	}
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)
 	cfg80211_put_bss(wiphy, cbss);
@@ -2035,6 +2055,7 @@ static s32 wl_inform_single_bss(struct wl_cfg80211_priv *wl, struct wl_bss_info 
 	cfg80211_put_bss(cbss);
 #endif
 
+inform_single_bss_out:
 	kfree(notif_bss_info);
 
 	return err;
@@ -2101,7 +2122,7 @@ wl_notify_connect_status(struct wl_cfg80211_priv *wl, struct net_device *ndev,
 				return err;
 			}
 			chan = wf_chspec_ctlchan(chanspec);
-			band = (chan <= CH_MAX_2G_CHANNEL) ? NL80211_BAND_2GHZ : NL80211_BAND_5GHZ;
+			band = (chan <= CH_MAX_2G_CHANNEL) ? IEEE80211_BAND_2GHZ : IEEE80211_BAND_5GHZ;
 			freq = ieee80211_channel_to_frequency(chan, band);
 			channel = ieee80211_get_channel(wiphy, freq);
 			cfg80211_ibss_joined(ndev, (u8 *)&wl->bssid, channel, GFP_KERNEL);
@@ -2235,10 +2256,10 @@ static void wl_ch_to_chanspec(struct ieee80211_channel *chan, struct wl_join_par
 		join_params->params.chanspec_list[0] =
 		    ieee80211_frequency_to_channel(chan->center_freq);
 
-		if (chan->band == NL80211_BAND_2GHZ) {
+		if (chan->band == IEEE80211_BAND_2GHZ) {
 			chanspec |= WL_CHANSPEC_BAND_2G;
 		}
-		else if (chan->band == NL80211_BAND_5GHZ) {
+		else if (chan->band == IEEE80211_BAND_5GHZ) {
 			chanspec |= WL_CHANSPEC_BAND_5G;
 		}
 		else {
@@ -2301,6 +2322,9 @@ static s32 wl_update_bss_info(struct wl_cfg80211_priv *wl)
 		if (err)
 			goto update_bss_info_out;
 
+		bss = cfg80211_get_bss(wl_to_wiphy(wl), NULL, (s8 *)&wl->bssid,
+		      ssid->SSID, ssid->SSID_len, WLAN_CAPABILITY_ESS, WLAN_CAPABILITY_ESS);
+
 		ie = ((u8 *)bi) + bi->ie_offset;
 		ie_len = bi->ie_length;
 	} else {
@@ -2313,11 +2337,18 @@ static s32 wl_update_bss_info(struct wl_cfg80211_priv *wl)
 		ie_len = bss->len_information_elements;
 #endif
 		wl->conf->channel = *bss->channel;
+	}
+
+	if (bss) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)
 		cfg80211_put_bss(wiphy, bss);
 #else
 		cfg80211_put_bss(bss);
 #endif
+	} else {
+		WL_DBG(("Could not update BSS\n"));
+		err = -EINVAL;
+		goto update_bss_info_out;
 	}
 
 	tim = bcm_parse_tlvs(ie, ie_len, WLAN_EID_TIM);
@@ -2343,34 +2374,40 @@ wl_bss_roaming_done(struct wl_cfg80211_priv *wl, struct net_device *ndev,
                     const wl_event_msg_t *e, void *data)
 {
 	struct wl_cfg80211_connect_info *conn_info = wl_to_conn(wl);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+	struct cfg80211_roam_info roam_info = {
+		.bssid = wl->profile->bssid,
+		.req_ie = conn_info->req_ie,
+		.req_ie_len = conn_info->req_ie_len,
+		.resp_ie = conn_info->resp_ie,
+		.resp_ie_len = conn_info->resp_ie_len,
+	};
+#endif
 	s32 err = 0;
 
-	wl_get_assoc_ies(wl);
+	err = wl_get_assoc_ies(wl);
+	if (err)
+		return err;
+
 	memcpy(wl->profile->bssid, &e->addr, ETHER_ADDR_LEN);
 	memcpy(&wl->bssid, &e->addr, ETHER_ADDR_LEN);
-	wl_update_bss_info(wl);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+
+	err = wl_update_bss_info(wl);
+	if (err)
+		return err;
+
 	cfg80211_roamed(ndev,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+			&roam_info,
+#else
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 39)
 			&wl->conf->channel,	 
 #endif
 			(u8 *)&wl->bssid,
 			conn_info->req_ie, conn_info->req_ie_len,
-			conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
-#else
-	{
-		struct cfg80211_roam_info r = {
-			.channel = &wl->conf->channel,
-			.bssid = (u8 *)&wl->bssid,
-			.req_ie = conn_info->req_ie,
-			.req_ie_len = conn_info->req_ie_len,
-			.resp_ie = conn_info->resp_ie,
-			.resp_ie_len = conn_info->resp_ie_len,
-		};
-		cfg80211_roamed(ndev, &r, GFP_KERNEL);
-
-	}
+			conn_info->resp_ie, conn_info->resp_ie_len,
 #endif
+			GFP_KERNEL);
 	WL_DBG(("Report roaming result\n"));
 
 	set_bit(WL_STATUS_CONNECTED, &wl->status);
@@ -2388,13 +2425,12 @@ wl_bss_connect_done(struct wl_cfg80211_priv *wl, struct net_device *ndev,
 	if (wl->scan_request) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
 		struct cfg80211_scan_info info = {
-			.aborted = true,
+			.aborted = true
 		};
 		WL_DBG(("%s: Aborting scan\n", __FUNCTION__));
 		cfg80211_scan_done(wl->scan_request, &info);
 #else
-		WL_DBG(("%s: Aborting scan\n", __FUNCTION__));
-		cfg80211_scan_done(wl->scan_request, true);     
+		cfg80211_scan_done(wl->scan_request, true);
 #endif
 		wl->scan_request = NULL;
 	}
@@ -2498,7 +2534,7 @@ scan_done_out:
 	if (wl->scan_request) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
 		struct cfg80211_scan_info info = {
-			.aborted = false,
+			.aborted = false
 		};
 		cfg80211_scan_done(wl->scan_request, &info);
 #else
@@ -2900,7 +2936,7 @@ static s32 wl_update_wiphybands(struct wl_cfg80211_priv *wl)
 
 	if (phy == 'n' || phy == 'a' || phy == 'v') {
 		wiphy = wl_to_wiphy(wl);
-		wiphy->bands[NL80211_BAND_5GHZ] = &__wl_band_5ghz_n;
+		wiphy->bands[IEEE80211_BAND_5GHZ] = &__wl_band_5ghz_n;
 	}
 
 	return err;
@@ -2930,11 +2966,11 @@ s32 wl_cfg80211_down(struct net_device *ndev)
 	if (wl->scan_request) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
 		struct cfg80211_scan_info info = {
-			.aborted = true,
+			.aborted = true
 		};
 		cfg80211_scan_done(wl->scan_request, &info);
 #else
-		cfg80211_scan_done(wl->scan_request, true);	
+		cfg80211_scan_done(wl->scan_request, true);
 #endif
 		wl->scan_request = NULL;
 	}

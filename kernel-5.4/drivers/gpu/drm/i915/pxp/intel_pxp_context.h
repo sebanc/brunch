@@ -21,7 +21,7 @@ struct pxp_context {
 	struct mutex mutex;
 
 	struct pxp_protected_session arb_session;
-	u32 arb_session_pxp_tag;
+	u32 arb_pxp_tag;
 
 	struct list_head type0_sessions;
 	struct list_head type1_sessions;

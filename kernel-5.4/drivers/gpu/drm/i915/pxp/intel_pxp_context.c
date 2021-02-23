@@ -15,6 +15,7 @@ void intel_pxp_ctx_init(struct pxp_context *ctx)
 	get_random_bytes(&ctx->id, sizeof(ctx->id));
 
 	ctx->global_state_attacked = false;
+	ctx->arb_pxp_tag = 0;
 
 	mutex_init(&ctx->mutex);
 

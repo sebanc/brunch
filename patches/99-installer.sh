@@ -187,7 +187,7 @@ while [ \$# -gt 0 ]; do
 		if [ -z "\${1##/dev/*}" ]; then
 			device=1
 		fi
-		destination="\$1"
+		destination="\$(realpath \$1)"
 		;;
 		-s | --size)
 		shift
@@ -217,6 +217,8 @@ if [ -z "\$destination" ]; then
 	usage
 	exit 1
 fi
+
+cd /
 
 if [[ \$device = 1 ]]; then
 	if [ ! -b "\$destination" ] || [ ! -d /sys/block/\$(echo "\$destination" | sed 's#/dev/##g') ]; then echo "\$destination is not a valid disk name"; exit 1; fi
@@ -287,7 +289,7 @@ To boot directly from this image file, add the lines between stars to either:
 - A brunch usb flashdrive grub config file (then boot from usb and choose boot from disk image in the menu),
 - Or your hard disk grub install if you have one (refer to you distro's online resources).
 ********************************************************************************
-menuentry "ChromeOS (boot from disk image)" {
+menuentry "ChromeOS" {
 	rmmod tpm
 	img_part=\$(df "\$destination" --output=source | sed 1d)
 	img_path=\$(if [ \$(findmnt -n -o TARGET -T "\$destination") == "/" ]; then echo \$(realpath "\$destination"); else echo \$(realpath "\$destination") | sed "s#\$(findmnt -n -o TARGET -T "\$destination")##g"; fi)
@@ -295,7 +297,18 @@ menuentry "ChromeOS (boot from disk image)" {
 	loopback loop \\\$img_path
 	linux (loop,7)/kernel boot=local noresume noswap loglevel=7 disablevmx=off \\\\
 		cros_secure cros_debug loop.max_part=16 img_part=\\\$img_part img_path=\\\$img_path \\\\
-		console= vt.global_cursor_default=0 brunch_bootsplash=default
+		console= vt.global_cursor_default=0 brunch_bootsplash=default quiet
+	initrd (loop,7)/lib/firmware/amd-ucode.img (loop,7)/lib/firmware/intel-ucode.img (loop,7)/initramfs.img
+}
+
+menuentry "ChromeOS (debug mode)" {
+	rmmod tpm
+	img_part=\$(df "\$destination" --output=source | sed 1d)
+	img_path=\$(if [ \$(findmnt -n -o TARGET -T "\$destination") == "/" ]; then echo \$(realpath "\$destination"); else echo \$(realpath "\$destination") | sed "s#\$(findmnt -n -o TARGET -T "\$destination")##g"; fi)
+	search --no-floppy --set=root --file \\\$img_path
+	loopback loop \\\$img_path
+	linux (loop,7)/kernel boot=local noresume noswap loglevel=7 disablevmx=off \\\\
+		cros_secure cros_debug loop.max_part=16 img_part=\\\$img_part img_path=\\\$img_path
 	initrd (loop,7)/lib/firmware/amd-ucode.img (loop,7)/lib/firmware/intel-ucode.img (loop,7)/initramfs.img
 }
 ********************************************************************************

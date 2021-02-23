@@ -18,6 +18,8 @@
 
 struct intel_engine_cs;
 
+#define ARB_SESSION_INDEX 0xf
+
 enum pxp_session_types {
 	SESSION_TYPE_TYPE0 = 0,
 	SESSION_TYPE_TYPE1 = 1,
@@ -39,6 +41,21 @@ enum pxp_sm_status {
 	PXP_SM_STATUS_RETRY_REQUIRED,
 	PXP_SM_STATUS_SESSION_NOT_AVAILABLE,
 	PXP_SM_STATUS_ERROR_UNKNOWN
+};
+
+struct pxp_tag {
+	union {
+		u32 value;
+		struct {
+			u32 session_id  : 8;
+			u32 instance_id : 8;
+			u32 enable      : 1;
+			u32 hm          : 1;
+			u32 reserved_1  : 1;
+			u32 sm          : 1;
+			u32 reserved_2  : 12;
+		};
+	};
 };
 
 struct intel_pxp {

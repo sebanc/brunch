@@ -148,6 +148,21 @@ static void notify_handler(acpi_handle handle, u32 event, void *context)
 		}
 		goto out_unknown;
 	}
+	
+	switch(event) {
+		case 0xc0: case 0xc2: case 0xc4: case 0xc6: case 0xc8: case 0xce:
+			ke = sparse_keymap_entry_from_scancode(
+				priv->input_dev, event);
+			input_report_key(priv->input_dev, ke->keycode, 1);
+			input_sync(priv->input_dev);
+			return;
+		case 0xc1: case 0xc3: case 0xc5: case 0xc7: case 0xc9: case 0xcf:
+			ke = sparse_keymap_entry_from_scancode(
+				priv->input_dev, event);
+			input_report_key(priv->input_dev, ke->keycode, 0);
+			input_sync(priv->input_dev);
+			return;
+	}
 
 	/*
 	 * Even press events are autorelease if there is no corresponding odd

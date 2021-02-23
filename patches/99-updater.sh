@@ -25,7 +25,7 @@ while [ \$# -gt 0 ]; do
 			echo "\$1 is not a valid ChromeOS recovey image (have you unzipped it ?)"
 			exit 1
 		fi
-		recovery="\$1"
+		recovery="\$(realpath \$1)"
 		;;
 		-f | --framework)
 		shift
@@ -35,7 +35,7 @@ while [ \$# -gt 0 ]; do
 			echo "\$1 is not a valid Brunch release archive"
 			exit 1
 		fi
-		framework="\$1"
+		framework="\$(realpath \$1)"
 		;;
 		-h | --help)
 		usage
@@ -48,6 +48,7 @@ while [ \$# -gt 0 ]; do
 	shift
 done
 
+cd /
 destination=\$(rootdev -d)
 if (expr match "\$destination" ".*[0-9]\$" >/dev/null); then
 	partition="\$destination"p

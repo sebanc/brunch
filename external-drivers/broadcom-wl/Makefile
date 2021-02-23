@@ -145,14 +145,11 @@ ifeq "$(GE_49)" "1"
 EXTRA_CFLAGS       += -Wno-date-time
 endif
 
-EXTRA_CFLAGS       += -Wno-date-time
-
 EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped
 
 KBASE              ?= ../kernel
-#KBUILD_DIR         ?= $(KBASE)/build
 KBUILD_DIR         ?= $(KBASE)
-MDEST_DIR          ?= ${D}$(KBASE)/kernel/drivers/net/wireless
+MDEST_DIR          ?= $(KBASE)/kernel/drivers/net/wireless
 
 # Cross compile setup.  Tool chain and kernel tree, replace with your own.
 CROSS_TOOLS        = /path/to/tools

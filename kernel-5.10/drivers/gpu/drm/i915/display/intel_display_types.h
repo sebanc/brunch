@@ -205,17 +205,6 @@ struct intel_encoder {
 	const struct drm_connector *audio_connector;
 };
 
-struct intel_panel_bl_funcs {
-	/* Connector and platform specific backlight functions */
-	int (*setup)(struct intel_connector *connector, enum pipe pipe);
-	u32 (*get)(struct intel_connector *connector);
-	void (*set)(const struct drm_connector_state *conn_state, u32 level);
-	void (*disable)(const struct drm_connector_state *conn_state, u32 level);
-	void (*enable)(const struct intel_crtc_state *crtc_state,
-		       const struct drm_connector_state *conn_state, u32 level);
-	u32 (*hz_to_pwm)(struct intel_connector *connector, u32 hz);
-};
-
 struct intel_panel {
 	struct drm_display_mode *fixed_mode;
 	struct drm_display_mode *downclock_mode;
@@ -232,28 +221,24 @@ struct intel_panel {
 		bool alternate_pwm_increment;	/* lpt+ */
 
 		/* PWM chip */
-		u32 pwm_level_min;
-		u32 pwm_level_max;
-		bool pwm_enabled;
 		bool util_pin_active_low;	/* bxt+ */
 		u8 controller;		/* bxt+ only */
 		struct pwm_device *pwm;
 		struct pwm_state pwm_state;
 
 		/* DPCD backlight */
-		union {
-			struct {
-				u8 pwmgen_bit_count;
-			} vesa;
-			struct {
-				bool sdr_uses_aux;
-			} intel;
-		} edp;
+		u8 pwmgen_bit_count;
 
 		struct backlight_device *device;
 
-		const struct intel_panel_bl_funcs *funcs;
-		const struct intel_panel_bl_funcs *pwm_funcs;
+		/* Connector and platform specific backlight functions */
+		int (*setup)(struct intel_connector *connector, enum pipe pipe);
+		u32 (*get)(struct intel_connector *connector);
+		void (*set)(const struct drm_connector_state *conn_state, u32 level);
+		void (*disable)(const struct drm_connector_state *conn_state);
+		void (*enable)(const struct intel_crtc_state *crtc_state,
+			       const struct drm_connector_state *conn_state);
+		u32 (*hz_to_pwm)(struct intel_connector *connector, u32 hz);
 		void (*power)(struct intel_connector *, bool enable);
 	} backlight;
 };
@@ -1314,6 +1299,7 @@ struct intel_dp {
 	int max_link_rate;
 	/* sink or branch descriptor */
 	struct drm_dp_desc desc;
+	u32 edid_quirks;
 	struct drm_dp_aux aux;
 	u32 aux_busy_last_status;
 	u8 train_set[4];

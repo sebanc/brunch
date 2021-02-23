@@ -14,4 +14,3 @@
 void ipts_receiver_callback(struct mei_cl_device *cldev);
 
 #endif /* _IPTS_RECEIVER_H_ */
-

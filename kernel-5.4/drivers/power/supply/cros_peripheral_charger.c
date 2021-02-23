@@ -43,6 +43,7 @@ struct charger_data {
 static enum power_supply_property cros_pchg_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_CAPACITY,
+	POWER_SUPPLY_PROP_SCOPE,
 	/*
 	 * todo: Add the following.
 	 *
@@ -109,6 +110,8 @@ static int cros_pchg_get_status(struct port_data *port)
 	struct ec_params_pchg req;
 	struct ec_response_pchg rsp;
 	struct device *dev = charger->dev;
+	int old_status = port->psy_status;
+	int old_percentage = port->battery_percentage;
 	int ret;
 
 	req.port = port->port_number;
@@ -137,6 +140,10 @@ static int cros_pchg_get_status(struct port_data *port)
 		port->battery_percentage = rsp.battery_percentage;
 		break;
 	}
+
+	if (port->psy_status != old_status
+			|| port->battery_percentage != old_percentage)
+		power_supply_changed(port->psy);
 
 	dev_dbg(dev,
 		"Port %d: state=%d battery=%d%%\n",
@@ -183,6 +190,9 @@ static int cros_pchg_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		val->intval = port->battery_percentage;
+		break;
+	case POWER_SUPPLY_PROP_SCOPE:
+		val->intval = POWER_SUPPLY_SCOPE_DEVICE;
 		break;
 	default:
 		return -EINVAL;
@@ -231,7 +241,7 @@ static int cros_ec_notify(struct notifier_block *nb,
 	u32 device_event_mask;
 
 	if (!host_event)
-		return NOTIFY_BAD;
+		return NOTIFY_DONE;
 
 	if (!(host_event & EC_HOST_EVENT_MASK(EC_HOST_EVENT_DEVICE)))
 		return NOTIFY_DONE;
@@ -302,7 +312,7 @@ static int cros_pchg_probe(struct platform_device *pdev)
 
 		psy_desc = &port->psy_desc;
 		psy_desc->name = port->name;
-		psy_desc->type = POWER_SUPPLY_TYPE_WIRELESS;
+		psy_desc->type = POWER_SUPPLY_TYPE_BATTERY;
 		psy_desc->get_property = cros_pchg_get_prop;
 		psy_desc->external_power_changed = NULL;
 		psy_desc->properties = cros_pchg_props;

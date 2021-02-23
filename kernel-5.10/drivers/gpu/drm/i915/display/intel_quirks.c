@@ -53,6 +53,16 @@ static void quirk_increase_ddi_disabled_time(struct drm_i915_private *i915)
 	drm_info(&i915->drm, "Applying Increase DDI Disabled quirk\n");
 }
 
+/*
+ * Some eDP backlight hardware uses the most-significant bits of the brightness
+ * register, so brightness values must be shifted first.
+ */
+static void quirk_shift_edp_backlight_brightness(struct drm_i915_private *i915)
+{
+	i915->quirks |= QUIRK_SHIFT_EDP_BACKLIGHT_BRIGHTNESS;
+	DRM_INFO("Applying shift eDP backlight brightness quirk\n");
+}
+
 struct intel_quirk {
 	int device;
 	int subsystem_vendor;
@@ -156,6 +166,9 @@ static struct intel_quirk intel_quirks[] = {
 	/* ASRock ITX*/
 	{ 0x3185, 0x1849, 0x2212, quirk_increase_ddi_disabled_time },
 	{ 0x3184, 0x1849, 0x2212, quirk_increase_ddi_disabled_time },
+
+	/* Google Pixelbook */
+	{ 0x591E, 0x8086, 0x2212, quirk_shift_edp_backlight_brightness },
 };
 
 void intel_init_quirks(struct drm_i915_private *i915)

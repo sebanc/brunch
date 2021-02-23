@@ -41,6 +41,9 @@ clean:
 check:
 	$(KDIR)/scripts/checkpatch.pl -f -q --no-tree $(sources)
 
+check_strict:
+	$(KDIR)/scripts/checkpatch.pl -f -q --no-tree --strict $(sources)
+
 dkms-install: $(sources)
 	mkdir -p $(MDIR)
 	cp -t $(MDIR) $(sources)

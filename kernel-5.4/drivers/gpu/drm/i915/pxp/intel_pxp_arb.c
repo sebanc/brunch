@@ -13,7 +13,6 @@
 #include "intel_pxp_cmd.h"
 
 /* Arbitrary session */
-#define ARB_SESSION_INDEX 0xf
 #define ARB_SESSION_TYPE SESSION_TYPE_TYPE0
 #define ARB_PROTECTION_MODE PROTECTION_MODE_HM
 
@@ -101,6 +100,7 @@ int intel_pxp_arb_create_session(struct intel_pxp *pxp)
 {
 	int ret;
 	struct intel_gt *gt = container_of(pxp, typeof(*gt), pxp);
+	struct pxp_tag *pxp_tag;
 
 	lockdep_assert_held(&pxp->ctx.mutex);
 
@@ -130,6 +130,12 @@ int intel_pxp_arb_create_session(struct intel_pxp *pxp)
 
 	pxp->ctx.flag_display_hm_surface_keys = true;
 
+	pxp_tag = (struct pxp_tag *)&pxp->ctx.arb_pxp_tag;
+	pxp_tag->session_id = ARB_SESSION_INDEX;
+	pxp_tag->instance_id++;
+	pxp_tag->enable = true;
+	pxp_tag->hm= true;
+
 end:
 	return ret;
 }
@@ -141,6 +147,7 @@ static int intel_pxp_arb_session_termination(struct intel_pxp *pxp)
 	int cmd_size_in_dw = 0;
 	int ret;
 	struct intel_gt *gt = container_of(pxp, typeof(*gt), pxp);
+	struct pxp_tag *pxp_tag;
 
 	/* Calculate how many bytes need to be alloc */
 	cmd_size_in_dw += intel_pxp_cmd_add_prolog(pxp, NULL, ARB_SESSION_TYPE, ARB_SESSION_INDEX);
@@ -174,6 +181,9 @@ static int intel_pxp_arb_session_termination(struct intel_pxp *pxp)
 		goto end;
 	}
 
+	pxp_tag = (struct pxp_tag *)&pxp->ctx.arb_pxp_tag;
+	pxp_tag->enable = false;
+	pxp_tag->hm = false;
 end:
 	kfree(cmd);
 	return ret;

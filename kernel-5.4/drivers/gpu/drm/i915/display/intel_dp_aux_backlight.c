@@ -25,111 +25,6 @@
 #include "intel_display_types.h"
 #include "intel_dp_aux_backlight.h"
 
-#define EDP_CUSTOMIZE_MAX_BRIGHTNESS_LEVEL	(512)
-
-static uint32_t intel_dp_aux_get_customize_backlight(struct intel_connector *connector)
-{
-	struct intel_dp *intel_dp = enc_to_intel_dp(connector->encoder);
-	uint8_t read_val[2] = { 0x0 };
-
-	if (drm_dp_dpcd_read(&intel_dp->aux, DP_EDP_BRIGHTNESS_NITS,
-			     &read_val, sizeof(read_val)) < 0) {
-		DRM_DEBUG_KMS("Failed to read DPCD register %x\n",
-			DP_EDP_BRIGHTNESS_NITS);
-		return 0;
-	}
-
-	return (read_val[1] << 8 | read_val[0]);
-}
-
-static void
-intel_dp_aux_set_customize_backlight(const struct drm_connector_state *conn_state, u32 level)
-{
-	struct intel_connector *connector = to_intel_connector(conn_state->connector);
-	struct intel_dp *intel_dp = enc_to_intel_dp(connector->encoder);
-	struct intel_panel *panel = &connector->panel;
-	uint8_t new_vals[4];
-
-	if (level > panel->backlight.max)
-		level = panel->backlight.max;
-
-	new_vals[0] = level & 0xFF;
-	new_vals[1] = (level & 0xFF00) >> 8;
-	new_vals[2] = 0;
-	new_vals[3] = 0;
-
-	if (drm_dp_dpcd_write(&intel_dp->aux, DP_EDP_BRIGHTNESS_NITS, new_vals, 4) < 0)
-		DRM_DEBUG_KMS("Failed to write aux backlight level\n");
-}
-
-static void intel_dp_aux_enable_customize_backlight(const struct intel_crtc_state *crtc_state,
-					  const struct drm_connector_state *conn_state)
-{
-	struct intel_connector *connector = to_intel_connector(conn_state->connector);
-	struct intel_dp *intel_dp = enc_to_intel_dp(connector->encoder);
-	uint8_t read_val[4], i;
-	uint8_t write_val[8] = {0x00, 0x00, 0xF0, 0x01, 0x90, 0x01, 0x00, 0x00};
-
-	if (drm_dp_dpcd_write(&intel_dp->aux, DP_EDP_PANEL_LUMINANCE_OVERRIDE, write_val, sizeof(write_val)) < 0)
-		DRM_DEBUG_KMS("Failed to write panel luminance.\n");
-
-	if (drm_dp_dpcd_writeb(&intel_dp->aux, DP_EDP_BRIGHTNESS_OPTIMIZATION, 0x01) < 0)
-		DRM_DEBUG_KMS("Failed to write %x\n",
-			DP_EDP_BRIGHTNESS_OPTIMIZATION);
-	/* write source OUI */
-	write_val[0] = 0x00;
-	write_val[1] = 0xaa;
-	write_val[2] = 0x01;
-	if (drm_dp_dpcd_write(&intel_dp->aux, DP_SOURCE_OUI, write_val, 3) < 0)
-		DRM_DEBUG_KMS("Failed to write OUI\n");
-
-	if (drm_dp_dpcd_readb(&intel_dp->aux, DP_EDP_GETSET_CTRL_PARAMS, read_val) != 1)
-		DRM_DEBUG_KMS("Failed to read %x\n",
-			DP_EDP_GETSET_CTRL_PARAMS);
-
-	if (drm_dp_dpcd_writeb(&intel_dp->aux, DP_EDP_GETSET_CTRL_PARAMS, 0) != 1)
-		DRM_DEBUG_KMS("Failed to write %x\n",
-			DP_EDP_GETSET_CTRL_PARAMS);
-
-	if (drm_dp_dpcd_readb(&intel_dp->aux, DP_EDP_GETSET_CTRL_PARAMS, read_val) != 1)
-		DRM_DEBUG_KMS("Failed to read %x\n",
-			DP_EDP_GETSET_CTRL_PARAMS);
-
-	if (drm_dp_dpcd_read(&intel_dp->aux, DP_EDP_CONTENT_LUMINANCE, &read_val, sizeof(read_val)) < 0)
-		DRM_DEBUG_KMS("Failed to read %x\n",
-			DP_EDP_CONTENT_LUMINANCE);
-
-	memset(read_val, 0x0, 4);
-	if (drm_dp_dpcd_write(&intel_dp->aux, DP_EDP_CONTENT_LUMINANCE, read_val, sizeof(read_val)) < 0)
-		DRM_DEBUG_KMS("Failed to write %x\n",
-			DP_EDP_CONTENT_LUMINANCE);
-
-	if (drm_dp_dpcd_readb(&intel_dp->aux, DP_EDP_GETSET_CTRL_PARAMS, read_val) != 1)
-		DRM_DEBUG_KMS("Failed to read %x\n",
-			DP_EDP_GETSET_CTRL_PARAMS);
-
-	if (drm_dp_dpcd_read(&intel_dp->aux, DP_SOURCE_OUI, read_val, 4) < 0)
-		DRM_DEBUG_KMS("Failed to read OUI\n");
-
-	DRM_DEBUG_KMS("got OUI %3ph\n", read_val);
-
-	for (i = 0; i < 6; i++) {
-		intel_dp_aux_set_customize_backlight(conn_state, connector->panel.backlight.level);
-
-		msleep(60);
-		if (intel_dp_aux_get_customize_backlight(connector))
-			return;
-	}
-
-	DRM_DEBUG_KMS("Restore brightness may have problem.\n");
-}
-
-static void intel_dp_aux_disable_customize_backlight(const struct drm_connector_state *old_conn_state)
-{
-	// do nothing
-	return;
-}
-
 static void set_aux_backlight_enable(struct intel_dp *intel_dp, bool enable)
 {
 	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
@@ -403,19 +298,6 @@ static void intel_dp_aux_disable_backlight(const struct drm_connector_state *old
 				 false);
 }
 
-static int intel_dp_aux_setup_customize_backlight(struct intel_connector *connector,
-					enum pipe pipe)
-{
-	struct intel_panel *panel = &connector->panel;
-
-	panel->backlight.max = EDP_CUSTOMIZE_MAX_BRIGHTNESS_LEVEL;
-	panel->backlight.min = 0;
-	panel->backlight.level = panel->backlight.get(connector);
-	panel->backlight.enabled = panel->backlight.level != 0;
-
-	return 0;
-}
-
 static u32 intel_dp_aux_calc_max_backlight(struct intel_connector *connector)
 {
 	struct drm_i915_private *i915 = to_i915(connector->base.dev);
@@ -615,20 +497,11 @@ int intel_dp_aux_init_backlight_funcs(struct intel_connector *intel_connector)
 	    !intel_dp_aux_display_control_heuristic(intel_connector))
 		return -ENODEV;
 
-	if (drm_dp_has_quirk(&intel_dp->desc, intel_dp->edid_quirks,
-	    DP_DPCD_QUIRK_CUSTOMIZE_BRIGHTNESS_CONTROL)) {
-		panel->backlight.setup   = intel_dp_aux_setup_customize_backlight;
-		panel->backlight.enable  = intel_dp_aux_enable_customize_backlight;
-		panel->backlight.disable = intel_dp_aux_disable_customize_backlight;
-		panel->backlight.set = intel_dp_aux_set_customize_backlight;
-		panel->backlight.get = intel_dp_aux_get_customize_backlight;
-	} else {
-		panel->backlight.setup   = intel_dp_aux_setup_backlight;
-		panel->backlight.enable  = intel_dp_aux_enable_backlight;
-		panel->backlight.disable = intel_dp_aux_disable_backlight;
-		panel->backlight.set = intel_dp_aux_set_backlight;
-		panel->backlight.get = intel_dp_aux_get_backlight;
-	}
+	panel->backlight.setup = intel_dp_aux_setup_backlight;
+	panel->backlight.enable = intel_dp_aux_enable_backlight;
+	panel->backlight.disable = intel_dp_aux_disable_backlight;
+	panel->backlight.set = intel_dp_aux_set_backlight;
+	panel->backlight.get = intel_dp_aux_get_backlight;
 
 	return 0;
 }

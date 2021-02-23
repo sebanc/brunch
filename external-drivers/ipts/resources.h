@@ -15,4 +15,3 @@ int ipts_resources_alloc(struct ipts_context *ipts);
 void ipts_resources_free(struct ipts_context *ipts);
 
 #endif /* _IPTS_RESOURCES_H_ */
-

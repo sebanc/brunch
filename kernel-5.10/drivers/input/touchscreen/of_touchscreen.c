@@ -11,6 +11,54 @@
 #include <linux/input/touchscreen.h>
 #include <linux/module.h>
 
+static int custom = 0;
+module_param(custom, int, 0644);
+MODULE_PARM_DESC(custom, "Override touchscreen settings");
+
+static int x = 0;
+module_param(x, int, 0644);
+MODULE_PARM_DESC(x, "Override touchscreen x size");
+
+static int y = 0;
+module_param(y, int, 0644);
+MODULE_PARM_DESC(y, "Override touchscreen y size");
+
+static int min_x = 0;
+module_param(min_x, int, 0644);
+MODULE_PARM_DESC(min_x, "Override touchscreen x minimum");
+
+static int min_y = 0;
+module_param(min_y, int, 0644);
+MODULE_PARM_DESC(min_y, "Override touchscreen y minimum");
+
+static int fuzz_x = 0;
+module_param(fuzz_x, int, 0644);
+MODULE_PARM_DESC(fuzz_x, "Override touchscreen x fuzz");
+
+static int fuzz_y = 0;
+module_param(fuzz_y, int, 0644);
+MODULE_PARM_DESC(fuzz_y, "Override touchscreen y fuzz");
+
+static int max_pressure = 0;
+module_param(max_pressure, int, 0644);
+MODULE_PARM_DESC(max_pressure, "Override touchscreen max pressure");
+
+static int fuzz_pressure = 0;
+module_param(fuzz_pressure, int, 0644);
+MODULE_PARM_DESC(fuzz_pressure, "Override touchscreen fuzz pressure");
+
+static int invert_x = 0;
+module_param(invert_x, int, 0644);
+MODULE_PARM_DESC(invert_x, "Override touchscreen x inversion");
+
+static int invert_y = 0;
+module_param(invert_y, int, 0644);
+MODULE_PARM_DESC(invert_y, "Override touchscreen y inversion");
+
+static int swap_x_y = 0;
+module_param(swap_x_y, int, 0644);
+MODULE_PARM_DESC(swap_x_y, "Override touchscreen x/y swap");
+
 static bool touchscreen_get_prop_u32(struct device *dev,
 				     const char *property,
 				     unsigned int default_value,
@@ -18,6 +66,41 @@ static bool touchscreen_get_prop_u32(struct device *dev,
 {
 	u32 val;
 	int error;
+	
+	if (custom) {
+		if (!strncmp(property, "touchscreen-size-x", 18) && x) {
+			*value = x;
+			return true;
+		}
+		if (!strncmp(property, "touchscreen-size-y", 18) && y) {
+			*value = y;
+			return true;
+		}
+		if (!strncmp(property, "touchscreen-min-x", 17) && min_x) {
+			*value = min_x;
+			return true;
+		}
+		if (!strncmp(property, "touchscreen-min-y", 17) && min_y) {
+			*value = min_y;
+			return true;
+		}
+		if (!strncmp(property, "touchscreen-fuzz-x", 18) && fuzz_x) {
+			*value = fuzz_x;
+			return true;
+		}
+		if (!strncmp(property, "touchscreen-fuzz-y", 18) && fuzz_y) {
+			*value = fuzz_y;
+			return true;
+		}
+		if (!strncmp(property, "touchscreen-max-pressure", 24) && max_pressure) {
+			*value = max_pressure;
+			return true;
+		}
+		if (!strncmp(property, "touchscreen-fuzz-pressure", 25) && fuzz_pressure) {
+			*value = fuzz_pressure;
+			return true;
+		}
+	}
 
 	error = device_property_read_u32(dev, property, &val);
 	if (error) {
@@ -121,7 +204,7 @@ void touchscreen_parse_properties(struct input_dev *input, bool multitouch,
 	prop->max_x = input_abs_get_max(input, axis_x);
 	prop->max_y = input_abs_get_max(input, axis_y);
 
-	prop->invert_x =
+	prop->invert_x = (custom && invert_x) ? true :
 		device_property_read_bool(dev, "touchscreen-inverted-x");
 	if (prop->invert_x) {
 		absinfo = &input->absinfo[axis_x];
@@ -129,7 +212,7 @@ void touchscreen_parse_properties(struct input_dev *input, bool multitouch,
 		absinfo->minimum = 0;
 	}
 
-	prop->invert_y =
+	prop->invert_y = (custom && invert_y) ? true :
 		device_property_read_bool(dev, "touchscreen-inverted-y");
 	if (prop->invert_y) {
 		absinfo = &input->absinfo[axis_y];
@@ -137,7 +220,7 @@ void touchscreen_parse_properties(struct input_dev *input, bool multitouch,
 		absinfo->minimum = 0;
 	}
 
-	prop->swap_x_y =
+	prop->swap_x_y = (custom && swap_x_y) ? true :
 		device_property_read_bool(dev, "touchscreen-swapped-x-y");
 	if (prop->swap_x_y)
 		swap(input->absinfo[axis_x], input->absinfo[axis_y]);

@@ -194,6 +194,7 @@ tar zcvf ../rootc/packages/version.tar.gz * --owner=0 --group=0
 cd ..
 rm -rf ./version-pkg
 
+mkdir -p ./initramfs/{bin,lib64,sbin}
 mkdir -p ./binaries-pkg/usr/sbin
 
 git clone -b master https://git.code.sf.net/p/linuxconsole/code linuxconsole
@@ -236,6 +237,16 @@ cp unsquashfs ../../binaries-pkg/usr/sbin/
 cd ../..
 rm -rf ./squashfs-tools
 
+git clone --depth=1 -b master https://github.com/icetee/pv
+cd ./pv
+./configure --prefix=/usr
+make
+make DESTDIR=/home/chronos/pv-pkg install
+cp /home/chronos/pv-pkg/usr/bin/pv ../binaries-pkg/usr/sbin/
+cp /home/chronos/pv-pkg/usr/bin/pv ../initramfs/sbin/
+cd ..
+rm -rf ./pv
+
 cd ./binaries-pkg
 tar zcvf ../rootc/packages/binaries.tar.gz * --owner=0 --group=0
 cd ..
@@ -245,7 +256,6 @@ git clone -b master https://github.com/godspeed1989/fbv.git fbv
 cd ./fbv
 ./configure --prefix=/
 make -j$(($(nproc)-1))
-mkdir -p ../initramfs/{bin,lib64}
 cp ./fbv ../initramfs/bin/
 for i in $(ldd ./fbv | cut -d' ' -f3); do cp "$i" ../initramfs/lib64/; done
 cd ..
@@ -268,6 +278,8 @@ cd haveged
 ./configure --prefix=/usr --libdir=/usr/lib64 --disable-init --enable-tune=no
 make -j$(($(nproc)-1))
 make DESTDIR=/home/chronos/haveged-pkg install
+cp ../haveged-pkg/usr/sbin/haveged ../initramfs/sbin/
+cp ../haveged-pkg/usr/lib64/libhavege.so* ../initramfs/lib64/
 cd ..
 rm -rf ./haveged
 
@@ -389,10 +401,10 @@ for i in $(ldd /sbin/losetup | cut -d' ' -f3); do cp "$i" ./lib64/; done
 cp /sbin/losetup ./sbin/
 for i in $(ldd /usr/bin/ntfs-3g | cut -d' ' -f3); do cp "$i" ./lib64/; done
 cp /usr/bin/ntfs-3g ./sbin/
-for i in $(ldd /usr/bin/pv | cut -d' ' -f3); do cp "$i" ./lib64/; done
-cp /usr/bin/pv ./sbin/
-cp ../haveged-pkg/usr/sbin/haveged ./sbin/
-cp ../haveged-pkg/usr/lib64/libhavege.so* ./lib64/
+#for i in $(ldd /usr/bin/pv | cut -d' ' -f3); do cp "$i" ./lib64/; done
+#cp /usr/bin/pv ./sbin/
+#cp ../haveged-pkg/usr/sbin/haveged ./sbin/
+#cp ../haveged-pkg/usr/lib64/libhavege.so* ./lib64/
 cp /lib64/ld-linux-x86-64.so.2 ./lib64/
 sudo chmod 0755 ./sbin/*
 find . | cpio -o -H newc | gzip > ../rootc/initramfs.img

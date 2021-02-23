@@ -792,6 +792,33 @@ static void pcie_config_aspm_dev(struct pci_dev *pdev, u32 val)
 					   PCI_EXP_LNKCTL_ASPMC, val);
 }
 
+void pcie_disable_aspm(struct pci_dev *pdev)
+{
+	if (!pci_is_pcie(pdev))
+		return;
+
+	pcie_config_aspm_dev(pdev, 0);
+}
+
+void pcie_save_aspm_control(struct pci_dev *pdev)
+{
+	u16 lnkctl;
+
+	if (!pci_is_pcie(pdev))
+		return;
+
+	pcie_capability_read_word(pdev, PCI_EXP_LNKCTL, &lnkctl);
+	pdev->saved_aspm_ctl = lnkctl & PCI_EXP_LNKCTL_ASPMC;
+}
+
+void pcie_restore_aspm_control(struct pci_dev *pdev)
+{
+	if (!pci_is_pcie(pdev))
+		return;
+
+	pcie_config_aspm_dev(pdev, pdev->saved_aspm_ctl);
+}
+
 static void pcie_config_aspm_link(struct pcie_link_state *link, u32 state)
 {
 	u32 upstream = 0, dwstream = 0;

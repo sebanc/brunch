@@ -1657,6 +1657,44 @@ static int vlv_resume_prepare(struct drm_i915_private *dev_priv,
 			      bool rpm_resume);
 static int vlv_suspend_complete(struct drm_i915_private *dev_priv);
 
+static void intel_shutdown_encoders(struct drm_i915_private *dev_priv)
+{
+	struct drm_device *dev = &dev_priv->drm;
+	struct intel_encoder *encoder;
+
+	drm_modeset_lock_all(dev);
+	for_each_intel_encoder(dev, encoder)
+		if (encoder->shutdown)
+			encoder->shutdown(encoder);
+	drm_modeset_unlock_all(dev);
+}
+
+void i915_driver_shutdown(struct drm_i915_private *i915)
+{
+	disable_rpm_wakeref_asserts(&i915->runtime_pm);
+	intel_runtime_pm_disable(&i915->runtime_pm);
+	intel_power_domains_disable(i915);
+
+	i915_gem_suspend(i915);
+
+	drm_kms_helper_poll_disable(&i915->drm);
+
+	drm_atomic_helper_shutdown(&i915->drm);
+
+	intel_dp_mst_suspend(i915);
+
+	intel_runtime_pm_disable_interrupts(i915);
+	intel_hpd_cancel_work(i915);
+
+	intel_suspend_encoders(i915);
+	intel_shutdown_encoders(i915);
+
+	intel_power_domains_driver_remove(i915);
+	enable_rpm_wakeref_asserts(&i915->runtime_pm);
+
+	intel_runtime_pm_driver_release(&i915->runtime_pm);
+}
+
 static bool suspend_to_idle(struct drm_i915_private *dev_priv)
 {
 #if IS_ENABLED(CONFIG_ACPI_SLEEP)

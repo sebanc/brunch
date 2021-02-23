@@ -62,9 +62,6 @@ typedef struct priv_link {
 	wl_iw_t *wliw;
 } priv_link_t;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0)
-#define get_ds() (KERNEL_DS)
-#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
 #define WL_DEV_LINK(dev)       (priv_link_t*)(dev->priv)
 #else

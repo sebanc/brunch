@@ -15,7 +15,7 @@ rm -r /roota/lib/firmware/*
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
 cp -r /rootc/lib/firmware/* /roota/lib/firmware/
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
-cp -r /rootc/usr/share/alsa/ucm/* /roota/usr/share/alsa/ucm/
+cp -r /rootc/usr/share/alsa/* /roota/usr/share/alsa/
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 cat >/roota/etc/init/camera.conf <<CAMERASCRIPT
 start on starting boot-services

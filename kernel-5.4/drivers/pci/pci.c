@@ -1470,6 +1470,10 @@ static void pci_restore_ltr_state(struct pci_dev *dev)
 int pci_save_state(struct pci_dev *dev)
 {
 	int i;
+
+	pcie_save_aspm_control(dev);
+	pcie_disable_aspm(dev);
+
 	/* XXX: 100% dword access ok here? */
 	for (i = 0; i < 16; i++)
 		pci_read_config_dword(dev, i * 4, &dev->saved_config_space[i]);
@@ -1477,16 +1481,20 @@ int pci_save_state(struct pci_dev *dev)
 
 	i = pci_save_pcie_state(dev);
 	if (i != 0)
-		return i;
+		goto exit;
 
 	i = pci_save_pcix_state(dev);
 	if (i != 0)
-		return i;
+		goto exit;
 
 	pci_save_ltr_state(dev);
 	pci_save_aspm_l1ss_state(dev);
 	pci_save_dpc_state(dev);
-	return pci_save_vc_state(dev);
+	i = pci_save_vc_state(dev);
+
+exit:
+	pcie_restore_aspm_control(dev);
+	return i;
 }
 EXPORT_SYMBOL(pci_save_state);
 
@@ -1584,6 +1592,8 @@ void pci_restore_state(struct pci_dev *dev)
 	if (!dev->state_saved)
 		return;
 
+	pcie_disable_aspm(dev);
+
 	/*
 	 * Restore max latencies (in the LTR capability) before enabling
 	 * LTR itself (in the PCIe capability).
@@ -1609,6 +1619,8 @@ void pci_restore_state(struct pci_dev *dev)
 	/* Restore ACS and IOV configuration state */
 	pci_enable_acs(dev);
 	pci_restore_iov_state(dev);
+
+	pcie_restore_aspm_control(dev);
 
 	dev->state_saved = false;
 }

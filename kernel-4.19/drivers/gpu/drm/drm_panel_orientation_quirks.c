@@ -188,6 +188,12 @@ static const struct dmi_system_id orientation_data[] = {
 		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "Hi10 X"),
 		},
 		.driver_data = (void *)&lcd1200x1920_rightside_up,
+	}, {	/* CHUWI INNOVATION AND TECHNOLOGY(SHENZHEN)CO.LTD Hi10 pro tablet */
+		.matches = {
+		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "CHUWI INNOVATION AND TECHNOLOGY(SHENZHEN)CO.LTD"),
+		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "Hi10 pro tablet"),
+		},
+		.driver_data = (void *)&lcd1200x1920_rightside_up,
 	}, {	/* Lenovo Ideapad D330 */
 		.matches = {
 		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "LENOVO"),

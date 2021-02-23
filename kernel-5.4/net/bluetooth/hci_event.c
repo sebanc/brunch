@@ -5826,6 +5826,13 @@ static void hci_le_remote_conn_param_req_evt(struct hci_dev *hdev,
 		params = hci_conn_params_lookup(hdev, &hcon->dst,
 						hcon->dst_type);
 		if (params) {
+			if (restrict_le_conn_params(hdev)) {
+				if (min == 6 && max == 9) {
+					min = 6;
+					max = 6;
+				}
+			}
+
 			params->conn_min_interval = min;
 			params->conn_max_interval = max;
 			params->conn_latency = latency;
@@ -5842,8 +5849,8 @@ static void hci_le_remote_conn_param_req_evt(struct hci_dev *hdev,
 	}
 
 	cp.handle = ev->handle;
-	cp.interval_min = ev->interval_min;
-	cp.interval_max = ev->interval_max;
+	cp.interval_min = cpu_to_le16(min);
+	cp.interval_max = cpu_to_le16(max);
 	cp.latency = ev->latency;
 	cp.timeout = ev->timeout;
 	cp.min_ce_len = 0;

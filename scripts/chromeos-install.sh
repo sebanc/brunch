@@ -356,13 +356,13 @@ else
 			esac
 		done
 	fi
-	echo "ChromeOS disk image created."
+	echo -e "\n ChromeOS disk image created.\n"
 	grep -qi 'Microsoft' /proc/version || cat <<GRUB | tee "$destination".grub.txt
 To boot directly from this image file, add the lines between stars to either:
 - A brunch usb flashdrive grub config file (then boot from usb and choose boot from disk image in the menu),
 - Or your hard disk grub install if you have one (refer to you distro's online resources).
 ********************************************************************************
-menuentry "ChromeOS (boot from disk image)" {
+menuentry "ChromeOS" {
 	rmmod tpm
 	img_part=$(df "$destination" --output=source | sed 1d)
 	img_path=$(if [ $(findmnt -n -o TARGET -T "$destination") == "/" ]; then echo $(realpath "$destination"); else echo $(realpath "$destination") | sed "s#$(findmnt -n -o TARGET -T "$destination")##g"; fi)
@@ -370,9 +370,30 @@ menuentry "ChromeOS (boot from disk image)" {
 	loopback loop \$img_path
 	linux (loop,7)/kernel boot=local noresume noswap loglevel=7 disablevmx=off \\
 		cros_secure cros_debug loop.max_part=16 img_part=\$img_part img_path=\$img_path \\
-		console= vt.global_cursor_default=0 brunch_bootsplash=default
+		console= vt.global_cursor_default=0 brunch_bootsplash=default quiet
+	initrd (loop,7)/lib/firmware/amd-ucode.img (loop,7)/lib/firmware/intel-ucode.img (loop,7)/initramfs.img
+}
+
+menuentry "ChromeOS (debug mode)" {
+	rmmod tpm
+	img_part=$(df "$destination" --output=source | sed 1d)
+	img_path=$(if [ $(findmnt -n -o TARGET -T "$destination") == "/" ]; then echo $(realpath "$destination"); else echo $(realpath "$destination") | sed "s#$(findmnt -n -o TARGET -T "$destination")##g"; fi)
+	search --no-floppy --set=root --file \$img_path
+	loopback loop \$img_path
+	linux (loop,7)/kernel boot=local noresume noswap loglevel=7 disablevmx=off \\
+		cros_secure cros_debug loop.max_part=16 img_part=\$img_part img_path=\$img_path
 	initrd (loop,7)/lib/firmware/amd-ucode.img (loop,7)/lib/firmware/intel-ucode.img (loop,7)/initramfs.img
 }
 ********************************************************************************
 GRUB
+	echo -e "\n"
+	if [ -f /etc/lsb-release ]; then
+		grep -qi 'Microsoft' /proc/version || ! (grep -qi 'Ubuntu' /etc/lsb-release || grep -qi 'LinuxMint' /etc/lsb-release) || cat <<AUTOGRUB
+If you have Ubuntu or Linux Mint installed, you can create the grub config automatically by running the below command:
+********************************************************************************
+echo -e '#!/bin/sh\nexec tail -n +3 \$0\n\n\n\n'"\$(sed '1,4d;\$d' \$(realpath "$destination").grub.txt)" | sudo tee /etc/grub.d/99_brunch && sudo chmod 0755 /etc/grub.d/99_brunch && sudo update-grub
+********************************************************************************
+If you use this command, remember that your grub configuration will be in the file /etc/grub.d/99_brunch, you will need to modify this file if you want to enable Brunch options.
+AUTOGRUB
+	fi
 fi

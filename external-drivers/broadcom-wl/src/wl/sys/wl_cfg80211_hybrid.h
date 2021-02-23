@@ -22,6 +22,11 @@
 #ifndef _wl_cfg80211_h_
 #define _wl_cfg80211_h_
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
+#define IEEE80211_BAND_2GHZ NL80211_BAND_2GHZ
+#define IEEE80211_BAND_5GHZ NL80211_BAND_5GHZ
+#endif
+
 #include <net/cfg80211.h>
 #include <wlioctl.h>
 

@@ -15,18 +15,18 @@
 #include "resources.h"
 
 static int ipts_receiver_handle_get_device_info(struct ipts_context *ipts,
-		struct ipts_response *rsp)
+						struct ipts_response *rsp)
 {
 	struct ipts_set_mode_cmd cmd;
 
 	memcpy(&ipts->device_info, rsp->payload,
-			sizeof(struct ipts_get_device_info_rsp));
+	       sizeof(struct ipts_get_device_info_rsp));
 
 	memset(&cmd, 0, sizeof(struct ipts_set_mode_cmd));
 	cmd.mode = IPTS_MODE_MULTITOUCH;
 
-	return ipts_control_send(ipts, IPTS_CMD_SET_MODE,
-			&cmd, sizeof(struct ipts_set_mode_cmd));
+	return ipts_control_send(ipts, IPTS_CMD_SET_MODE, &cmd,
+				 sizeof(struct ipts_set_mode_cmd));
 }
 
 static int ipts_receiver_handle_set_mode(struct ipts_context *ipts)
@@ -68,15 +68,14 @@ static int ipts_receiver_handle_set_mode(struct ipts_context *ipts)
 	cmd.workqueue_size = IPTS_WORKQUEUE_SIZE;
 	cmd.workqueue_item_size = IPTS_WORKQUEUE_ITEM_SIZE;
 
-	return ipts_control_send(ipts, IPTS_CMD_SET_MEM_WINDOW,
-			&cmd, sizeof(struct ipts_set_mem_window_cmd));
+	return ipts_control_send(ipts, IPTS_CMD_SET_MEM_WINDOW, &cmd,
+				 sizeof(struct ipts_set_mem_window_cmd));
 }
 
 static int ipts_receiver_handle_set_mem_window(struct ipts_context *ipts)
 {
 	dev_info(ipts->dev, "Device %04hX:%04hX ready\n",
-			ipts->device_info.vendor_id,
-			ipts->device_info.device_id);
+		 ipts->device_info.vendor_id, ipts->device_info.device_id);
 	ipts->status = IPTS_HOST_STATUS_STARTED;
 
 	return ipts_control_send(ipts, IPTS_CMD_READY_FOR_DATA, NULL, 0);
@@ -84,15 +83,22 @@ static int ipts_receiver_handle_set_mem_window(struct ipts_context *ipts)
 
 static int ipts_receiver_handle_clear_mem_window(struct ipts_context *ipts)
 {
+	ipts->status = IPTS_HOST_STATUS_STOPPED;
+
 	if (ipts->restart)
 		return ipts_control_start(ipts);
 
-	ipts->status = IPTS_HOST_STATUS_STOPPED;
 	return 0;
 }
 
+static bool ipts_receiver_sensor_was_reset(u32 status)
+{
+	return status == IPTS_STATUS_SENSOR_EXPECTED_RESET ||
+	       status == IPTS_STATUS_SENSOR_UNEXPECTED_RESET;
+}
+
 static bool ipts_receiver_handle_error(struct ipts_context *ipts,
-		struct ipts_response *rsp)
+				       struct ipts_response *rsp)
 {
 	bool error;
 
@@ -115,10 +121,10 @@ static bool ipts_receiver_handle_error(struct ipts_context *ipts,
 	if (!error)
 		return false;
 
-	dev_err(ipts->dev, "Command 0x%08x failed: %d\n",
-			rsp->code, rsp->status);
+	dev_err(ipts->dev, "Command 0x%08x failed: %d\n", rsp->code,
+		rsp->status);
 
-	if (rsp->code == IPTS_STATUS_SENSOR_UNEXPECTED_RESET) {
+	if (ipts_receiver_sensor_was_reset(rsp->status)) {
 		dev_err(ipts->dev, "Sensor was reset\n");
 
 		if (ipts_control_restart(ipts))
@@ -129,7 +135,7 @@ static bool ipts_receiver_handle_error(struct ipts_context *ipts,
 }
 
 static void ipts_receiver_handle_response(struct ipts_context *ipts,
-		struct ipts_response *rsp)
+					  struct ipts_response *rsp)
 {
 	int ret;
 
@@ -158,7 +164,7 @@ static void ipts_receiver_handle_response(struct ipts_context *ipts,
 		return;
 
 	dev_err(ipts->dev, "Error while handling response 0x%08x: %d\n",
-			rsp->code, ret);
+		rsp->code, ret);
 
 	if (ipts_control_stop(ipts))
 		dev_err(ipts->dev, "Failed to stop IPTS\n");
@@ -180,4 +186,3 @@ void ipts_receiver_callback(struct mei_cl_device *cldev)
 
 	ipts_receiver_handle_response(ipts, &rsp);
 }
-

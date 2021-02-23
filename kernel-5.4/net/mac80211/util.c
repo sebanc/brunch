@@ -2428,9 +2428,12 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 	}
 	mutex_unlock(&local->sta_mtx);
 
-	/* add back keys */
-	list_for_each_entry(sdata, &local->interfaces, list)
-		ieee80211_reenable_keys(sdata);
+
+	if (!(hw->wiphy->flags & WIPHY_FLAG_STA_DISCONNECT_ON_HW_RESTART)) {
+		/* add back keys */
+		list_for_each_entry(sdata, &local->interfaces, list)
+			ieee80211_reenable_keys(sdata);
+	}
 
 	/* Reconfigure sched scan if it was interrupted by FW restart */
 	mutex_lock(&local->mtx);
@@ -2503,6 +2506,19 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 	ieee80211_wake_queues_by_reason(hw, IEEE80211_MAX_QUEUE_MAP,
 					IEEE80211_QUEUE_STOP_REASON_SUSPEND,
 					false);
+
+	if ((hw->wiphy->flags & WIPHY_FLAG_STA_DISCONNECT_ON_HW_RESTART) &&
+	    !reconfig_due_to_wowlan) {
+		list_for_each_entry(sdata, &local->interfaces, list) {
+			if (!ieee80211_sdata_running(sdata))
+				continue;
+			if (sdata->vif.type == NL80211_IFTYPE_STATION) {
+				sdata->flags |=
+					IEEE80211_SDATA_DISCONNECT_HW_RESTART;
+				ieee80211_sta_restart(sdata);
+			}
+		}
+	}
 
 	/*
 	 * If this is for hw restart things are still running.

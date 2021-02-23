@@ -16,21 +16,6 @@
 #define SESSION_TYPE_MASK BIT(7)
 #define SESSION_ID_MASK (BIT(7) - 1)
 
-struct pxp_tag {
-	union {
-		u32 value;
-		struct {
-			u32 session_id  : 8;
-			u32 instance_id : 8;
-			u32 enable      : 1;
-			u32 hm          : 1;
-			u32 reserved_1  : 1;
-			u32 sm          : 1;
-			u32 reserved_2  : 12;
-		};
-	};
-};
-
 static inline struct list_head *session_list(struct intel_pxp *pxp,
 					     int session_type)
 {
@@ -272,7 +257,9 @@ static u32 pxp_get_pxp_tag(struct intel_pxp *pxp, int session_type,
 {
 	struct pxp_tag *pxp_tag;
 
-	if (session_type == SESSION_TYPE_TYPE0 && session_idx < PXP_MAX_TYPE0_SESSIONS)
+	if (session_type == SESSION_TYPE_TYPE0 && session_idx == ARB_SESSION_INDEX)
+		pxp_tag = (struct pxp_tag *)&pxp->ctx.arb_pxp_tag;
+	else if (session_type == SESSION_TYPE_TYPE0 && session_idx < PXP_MAX_TYPE0_SESSIONS)
 		pxp_tag = (struct pxp_tag *)&pxp->ctx.type0_pxp_tag[session_idx];
 	else if (session_type == SESSION_TYPE_TYPE1 && session_idx < PXP_MAX_TYPE1_SESSIONS)
 		pxp_tag = (struct pxp_tag *)&pxp->ctx.type1_pxp_tag[session_idx];

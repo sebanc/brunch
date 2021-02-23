@@ -717,6 +717,36 @@ static const struct ts_dmi_data teclast_x98plus2_data = {
 	.properties	= teclast_x98plus2_props,
 };
 
+static const struct property_entry teclast_tbook16p_props[] = {
+	PROPERTY_ENTRY_U32("touchscreen-size-x", 1975),
+	PROPERTY_ENTRY_U32("touchscreen-size-y", 1520),
+	PROPERTY_ENTRY_BOOL("touchscreen-inverted-x"),
+	PROPERTY_ENTRY_BOOL("touchscreen-inverted-y"),
+	PROPERTY_ENTRY_STRING("firmware-name", "gsl1686-teclast_tbook16p.fw"),
+	PROPERTY_ENTRY_U32("silead,max-fingers", 10),
+	{ }
+};
+
+static const struct ts_dmi_data teclast_tbook16p_data = {
+	.acpi_name	= "MSSL1680:00",
+	.properties	= teclast_tbook16p_props,
+};
+
+static const struct property_entry avita_wt9t12_props[] = {
+	PROPERTY_ENTRY_U32("touchscreen-size-x", 1792),
+	PROPERTY_ENTRY_U32("touchscreen-size-y", 1082),
+	PROPERTY_ENTRY_U32("touchscreen-fuzz-x", 20),
+	PROPERTY_ENTRY_U32("touchscreen-fuzz-y", 20),
+	PROPERTY_ENTRY_STRING("firmware-name", "gsl1680-avita-wt9t12.fw"),
+	PROPERTY_ENTRY_U32("silead,max-fingers", 10),
+	{ }
+};
+
+static const struct ts_dmi_data avita_wt9t12_data = {
+	.acpi_name	= "MSSL1680:00",
+	.properties	= avita_wt9t12_props,
+};
+
 static const struct property_entry trekstor_primebook_c11_props[] = {
 	PROPERTY_ENTRY_U32("touchscreen-size-x", 1970),
 	PROPERTY_ENTRY_U32("touchscreen-size-y", 1530),
@@ -1213,6 +1243,22 @@ const struct dmi_system_id touchscreen_dmi_table[] = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "TECLAST"),
 			DMI_MATCH(DMI_PRODUCT_NAME, "X98 Plus II"),
+		},
+	},
+	{
+		/* Teclast TbooK 16 Power */
+		.driver_data = (void *)&teclast_tbook16p_data,
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "TECLAST"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "TbooK 16 Power"),
+		},
+	},
+	{
+		/* Avita Magus Lite */
+		.driver_data = (void *)&avita_wt9t12_data,
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "AVITA"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "WT9T12"),
 		},
 	},
 	{

@@ -622,6 +622,9 @@ struct ath10k_hw_params {
 	bool tx_stats_over_pktlog;
 
 	bool dynamic_sar_support;
+
+	/* tx mac seq num is added by FW */
+	bool tx_mac_seq_by_fw;
 };
 
 struct htt_rx_desc;

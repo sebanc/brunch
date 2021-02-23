@@ -3,6 +3,7 @@
 ret=0
 cat >/roota/usr/sbin/resize-data <<RESIZEDATA
 #!/bin/bash
+cd /
 if ( ! test -z {,} ); then echo "Must be ran with \"bash\""; exit 1; fi
 if [ \$(whoami) != "root" ]; then echo "Please run with this script with sudo"; exit 1; fi
 source=\$(rootdev -d)

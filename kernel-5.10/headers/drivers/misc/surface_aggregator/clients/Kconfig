@@ -1,0 +1,151 @@
+# SPDX-License-Identifier: GPL-2.0+
+# Copyright (C) 2019-2020 Maximilian Luz <luzmaximilian@gmail.com>
+
+config SURFACE_AGGREGATOR_CDEV
+	tristate "Surface System Aggregator Module User-Space Interface"
+	depends on SURFACE_AGGREGATOR
+	help
+	  Provides a misc-device interface to the Surface System Aggregator
+	  Module (SSAM) controller.
+
+	  This option provides a module (called surface_aggregator_cdev), that,
+	  when loaded, will add a client device (and its respective driver) to
+	  the SSAM controller. Said client device manages a misc-device
+	  interface (/dev/surface/aggregator), which can be used by user-space
+	  tools to directly communicate with the SSAM EC by sending requests and
+	  receiving the correspondign responses.
+
+	  The provided interface is intended for debugging and development only,
+	  and should not be used otherwise.
+
+config SURFACE_AGGREGATOR_REGISTRY
+	tristate "Surface System Aggregator Module Device Registry"
+	depends on SURFACE_AGGREGATOR_BUS
+	default m
+	help
+	  Device-registry and device-hubs for Surface System Aggregator Module
+	  (SSAM) devices.
+
+	  Provides a module and driver which act as device-registry for SSAM
+	  client devices that cannot be detected automatically, e.g. via ACPI.
+	  Such devices are instead provided via this registry and attached via
+	  device hubs, also provided in this module.
+
+	  Devices provided via this registry are:
+	  - performance / cooling mode device (all generations)
+	  - battery/AC devices (7th generation)
+	  - HID input devices (7th generation)
+
+	  Note that this module only provides the respective client devices.
+	  Drivers for these devices still need to be selected via the other
+	  options.
+
+config SURFACE_ACPI_NOTIFY
+	tristate "Surface ACPI Notify Driver"
+	depends on SURFACE_AGGREGATOR
+	default m
+	help
+	  Surface ACPI Notify (SAN) driver for Microsoft Surface devices.
+
+	  This driver provides support for the ACPI interface (called SAN) of
+	  the Surface System Aggregator Module (SSAM) EC. This interface is used
+	  on 5th- and 6th-generation Microsoft Surface devices (including
+	  Surface Pro 5 and 6, Surface Book 2, Surface Laptops 1 and 2, and in
+	  reduced functionality on the Surface Laptop 3) to execute SSAM
+	  requests directly from ACPI code, as well as receive SSAM events and
+	  turn them into ACPI notifications. It essentially acts as a
+	  translation layer between the SSAM controller and ACPI.
+
+	  Specifically, this driver may be needed for battery status reporting,
+	  thermal sensor access, and real-time clock information, depending on
+	  the Surface device in question.
+
+config SURFACE_BATTERY
+	tristate "Surface Battery Driver"
+	depends on SURFACE_AGGREGATOR_BUS
+	select POWER_SUPPLY
+	default m
+	help
+	  Driver for battery and AC-adapter devices connected/managed via the
+	  Surface System Aggregator Module (SSAM) EC.
+
+	  This driver provides battery-/AC-information and -status support for
+	  Surface devices where said data is not exposed via the standard ACPI
+	  devices. On those models (7th-generation, i.e. Surface pro 7, Surface
+	  Laptop 3, and Surface Book 3), battery-/AC-status and -information is
+	  instead handled directly via SSAM client devices.
+
+config SURFACE_DTX
+	tristate "Surface Detachment System Driver"
+	depends on SURFACE_AGGREGATOR
+	depends on INPUT
+	default m
+	help
+	  Driver for the Surface Book clipboard detachment system (DTX).
+
+	  On the Surface Book series devices, the display part containing the
+	  CPU (called the clipboard) can be detached from the base (containing a
+	  battery, the keyboard, and, optionally, a discrete GPU) by (if
+	  necessary) unlocking and opening the latch connecting both parts.
+
+	  This driver provides a user-space interface that can influence the
+	  behavior of this process, which includes the option to abort it in
+	  case the base is still in use or speed it up in case it is not.
+
+	  Note that this module can be built without support for the Surface
+	  Aggregator Bus (i.e. CONFIG_SURFACE_AGGREGATOR_BUS=n). In that case,
+	  some devices, specifically the Surface Book 3, will not be supported.
+
+config SURFACE_HID
+	tristate "Surface HID Transport Driver"
+	depends on SURFACE_AGGREGATOR_BUS
+	depends on HID
+	default m
+	help
+	  Transport driver for HID devices connected via the Surface System
+	  Aggregator Module (SSAM).
+
+	  This driver provides support for HID input devices (e.g. touchpad and
+	  keyboard) connected via SSAM. It is required for keyboard input on the
+	  Surface Laptop 1 and 2, as well as keyboard and touchpad input on the
+	  Surface Laptop 3 and Surface Book 3.
+
+	  Note that this module can be built without support for the Surface
+	  Aggregator Bus (i.e. CONFIG_SURFACE_AGGREGATOR_BUS=n). In that case,
+	  some devices, specifically the Surface Book 3 and Surface Laptop 3,
+	  will not be supported.
+
+config SURFACE_HOTPLUG
+	tristate "Surface Hot-Plug System Driver"
+	depends on SURFACE_AGGREGATOR
+	depends on SURFACE_ACPI_NOTIFY
+	depends on GPIO_SYSFS
+	default m
+	help
+	  Driver for the Surface discrete GPU (dGPU) hot-plug system.
+
+	  This driver manages the dGPU power on the Surface Books, including
+	  when hot-plugging it by detaching the clipboard (display part
+	  containing the CPU) from the base (containing the keyboard and dGPU)
+	  of the device when it is running. This driver also provides a
+	  user-space interface via which the dGPU power-state (on/off) can be
+	  set, allowing users to turn off the dGPU in order to reduce power
+	  consumption.
+
+config SURFACE_PERFMODE
+	tristate "Surface Performance-Mode Driver"
+	depends on SURFACE_AGGREGATOR_BUS
+	depends on SYSFS
+	default m
+	help
+	  Driver for the performance-/cooling-mode interface of Microsoft
+	  Surface devices.
+
+	  Microsoft Surface devices using the Surface System Aggregator Module
+	  (SSAM) can be switched between different performance modes. This,
+	  depending on the device, can influence their cooling behavior and may
+	  influence power limits, allowing users to choose between performance
+	  and higher power-draw, or lower power-draw and more silent operation.
+
+	  This driver provides a user-space interface (via sysfs) for
+	  controlling said mode via the corresponding client device.

@@ -1,0 +1,27 @@
+if ARCH_ROCKCHIP || COMPILE_TEST
+
+#
+# Rockchip Soc drivers
+#
+config ROCKCHIP_PM_DOMAINS
+        bool "Rockchip generic power domain"
+        depends on PM
+        select PM_GENERIC_DOMAINS
+        help
+          Say y here to enable power domain support.
+          In order to meet high performance and low power requirements, a power
+          management unit is designed or saving power when RK3288 in low power
+          mode. The RK3288 PMU is dedicated for managing the power of the whole chip.
+
+          If unsure, say N.
+
+config ROCKCHIP_PANIC_HANDLER
+	bool "Rockchip panic handler"
+	depends on (ARCH_ROCKCHIP || COMPILE_TEST) && 64BIT
+	help
+	  Say Y here to enable a panic handler that logs sampled program counter
+	  values for each CPU on RK3399.  This can be helpful in debugging hangs.
+
+	  If unsure, say N.
+
+endif

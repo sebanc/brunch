@@ -1,0 +1,375 @@
+/*
+ * Google Gru-Scarlet Rev0 board device tree source
+ *
+ * Copyright 2017 Google, Inc
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPL or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This file is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This file is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *  Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/dts-v1/;
+
+#include "rk3399-gru.dtsi"
+
+/ {
+	model = "Google Scarlet";
+	compatible = "google,scarlet-rev0", "google,scarlet",
+		     "google,gru", "rockchip,rk3399";
+
+	/* pp1800 children */
+
+	pp1200_rcam: pp1200-rcam {
+		compatible = "regulator-fixed";
+		regulator-name = "pp1200_rcam";
+		pinctrl-names = "default";
+		pinctrl-0 = <&en_rcam_pwr>;
+
+		enable-active-high;
+		gpio = <&gpio4 4 GPIO_ACTIVE_HIGH>;
+
+		startup-delay-us = <270>;
+		vin-supply = <&pp1800_s0>;
+	};
+
+	pp1800_fp: pp1800-fp {
+		compatible = "regulator-fixed";
+		regulator-name = "pp1800_fp";
+		pinctrl-names = "default";
+		pinctrl-0 = <&fp_en>;
+
+		enable-active-high;
+		gpio = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+
+		vin-supply = <&pp1800>;
+	};
+
+	pp1800_rcam: pp1800-rcam {
+		compatible = "regulator-fixed";
+		regulator-name = "pp1800_rcam";
+		pinctrl-names = "default";
+		pinctrl-0 = <&en_rcam_pwr>;
+
+		enable-active-high;
+		gpio = <&gpio4 4 GPIO_ACTIVE_HIGH>;
+
+		vin-supply = <&pp1800_s0>;
+	};
+
+	/* pp3000 children */
+
+	pp2800_rcam: pp2800-rcam {
+		compatible = "regulator-fixed";
+		regulator-name = "pp2800_rcam";
+		pinctrl-names = "default";
+		pinctrl-0 = <&en_rcam_pwr>;
+
+		enable-active-high;
+		gpio = <&gpio4 4 GPIO_ACTIVE_HIGH>;
+
+		startup-delay-us = <500>;
+		vin-supply = <&pp3000>;
+	};
+
+	/* pp3300 children */
+
+	pp3300_fp: pp3300-fp {
+		compatible = "regulator-fixed";
+		regulator-name = "pp3300_fp";
+		/* NOTE: fp_en pinctrl in pp1800_fp */
+
+		enable-active-high;
+		gpio = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+
+		vin-supply = <&pp3300>;
+	};
+
+	backlight: backlight {
+		compatible = "pwm-backlight";
+		pwms = <&cros_ec_pwm 0>;
+		brightness-levels-scale = <0x10000>;
+		default-brightness-level = <0x828f>; /* arbitrary, ~51% */
+		enable-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+		power-supply = <&pp3300_disp>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&bl_en>;
+		pwm-delay-us = <10000>;
+	};
+
+};
+
+ap_i2c_cam: &i2c2 {
+	status = "okay";
+
+	clock-frequency = <400000>;
+
+	/* These are relatively safe rise/fall times; TODO: measure */
+	i2c-scl-falling-time-ns = <50>;
+	i2c-scl-rising-time-ns = <300>;
+
+	// TODO: add MIPI camera node
+};
+
+&ap_i2c_tp {
+	status = "disabled";
+};
+
+&ap_i2c_ts {
+	touchscreen: touchscreen@10 {
+		compatible = "elan,ekth3500";
+		reg = <0x10>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&touch_int_l &touch_reset_l>;
+
+		interrupt-parent = <&gpio3>;
+		interrupts = <13 IRQ_TYPE_LEVEL_LOW>;
+
+		reset-gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&cdn_dp {
+	extcon = <&usbc_extcon0>;
+	phys = <&tcphy0_dp>;
+};
+
+// TODO: remove for new revisions, where centerlogic should be more stable.
+&dmc {
+	rockchip,pd_idle_dis_freq = <800000000>;
+	rockchip,sr_idle_dis_freq = <800000000>;
+	rockchip,sr_mc_gate_idle_dis_freq = <800000000>;
+};
+
+&i2c7 {
+	status = "okay";
+
+	clock-frequency = <400000>;
+
+	/* These are relatively safe rise/fall times; TODO: measure */
+	i2c-scl-falling-time-ns = <50>;
+	i2c-scl-rising-time-ns = <300>;
+
+	rcam: camera@36 {
+		compatible = "ovti,ov5695";
+		reg = <0x36>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&test_clkout1 &reset_rcam>;
+
+		clocks = <&cru SCLK_TESTCLKOUT1>;
+		clock-names = "xvclk";
+
+		avdd-supply = <&pp2800_rcam>;
+		dvdd-supply = <&pp1200_rcam>;
+		dovdd-supply = <&pp1800_rcam>;
+		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
+
+		port {
+			wcam_out: endpoint {
+				remote-endpoint = <&mipi_in_wcam>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
+};
+
+&isp0 {
+	status = "okay";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		isp0_mipi_in: endpoint@0 {
+			reg = <0>;
+			remote-endpoint = <&dphy_rx0_out>;
+		};
+	};
+};
+
+&isp0_mmu {
+	status = "okay";
+};
+
+&mipi_dphy_rx0 {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			mipi_in_wcam: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&wcam_out>;
+				data-lanes = <1 2>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dphy_rx0_out: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&isp0_mipi_in>;
+			};
+		};
+	};
+};
+
+&mipi_dsi {
+	status = "okay";
+
+	ports {
+		mipi_out: port@1 {
+			reg = <1>;
+
+			mipi_out_panel: endpoint {
+				remote-endpoint = <&mipi_in_panel>;
+			};
+		};
+	};
+
+	panel@0 {
+		compatible = "innolux,p079zca";
+		reg = <0>;
+		backlight = <&backlight>;
+		power-supply = <&pp3300_disp>;
+
+		port {
+			mipi_in_panel: endpoint {
+				remote-endpoint = <&mipi_out_panel>;
+			};
+		};
+	};
+};
+
+&spi0 {
+	status = "okay";
+
+	cr50@0 {
+		compatible = "google,cr50";
+
+		interrupt-parent = <&gpio0>;
+		interrupts = <5 IRQ_TYPE_EDGE_RISING>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&h1_int_od_l>;
+
+		reg = <0>;
+		spi-max-frequency = <800000>;
+	};
+};
+
+&spi4 {
+	status = "okay";
+
+	fingerprint@0 {
+		compatible = "fpc,fpc1020";
+		reg = <0>;
+		spi-max-frequency = <5000000>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&fp_int &fp_reset_delayed_l>;
+		reset-gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+
+		interrupt-parent = <&gpio1>;
+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+
+		vdd-supply = <&pp1800_fp>;
+		vddio-supply = <&pp3300_fp>;
+	};
+};
+
+&tcphy1 {
+	status = "disabled";
+};
+
+&usbc_extcon1 {
+	status = "disabled";
+};
+
+&usbdrd3_1 {
+	status = "disabled";
+};
+
+&usbdrd_dwc3_1 {
+	status = "disabled";
+};
+
+/* PINCTRL: always below everything else */
+
+&pinctrl {
+	camera {
+		en_rcam_pwr: en-rcam-pwr {
+			rockchip,pins = <RK_GPIO4 4 RK_FUNC_GPIO
+					 &pcfg_pull_down>;
+		};
+
+		reset_rcam: reset-rcam {
+			rockchip,pins = <RK_GPIO2 5 RK_FUNC_GPIO
+					 &pcfg_pull_down>;
+		};
+	};
+
+	fingerprint {
+		fp_int: fp-int {
+			rockchip,pins = <RK_GPIO1 0 RK_FUNC_GPIO
+					 &pcfg_pull_up>;
+		};
+
+		fp_en: fp-en {
+			rockchip,pins = <RK_GPIO1 1 RK_FUNC_GPIO
+					 &pcfg_pull_none>;
+		};
+
+		fp_reset_delayed_l: fp-reset-delayed-l {
+			rockchip,pins = <RK_GPIO1 3 RK_FUNC_GPIO
+					 &pcfg_pull_down>;
+		};
+	};
+};
+
+/* DON'T PUT ANYTHING BELOW HERE.  PUT IT ABOVE PINCTRL */
+/* DON'T PUT ANYTHING BELOW HERE.  PUT IT ABOVE PINCTRL */
+/* DON'T PUT ANYTHING BELOW HERE.  PUT IT ABOVE PINCTRL */

@@ -1,0 +1,17 @@
+Template: mok/generate
+Type: password
+Description: Going to generate the Machine Owner Key (MOK). Please enter passphrase?
+ The passphrase you enter for this key will be required every time you want to sign a module.
+
+Template: mok/import
+Type: note
+Description: Now I will import the generated key into the secure keystore in UEFI.
+ The passphrase you will enter is only required once, during the following reboot.
+ Please press Return to go on...
+
+Template: mok/reboot
+Type: select
+Choices: yes, no
+Description: Reboot your computer now to complete the enrollment of your new MOK.
+ Please reboot your computer now to complete the enrollment of your new MOK.
+ This is going to look somewhat similar to https://sourceware.org/systemtap/wiki/SecureBoot

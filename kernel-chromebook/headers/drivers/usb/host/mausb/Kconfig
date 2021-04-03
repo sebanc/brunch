@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Kernel configuration file for MA-USB Host driver.
+#
+# Copyright (c) 2019 - 2020 DisplayLink (UK) Ltd.
+#
+
+config USB_HOST_MAUSB
+	tristate "Media Agnostic (MA) USB Host Driver"
+	help
+	  This is a Media Agnostic (MA) USB Host driver which enables host
+	  communication via MA USB protocol stack.
+
+	  If this driver is compiled as a module, it will be named mausb_host.

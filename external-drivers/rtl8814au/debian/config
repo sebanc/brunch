@@ -1,0 +1,65 @@
+#!/bin/sh -e
+
+# Source debconf library.
+. /usr/share/debconf/confmodule
+
+PROMPT="${PROMPT:-Enter Machine Owner Key (MOK) passphrase: }"
+KERNELVER=${KERNELVER:-$(uname -r)}
+
+MOKPRIV=/etc/mok/MOK.priv
+MOKDER=/etc/mok/MOK.der
+
+IS_SECBOOT=0
+PASSWD=""
+
+read_passphrase() {
+    # We write to /dev/tty to get around DKMS' redirection to /dev/null if it's being run with -q (e.g. during rpm installs)
+    echo -n "$PROMPT" > /dev/tty
+    read -s KBUILD_SIGN_PIN < /dev/tty
+    export KBUILD_SIGN_PIN
+    echo > /dev/tty
+    openssl rsa -check -noout -passin env:KBUILD_SIGN_PIN -in $mydir/MOK.priv > /dev/null 2>&1
+}
+
+do_sign() {
+    /lib/modules/$KERNELVER/build/scripts/sign-file sha256 $MOKPRIV $MOKDER "$1"
+}
+
+# check UEFI security boot
+mokutil --sb-state|grep "enable"
+if  [  $? -eq 0 ]; then
+    echo "SecureBoot"
+    IS_SECBOOT=1
+fi
+
+
+#
+if [ $IS_SECBOOT ]; then
+    # check exist MOK
+    if [ ! -e $MOKPRIV ]; then
+        #generate the Machine Owner Key
+        db_input PASSWD mok/generate || true
+        db_go
+        openssl req -new -x509 -newkey rsa:2048 -keyout $MOKPRIV -outform DER -out $MOKDER -days 36500 -subj "/CN=$(hostname) module signing key/" || exit 1
+    fi
+    # check password?
+    if [ -z $PASSWD ]; then
+        echo "check password"
+        # while ! read_passphrase; do echo "Wrong passphrase, please try again."; done
+    fi
+    # sign drivers
+    for module in $@; do
+        do_sign "$module"
+    done
+
+    # import MOK
+    db_input PASSWD mok/import || true
+    db_go
+    mokutil --import $MOKDER || exit 1
+    #
+    db_get mok/reboot
+    if [ "$RET" = "true" ]; then
+        # reboot
+        shutdown -r now
+    fi
+fi

@@ -1,0 +1,11 @@
+--- drivers/remoteproc/mtk_scp.c	2021-01-09 13:46:25.000000000 +0100
++++ drivers/remoteproc/mtk_scp.c	2021-03-20 09:20:19.000000000 +0100
+@@ -832,7 +877,7 @@
+ 	.remove = scp_remove,
+ 	.driver = {
+ 		.name = "mtk-scp",
+-		.of_match_table = of_match_ptr(mtk_scp_of_match),
++		.of_match_table = mtk_scp_of_match,
+ 	},
+ };
+ 

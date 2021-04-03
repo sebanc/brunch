@@ -1,0 +1,91 @@
+#! /bin/bash
+#
+# Copyright (c) 2013 The Chromium OS Authors. All rights reserved.
+# Distributed under the terms of the GNU General Public License v2
+
+# Print help if no args provided, or if the user is requesting help.
+if [[ $# -eq 0 || $1 == "--help" || $1 == "-h" ]]; then
+	name=$(basename $0)
+	cat <<-EOF
+	USAGE: ./${name} [list of boards]
+	  e.g. ./${name} x86-generic amd64-generic daisy
+	  This command will build kernel for the following boards:
+	    - x86-generic
+	    - amd64-generic
+	    - daisy
+	  It will then generate a file containing all smatch errors not already
+	  in the known errors whitelist.  Duplicates will be listed only once.
+
+	  If chromeos-kernel is not cros_workon'd for a board, that board will
+	  be skipped.
+	EOF
+	exit
+fi
+
+# Put board name arguments into a list.
+BOARDS=()
+SKIPPED_BOARDS=()
+while [[ $# -gt 0 ]]; do
+	board=$1
+	# If kernel is not cros-workon'd, then skip this board.
+	if cros_workon-${board} list | grep -q chromeos-kernel; then
+		BOARDS+=( "${board}" )
+	else
+		SKIPPED_BOARDS+=( "${board}" )
+	fi
+	shift
+done
+
+datestamp() {
+	date +%Y%m%d%H%M%s
+}
+
+# We want to ignore smatch test errors when building kernel, so that we can
+# collect those errors for updating the whitelist.
+export FEATURES='test test-fail-continue'
+export USE="smatch ignore_test_errors"
+LOG_FILES=()
+for board in "${BOARDS[@]}"; do
+	LOG_FILE=/tmp/${board}-kernel-$(datestamp).log
+
+	emerge-${board} chromeos-kernel |& tee "${LOG_FILE}"
+	pipestatus=${PIPESTATUS[*]}
+	if [[ ${pipestatus// } -ne 0 ]]; then
+		echo "Error building kernel for ${board}" >&2
+		exit 1
+	fi
+	grep "Non-whitelisted error found:" "${LOG_FILE}" | cut -f 2- -d: | \
+		sed -e 's/"$//g' | cut -f 2- -d '"' | \
+		sort > "${LOG_FILE}.new_errors"
+	LOG_FILES+=( "${LOG_FILE}.new_errors" )
+done
+
+# Create a new log file to contain all errors, overwriting it if it already
+# exists.  For each board's new errors, add to this log file the errors that
+# haven't already been added.  This creates the union of all new errors.
+NEW_ERRORS_FILE=/tmp/smatch_new_errors-$(datestamp).log
+for log_file in "${LOG_FILES[@]}"; do
+	while read line; do
+		fgrep -q "${line}" "${NEW_ERRORS_FILE}" && continue
+		echo "${line}"
+	done < "${log_file}"
+done > "${NEW_ERRORS_FILE}"
+
+# Rename the new errors file to reflect the new boards, and move it to the
+# current working directory.
+BOARDS_NO_SPACES=$(printf -- -%s "${BOARDS[@]}")
+NEW_ERRORS_FILE_FINAL=smatch_new_errors${BOARDS_NO_SPACES}.log
+if [[ $(wc -l < "${NEW_ERRORS_FILE}") -ne 0 ]]; then
+	mv "${NEW_ERRORS_FILE}" "${NEW_ERRORS_FILE_FINAL}" || exit
+fi
+
+echo "*****************************************************"
+echo "Done building kernel for these boards: ${BOARDS[*]}"
+[[ ${#SKIPPED_BOARDS[@]} -gt 0 ]] && \
+	echo "Skipped these boards because kernel was not cros_workon'd:" \
+		"${SKIPPED_BOARDS[*]}"
+if [[ -e ${NEW_ERRORS_FILE_FINAL} ]]; then
+	echo "New smatch errors are in ${NEW_ERRORS_FILE_FINAL}"
+else
+	echo "No new smatch errors found."
+fi

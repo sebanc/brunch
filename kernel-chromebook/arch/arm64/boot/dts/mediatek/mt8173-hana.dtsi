@@ -1,0 +1,56 @@
+/*
+ * Copyright 2016 MediaTek Inc.
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "mt8173-elm.dtsi"
+
+&i2c_tunnel {
+	google,limited-passthrough;
+};
+
+&i2c0 {
+	clock-frequency = <200000>;
+};
+
+&i2c3 {
+	/delete-node/touchscreen@10;
+	touchscreen: touchscreen@34 {
+		compatible = "melfas,mip4_ts";
+		reg = <0x34>;
+		interrupt-parent = <&pio>;
+		interrupts = <88 IRQ_TYPE_LEVEL_LOW>;
+	};
+};
+
+&mmc1 {
+	wp-gpios = <&pio 42 GPIO_ACTIVE_HIGH>;
+};
+
+&pio {
+	hdmi_mux_pins: hdmi_mux_pins {
+		pins2 {
+			pinmux = <MT8173_PIN_98_URTS1__FUNC_GPIO98>;
+			slew-rate = <1>;
+			bias-pull-up;
+			output-high;
+		};
+	};
+
+	mmc1_pins_default: mmc1default {
+		pins_wp {
+			pinmux = <MT8173_PIN_42_DSI_TE__FUNC_GPIO42>;
+			input-enable;
+			bias-pull-up;
+		};
+	};
+};

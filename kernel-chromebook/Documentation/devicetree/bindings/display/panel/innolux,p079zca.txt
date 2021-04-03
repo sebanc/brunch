@@ -1,0 +1,30 @@
+Innolux P079ZCA 7.85" 768x1024 TFT LCD panel
+Innolux P097PFG 9.7" 1536x2048 TFT LCD panel
+
+Required properties:
+- compatible: should be one of the following.
+    -"innolux,p079zca" for Innolux 7.9" P079ZCA 768*1024 panel
+    -"innolux,p097pfg" for Innolux 9.7" P097PFG 1536*2048 panel
+- reg: DSI virtual channel of the peripheral
+- enable-gpios: panel enable gpio
+
+Optional properties:
+- backlight: phandle of the backlight device attached to the panel
+- power-supply: phandle of the regulator that provides the supply voltage
+- avdd-supply: phandle of the regulator that provides positive voltage
+- avee-supply: phandle of the regulator that provides negative voltage
+
+Example:
+
+	&mipi_dsi {
+		panel {
+			compatible = "innolux,p079zca";
+			reg = <0>;
+			power-supply = <...>;
+			avdd-supply = <...>;
+			avee-supply = <...>;
+			backlight = <&backlight>;
+			enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+			status = "okay";
+		};
+	};

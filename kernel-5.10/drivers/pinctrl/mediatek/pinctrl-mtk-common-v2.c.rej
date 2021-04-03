@@ -1,0 +1,13 @@
+--- drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c	2021-01-09 13:46:25.000000000 +0100
++++ drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c	2021-03-20 09:20:18.000000000 +0100
+@@ -926,6 +926,10 @@
+ 			err = hw->soc->bias_set(hw, desc, pullup);
+ 			if (err)
+ 				return err;
++		} else if (hw->soc->bias_set_combo) {
++			err = hw->soc->bias_set_combo(hw, desc, pullup, arg);
++			if (err)
++				return err;
+ 		} else {
+ 			return -ENOTSUPP;
+ 		}

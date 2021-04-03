@@ -1,0 +1,61 @@
+language: c
+compiler: gcc
+dist: bionic
+os: linux
+
+before_install:
+  - export KERNEL_URL_DETAILS=$(wget --quiet -O - ${KERNEL_URL}v${KVER}/ | grep -A8 'Build for amd64\|Test amd64')
+  - export ALL_DEB=$(echo "$KERNEL_URL_DETAILS" |  grep -m1 'all.deb' | cut -d '"' -f 2)
+  - export KVER_BUILD=$(echo $ALL_DEB | cut -d '_' -f 2 | rev | cut -c14- | rev)
+  - wget ${KERNEL_URL}v${KVER}/$(echo "$KERNEL_URL_DETAILS" | grep -m1 'amd64.deb' | cut -d '"' -f 2)
+  - wget ${KERNEL_URL}v${KVER}/$ALL_DEB
+  - sudo dpkg -i *.deb
+
+script:
+  - make CC=$COMPILER KVER=$KVER_BUILD-generic
+env:
+  global:
+    - KERNEL_URL=https://kernel.ubuntu.com/~kernel-ppa/mainline/
+
+addons:
+  apt:
+    packages:
+      #Force update to GCC-7.5 in order to compile Kernels >= 5.4.
+      - gcc-7
+
+cache:
+  - ccache: true
+
+jobs:
+  include:
+    - addons:
+        apt:
+          sources:
+            - sourceline: "ppa:ubuntu-toolchain-r/test"
+          packages:
+            - gcc-9
+      env: COMPILER=gcc-9 KVER=$(curl -s https://www.kernel.org/releases.json | grep 'mainline' -B1 | head -1 | cut -d'"' -f4)
+    - addons:
+        apt:
+          packages:
+            - gcc-8
+      env: COMPILER=gcc-8 KVER=$(curl -s https://www.kernel.org/releases.json | grep 'mainline' -B1 | head -1 | cut -d'"' -f4)
+
+    - env: COMPILER=gcc-7 KVER=$(curl -s https://www.kernel.org/releases.json | grep 'mainline' -B1 | head -1 | cut -d'"' -f4)
+    - env: COMPILER=gcc-7 KVER=$(curl -s https://www.kernel.org/releases.json | grep -A1 'latest_stable' | tail -1 | cut -d'"' -f4)
+ #Kernels 5.4 with minor versions > 28 are failing on amd64. Not upgrade the minor version without check https://kernel.ubuntu.com/~kernel-ppa/mainline/
+    - env: COMPILER=gcc-7 KVER=5.4.28
+    - env: COMPILER=gcc-7 KVER=4.19.116
+    - env: COMPILER=gcc-7 KVER=4.14.176
+    - env: COMPILER=gcc-7 KVER=4.9.219
+    - env: COMPILER=gcc-7 KVER=4.4.219
+
+#Version 4.15.x requested to test Ubuntu 18.04 LTS version
+#TODO identify 4.15.x version dynamically instead of hardcode it.
+    - addons:
+        apt:
+          packages:
+            - linux-headers-4.15.0-20-generic
+#Use the kernel headers from apt instead of download it from an external source
+      before_install: true
+      env: COMPILER=gcc-7 $KVER_BUILD=4.15.0-20

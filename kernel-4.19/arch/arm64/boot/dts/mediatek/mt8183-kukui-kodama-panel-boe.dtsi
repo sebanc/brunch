@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2020 Google LLC
+ *
+ * SKU bits 7..4: Panel ID: 0x2 (BOE)
+ */
+
+&panel {
+	status = "okay";
+	compatible = "boe,tv101wum-n53";
+	reg = <0>;
+	enable-gpios = <&pio 45 0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&panel_pins_default>;
+	avdd-supply = <&ppvarn_lcd>;
+	avee-supply = <&ppvarp_lcd>;
+	pp1800-supply = <&pp1800_lcd>;
+	rotation = <270>;
+};

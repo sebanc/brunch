@@ -1,0 +1,141 @@
+energy-costs {
+	MT8173_CPU_COST_0: mt8173-core-cost0 {
+		busy-cost-data = <
+			204	48
+			295	66
+			420	115
+			465	137
+			500	156
+			591	217
+		>;
+		idle-cost-data = <
+			3
+			3
+			0
+			0
+		>;
+	};
+	MT8173_CPU_COST_1: mt8173-core-cost1 {
+		busy-cost-data = <
+			284	155
+			398	174
+			569	289
+			682	428
+			796	602
+			921	835
+			1024	1098
+		>;
+		idle-cost-data = <
+			6
+			6
+			0
+			0
+		>;
+	};
+	MT8173_CLUSTER_COST_0: mt8173-cluster-cost0 {
+		busy-cost-data = <
+			204	74
+			295	104
+			420	151
+			465	168
+			500	181
+			591	220
+		>;
+		idle-cost-data = <
+			21
+			21
+			21
+			1
+		>;
+	};
+	MT8173_CLUSTER_COST_1: mt8173-cluster-cost1 {
+		busy-cost-data = <
+			284	90
+			398	127
+			569	174
+			682	201
+			796	222
+			921	240
+			1024	252
+		>;
+		idle-cost-data = <
+			37
+			37
+			37
+			5
+		>;
+	};
+
+	MT8173_TURBO_CPU_COST_0: mt8173-turbo-core-cost0 {
+		busy-cost-data = <
+			174	48
+			245	72
+			348	99
+			389	110
+			430	122
+			460	133
+			532	160
+			604	210
+		>;
+		idle-cost-data = <
+			3
+			3
+			0
+			0
+		>;
+	};
+	MT8173_TURBO_CPU_COST_1: mt8173-turbo-core-cost1 {
+		busy-cost-data = <
+			245	165
+			337	212
+			481	317
+			583	415
+			675	522
+			778	657
+			870	799
+			1024	1081
+		>;
+		idle-cost-data = <
+			6
+			6
+			0
+			0
+		>;
+	};
+	MT8173_TURBO_CLUSTER_COST_0: mt8173-turbo-cluster-cost0 {
+		busy-cost-data = <
+			174	27
+			245	45
+			348	93
+			389	111
+			430	129
+			460	146
+			532	188
+			604	208
+		>;
+		idle-cost-data = <
+			21
+			21
+			21
+			1
+		>;
+	};
+	MT8173_TURBO_CLUSTER_COST_1: mt8173-turbo-cluster-cost1 {
+		busy-cost-data = <
+			245	56
+			337	107
+			481	182
+			583	231
+			675	276
+			778	321
+			870	363
+			1024	393
+		>;
+		idle-cost-data = <
+			37
+			37
+			37
+			5
+		>;
+	};
+};

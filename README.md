@@ -16,14 +16,13 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 Base hardware compatibility:
 - x86_64 computers with UEFI boot support (BIOS/MBR devices have limited support through a specific procedure detailled in "Limited support for MBR/BIOS devices" section),
 - Intel hardware (CPU and GPU) starting from 1st generation "Nehalem" (refer to https://en.wikipedia.org/wiki/Intel_Core),
-- AMD Ryzen 3XXX (CPU and GPU), only with "zork" recovery image (newer Ryzen models are not yet supported),
+- AMD Ryzen (CPU and GPU), only with "zork" recovery image,
 - AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU are not supported),
 - Devices having only a Nvidia graphic card are not supported.
 
 Notes: 
 - Intel Gen 1 graphics do not work with ChromeOS versions above r81 (it might still change with a future ChromeOS update).
-- Some Intel 10th Gen devices do not seem to be compatible with the android container.
-- Intel 11th Gen devices are not supported for now.
+- Some Intel 10th Gen / 11th Gen devices do not seem to be compatible with the arc++ android container (you can try arcvm by using "hatch" recovery in beta channel).
 
 Specific hardware support:
 - sensors: an experimental patch aims to allow intel ISH accelerometer and light sensors through a custom kernel module,
@@ -44,7 +43,7 @@ Contrarily to the Croissant framework which mostly supports non-unibuilds images
 Currently:
 - "rammus" is the recommended image for devices with 4th generation Intel CPU and newer.
 - "samus" is the recommended image for devices with 3rd generation Intel CPU and older.
-- "zork" is the image to use for AMD Ryzen 3XXX.
+- "zork" is the image to use for AMD Ryzen.
 - "grunt" is the image to use for AMD Stoney Ridge.
 
 ChromeOS recovery images can be downloaded from: https://cros-updates-serving.appspot.com/ or https://cros.tech/
@@ -253,6 +252,7 @@ Some options can be passed through the kernel command lines to activate specific
 - "rtl8188eu": enable this option if you have a rtl8188eu wireless card/adapter,
 - "rtl8723bu": enable this option if you have a rtl8723bu wireless card/adapter,
 - "rtl8723de": enable this option if you have a rtl8723de wireless card/adapter,
+- "rtl8723du": enable this option if you have a rtl8723du wireless card/adapter,
 - "rtl8812au": enable this option if you have a rtl8812au wireless card/adapter,
 - "rtl8814au": enable this option if you have a rtl8814au wireless card/adapter,
 - "rtl8821ce": enable this option if you have a rtl8821ce wireless card/adapter,

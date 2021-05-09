@@ -16,13 +16,12 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 Base hardware compatibility:
 - x86_64 computers with UEFI boot support (BIOS/MBR devices have limited support through a specific procedure detailled in "Limited support for MBR/BIOS devices" section),
 - Intel hardware (CPU and GPU) starting from 1st generation "Nehalem" (refer to https://en.wikipedia.org/wiki/Intel_Core),
-- AMD Ryzen (CPU and GPU), only with "zork" recovery image,
-- AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units), only with "grunt" recovery image (older AMD CPU are not supported),
-- Devices having only a Nvidia graphic card are not supported.
+- AMD Ryzen (CPU and GPU),
+- AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units),
+- Devices having only a Nvidia GPU are not supported.
 
 Notes: 
 - Intel Gen 1 graphics do not work with ChromeOS versions above r81 (it might still change with a future ChromeOS update).
-- Some Intel 10th Gen / 11th Gen devices do not seem to be compatible with the arc++ android container (you can try arcvm by using "hatch" recovery in beta channel).
 
 Specific hardware support:
 - sensors: an experimental patch aims to allow intel ISH accelerometer and light sensors through a custom kernel module,
@@ -41,9 +40,9 @@ Additional features:
 Contrarily to the Croissant framework which mostly supports non-unibuilds images (configuration and access to android apps), Brunch should work with both but will provide better hardware support for unibuild images.
 
 Currently:
-- "rammus" is the recommended image for devices with 4th generation Intel CPU and newer.
-- "samus" is the recommended image for devices with 3rd generation Intel CPU and older.
-- "zork" is the image to use for AMD Ryzen.
+- "rammus" is the recommended image for devices with 1st gen Intel CPU up to 9th gen.
+- "volteer" is the recommended image for devices with Intel 10th and 11th gen CPU (Intel 11th Gen devices need kernel 5.10, read "Changing kernel version" section).
+- "zork" is the image to use for AMD Ryzen (Ryzen 4xxx devices need kernel 5.10, read "Changing kernel version" section).
 - "grunt" is the image to use for AMD Stoney Ridge.
 
 ChromeOS recovery images can be downloaded from: https://cros-updates-serving.appspot.com/ or https://cros.tech/

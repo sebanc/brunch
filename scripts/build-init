@@ -1,0 +1,450 @@
+#!/bin/bash
+export HOME=/home/chronos
+export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib:/lib64:/lib
+export C_INCLUDE_PATH=/usr/local/include/ncurses
+export GCONV_PATH=/usr/local/lib64/gconv
+export PERL5LIB=/usr/local/lib/perl5/5.32.0
+export PKG_CONFIG_PATH=/home/chronos/inih-pkg/usr/lib64/pkgconfig:/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig:/usr/local/lib64/pkgconfig
+export PYTHON=/usr/local/bin/python3
+export PYTHONHOME=/usr/local
+export SGML_CATALOG_FILES="/usr/local/etc/sgml/catalog"
+export XML_CATALOG_FILES="/usr/local/etc/xml/catalog"
+export LANGUAGE=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+blocksize() {
+  local path="$1"
+  if [ -b "${path}" ]; then
+    local dev="${path##*/}"
+    local sys="/sys/block/${dev}/queue/logical_block_size"
+    if [ -e "${sys}" ]; then
+      cat "${sys}"
+    else
+      local part="${path##*/}"
+      local block
+      block="$(get_block_dev_from_partition_dev "${path}")"
+      block="${block##*/}"
+      cat "/sys/block/${block}/${part}/queue/logical_block_size"
+    fi
+  else
+    echo 512
+  fi
+}
+
+numsectors() {
+  local block_size
+  local sectors
+  local path="$1"
+
+  if [ -b "${path}" ]; then
+    local dev="${path##*/}"
+    block_size="$(blocksize "${path}")"
+
+    if [ -e "/sys/block/${dev}/size" ]; then
+      sectors="$(cat "/sys/block/${dev}/size")"
+    else
+      part="${path##*/}"
+      block="$(get_block_dev_from_partition_dev "${path}")"
+      block="${block##*/}"
+      sectors="$(cat "/sys/block/${block}/${part}/size")"
+    fi
+  else
+    local bytes
+    bytes="$(stat -c%s "${path}")"
+    local rem=$(( bytes % 512 ))
+    block_size=512
+    sectors=$(( bytes / 512 ))
+    if [ "${rem}" -ne 0 ]; then
+      sectors=$(( sectors + 1 ))
+    fi
+  fi
+
+  echo $(( sectors * 512 / block_size ))
+}
+
+write_base_table() {
+  local target="$1"
+  local blocks
+  block_size=$(blocksize "${target}")
+  numsecs=$(numsectors "${target}")
+  local curr=32768
+  if [ $(( 0 & (block_size - 1) )) -gt 0 ]; then
+    echo "Primary Entry Array padding is not block aligned." >&2
+    exit 1
+  fi
+  cgpt create -p $(( 0 / block_size )) "${target}"
+  blocks=$(( 8388608 / block_size ))
+  if [ $(( 8388608 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 11 -b $(( curr / block_size )) -s ${blocks} -t firmware     -l "RWFW" "${target}"
+  : $(( curr += blocks * block_size ))
+  blocks=$(( 1 / block_size ))
+  if [ $(( 1 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 6 -b $(( curr / block_size )) -s ${blocks} -t kernel     -l "KERN-C" "${target}"
+  : $(( curr += blocks * block_size ))
+  if [ $(( curr % 4096 )) -gt 0 ]; then
+    : $(( curr += 4096 - curr % 4096 ))
+  fi
+  blocks=$(( 1073741824 / block_size ))
+  if [ $(( 1073741824 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 7 -b $(( curr / block_size )) -s ${blocks} -t rootfs     -l "ROOT-C" "${target}"
+  : $(( curr += blocks * block_size ))
+  blocks=$(( 1 / block_size ))
+  if [ $(( 1 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 9 -b $(( curr / block_size )) -s ${blocks} -t reserved     -l "reserved" "${target}"
+  : $(( curr += blocks * block_size ))
+  blocks=$(( 1 / block_size ))
+  if [ $(( 1 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 10 -b $(( curr / block_size )) -s ${blocks} -t reserved     -l "reserved" "${target}"
+  : $(( curr += blocks * block_size ))
+  blocks=$(( 2062336 / block_size ))
+  if [ $(( 2062336 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  : $(( curr += blocks * block_size ))
+  blocks=$(( 33554432 / block_size ))
+  if [ $(( 33554432 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 2 -b $(( curr / block_size )) -s ${blocks} -t kernel     -l "KERN-A" "${target}"
+  : $(( curr += blocks * block_size ))
+  blocks=$(( 33554432 / block_size ))
+  if [ $(( 33554432 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 4 -b $(( curr / block_size )) -s ${blocks} -t kernel     -l "KERN-B" "${target}"
+  : $(( curr += blocks * block_size ))
+  if [ $(( curr % 4096 )) -gt 0 ]; then
+    : $(( curr += 4096 - curr % 4096 ))
+  fi
+  blocks=$(( 16777216 / block_size ))
+  if [ $(( 16777216 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 8 -b $(( curr / block_size )) -s ${blocks} -t data     -l "OEM" "${target}"
+  : $(( curr += blocks * block_size ))
+  blocks=$(( 67108864 / block_size ))
+  if [ $(( 67108864 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  : $(( curr += blocks * block_size ))
+  blocks=$(( 33554432 / block_size ))
+  if [ $(( 33554432 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 12 -b $(( curr / block_size )) -s ${blocks} -t efi     -l "EFI-SYSTEM" "${target}"
+  : $(( curr += blocks * block_size ))
+  if [ $(( curr % 4096 )) -gt 0 ]; then
+    : $(( curr += 4096 - curr % 4096 ))
+  fi
+  blocks=$(( 4294967296 / block_size ))
+  if [ $(( 4294967296 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 5 -b $(( curr / block_size )) -s ${blocks} -t rootfs     -l "ROOT-B" "${target}"
+  : $(( curr += blocks * block_size ))
+  if [ $(( curr % 4096 )) -gt 0 ]; then
+    : $(( curr += 4096 - curr % 4096 ))
+  fi
+  blocks=$(( 4294967296 / block_size ))
+  if [ $(( 4294967296 % block_size )) -gt 0 ]; then
+     : $(( blocks += 1 ))
+  fi
+  cgpt add -i 3 -b $(( curr / block_size )) -s ${blocks} -t rootfs     -l "ROOT-A" "${target}"
+  : $(( curr += blocks * block_size ))
+  if [ $(( curr % 4096 )) -gt 0 ]; then
+    : $(( curr += 4096 - curr % 4096 ))
+  fi
+  blocks=$(( numsecs - (curr + 24576) / block_size ))
+  cgpt add -i 1 -b $(( curr / block_size )) -s ${blocks} -t data     -l "STATE" "${target}"
+  cgpt add -i 2 -S 0 -T 15 -P 15 "${target}"
+  cgpt add -i 4 -S 0 -T 15 -P 0 "${target}"
+  cgpt add -i 6 -S 0 -T 15 -P 0 "${target}"
+  cgpt boot -p -i 12 "${target}"
+  cgpt add -i 12 -B 0 "${target}"
+  cgpt show "${target}"
+}
+
+cd /home/chronos/
+
+version="$(/opt/google/chrome/chrome --version)"
+version=r"${version:14:2}"
+echo "Entered chroot with recovery version $version"
+
+sudo chown 1000:1000 /usr/local
+
+curl -L https://github.com/sebanc/brunch-toolchain/releases/download/20210411/brunch_toolchain_20210411.tar.gz -o brunch_toolchain.tar.gz
+tar zxf brunch_toolchain.tar.gz -C /usr/local
+sudo rm /usr/lib64/libc.so /usr/lib64/libm.so
+
+mkdir -p ./version-pkg/etc
+echo "Brunch $version $(date +"%Y%m%d")" > ./version-pkg/etc/brunch_version
+cd ./version-pkg
+tar zcvf ../rootc/packages/version.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./version-pkg
+
+mkdir -p ./initramfs/{bin,lib64,sbin}
+mkdir -p ./binaries-pkg/usr/sbin
+
+git clone -b master https://git.code.sf.net/p/linuxconsole/code linuxconsole
+cd linuxconsole/utils
+make -j$(($(nproc)-1)) inputattach
+cp inputattach ../../binaries-pkg/usr/sbin/
+cd ../..
+rm -rf ./linuxconsole
+
+git clone --depth=1 -b msr-tools-1.3 https://github.com/intel/msr-tools.git
+cd msr-tools
+make -j$(($(nproc)-1))
+cp cpuid ../binaries-pkg/usr/sbin/
+cp rdmsr ../binaries-pkg/usr/sbin/
+cp wrmsr ../binaries-pkg/usr/sbin/
+cd ..
+rm -rf ./msr-tools
+
+git clone --depth=1 -b master https://github.com/joewalnes/websocketd.git
+cd ./websocketd
+make -j$(($(nproc)-1)) websocketd
+cp ./websocketd ../binaries-pkg/usr/sbin/
+cd ..
+rm -rf ./websocketd
+
+git clone --depth=1 -b master git://thekelleys.org.uk/dnsmasq.git
+cd dnsmasq
+sed -i "s#PREFIX        = /usr/local#PREFIX        = /usr#g" ./Makefile
+make -j$(($(nproc)-1))
+cp ./src/dnsmasq ../binaries-pkg/usr/sbin/
+cd ..
+rm -rf ./dnsmasq
+
+git clone --depth=1 -b master https://github.com/tinyproxy/tinyproxy.git
+cd tinyproxy
+./autogen.sh --prefix=/usr
+make -j$(($(nproc)-1))
+cp ./src/tinyproxy ../binaries-pkg/usr/sbin/
+cd ..
+rm -rf ./tinyproxy
+
+git clone --depth=1 -b master https://github.com/plougher/squashfs-tools.git
+cd squashfs-tools/squashfs-tools
+make -j$(($(nproc)-1))
+cp mksquashfs ../../binaries-pkg/usr/sbin/
+cp unsquashfs ../../binaries-pkg/usr/sbin/
+cd ../..
+rm -rf ./squashfs-tools
+
+git clone --depth=1 -b master https://github.com/icetee/pv
+cd ./pv
+./configure --prefix=/usr
+make
+sudo make install
+make DESTDIR=/home/chronos/pv-pkg install
+cp /home/chronos/pv-pkg/usr/bin/pv ../binaries-pkg/usr/sbin/
+cp /home/chronos/pv-pkg/usr/bin/pv ../initramfs/sbin/
+cd ..
+rm -rf ./pv
+
+cd ./binaries-pkg
+tar zcvf ../rootc/packages/binaries.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./binaries-pkg
+
+git clone -b master https://github.com/godspeed1989/fbv.git fbv
+cd ./fbv
+./configure --prefix=/
+make -j$(($(nproc)-1))
+cp ./fbv ../initramfs/bin/
+for i in $(ldd ./fbv | cut -d' ' -f3); do cp "$i" ../initramfs/lib64/; done
+cd ..
+rm -rf ./fbv
+
+git clone -b master https://github.com/linux-surface/iptsd.git iptsd
+cd iptsd
+meson --prefix="/usr" -Dservice_manager="" -Dsample_config=false build/
+meson configure build/
+DESTDIR=/home/chronos/ipts-pkg ninja -C build/ install
+cd ..
+rm -rf ./iptsd
+cd ./ipts-pkg
+tar zcvf ../rootc/packages/ipts.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./ipts-pkg
+
+git clone -b master https://github.com/jirka-h/haveged.git
+cd haveged
+./configure --prefix=/usr --libdir=/usr/lib64 --disable-init --enable-tune=no
+make -j$(($(nproc)-1))
+make DESTDIR=/home/chronos/haveged-pkg install
+cp ../haveged-pkg/usr/sbin/haveged ../initramfs/sbin/
+cp ../haveged-pkg/usr/lib64/libhavege.so* ../initramfs/lib64/
+cd ..
+rm -rf ./haveged
+
+git clone -b popt-1.18-release https://github.com/rpm-software-management/popt.git
+cd ./popt
+./autogen.sh
+./configure --prefix=/usr --libdir=/usr/lib64
+make -j$(($(nproc)-1))
+make DESTDIR=/home/chronos/efibootmgr-pkg install
+cd ..
+rm -rf ./popt
+
+git clone -b 37 https://github.com/rhboot/efivar.git
+cd ./efivar
+sed -i "s# --add-needed##g" ./gcc.specs
+make -j$(($(nproc)-1)) CFLAGS="-Wno-address-of-packed-member"
+make DESTDIR=/home/chronos/efibootmgr-pkg install
+sed -i "s#/usr#/home/chronos/efibootmgr-pkg/usr#g" /home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig/*
+cd ..
+rm -rf ./efivar
+
+git clone -b master https://github.com/rhboot/efibootmgr.git
+cd ./efibootmgr
+make -j$(($(nproc)-1)) EFIDIR=boot EFI_LOADER=grubx64.efi CFLAGS="-Wno-pointer-sign" C_INCLUDE_PATH=/home/chronos/efibootmgr-pkg/usr/include
+make EFIDIR=boot EFI_LOADER=grubx64.efi DESTDIR=/home/chronos/efibootmgr-pkg install
+cd ..
+rm -rf ./efibootmgr
+
+cd ./efibootmgr-pkg
+sed -i "s#/home/chronos/efibootmgr-pkg/usr#/usr#g" /home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig/*
+tar zcvf ../rootc/packages/efibootmgr.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./efibootmgr-pkg
+
+git clone --depth=1 -b master https://github.com/stefanberger/libtpms.git
+cd ./libtpms
+./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib64 --with-openssl --with-tpm2
+make install
+cd ..
+rm -rf ./libtpms
+
+git clone --depth=1 -b master https://github.com/stefanberger/swtpm.git
+cd ./swtpm
+sed -i '/AC_CONFIG_SRCDIR/ a AC_CONFIG_AUX_DIR([.])' ./configure.ac
+./autogen.sh --prefix=/usr --libdir=/usr/lib64 --disable-python-installation with_seccomp=no with_swtpm_setup=no with_gnutls=no with_cuse=no with_swtpm_setup=no
+make -j$(($(nproc)-1))
+make DESTDIR=/home/chronos/swtpm-pkg install
+for i in $(ldd ../swtpm-pkg/usr/bin/swtpm | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../swtpm-pkg/usr/lib64/; fi; done
+cd ..
+rm -rf ./swtpm
+
+cd ./swtpm-pkg/usr/lib64
+mv ./swtpm/* ./
+rm -r `ls | grep -v '.so'`
+cd ../bin
+rm -r `ls swtpm_* | grep -v 'swtpm_ioctl'`
+cd ../..
+mkdir -p ./etc/init
+cat >./etc/init/swtpm.conf <<SWTPM
+start on stopped startup
+
+script
+   modprobe tpm_vtpm_proxy
+   mkdir -p /var/lib/swtpm
+   if [ -f "/etc/init/trunksd.conf" ]; then
+   	swtpm chardev --vtpm-proxy --tpm2 --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001 --flags startup-clear
+   else
+   	swtpm chardev --vtpm-proxy --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001 --flags startup-clear
+   fi
+   swtpm_ioctl --tcp :10001 -i
+end script
+SWTPM
+tar zcvf ../rootc/packages/swtpm.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./swtpm-pkg
+
+git clone -b master https://github.com/ThomasDickey/ncurses-snapshots.git
+cd ./ncurses-snapshots
+./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal --enable-pc-files --with-libtool --with-pkg-config-libdir=/usr/lib64/pkgconfig
+make -j$(($(nproc)-1))
+make DESTDIR=/home/chronos/ncurses-pkg install
+cd ../ncurses-pkg
+tar zcvf ../rootc/packages/ncurses.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./ncurses
+sed -i "s#/usr#/home/chronos/ncurses-pkg/usr#g" /home/chronos/ncurses-pkg/usr/lib64/pkgconfig/*
+
+git clone -b master https://git.savannah.gnu.org/git/nano.git
+cd ./nano
+./autogen.sh
+./configure --prefix=/usr --libdir=/usr/lib64
+make -j$(($(nproc)-1))
+make DESTDIR=/home/chronos/nano-pkg install
+mkdir -p ../nano-pkg/usr/lib64
+for i in $(ldd ../nano-pkg/usr/bin/nano | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../nano-pkg/usr/lib64/; fi; done
+cd ../nano-pkg
+tar zcvf ../rootc/packages/nano.tar.gz * --owner=0 --group=0
+cd ..
+rm -rf ./ncurses-pkg ./nano ./nano-pkg
+
+git clone --depth=1 -b 1_33_stable https://github.com/mirror/busybox.git
+cd busybox
+make defconfig
+sed -i 's/# CONFIG_INSTALL_NO_USR is not set/CONFIG_INSTALL_NO_USR=y/g' .config
+sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/g' .config
+make -j$(($(nproc)-1))
+cd ..
+
+cd initramfs
+mkdir -p bin etc lib lib64 proc sbin sys tmp usr
+cp ../busybox/busybox ./bin/busybox
+for i in $(ldd /sbin/blkid | cut -d' ' -f3); do cp "$i" ./lib64/; done
+cp /sbin/blkid ./sbin/
+for i in $(ldd /usr/bin/cgpt | cut -d' ' -f3); do cp "$i" ./lib64/; done
+cp /usr/bin/cgpt ./sbin/
+for i in $(ldd /sbin/e2fsck | cut -d' ' -f3); do cp "$i" ./lib64/; done
+cp /sbin/e2fsck ./sbin/
+for i in $(ldd /sbin/losetup | cut -d' ' -f3); do cp "$i" ./lib64/; done
+cp /sbin/losetup ./sbin/
+for i in $(ldd /usr/bin/ntfs-3g | cut -d' ' -f3); do cp "$i" ./lib64/; done
+cp /usr/bin/ntfs-3g ./sbin/
+cp /lib64/ld-linux-x86-64.so.2 ./lib64/
+sudo chmod 0755 ./sbin/*
+find . | cpio -o -H newc | gzip > ../rootc/initramfs.img
+cd ..
+rm -rf ./busybox
+
+cd ./image
+image_size=12
+dd if=/dev/zero of=./chromeos.img bs=1G seek=$image_size count=0
+write_base_table ./chromeos.img
+loopdev=`sudo losetup --show -fP ./chromeos.img`
+sudo mkdir ./tmp
+yes | sudo mkfs.ext4 -F -b 4096 -L "ROOT-C" "$loopdev"p7
+sudo mount "$loopdev"p7 ./tmp
+sudo cp -r ../rootc/* ./tmp/
+sudo umount ./tmp
+sudo bash -c "pv ""$loopdev""p7 > ../brunch/rootc.img"
+yes | sudo mkfs.fat "$loopdev"p12
+sudo mount "$loopdev"p12 ./tmp
+sudo cp -r ./efi-mods/* ./tmp/
+sudo umount ./tmp
+sudo bash -c "pv ""$loopdev""p12 > ../brunch/efi_secure.img"
+yes | sudo mkfs.fat "$loopdev"p12
+sudo mount "$loopdev"p12 ./tmp
+sudo cp -r ./efi-mods/* ./tmp/
+sudo rm ./tmp/efi/boot/bootx64.efi
+sudo mv ./tmp/efi/boot/grubx64.efi ./tmp/efi/boot/bootx64.efi
+sudo umount ./tmp
+sudo bash -c "pv ""$loopdev""p12 > ../brunch/efi_legacy.img"
+sudo rm -r ./tmp
+sudo losetup -d "$loopdev"
+rm ./chromeos.img
+cd ..
+
+cd ./brunch
+tar zcf /out/brunch_"$version"_"$(date +"%Y%m%d")".tar.gz * --owner=0 --group=0
+cd ..
+
+echo "End of chroot"

@@ -1,0 +1,25 @@
+config AR10K
+	tristate "Atheros 802.11ac wireless PCI cards support"
+
+	depends on PCI
+	depends on HAS_DMA
+	# competing implementations; only one must be enabled to avoid conflicts
+	depends on ATH10K=n
+	select FW_LOADER
+	select NEW_LEDS
+	select LEDS_CLASS
+	select LEDS_TRIGGERS
+	select ATH_COMMON
+
+	# this is because we don't depend on mac80211
+	depends on CFG80211
+
+	# things mac80211 select
+        select CRYPTO
+        select CRYPTO_ARC4
+        select CRYPTO_AES
+        select CRYPTO_CCM
+        select CRC32
+        select AVERAGE
+
+	depends on m

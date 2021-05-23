@@ -1,0 +1,45 @@
+/*
+ * Copyright 2015 MediaTek Inc.
+ * Author: Eddie Huang <eddie.huang@mediatek.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+#include "mt8173-oak.dtsi"
+
+/ {
+	model = "Mediatek Oak rev5 board";
+	compatible = "google,oak-rev5", "google,oak", "mediatek,mt8173";
+};
+
+&aud_i2s2 {
+	pins1 {
+		pinmux = <MT8173_PIN_128_I2S0_LRCK__FUNC_I2S1_WS>,
+			 <MT8173_PIN_129_I2S0_BCK__FUNC_I2S1_BCK>,
+			 <MT8173_PIN_130_I2S0_MCK__FUNC_I2S1_MCK>,
+			 <MT8173_PIN_131_I2S0_DATA0__FUNC_I2S1_DO_1>,
+			 <MT8173_PIN_132_I2S0_DATA1__FUNC_I2S2_DI_2>;
+		bias-pull-down;
+	};
+};
+
+/delete-node/&rt5514;
+
+/delete-node/&rt5514_irq;
+
+&rt5650 {
+	 realtek,dmic1-data-pin = <2>;
+};
+
+&sound {
+	compatible = "mediatek,mt8173-rt5650";
+	mediatek,audio-codec = <&rt5650 &hdmi0>;
+};

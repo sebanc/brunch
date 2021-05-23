@@ -1,0 +1,17 @@
+Source: rtl8821cu
+Section: misc
+Priority: optional
+Maintainer: Marc Leeman <m.leeman@televic.com>
+Build-Depends: debhelper (>> 3.0.0), zlib1g-dev, module-assistant, bc
+Standards-Version: 3.5.8
+
+Package: rtl8821cu-module-#KVERS#
+Depends: debconf, initramfs-tools
+Architecture: any
+Provides: rtl8821cu-module
+Description: rtl8821cu kernel module
+ The rtl8821cu driver provides the driver for Realtek RTL8811CU/RTL8821CU
+ USB wifi adapter.
+ .
+ This package contains the pre-compiled version for kernel #KVERS#
+

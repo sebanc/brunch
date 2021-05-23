@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+# for m-a
+SHELL=/bin/bash
+PACKAGE=rtl8821cu-module
+MA_DIR ?= /usr/share/modass
+-include $(MA_DIR)/include/generic.mk
+-include $(MA_DIR)/include/common-rules.mk
+kdist_config: kdist_configure
+kdist_configure: prep-deb-files
+
+binary-modules: kdist_configure
+	$(MAKE) module KERNEL_DIR=$(KSRC)  KVERSION=$(KVERS)
+	dh_installdirs -p $(PKGNAME) lib/modules/$(KVERS)/extra
+	cp 8821cu.ko $(CURDIR)/debian/$(PKGNAME)/lib/modules/$(KVERS)/extra
+	dh_testdir -a
+	dh_testroot -a
+	dh_installdebconf -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_installdeb -a
+	dh_gencontrol -a -- -v$(VERSION)
+	dh_md5sums -a
+	dh_builddeb -a --destdir=$(DEB_DESTDIR)
+
+kdist_clean:
+	rm -rf *.ko debian/$(PKGNAME)
+
+.PHONY: kdist kdist_image kdist_configure kdist_clean kdist
+.NOTPARALLEL:

@@ -1,0 +1,22 @@
+* Rockchip rk3288 Interconnect Service Bus
+
+This device contains registers to control the memory scheduler on
+rk3288 SoCs.  It is accessed during DDRFreq transitions and also at
+suspend/resume.
+
+Downstream this is sometimes referred to as the NoC (network on chip).
+
+
+Required Properties:
+
+- compatible: GRF should be one of the following:
+   - compatible = "rockchip,rk3288-service-bus", "syscon";
+- reg: physical base address of the controller and length of memory mapped
+  region.
+
+Example:
+
+	service_bus: syscon@ffac0000 {
+		compatible = "rockchip,rk3288-service-bus", "syscon";
+		reg = <0x0 0xffac0000 0x0 0x2000>;
+	};

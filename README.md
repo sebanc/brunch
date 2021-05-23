@@ -244,6 +244,7 @@ Installation procedure:
 
 Some options can be passed through the kernel command lines to activate specific features which might be dangerous or not work from everyone:
 - "enable_updates": allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
+- "pwa": use this option to enable the brunch PWA (then install it from https://sebanc.github.io/brunch-pwa/),
 - "android_init_fix": alternative init to support devices on which the android container fails to start with the standard init,
 - "mount_internal_drives": allows automatic mounting of HDD partitions in ChromeOS (android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data), partition label will be used if it exists,
 - "broadcom_wl": enable this option if you need the broadcom_wl module,
@@ -259,6 +260,8 @@ Some options can be passed through the kernel command lines to activate specific
 - "rtl88x2bu": enable this option if you have a rtl88x2bu wireless card/adapter,
 - "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
 - "ipts": enable support for Surface devices touchscreen with kernel 5.4 / 5.10 (thanks go to the linux-surface team, especially StollD),
+- "invert_camera_order": use this option if your camera order is inverted,
+- "no_camera_config": if your camera does not work you can try this option which disables the camera config,
 - "oled_display": enable this option if you have an oled display (use with kernel 5.10),
 - "acpi_power_button": try this option if long pressing the power button does not display the power menu,
 - "alt_touchpad_config": try this option if you have touchpad issues,

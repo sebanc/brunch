@@ -14,7 +14,8 @@ It is therefore highly recommended to only use this framework on a device which 
 Hardware support is highly dependent on the general Linux kernel hardware compatibility. As such only Linux supported hardware will work and the same specific kernel command line options recommended for your device should be passed through the GRUB bootloader (see "Modify the GRUB bootloader" section).
 
 Base hardware compatibility:
-- x86_64 computers with UEFI boot support (BIOS/MBR devices have limited support through a specific procedure detailled in "Limited support for MBR/BIOS devices" section),
+- x86_64 computers with UEFI boot support.
+- ×86_64 computers with MBR/BIOS have limited support. Click [For only Chrome OS installation](https://github.com/sebanc/brunch#limited-support-for-mbrbios-devices) and [For dual booting with Windows](https://github.com/sebanc/brunch/wiki/Detailed-installation-instructions-from-Windows)
 - Intel hardware (CPU and GPU) starting from 1st generation "Nehalem" (refer to https://en.wikipedia.org/wiki/Intel_Core),
 - AMD Ryzen (CPU and GPU),
 - AMD Stoney Ridge (refer to https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units),
@@ -69,6 +70,8 @@ In case you run into issues while installing / using Brunch, below are the main 
 - Reddit: https://www.reddit.com/r/Brunchbook
 
 # Install instructions
+
+**NOTE**: A detailed and beginner friendly guide for dual booting Chrome OS with windows is available [here](https://github.com/sebanc/brunch/wiki/Detailed-installation-instructions-from-Windows)
 
 You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an image on your hard disk for dual booting (14GB of free space needed).
 
@@ -226,9 +229,8 @@ The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch
 
 ## Limited support for MBR/BIOS devices
 
-The mbr_support.tar.gz patch present in the this branch (master) allows booting Brunch on BIOS/MBR devices with a few limitations:
+The mbr_support.tar.gz patch present in the this branch (master) allows single booting Brunch on BIOS/MBR devices.
 - Brunch can only be installed from linux.
-- The dual boot method is not supported.
 
 Installation procedure:
 1) Verify that your device cpu/gpu is supported according to the "base hardware compatibility" requirements.

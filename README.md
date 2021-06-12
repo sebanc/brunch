@@ -144,6 +144,8 @@ The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after 
 
 ## Install ChromeOS from Windows
 
+**NOTE**: If you find the below instructions difficult to follow, a detailed and beginner friendly guide for dual booting Chrome OS with windows is also available [here](https://github.com/sebanc/brunch/wiki/Detailed-installation-instructions-from-Windows)
+
 ### Requirements
 
 - Administrator access.
@@ -232,17 +234,15 @@ The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch
 
 ## Limited support for MBR/BIOS devices
 
-The mbr_support.tar.gz patch present in the this branch (master) allows booting Brunch on BIOS/MBR devices with a few limitations:
-- Brunch can only be installed from linux.
-- The dual boot method is not supported.
-
-Installation procedure:
+Brunch can be installed on BIOS/MBR devices but with a limited number of methods:
+- If you have Windows installed on your device and want to dual boot ChromeOS, you can follow the guide [here](https://github.com/sebanc/brunch/wiki/Detailed-installation-instructions-from-Windows).
+- Otherwise, the mbr_support.tar.gz patch present in this branch (master) allows to create a Brunch USB or to make a full disk install but it only works with the  "Install ChromeOS from Linux" single boot method:
 1) Verify that your device cpu/gpu is supported according to the "base hardware compatibility" requirements.
 2) Verify that `pv`, `tar`,`cgpt` and `sgdisk` packages/binaries are installed.
 3) Extract the brunch release archive to your working directory.
 4) Extract the mbr_support.tar.gz patch present in the this branch (master) of the Brunch repo in the same directory (overwriting files when requested)
 5) Download the ChromeOS recovery image and extract it.
-6) Follow the linux "Install ChromeOS on a USB flash drive / SD card / HDD (full disk install / single boot)" instructions from step 5.
+6) Follow the Linux "Install ChromeOS on a USB flash drive / SD card / HDD (full disk install / single boot)" instructions from step 5.
 
 # Optional steps
 

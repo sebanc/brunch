@@ -144,8 +144,6 @@ The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after 
 
 ## Install ChromeOS from Windows
 
-**NOTE**: If you find the below instructions difficult to follow, a detailed and beginner friendly guide for dual booting Chrome OS with windows is also available [here](https://github.com/sebanc/brunch/wiki/Detailed-installation-instructions-from-Windows)
-
 ### Requirements
 
 - Administrator access.
@@ -186,6 +184,8 @@ sudo resize-data
 16. Reboot your computer when requested and boot again from USB flash drive / SD card. You can now start using ChromeOS.
 
 ### Dual Boot ChromeOS with Windows on your HDD
+
+**NOTE**: If you find the below instructions difficult to follow, a detailed and beginner friendly guide for dual booting Chrome OS with windows is also available [here](https://github.com/sebanc/brunch/wiki/Detailed-installation-instructions-from-Windows)
 
 1. Make sure you have a NTFS partition with at least 14gb of free space available and no BitLocker encryption or create one (refer to online resources).
 2. Make a Brunch USB flashdrive / SD card (see above) and boot it.

@@ -40,12 +40,16 @@ Additional features:
 Contrarily to the Croissant framework which mostly supports non-unibuilds images (configuration and access to android apps), Brunch should work with both but will provide better hardware support for unibuild images.
 
 Currently:
-- "rammus" is the recommended image for devices with 1st gen Intel CPU up to 9th gen.
-- "volteer" is the recommended image for devices with Intel 10th and 11th gen CPU (Intel 11th Gen devices need kernel 5.10, read "Changing kernel version" section).
-- "zork" is the image to use for AMD Ryzen (Ryzen 4xxx devices need kernel 5.10, read "Changing kernel version" section).
-- "grunt" is the image to use for AMD Stoney Ridge.
+### Intel
+* ["rammus" is suggested for 1st gen -> 9th gen.](https://cros.tech/device/rammus)
+* ["volteer" is suggested for 10th & 11th gen.](https://cros.tech/device/volteer)
+  * [11th gen (and some 10th gen) may need kernel 5.10](https://github.com/sebanc/brunch#changing-kernel-version) 
+### AMD
+* ["grunt" is suggested for Stoney Ridge & Bristol Ridge.](https://cros.tech/device/grunt)
+* ["zork" is suggested for Ryzen.](https://cros.tech/device/zork)
+  * [Ryzen 4xxx devices need kernel 5.10](https://github.com/sebanc/brunch#changing-kernel-version) 
 
-ChromeOS recovery images can be downloaded from: https://cros-updates-serving.appspot.com/ or https://cros.tech/
+ChromeOS recovery images can be downloaded from the links above, or from: https://cros-updates-serving.appspot.com/ or https://cros.tech/
 
 # Brunch toolkit
 
@@ -82,13 +86,13 @@ You can install ChromeOS on a USB flash drive / SD card (16GB minimum) or as an 
 ### Install ChromeOS on a USB flash drive / SD card / HDD (full disk install / single boot)
 
 1. Download the ChromeOS recovery image and extract it.
-2. Download the Brunch release corresponding to the ChromeOS recovery image version you have downloaded (from the GitHub release section).
+2. Download the Brunch release from the [releases tab](https://github.com/sebanc/brunch/releases). It is generally suggested to use the [latest release](https://github.com/sebanc/brunch/releases/latest).
 3. Open a terminal, navigate to the directory containing the package.
 4. Extract it: 
 ```
 tar zxvf brunch_< version >.tar.gz
 ```
-5. Identify your USB flash drive / SD card / HDD device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive)
+5. Identify your USB flash drive / SD card / HDD device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive) You can use gparted, gnome disks or run `lsblk -e7` to see your disks and identify the right one.
 6. Install ChromeOS on the USB flash drive / SD card / HDD:
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst < your USB flash drive / SD card device. e.g. /dev/sdX >
@@ -111,29 +115,30 @@ Make sure you have an ext4 (recommended) or NTFS partition with at least 14gb of
 ```
 tar zxvf brunch_< version >.tar.gz
 ```
-5. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
+5. Identify the partition you intend to use for Brunch, you can run `lsblk -e7` to see your disks and identify the right one. (If you have not made a partition yet, make one before continuing.)
+6. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
 ```
 mkdir -p ~/tmpmount
 sudo mount < the destination partition (ext4 or ntfs) which will contain the disk image > ~/tmpmount
 ```
-6. Create the ChromeOS disk image:
+7. Create the ChromeOS disk image:
 ```
 sudo bash chromeos-install.sh -src < path to the ChromeOS recovery image > -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
-7. Create a GRUB configuration file for brunch in your linux install:
+8. Create a GRUB configuration file for brunch in your linux install:
 - Copy the grub config which appeared in the terminal at the end of the process (the text between lines with stars)
 - Run `sudo cp /etc/grub.d/40_custom /etc/grub.d/99_brunch`
 - Then run `sudo nano /etc/grub.d/99_brunch`, paste the grub config at the end of the file. Save the changes and exit nano (CTRL-X).
 - Lastly, run `sudo update-grub`.
-8. Unmount the destination partition
+9. Unmount the destination partition
 ```
 sudo umount ~/tmpmount
 ```
-9. (secure boot only) Download the secure boot key "brunch.der" in this branch (master) of the repository and enroll it by running the command:
+10. (secure boot only) Download the secure boot key "brunch.der" in this branch (master) of the repository and enroll it by running the command:
 ```
 sudo mokutil --import brunch.der
 ```
-10. Reboot your computer and boot to the bootloader with the modified GRUB config.
+11. Reboot your computer and boot to the bootloader with the modified GRUB config.
 
 The GRUB menu should appear, select "ChromeOS (boot from disk image)" and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS from your HDD.
 
@@ -178,49 +183,50 @@ sudo resize-data
 ```
 16. Reboot your computer when requested and boot again from USB flash drive / SD card. You can now start using ChromeOS.
 
-### Dual Boot ChromeOS from your HDD
+### Dual Boot ChromeOS with Windows on your HDD
 
 1. Make sure you have a NTFS partition with at least 14gb of free space available and no BitLocker encryption or create one (refer to online resources).
-2. Make a ChromeOS USB flashdrive / SD card (see above) and boot it.
+2. Make a Brunch USB flashdrive / SD card (see above) and boot it.
 3. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite).
-4. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
+4. Identify the partition you intend to use for Brunch, you can run `lsblk -e7` to see your disks and identify the right one. (If you have not made a partition yet, make one before continuing.)
+5. Mount the unencrypted ext4 or NTFS partition on which we will create the disk image to boot from:
 ```
 mkdir -p ~/tmpmount
 sudo mount < the destination partition (ext4 or ntfs) which will contain the disk image > ~/tmpmount
 ```
-5. Create the ChromeOS disk image:
+6. Create the ChromeOS disk image:
 ```
 sudo bash chromeos-install -dst ~/tmpmount/chromeos.img -s < size you want to give to your chromeos install in GB (system partitions will take around 10GB, the rest will be for your data) >
 ```
-6. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C).
-7. Run `sudo nano ~/tmpmount/chromeos.grub.txt` and paste the config there (CTRL°SHIFT+V to paste and then CTRL-X to exit)
-8. Unmount the destination partition
+7. Copy the GRUB configuration which is displayed in the terminal (select it and CTRL+SHIFT+C).
+8. Run `sudo nano ~/tmpmount/chromeos.grub.txt` and paste the config there (CTRL°SHIFT+V to paste and then CTRL-X to exit)
+9. Unmount the destination partition
 ```
 sudo umount ~/tmpmount
 ```
-9. Reboot to Windows, Install grub 2 win (https://sourceforge.net/projects/grub2win/) and launch the application.
-10. Click on `Manage Boot Menu` button, then `Add A New Entry`.
-11. Select `submenu` in the 'Type' section and input "Chrome OS" as title.
-12. Now, click `Edit Custom Code` this will open a text file. Open the chromeos.grub.txt file we saved in step 7 and copy the grub configuration in grub2win.
+10. Reboot to Windows, Install grub 2 win (https://sourceforge.net/projects/grub2win/) and launch the application.
+11. Click on `Manage Boot Menu` button, then `Add A New Entry`.
+12. Select `submenu` in the 'Type' section and input "Chrome OS" as title.
+13. Now, click `Edit Custom Code` this will open a text file. Open the chromeos.grub.txt file we saved in step 7 and copy the grub configuration in grub2win.
 #### Then remove the "rmmod tpm" line.
-13. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
-14. Important: Disable "Fast startup" in Windows (refer to online resources).
-15. Reboot.
-16. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient. You should be greeted by ChromeOS startup screen once the process completes.
+14. Click `Ok` and `apply` (It won't save your entry unless you click `ok` and `apply`)
+15. Important: Disable "Fast startup" in Windows (refer to online resources).
+16. Reboot.
+17. The GRUB-2 win menu should appear, select "ChromeOS". Brunch will be rebuilt on first boot so, be patient. You should be greeted by ChromeOS startup screen once the process completes.
 You can now start using ChromeOS from your HDD.
 
-## Install ChromeOS on HDD from ChromeOS
+## Install ChromeOS on HDD from a Brunch USB / SD Card
 
 1. Boot your ChromeOS USB flash drive / SD card.
 2. Open the ChromeOS shell (CTRL+ALT+T and enter `shell` at the invite)
-3. Identify your HDD device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive)
+3. Identify your HDD device name e.g. /dev/sdX (Be careful here as the installer will erase all data on the target drive) You can run `lsblk -e7` to see your disks and identify the right one.
 4. Install ChromeOS to HDD:
 ```
 sudo chromeos-install -dst < your HDD device. e.g. /dev/sdX >
 ```
-5. Shutdown your computer and remove your ChromeOS USB flash drive / SD card.
+5. Shutdown your computer and remove your Brunch USB flash drive / SD card.
 
-Note: Even if you boot from GRUB on your HDD, if you have a ChromeOS USB flash drive / SD card inserted, the initramfs will boot from it in priority.
+Note: Even if you boot from GRUB on your HDD, if you have a Brunch USB flash drive / SD card inserted, the initramfs will boot from it in priority.
 
 The GRUB menu should appear, select ChromeOS and after a few minutes (the Brunch framework is building itself on the first boot), you should be greeted by ChromeOS startup screen. You can now start using ChromeOS.
 

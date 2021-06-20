@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2020 Google LLC
+ */
+/dts-v1/;
+#include "mt8192-asurada.dtsi"
+#include "mt8192-asurada-audio-rt1015-rt5682.dtsi"
+
+/ {
+	model = "MediaTek Asurada rev0 board";
+	compatible = "google,asurada-rev0";
+};
+
+&anx7625_dp_pins {
+	pins2 {
+		pinmux = <PINMUX_GPIO0__FUNC_GPIO0>;
+	};
+	/* Note: We don't seem to do anything with that pin? */
+	hpd: hpd {
+		pinmux = <PINMUX_GPIO16__FUNC_GPIO16>;
+		bias-disable;
+	};
+};
+
+&bluetooth {
+	enable-gpios = <&pio 131 GPIO_ACTIVE_HIGH>;
+};
+
+&bt_kill {
+	pinmux = <PINMUX_GPIO131__FUNC_GPIO131>; /* BT_KILL_L */
+	output-low;
+};
+
+&pcie_en_pp3300_wlan {
+	/* TODO: Model as a regulator */
+	pinmux = <PINMUX_GPIO130__FUNC_GPIO130>;
+	output-high;
+};
+
+&pp1000_dpbrdg {
+	gpio = <&pio 30 GPIO_ACTIVE_HIGH>;
+};
+
+&pp1000_dpbrdg_en {
+	pins1 {
+		pinmux = <PINMUX_GPIO30__FUNC_GPIO30>;
+	};
+};
+
+/* TODO: Split and implement. */
+&wifi_kill {
+	pinmux = <PINMUX_GPIO132__FUNC_GPIO132>; /* WIFI_KILL_L */
+	output-high;
+};

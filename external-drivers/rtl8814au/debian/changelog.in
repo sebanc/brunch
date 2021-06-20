@@ -1,0 +1,37 @@
+rtl8814au (5.8.5.1) unstable; urgency=medium
+
+  * Fix kernel 5.6, proc_create_data takes "proc_ops" and not "file_operations" now
+
+ -- jimmy <jimmy@jimmy-alpha>  Thu, 01 Dec 2016 13:09:37 +0800
+
+rtl8814au (5.8.5-34085.20190824) unstable; urgency=medium
+
+  * import v5.8.5_34085.20190624
+  * add kmodsign
+
+ -- jimmy <jimmy@jimmy-alpha>  Fri, 16 Aug 2019 10:13:15 +0800
+
+rtl8814au (4.3.21.1-24835.20190816) unstable; urgency=medium
+
+  * Fix compilation for Linux 5.1, replace get_ds() with KERNEL_DS
+  * Fix compilation for Linux 5.2,  .ndo_select_queue = rtw_select_queue kernel API change
+
+ -- jimmy <jimmy@jimmy-alpha>  Wed, 05 Jun 2019 13:34:16 +0800
+
+rtl8814au (4.3.21.1-24835.20190213) unstable; urgency=medium
+
+  * fix Linux 5.0: access_ok() drops 'type' parameter
+
+ -- coolshou <coolshou@coolshou-desktop>  Wed, 13 Feb 2019 01:34:18 +0800
+
+rtl8814au (4.3.21.1-24835.20190212) unstable; urgency=medium
+
+  * fix get_monotonic_boottime to ktime_get_boottime_ts64 when kernel >= 4.15
+
+ -- jimmy <jimmy@jimmy-alpha>  Tue, 15 Jan 2019 09:22:19 +0800
+
+rtl8814au (4.3.21.1-24835.20181203) unstable; urgency=medium
+
+  * Initial release
+
+ -- jimmy <jimmy@jimmy-alpha>  Thu, 01 Dec 2018 13:09:37 +0800

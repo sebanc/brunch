@@ -1,0 +1,45 @@
+USB Vendor and Device ID List for the rtl8821cu
+
+To determine your Device ID:
+
+$ lsusb
+
+Example output:
+
+Bus 003 Device 011: ID 0bda:8811 Realtek Semiconductor Corp.
+
+ID VendorID:DeviceID = 0bda:8811
+
+We can search the list of driver supported IDs shown below.
+
+Realtek default IDs
+
+ID 0BDA:B82B
+ID 0BDA:b820
+ID 0BDA:C821
+ID 0BDA:C820
+ID 0BDA:C82A
+ID 0BDA:C82B
+ID 0BDA:C811
+ID 0BDA:8811
+ID 0BDA:2006
+ID 0BDA:8731
+ID 0BDA:C80C
+
+
+Seller specific IDs
+
+ID 2001:331d  -  D-Link DWA-171C
+
+If your adapter matches one of the default or seller specific
+IDs then this is the driver to use.
+
+If your adapter matches one of the IDs then this is the driver to use.
+
+If you are sure that your adapter contains a rtl8811cu, rtl8821cu or
+rtl8731au chipset and the ID is not shown above, please provide
+the follow information so that I can include your adapter in the
+driver source code so that the driver will work with your adapter:
+
+1. VendorID:DeviceID
+2. Link to device on internet

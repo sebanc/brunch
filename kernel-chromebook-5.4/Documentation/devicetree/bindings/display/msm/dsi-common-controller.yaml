@@ -1,0 +1,180 @@
+# SPDX-License-Identifier: GPL-2.0-only or BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/display/msm/dsi-common-controller.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Description of Qualcomm Display DSI controller dt properties.
+
+maintainers:
+  - Krishna Manikandan <mkrishn@codeaurora.org>
+
+description: |
+  Common Device tree bindings for DSI controller.
+
+allOf:
+  - $ref: "../dsi-controller.yaml#"
+
+properties:
+  compatible:
+    items:
+      - const: qcom,mdss-dsi-ctrl
+
+  clocks:
+    maxItems: 6
+
+  clock-names:
+    description: |
+      Device clock names in the same order as mentioned in clocks property.
+
+  assigned-clocks:
+    description: Parents of "byte" and "pixel" for the given platform.
+
+  assigned-clock-parents:
+    description: |
+      The Byte clock and Pixel clock PLL outputs provided by a DSI PHY block.
+      Details on clock bindings are mentioned in
+      Documentation/devicetree/bindings/clock/clock-bindings.txt.
+
+  vdd-supply:
+    description: Phandle to vdd regulator device node.
+
+  vddio-supply:
+    description: Phandle to vdd-io regulator device node.
+
+  vdda-supply:
+    description: Phandle to vdda regulator device node.
+
+  phys:
+    description: Phandle to DSI PHY device node.
+    maxItems: 1
+
+  phy-names:
+    description: Name of the corresponding PHY device.
+    maxItems: 1
+
+  syscon-sfpb:
+    description: A phandle to mmss_sfpb syscon node (only for DSIv2).
+    $ref: "/schemas/types.yaml#/definitions/phandle"
+
+      # Optional Properties for dsi controller
+  qcom,mdss-mdp-transfer-time-us:
+    description: |
+      Specifies the DSI transfer time for command mode
+      panels in microseconds. Driver uses this number to adjust
+      the clock rate according to the expected transfer time.
+      Increasing this value would slow down the mdp processing
+      and can result in slower performance.
+      Decreasing this value can speed up the mdp processing,
+      but this can also impact power consumption.
+      As a rule this time should not be higher than the time
+      that would be expected with the processing at the
+      DSI link rate since anyways this would be the maximum
+      transfer time that could be achieved.
+      If ping pong split is enabled, this time should not be higher
+      than two times the DSI link rate time.
+      If the property is not specified, then the default value is
+      14000 us. This is an optional property.
+
+  qcom,dual-dsi-mode:
+    type: boolean
+    description: |
+      Boolean value indicating if the DSI controller is
+      driving a panel which needs 2 DSI links.
+
+  qcom,master-dsi:
+    type: boolean
+    description: |
+      Boolean value indicating if the DSI controller is driving
+      the master link of the 2-DSI panel.
+
+  qcom,sync-dual-dsi:
+    type: boolean
+    description: |
+      Boolean value indicating if the DSI controller is driving a
+      2-DSI panel whose 2 links need receive command simultaneously.
+
+  pinctrl-names:
+    description: The pin control state names.
+    items:
+      - const: default
+      - const: sleep
+
+  pinctrl-0:
+    description: The default pinctrl state (active)
+
+  pinctrl-1:
+    description: The sleep pinctrl state (suspend)
+
+  ports:
+    type: object
+    description: |
+      Contains DSI controller input and output ports as children, each
+      containing one endpoint subnode as defined in
+      Documentation/devicetree/bindings/graph.txt and
+      Documentation/devicetree/bindings/media/video-interfaces.txt.
+
+    properties:
+      port@0:
+        type: object
+        description: |
+          Input endpoints of the controller.
+
+        properties:
+          reg:
+            const: 0
+
+          endpoint:
+            type: object
+            properties:
+              remote-endpoint:
+                description: |
+                  For port@0, set to phandle of the connected panel/bridge's
+                  input endpoint. For port@1, set to the MDP interface output.
+                  See Documentation/devicetree/bindings/graph.txt for
+                  device graph info.
+
+              data-lanes:
+                description: |
+                  This describes how the physical DSI data lanes are mapped
+                  to the logical lanes on the given platform. The value contained in
+                  index n describes what physical lane is mapped to the logical lane n
+                  (DATAn, where n lies between 0 and 3). The clock lane position is fixed
+                  and can't be changed. Hence, they aren't a part of the DT bindings. See
+                  Documentation/devicetree/bindings/media/video-interfaces.txt for
+                  more info on the data-lanes property.
+
+                  For example:
+                  data-lanes = <3 0 1 2>;
+
+                  The above mapping describes that the logical data lane DATA0 is mapped
+                  to the physical data lane DATA3, logical DATA1 to physical DATA0,
+                  logic DATA2 to phys DATA1 and logic DATA3 to phys DATA2. There are
+                  only a limited number of physical to logical mappings possible.
+                  oneOf:
+                    - const: <0 1 2 3>
+                    - const: <1 2 3 0>
+                    - const: <2 3 0 1>
+                    - const: <3 0 1 2>
+                    - const: <0 3 2 1>
+                    - const: <1 0 3 2>
+                    - const: <2 1 0 3>
+                    - const: <3 2 1 0>
+                maxItems: 1
+
+      port@1:
+        type: object
+        description: |
+          Output endpoints of the controller.
+        properties:
+          reg:
+            const: 1
+
+          endpoint:
+            type: object
+            properties:
+              remote-endpoint: true
+              data-lanes:
+                maxItems: 1
+
+...

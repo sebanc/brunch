@@ -1,0 +1,21 @@
+/* SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause */
+/*
+ * Copyright (C) 2013-2014 Intel Corporation
+ * Copyright (C) 2017 Intel Deutschland GmbH
+ */
+#ifndef __XVT_CONSTANTS_H
+#define __XVT_CONSTANTS_H
+
+#ifndef CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES
+#define IWL_XVT_DEFAULT_DBGM_MEM_POWER	0
+#define IWL_XVT_DEFAULT_DBGM_LMAC_MASK	0
+#define IWL_XVT_DEFAULT_DBGM_PRPH_MASK	0
+
+#else /* CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES */
+#define IWL_XVT_DEFAULT_DBGM_MEM_POWER	(xvt->trans->dbg_cfg.XVT_DEFAULT_DBGM_MEM_POWER)
+#define IWL_XVT_DEFAULT_DBGM_LMAC_MASK	(xvt->trans->dbg_cfg.XVT_DEFAULT_DBGM_LMAC_MASK)
+#define IWL_XVT_DEFAULT_DBGM_PRPH_MASK	(xvt->trans->dbg_cfg.XVT_DEFAULT_DBGM_PRPH_MASK)
+
+#endif /* CPTCFG_IWLWIFI_SUPPORT_DEBUG_OVERRIDES */
+
+#endif /* __XVT_CONSTANTS_H */

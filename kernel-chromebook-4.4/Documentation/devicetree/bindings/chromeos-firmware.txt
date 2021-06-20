@@ -1,0 +1,39 @@
+ChromeOS Firmware
+
+This node specifies information of ChromeOS verified-boot firmware.  The
+firmware might update this node prior to booting the kernel.
+
+Required properties:
+
+  - write-protect-gpio : Describe the write-protect GPIO of the system.
+  - nonvolatile-context-storage : Storage device type that firmware used for
+    vboot nonvolatile context.  It should be one of "disk", "cros-ec", or
+    "nvram". Kernel should look for the device that firmware actually used in
+    the corresponding optional property below.
+
+Optional properties:
+
+  - recovery-switch : Describe the recovery switch GPIO of the system.
+  - developer-switch : Describe the developer switch GPIO of the system.
+
+Example:
+
+firmware {
+	chromeos {
+		write-protect-gpio = <&gpd1 6 0 0x10000 0>;
+		nonvolatile-context-storage = "disk";
+		chromeos-vbc-blk = <&mshc_0 0 0 16>;
+	};
+};
+
+Example:
+
+firmware {
+	chromeos {
+		pinctrl-0 = <&fw_pins>;
+		pinctrl-names = "default";
+		write-protect-gpio = <&qcom_pinmux 17 1>;
+		recovery-switch = <&qcom_pinmux 16 1>;
+		developer-switch = <&qcom_pinmux 15 1>;
+	};
+};

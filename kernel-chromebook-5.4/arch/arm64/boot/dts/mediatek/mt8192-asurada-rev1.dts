@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2020 Google LLC
+ */
+/dts-v1/;
+#include "mt8192-asurada.dtsi"
+#include "mt8192-asurada-audio-rt1015-rt5682.dtsi"
+
+/ {
+	model = "MediaTek Asurada rev1 board";
+	compatible = "google,asurada-rev1", "google,asurada", "mediatek,mt8192";
+};

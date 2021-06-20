@@ -1,0 +1,300 @@
+#
+# Qualcomm camera configuration
+#
+
+menuconfig SPECTRA_CAMERA
+	bool "Qualcomm Technologies, Inc. Spectra Camera"
+	depends on (ARCH_QCOM)
+	depends on (MEDIA_SUPPORT && MEDIA_CONTROLLER && V4L_PLATFORM_DRIVERS)
+	depends on (VIDEO_DEV && VIDEO_V4L2=y)
+	depends on ARM64
+	depends on !COMPILE_TEST
+	depends on SC_CAMCC_7180
+	help
+	  Say Y here to enable selecting the video adapters for
+	  Qualcomm Technologies, Inc. Spectra camera and video capture.
+	  Enabling this adds support for the camera driver stack including sensor,
+	  IFE and postprocessing drivers.
+
+if SPECTRA_CAMERA
+
+config QTI_CAMERA_SYNC
+        bool "Qualcomm camera SYNC driver"
+	default y
+        help
+	  Say Y here to enable selecting module
+          Support for camera drivers synchronization
+
+config QTI_CAMERA_SMMU
+        bool "Qualcomm System Memory Management Unit (SMMU)"
+	default y
+	depends on (IOMMU_DMA)
+        help
+	  Say Y here to enable selecting module
+          Support for memory pools and context banks
+
+config QTI_CAMERA_CRM
+        bool "Qualcomm Camera Request Manager (CRM)"
+	default y
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU)
+	select VIDEOBUF2_DMA_SG
+        help
+	  Say Y here to enable selecting module
+          Support for camera drivers memory requests
+
+config QTI_ISP
+        bool "Qualcomm ISP drivers"
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+	default y
+        help
+	  Say Y here to enable selecting module
+	  Support for the ISP engine
+
+if QTI_ISP
+	config QTI_MIPI_PHY
+		bool "Qualcomm MIPI C-PHY driver"
+		default y
+		depends on (QTI_ISP)
+		help
+		  Say Y here to enable selecting module
+		  Support for MIPI Combo CSI physical interfaces
+
+	config QTI_PPI
+		bool "Qualcomm PPI driver"
+		default y
+		depends on (QTI_ISP)
+		help
+		  Say Y here to enable selecting module
+		  Support for the PPI interfaces
+
+	config QTI_CSID
+		bool "Qualcomm CSIDx driver"
+		default y
+		depends on (QTI_ISP)
+		help
+		  Say Y here to enable selecting module
+		  Support for the CSIDx engines
+
+	config QTI_VFE
+		bool "Qualcomm VFEx driver"
+		default y
+		depends on (QTI_ISP)
+		help
+		  Say Y here to enable selecting module
+		  Support for the VFEx engines
+
+	config QTI_VFE_LITE
+		bool "Qualcomm Lite VFEx driver"
+		default y
+		depends on (QTI_ISP)
+		help
+		  Say Y here to enable selecting module
+		  Support for the Lite IFEx engines
+endif
+
+config QTI_ICP_A5
+        bool "Qualcomm ICP/A5 driver"
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+	default y
+        help
+	  Say Y here to enable selecting module
+          Support for the ICP/A5 engine
+
+if QTI_ICP_A5
+	config QTI_IPE
+		bool "Qualcomm IPE driver"
+		default y
+		depends on (QTI_ICP_A5)
+		help
+		  Say Y here to enable selecting module
+		  Support for the IPE engines
+
+	config QTI_BPS
+		bool "Qualcomm BPS driver"
+		default y
+		depends on (QTI_ICP_A5)
+		help
+		  Say Y here to enable selecting module
+		  Support for the BPS engine
+endif
+
+config QTI_CPAS
+        bool "Qualcomm CPAS driver"
+	default y
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+	depends on QCOM_CLK_RPMH
+	depends on INTERCONNECT_QCOM_SC7180
+        help
+	  Say Y here to enable selecting module
+          Support for CDMx engines SW interface
+
+if QTI_CPAS
+	config QTI_CDM
+		bool "Qualcomm CDMx driver"
+		default y
+		depends on (QTI_CPAS)
+		help
+		  Say Y here to enable selecting module
+		  Support for the CDMx engine
+endif
+
+config QTI_JPEG
+        bool "Qualcomm JPEG driver"
+	default n
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+        help
+	  Say Y here to enable selecting module
+          Support for the JPEG engine
+
+config QTI_FD
+        bool "Qualcomm FD driver"
+	default n
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+        help
+	  Say Y here to enable selecting module
+          Support for the FD engine
+
+config QTI_LRME
+        bool "Qualcomm LRME driver"
+	default n
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+        help
+	  Say Y here to enable selecting module
+          Support for the LRME engine
+
+config QTI_SENSORS
+        bool "Qualcomm sensor drivers"
+	default y
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+        help
+	  Say Y here to enable selecting module
+          Support for the Sensors and Actuator etc
+
+	if QTI_SENSORS
+		config QTI_EEPROM
+			bool "Camera EEPROM driver"
+			default y
+			help
+			  Say Y here to enable selecting module
+			  Support for the Camera eeprom driver
+
+		config QTI_ACTUATOR
+			bool "Camera Actuator driver"
+			default n
+			help
+			  Say Y here to enable selecting module
+			  Support for the Camera actuator driver
+
+		config QTI_FLASH
+			bool "Camera FLASH driver"
+			default n
+			help
+			  Say Y here to enable selecting module
+			  Support for the Camera Flash driver
+
+		config QTI_IR_LED
+			bool "Camera IR Led driver"
+			default n
+			help
+			  Say Y here to enable selecting module
+			  Support for the Camera Infrared Led driver
+
+		choice
+			prompt "Select interface"
+			help
+			  Select physical interface for real devices or Virtual
+			  interface and dummy devices
+
+			config QTI_PHY_IO
+				bool "I2C, CCI or SPI interface"
+				help
+				  Use real devices attached on I2C/CCI or SPI physical interface.
+
+			config QTI_VIRT_IO
+				bool "Virtual interface"
+				help
+				  Use Virtual interface for dummy devices.
+				  This driver not return data or acknowledge.
+				  May be useful for diagnostic purposes.
+		endchoice
+
+		if (QTI_VIRT_IO)
+			config QTI_FSENSOR_ADDR
+				hex "Front Sensor ID register"
+				range 0x0 0xFFFF
+				default "0x300b"
+				help
+				  The address of register contains the sensor id.
+				  This value will used for virtual device matching.
+
+			config QTI_FSENSOR_DATA
+				hex "Front Sensor ID"
+				range 0x0 0xFFFF
+				default "0x5675"
+				help
+				  The value in ID register
+				  This value will used for virtual device matching.
+
+			if (QTI_FSENSOR_ADDR != 0)
+				config QTI_FSENSOR_ID
+					hex "Sensor Slave address"
+					range 0x0 0xFF
+					default "0x6c"
+					help
+					  The Sensor address on CCI/I2C bus
+					  This value will used for virtual device matching.
+			endif
+
+			config QTI_RSENSOR_ADDR
+				hex "Rear Sensor ID register"
+				range 0x0 0xFFFF
+				default "0x300b"
+				help
+				  The address of register contains the sensor id
+				  This value will used for virtual device matching.
+
+			config QTI_RSENSOR_DATA
+				hex "Rear Sensor ID"
+				range 0x0 0xFFFF
+				default "0x885a"
+				help
+				  The value in ID register
+				  This value will used for virtual device matching.
+
+			if (QTI_RSENSOR_ADDR != 0)
+				config QTI_RSENSOR_ID
+					hex "Sensor Slave address"
+					range 0x0 0xFF
+					default "0x20"
+					help
+					  The Sensor address on CCI/I2C bus
+					  This value will used for virtual device matching.
+			endif
+		endif
+
+		if (QTI_PHY_IO || QTI_VIRT_IO)
+			config QTI_CCI
+				bool "Qualcomm CCI driver"
+				default y
+				help
+				  Say Y here to enable selecting module
+				  Support for the synchronous QUP based I2C interface
+
+			config QTI_I2C
+				bool "Qualcomm I2C driver"
+				default y
+				help
+				  Say Y here to enable selecting module
+				  Support for the synchronous GENI based I2C interface
+
+			config QTI_SPI
+				bool "Qualcomm SPI_GENI driver"
+				default y
+				help
+				  Say Y here to enable selecting module
+				  Support for the GENI based Serial Peripheral Interface
+		endif
+
+	endif
+
+endif

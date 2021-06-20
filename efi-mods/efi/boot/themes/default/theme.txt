@@ -1,0 +1,48 @@
+desktop-image: "background.png"
+title-text: ""
+terminal-left: "0"
+terminal-top: "0"
+terminal-width: "100%"
+terminal-height: "100%"
+terminal-border: "0"
+terminal-font: "Ubuntu Mono Bold 28"
+
++ progress_bar {
+id = "__timeout__"
+left = 5%
+top = 85%
+height = 20
+width = 80%
+font = "Ubuntu Mono Bold 28"
+text_color = "#000000"
+fg_color = "#888888"
+bg_color = "#ffffff"
+border_color = "#ffffff"
+text = "@TIMEOUT_NOTIFICATION_LONG@"
+}
+
++ boot_menu {
+left = 0
+width = 500
+top = 0%
+height = 100%
+
+menu_pixmap_style = "boot_menu_*.png"
+
+item_font = "Ubuntu Mono Bold 28"
+item_color = "#eff0f1"
+item_height = 140
+item_icon_space = 40
+item_padding = 0
+item_spacing = 0
+
+selected_item_font = "Ubuntu Mono Bold 28"
+selected_item_color= "#eff0f1"
+selected_item_pixmap_style = "select_*.png"
+
+icon_height = 100
+icon_width = 100
+
+scrollbar = false
+}
+

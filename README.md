@@ -266,6 +266,7 @@ Some options can be passed through the kernel command lines to activate specific
 - "rtl88x2bu": enable this option if you have a rtl88x2bu wireless card/adapter,
 - "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
 - "ipts": enable support for Surface devices touchscreen with kernel 5.4 / 5.10 (thanks go to the linux-surface team, especially StollD),
+- "goodix": improve goodix touchscreens support,
 - "invert_camera_order": use this option if your camera order is inverted,
 - "no_camera_config": if your camera does not work you can try this option which disables the camera config,
 - "oled_display": enable this option if you have an oled display (use with kernel 5.10),

@@ -246,7 +246,7 @@ Brunch can be installed on BIOS/MBR devices but with a limited number of methods
 # Brunch settings
 
 The brunch configuration menu can be accessed from Grub using the "ChromeOS (settings)" boot option or directly from ChromeOS using the `sudo edit-brunch-config` command in crosh shell.
-Note: To access crosh shell, press CTRL+ALT+SHIFT+T and type "shell" at the invite.
+Note: To access crosh shell, press CTRL+ALT+T and type "shell" at the invite.
 
 ## Framework options
 

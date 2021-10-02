@@ -1,0 +1,283 @@
+/*
+ * Google Gru-Nefario board device tree source
+ *
+ * Copyright 2017 Google, Inc
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPL or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This file is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This file is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *  Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/dts-v1/;
+
+#include "rk3399-gru.dtsi"
+
+/ {
+	model = "Google Nefario";
+
+	compatible = "google,nefario-rev15", "google,nefario-rev14",
+		     "google,nefario-rev13", "google,nefario-rev12",
+		     "google,nefario-rev11", "google,nefario-rev10",
+		     "google,nefario-rev9", "google,nefario-rev8",
+		     "google,nefario-rev7", "google,nefario-rev6",
+		     "google,nefario-rev5", "google,nefario-rev4",
+		     "google,nefario-rev3", "google,nefario-rev2",
+		     "google,nefario-rev1", "google,nefario-rev0",
+		     "google,nefario", "google,gru", "rockchip,rk3399";
+
+	/* REGULATORS */
+
+	/* ppvar_sys children, sorted by name */
+
+	pp900_s0: pp900-s0 {
+		compatible = "regulator-fixed";
+		regulator-name = "pp900_s0";
+
+		/* EC turns on w/ pp900_s0_en; always on for AP */
+		regulator-always-on;
+		regulator-boot-on;
+
+		regulator-min-microvolt = <900000>;
+		regulator-max-microvolt = <900000>;
+
+		vin-supply = <&ppvar_sys>;
+	};
+
+	/* pp3300 children, sorted by name */
+
+	pp900_s3: pp900-s3 {
+		compatible = "regulator-fixed";
+		regulator-name = "pp900_s3";
+
+		/* EC turns on w/ pp900_s3_en; always on for AP */
+		regulator-always-on;
+		regulator-boot-on;
+
+		regulator-min-microvolt = <900000>;
+		regulator-max-microvolt = <900000>;
+
+		vin-supply = <&pp3300>;
+	};
+
+	/* MISC */
+
+	backlight: backlight {
+		compatible = "pwm-backlight";
+		pwms = <&cros_ec_pwm 1>;
+		brightness-levels-scale = <0x10000>;
+		default-brightness-level = <0x828f>; /* arbitrary, ~51% */
+		enable-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+		power-supply = <&pp3300_disp>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&bl_en>;
+		pwm-delay-us = <10000>;
+	};
+
+	dmic: dmic {
+		compatible = "dmic-codec";
+	};
+
+	edp_panel: edp-panel {
+		compatible = "hack,nefario-rev0";
+		backlight = <&backlight>;
+		power-supply = <&pp3300_disp>;
+
+		ports {
+			panel_in_edp: endpoint {
+				remote-endpoint = <&edp_out_panel>;
+			};
+		};
+	};
+};
+
+/* REGULATOR OVERRIDES (node deletions first) */
+
+/* On nefario there's no exact pp900_ap; instead there is pp900_s0 / pp900_s3 */
+/delete-node/ &pp900_ap;
+
+/* Nefario doesn't have variable centerlogic; folded into pp900_s0 */
+/delete-node/ &ppvar_centerlogic;
+
+/* No more "logic en" pin for turning this on; folded into pp900_s0 */
+/delete-node/ &ppvar_logic;
+
+/* pp900_s0 aliases */
+pp900_centerlogic: &pp900_s0 {
+};
+pp900_logic: &pp900_s0 {
+};
+pp900_pcie: &pp900_s0 {
+};
+pp900_pll: &pp900_s0 {
+};
+
+/* pp900_s3 aliases */
+pp900_ddrpll: &pp900_s3 {
+};
+pp900_pmu: &pp900_s3 {
+};
+pp900_usb: &pp900_s3 {
+};
+
+/* pp1800 children */
+
+&pp1800_pcie {
+	/* Module spec suggest 10 ms delay after giving power */
+	regulator-enable-ramp-delay = <10000>;
+};
+
+/*
+ * TODO: for next rev we'll want to remove pp1800_audio and merge
+ * with pp1800-s0, I think.  We have no rt5514, so we don't need it.
+ */
+
+/* MISC OVERRIDES (node deletions first) */
+
+/* No rt5514 */
+/delete-node/ &headsetcodec;
+
+/* Different WiFi */
+/delete-node/ &mvl_wifi;
+
+/* No rt5514 */
+/delete-node/ &wacky_spi_audio;
+
+/* No module reset on this WiFi */
+/delete-node/ &wlan_pd_n;
+
+/* Nothing left here after rt5514 was removed; disable it */
+&ap_i2c_mic {
+	status = "disabled";
+};
+
+&ap_i2c_tp {
+	trackpad: trackpad@15 {
+		compatible = "elan,ekth3000";
+		reg = <0x15>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&trackpad_int_l>;
+
+		interrupt-parent = <&gpio1>;
+		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
+
+		wakeup-source;
+	};
+};
+
+/* No touchscreen */
+ap_i2c_ts: &i2c3 {
+	status = "disabled";
+};
+
+/* The center supply is fixed to .9V on nefario */
+&dmc {
+	center-supply = <&pp900_centerlogic>;
+};
+
+/* We don't need .925 V for 928 MHz on nefario */
+&dmc_opp_table {
+	opp03 {
+		opp-microvolt = <900000>;
+	};
+};
+
+&edp {
+	status = "okay";
+
+	ports {
+		edp_out: port@1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			edp_out_panel: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&panel_in_edp>;
+			};
+		};
+	};
+};
+
+&pcie0 {
+	/* No module reset on this WiFi, so no hack needed */
+	vpcie1v8-supply = <&pp1800_pcie>;
+};
+
+/* Nefario doesn't have variable centerlogic; pwm3 is unused */
+&pwm3 {
+	status = "disabled";
+};
+
+&sound {
+	rockchip,codec = <&max98357a &dmic &codec &cdn_dp>;
+};
+
+&spi0 {
+	status = "okay";
+
+	cr50@0 {
+		compatible = "google,cr50";
+
+		interrupt-parent = <&gpio0>;
+		interrupts = <5 IRQ_TYPE_EDGE_RISING>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&h1_int_od_l>;
+
+		reg = <0>;
+		spi-max-frequency = <800000>;
+	};
+};
+
+/* Nothing left here after rt5514 was removed; disable it */
+&spi2 {
+	status = "disabled";
+};
+
+/* PINCTRL OVERRIDES (node deletions first) */
+
+/* No module reset on this WiFi */
+/delete-node/ &wlan_module_reset_l;
+
+&pinctrl {
+	/* Override to remove &wlan_module_reset_l */
+	pinctrl-0 = <
+		&ap_pwroff	/* AP will auto-assert this when in S3 */
+		&clk_32k	/* This pin is always 32k on gru boards */
+	>;
+};

@@ -1,0 +1,29 @@
+From d1dfd471bfc5bb4e9513e8a26ecb11de934dc27e Mon Sep 17 00:00:00 2001
+From: Marcelo Henrique Cerri <marcelo.cerri@canonical.com>
+Date: Fri, 15 Dec 2017 17:09:04 +0000
+Subject: [PATCH 25/26] add support for Linux 4.14
+
+Signed-off-by: Marcelo Henrique Cerri <marcelo.cerri@canonical.com>
+---
+ src/shared/linux_osl.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/shared/linux_osl.c b/src/shared/linux_osl.c
+index 6157d1832767..318874541d89 100644
+--- a/src/shared/linux_osl.c
++++ b/src/shared/linux_osl.c
+@@ -1076,7 +1076,11 @@ osl_os_get_image_block(char *buf, int len, void *image)
+ 	if (!image)
+ 		return 0;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	rdlen = kernel_read(fp, buf, len, &fp->f_pos);
++#else
+ 	rdlen = kernel_read(fp, fp->f_pos, buf, len);
++#endif
+ 	if (rdlen > 0)
+ 		fp->f_pos += rdlen;
+ 
+-- 
+2.14.1
+

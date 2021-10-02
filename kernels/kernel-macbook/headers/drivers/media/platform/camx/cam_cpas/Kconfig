@@ -1,0 +1,9 @@
+config QTI_CPAS
+	bool "Qualcomm CPAS driver"
+	default y
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+	depends on QCOM_CLK_RPMH
+	depends on INTERCONNECT_QCOM_SC7180
+	help
+	  Say Y here to enable selecting module
+	  Support for CDMx engines SW interface

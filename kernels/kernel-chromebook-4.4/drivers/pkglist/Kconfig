@@ -1,0 +1,31 @@
+config PKGLIST
+	tristate "Package list for emulated 'SD card' file system for Android"
+	default ANDROID
+	depends on CONFIGFS_FS || !CONFIGFS_FS
+	help
+	  Pkglist presents an interface for Android's emulated sdcard layer.
+	  It relates the names of packages to their package ids, so that they can be
+	  given access to their app specific folders.
+
+	  Additionally, pkglist allows configuring the gid assigned to the lower file
+	  outside of package specific directories for the purpose of tracking storage
+	  with quotas.
+
+choice
+	prompt "Configuration options"
+	depends on PKGLIST
+	help
+	  Configuration options. This controls how you provide the emulated
+	  SD card layer with configuration information from userspace.
+
+config PKGLIST_USE_CONFIGFS
+	bool "Use Configfs based pkglist"
+	depends on CONFIGFS_FS
+	help
+	  Use configfs based pkglist driver for configuration information.
+
+config PKGLIST_NO_CONFIG
+	bool "None"
+	help
+	  This does not allow configuration of sdcardfs.
+endchoice

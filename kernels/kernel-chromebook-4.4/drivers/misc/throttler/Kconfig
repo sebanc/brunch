@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: GPL-2.0
+
+menuconfig THROTTLER
+	bool "Throttler support"
+	depends on OF
+	depends on PM_DEVFREQ
+	help
+	  This option enables core support for non-thermal throttling of CPUs
+	  and devfreq devices.
+
+	  Note that you also need a event monitor module usually called
+	  *_throttler.
+
+if THROTTLER
+
+menuconfig THROTTLER_DEBUG
+	bool "Enable throttler debugging"
+	help
+	  This option enables throttler debugging features like additional
+	  logging and a debugfs attribute for setting the logging level.
+
+	  Choose N unless you want to debug throttler drivers.
+
+config CROS_EC_THROTTLER
+	tristate "Throttler event monitor for the Chrome OS Embedded Controller"
+	depends on MFD_CROS_EC
+	help
+	  This driver adds support to throttle the system in reaction to
+	  Chrome OS EC events.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cros_ec_throttler.
+
+endif # THROTTLER

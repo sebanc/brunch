@@ -1,0 +1,135 @@
+What:		/sys/bus/platform/devices/GOOG000C\:00/boot_on_ac
+Date:		April 2019
+KernelVersion:	5.3
+Description:
+		Boot on AC is a policy which makes the device boot from S5
+		when AC power is connected. This is useful for users who
+		want to run their device headless or with a dock.
+
+		Input should be parseable by kstrtou8() to 0 or 1.
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/build_date
+Date:          May 2019
+KernelVersion: 5.3
+Description:
+               Display Wilco Embedded Controller firmware build date.
+               Output will a MM/DD/YY string.
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/build_revision
+Date:          May 2019
+KernelVersion: 5.3
+Description:
+               Display Wilco Embedded Controller build revision.
+               Output will a version string be similar to the example below:
+               d2592cae0
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/model_number
+Date:          May 2019
+KernelVersion: 5.3
+Description:
+               Display Wilco Embedded Controller model number.
+               Output will a version string be similar to the example below:
+               08B6
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/usb_charge
+Date:          October 2019
+KernelVersion: 5.5
+Description:
+               Control the USB PowerShare Policy. USB PowerShare is a policy
+               which affects charging via the special USB PowerShare port
+               (marked with a small lightning bolt or battery icon) when in
+               low power states:
+
+               - In S0, the port will always provide power.
+               - In S0ix, if usb_charge is enabled, then power will be
+                 supplied to the port when on AC or if battery is > 50%.
+                 Else no power is supplied.
+               - In S5, if usb_charge is enabled, then power will be supplied
+                 to the port when on AC. Else no power is supplied.
+
+               Input should be either "0" or "1".
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/version
+Date:          May 2019
+KernelVersion: 5.3
+Description:
+               Display Wilco Embedded Controller firmware version.
+               The format of the string is x.y.z. Where x is major, y is minor
+               and z is the build number. For example: 95.00.06
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/wilco-charge-schedule/advanced_charging/enable
+Date:          May 2019
+KernelVersion: 5.3
+Description:
+		Enable/disable the Advanced Charging policy.
+
+		Advanced Charging Mode maximizes the battery health by adjusting
+		the charging algorithm throughout the day. When enabled, the
+		system will use standard charging algorithms and other
+		techniques during non-work hours to maximize battery health.
+		During work hours, an express charge is used, allowing the
+		battery to be charged faster. For each day the time in which the
+		system will be most heavily used is specified by the start time
+		and the duration.
+
+		The input must be parseable by strtobool() from linux/string.h.
+		The output is either "0\n" or "1\n".
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/wilco-charge-schedule/advanced_charging/{sunday,monday,...}
+Date:          May 2019
+KernelVersion: 5.3
+Description:
+		Get or set the Advanced Charging schedule for a day of the week.
+
+		The input and output string have the format
+		"start_hr:start_min duration_hr:duration_min". The hour fields
+		are in the range [0-23], and the minutes are one of
+		{0, 15, 30, 45}.
+
+		For writing, the input string must be parseable by sscanf()
+		using the format string "%d:%d %d:%d". An example valid input is
+		"0006:15 23:45". When reading, the schedule is formatted with
+		"%02d:%02d %02d:%02d\n". An example output is "06:15 23:45\n".
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/wilco-charge-schedule/peak_shift/enable
+Date:          May 2019
+KernelVersion: 5.3
+Description:
+		Enable/disable the Peak Shift power management policy.
+
+		Peak Shift is power saving policy that minimizes AC usage during
+		the peak usage times of the day. For each weekday a start, end,
+		and charge_start time to run in Peak Shift mode can be set.
+		After the start time the system will run from the battery even
+		if the AC is attached, as long as the battery stays above a
+		specified threshold. After the end time the system will run from
+		AC (if attached) but will not charge the battery. The system
+		will again function normally (use AC and recharge the battery)
+		after the charge_start time.
+
+		The input must be parseable by strtobool() from linux/string.h.
+		The output is either "0\n" or "1\n".
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/wilco-charge-schedule/peak_shift/{sunday,monday,...}
+Date:          May 2019
+KernelVersion: 5.3
+Description:
+		Get or set the Peak Shift schedule for a day of the week.
+
+		The input and output string has the format
+		"start_hr:start_min end_hr:end_min charge_start_hr:charge_start_min".
+		The hour fields are in the range [0-23], and the minutes are one
+		of {0, 15, 30, 45}.
+
+		For writing, the input string must be parseable by sscanf()
+		using the format string "%d:%d %d:%d %d:%d". An example valid
+		input is "6:15  009:45 23:0". When reading, the schedule is
+		formatted with "%02d:%02d %02d:%02d %02d:%02d\n". An example
+		output is "06:15 09:45 23:00\n".
+
+What:          /sys/bus/platform/devices/GOOG000C\:00/wilco-charge-schedule/peak_shift/battery_threshold
+Date:          May 2019
+KernelVersion: 5.3
+Description:
+		Read or write the battery percentage threshold for which the
+		peak shift policy is used. The valid range is [15, 100].

@@ -1,0 +1,265 @@
+/*
+ * Google Gru-Gru board device tree source
+ *
+ * Copyright 2016 Google, Inc
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPL or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This file is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This file is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *  Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+#include "rk3399-gru.dtsi"
+
+/ {
+	// TODO: Model:
+	// - pp1200_mipi_cam
+	// - pp1800_mipi_cam
+	// - pp2800_mipi_cam
+
+	/* pp1800 children */
+
+	pp1800_fp: pp1800-fp {
+		compatible = "regulator-fixed";
+		regulator-name = "pp1800_fp";
+		pinctrl-names = "default";
+		pinctrl-0 = <&fp_en>;
+
+		enable-active-high;
+		gpio = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+
+		vin-supply = <&pp1800>;
+	};
+
+	/* pp3300 children */
+
+	pp3300_fp: pp3300-fp {
+		compatible = "regulator-fixed";
+		regulator-name = "pp3300_fp";
+		/* NOTE: fp_en pinctrl in pp1800_fp */
+
+		enable-active-high;
+		gpio = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+
+		vin-supply = <&pp3300>;
+	};
+
+	edp_panel: edp-panel {
+		compatible = "starry,kr122ea0sra", "simple-panel";
+		backlight = <&backlight>;
+		power-supply = <&pp3300_disp>;
+
+		ports {
+			panel_in_edp: endpoint {
+				remote-endpoint = <&edp_out_panel>;
+			};
+		};
+	};
+};
+
+/* pp1800 alias; EC turns on w/ pp1800_s0_en_l */
+pp1800_gps: &pp1800_s0 {
+};
+
+&edp {
+	status = "okay";
+
+	ports {
+		edp_out: port@1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			edp_out_panel: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&panel_in_edp>;
+			};
+		};
+	};
+};
+
+ap_i2c_bl: &i2c0 {
+	status = "okay";
+
+	clock-frequency = <400000>;
+
+	/* These are relatively safe rise/fall times; TODO: measure */
+	i2c-scl-falling-time-ns = <50>;
+	i2c-scl-rising-time-ns = <300>;
+
+	backlight: backlight@30 {
+		compatible = "arc,arc2c0608";
+		reg = <0x30>;
+		default-brightness = <0x828>; /* arbitrary, ~51% */
+		enable-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&bl_en>;
+		arc,led-config-0 = <0x00>;
+		arc,led-config-1 = <0x57>;
+	};
+};
+
+ap_i2c_cam: &i2c2 {
+	status = "okay";
+
+	clock-frequency = <400000>;
+
+	/* These are relatively safe rise/fall times; TODO: measure */
+	i2c-scl-falling-time-ns = <50>;
+	i2c-scl-rising-time-ns = <300>;
+
+	// TODO: add MIPI camera node
+};
+
+&ap_i2c_ts {
+	touchscreen: touchscreen@10 {
+		compatible = "elan,ekth3500";
+		reg = <0x10>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&touch_int_l &touch_reset_l>;
+
+		interrupt-parent = <&gpio3>;
+		interrupts = <13 IRQ_TYPE_LEVEL_LOW>;
+
+		reset-gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&ap_i2c_tp {
+	trackpad: trackpad@15 {
+		compatible = "elan,ekth3000";
+		reg = <0x15>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&trackpad_int_l>;
+
+		interrupt-parent = <&gpio1>;
+		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
+
+		wakeup-source;
+	};
+};
+
+ap_i2c_nfc: &i2c7 {
+	status = "okay";
+
+	clock-frequency = <400000>;
+
+	/* These are relatively safe rise/fall times; TODO: measure */
+	i2c-scl-falling-time-ns = <50>;
+	i2c-scl-rising-time-ns = <300>;
+
+	// TODO: add NFC module
+};
+
+&spi0 {
+	status = "okay";
+
+	cr50@0 {
+		compatible = "google,cr50";
+
+		interrupt-parent = <&gpio0>;
+		interrupts = <5 IRQ_TYPE_EDGE_RISING>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&h1_int_od_l>;
+
+		reg = <0>;
+		spi-max-frequency = <800000>;
+	};
+};
+
+&spi4 {
+	status = "okay";
+
+	fingerprint@0 {
+		compatible = "fpc,fpc1020";
+		reg = <0>;
+		spi-max-frequency = <5000000>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&fp_int>;
+
+		interrupt-parent = <&gpio1>;
+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+
+		vdd-supply = <&pp1800_fp>;
+		vddio-supply = <&pp3300_fp>;
+	};
+};
+
+&u2phy1_host {
+	phy-supply = <&pp5000_usb_a_vbus>;
+};
+
+/* PINCTRL: always below everything else */
+
+&pinctrl {
+	fingerprint {
+		fp_int: fp-int {
+			rockchip,pins = <RK_GPIO1 0 RK_FUNC_GPIO
+					 &pcfg_pull_up>;
+		};
+
+		fp_en: fp-en {
+			rockchip,pins = <RK_GPIO1 1 RK_FUNC_GPIO
+					 &pcfg_pull_none>;
+		};
+	};
+
+	// TODO: GPS not handled: http://crosbug.com/p/55782
+	gps {
+		gps_en: gps-en {
+			rockchip,pins =
+				<RK_GPIO4 28 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+
+		gps_host_wake: gps-host-wake {
+			rockchip,pins =
+				<RK_GPIO1 14 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+
+		gps_reset_l: gps-reset-l {
+			rockchip,pins =
+				<RK_GPIO1 24 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+	};
+};
+
+/* DON'T PUT ANYTHING BELOW HERE.  PUT IT ABOVE PINCTRL */
+/* DON'T PUT ANYTHING BELOW HERE.  PUT IT ABOVE PINCTRL */
+/* DON'T PUT ANYTHING BELOW HERE.  PUT IT ABOVE PINCTRL */

@@ -1,0 +1,34 @@
+config QTI_SENSORS
+	bool "Qualcomm sensor drivers"
+	default y
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+	help
+	  Say Y here to enable selecting module
+	  Support for the Sensors and Actuator etc
+
+if QTI_SENSORS
+	source "drivers/media/platform/camx/cam_sensor_module/cam_eeprom/Kconfig"
+	source "drivers/media/platform/camx/cam_sensor_module/cam_actuator/Kconfig"
+	source "drivers/media/platform/camx/cam_sensor_module/cam_sensor_io/Kconfig"
+
+	config QTI_CCI
+		bool "Qualcomm CCI driver"
+		default y
+		help
+		  Say Y here to enable selecting module
+		  Support for the synchronous QUP based I2C interface
+
+	config QTI_I2C
+		bool "Qualcomm I2C driver"
+		default y
+		help
+		  Say Y here to enable selecting module
+		  Support for the synchronous GENI based I2C interface
+
+	config QTI_SPI
+		bool "Qualcomm SPI_GENI driver"
+		default y
+		help
+		  Say Y here to enable selecting module
+		  Support for the GENI based Serial Peripheral Interface
+endif

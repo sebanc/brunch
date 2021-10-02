@@ -1,0 +1,13 @@
+#
+# Intel(R) Gaussian & Neural Accelerator (Intel(R) GNA)
+#
+
+config INTEL_GNA
+	tristate "Intel(R) Gaussian & Neural Accelerator (Intel(R) GNA)"
+	depends on X86 && PCI
+	help
+	  This option enables the Intel(R) Gaussian & Neural Accelerator
+	  (Intel(R) GNA) driver: intel_gna.
+	  User space interface is defined in include/uapi/misc/intel/gna.h, while
+	  information about functionality is in
+	  Documentation/misc-devices/intel/gna.rst

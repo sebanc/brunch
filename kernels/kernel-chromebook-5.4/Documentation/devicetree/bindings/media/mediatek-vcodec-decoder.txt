@@ -1,0 +1,157 @@
+Mediatek Video Decoder
+
+Mediatek Video Decoder is the video decode hw present in Mediatek SoCs which
+supports high resolution decoding functionalities. Required  master and
+component node properties:
+
+Master properties:
+- compatible :
+  "mediatek,mt8173-vcodec-dec" for MT8173 decoder.
+  "mediatek,mt8183-vcodec-dec" for MT8183 decoder.
+  "mediatek,mt8192-vcodec-dec" for MT8192 decoder.
+- reg : Physical base address of the video decoder registers and length of
+  memory mapped region.
+- iommus : should point to the respective IOMMU block with master port as
+  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+  for details.
+One of the two following nodes:
+- mediatek,vpu : the node of the video processor unit, if using VPU.
+- mediatek,scp : the node of the SCP unit, if using SCP.
+
+component properties(core and lat):
+- compatible(core) : "mediatek,mtk-vcodec-core" core hardware decoder
+  "mediatek,mtk-vcodec-core" for core hardware decoder.
+- compatible(lat) : "mediatek,mtk-vcodec-lat" lat hardware decoder
+  "mediatek,mtk-vcodec-lat" for lat hardware decoder.
+- reg : Physical base address of the video decoder registers and length of
+  memory mapped region.
+- interrupts : interrupt number to the cpu.
+- clocks : list of clock specifiers, corresponding to entries in
+  the clock-names property.
+- clock-names: decoder must contain "vcodecpll", "univpll_d2",
+  "clk_cci400_sel", "vdec_sel", "vdecpll", "vencpll", "venc_lt_sel",
+  "vdec_bus_clk_src".
+- iommus : should point to the respective IOMMU block with master port as
+  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+  for details.
+- dma-ranges : describes how the physical address space of the IOMMU maps
+  to memory.
+
+Example for no lat:
+vcodec_dec: vcodec@16000000 {
+    compatible = "mediatek,mt8173-vcodec-dec";
+    reg = <0 0x16000000 0 0x100>,	/* VDEC_SYS */
+          <0 0x16021000 0 0x800>,	/* VDEC_LD */
+          <0 0x16021800 0 0x800>,	/* VDEC_TOP */
+          <0 0x16022000 0 0x1000>,	/* VDEC_CM */
+          <0 0x16023000 0 0x1000>,	/* VDEC_AD */
+          <0 0x16024000 0 0x1000>,	/* VDEC_AV */
+          <0 0x16025000 0 0x1000>,	/* VDEC_PP */
+          <0 0x16026800 0 0x800>,	/* VDEC_HWD */
+          <0 0x16027000 0 0x800>,	/* VDEC_HWQ */
+          <0 0x16027800 0 0x800>,	/* VDEC_HWB */
+          <0 0x16028400 0 0x400>;	/* VDEC_HWG */
+    mediatek,larb = <&larb1>;
+    iommus = <&iommu M4U_PORT_HW_VDEC_MC_EXT>;
+    mediatek,vpu = <&vpu>;
+  };
+
+vcodec_core: core@0x16020000 {
+    compatible = "mediatek,mtk-vcodec-core";
+    reg = <0 0x16020000 0 0x1000>;	/* VDEC_MISC */
+    interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_LOW>;
+    iommus = <&iommu M4U_PORT_HW_VDEC_MC_EXT>,
+             <&iommu M4U_PORT_HW_VDEC_PP_EXT>,
+             <&iommu M4U_PORT_HW_VDEC_AVC_MV_EXT>,
+             <&iommu M4U_PORT_HW_VDEC_PRED_RD_EXT>,
+             <&iommu M4U_PORT_HW_VDEC_PRED_WR_EXT>,
+             <&iommu M4U_PORT_HW_VDEC_UFO_EXT>,
+             <&iommu M4U_PORT_HW_VDEC_VLD_EXT>,
+             <&iommu M4U_PORT_HW_VDEC_VLD2_EXT>;
+    power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
+    clocks = <&apmixedsys CLK_APMIXED_VCODECPLL>,
+             <&topckgen CLK_TOP_UNIVPLL_D2>,
+             <&topckgen CLK_TOP_CCI400_SEL>,
+             <&topckgen CLK_TOP_VDEC_SEL>,
+             <&topckgen CLK_TOP_VCODECPLL>,
+             <&apmixedsys CLK_APMIXED_VENCPLL>,
+             <&topckgen CLK_TOP_VENC_LT_SEL>,
+             <&topckgen CLK_TOP_VCODECPLL_370P5>;
+    clock-names = "vcodecpll",
+                  "univpll_d2",
+                  "clk_cci400_sel",
+                  "vdec_sel",
+                  "vdecpll",
+                  "vencpll",
+                  "venc_lt_sel",
+                  "vdec_bus_clk_src";
+    assigned-clocks = <&topckgen CLK_TOP_VENC_LT_SEL>,
+                      <&topckgen CLK_TOP_CCI400_SEL>,
+                      <&topckgen CLK_TOP_VDEC_SEL>,
+                      <&apmixedsys CLK_APMIXED_VCODECPLL>,
+                      <&apmixedsys CLK_APMIXED_VENCPLL>;
+    assigned-clock-parents = <&topckgen CLK_TOP_VCODECPLL_370P5>,
+                             <&topckgen CLK_TOP_UNIVPLL_D2>,
+                             <&topckgen CLK_TOP_VCODECPLL>;
+    assigned-clock-rates = <0>, <0>, <0>, <1482000000>, <800000000>;
+  };
+
+Example for with lat:
+vcodec_dec: vcodec_dec@16000000 {
+    compatible = "mediatek,mt8192-vcodec-dec";
+    reg = <0 0x16000000 0 0x1000>;		/* VDEC_SYS */
+    mediatek,scp = <&scp>;
+    iommus = <&iommu0 M4U_PORT_L4_VDEC_MC_EXT>;
+    dma-ranges = <0x1 0x0 0x0 0x40000000 0x0 0xfff00000>;
+  };
+
+vcodec_lat: vcodec_lat@0x16010000 {
+    compatible = "mediatek,mtk-vcodec-lat";
+    reg = <0 0x16010000 0 0x800>;		/* VDEC_MISC */
+    interrupts = <GIC_SPI 426 IRQ_TYPE_LEVEL_HIGH 0>;
+    iommus = <&iommu0 M4U_PORT_L5_VDEC_LAT0_VLD_EXT>,
+         <&iommu0 M4U_PORT_L5_VDEC_LAT0_VLD2_EXT>,
+         <&iommu0 M4U_PORT_L5_VDEC_LAT0_AVC_MV_EXT>,
+         <&iommu0 M4U_PORT_L5_VDEC_LAT0_PRED_RD_EXT>,
+         <&iommu0 M4U_PORT_L5_VDEC_LAT0_TILE_EXT>,
+         <&iommu0 M4U_PORT_L5_VDEC_LAT0_WDMA_EXT>,
+         <&iommu0 M4U_PORT_L5_VDEC_LAT0_RG_CTRL_DMA_EXT>,
+         <&iommu0 M4U_PORT_L5_VDEC_UFO_ENC_EXT>;
+    dma-ranges = <0x1 0x0 0x0 0x40000000 0x0 0xfff00000>;
+    clocks = <&topckgen CLK_TOP_VDEC_SEL>,
+         <&vdecsys_soc CLK_VDEC_SOC_VDEC>,
+         <&vdecsys_soc CLK_VDEC_SOC_LAT>,
+         <&vdecsys_soc CLK_VDEC_SOC_LARB1>,
+         <&topckgen CLK_TOP_MAINPLL_D4>;
+    clock-names = "vdec-sel", "vdec-soc-vdec", "vdec-soc-lat", "vdec-vdec", "vdec-top";
+    assigned-clocks = <&topckgen CLK_TOP_VDEC_SEL>;
+    assigned-clock-parents = <&topckgen CLK_TOP_MAINPLL_D4>;
+    power-domains = <&scpsys MT8192_POWER_DOMAIN_VDEC>;
+  };
+
+vcodec_core: vcodec_core@0x16025000 {
+    compatible = "mediatek,mtk-vcodec-core";
+    reg = <0 0x16025000 0 0x1000>;		/* VDEC_CORE_MISC */
+    interrupts = <GIC_SPI 425 IRQ_TYPE_LEVEL_HIGH 0>;
+    iommus = <&iommu0 M4U_PORT_L4_VDEC_MC_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_UFO_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_PP_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_PRED_RD_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_PRED_WR_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_PPWRAP_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_TILE_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_VLD_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_VLD2_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_AVC_MV_EXT>,
+         <&iommu0 M4U_PORT_L4_VDEC_RG_CTRL_DMA_EXT>;
+    dma-ranges = <0x1 0x0 0x0 0x40000000 0x0 0xfff00000>;
+    clocks = <&topckgen CLK_TOP_VDEC_SEL>,
+         <&vdecsys CLK_VDEC_VDEC>,
+         <&vdecsys CLK_VDEC_LAT>,
+         <&vdecsys CLK_VDEC_LARB1>,
+         <&topckgen CLK_TOP_MAINPLL_D4>;
+    clock-names = "vdec-sel", "vdec-soc-vdec", "vdec-soc-lat", "vdec-vdec", "vdec-top";
+    assigned-clocks = <&topckgen CLK_TOP_VDEC_SEL>;
+    assigned-clock-parents = <&topckgen CLK_TOP_MAINPLL_D4>;
+    power-domains = <&scpsys MT8192_POWER_DOMAIN_VDEC2>;
+ };

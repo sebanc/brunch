@@ -1,0 +1,6 @@
+config QTI_ACTUATOR
+	bool "Camera Actuator driver"
+	default n
+	help
+	  Say Y here to enable selecting module
+	  Support for the Camera actuator driver

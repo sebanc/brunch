@@ -1,0 +1,7 @@
+config QTI_ICP_A5
+	bool "Qualcomm ICP/A5 driver"
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU && QTI_CAMERA_CRM)
+	default y
+	help
+	  Say Y here to enable selecting module
+	  Support for the ICP/A5 engine

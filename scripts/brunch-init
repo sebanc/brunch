@@ -26,9 +26,15 @@ else
 	sleep 10
 fi
 
-if [ ! -z "$img_uuid" ] && [ ! -z "$img_path" ]; then img_part=$(blkid | grep -i "$img_uuid" | awk -F: '{ print $1 }'); fi
+if   [ ! -z "$part_uuid" ];                         then     part=$(blkid | grep -i "$part_uuid" | awk -F: '{ print $1 }')
+elif [ ! -z "$img_uuid"  ] && [ ! -z "$img_path" ]; then img_part=$(blkid | grep -i "$img_uuid"  | awk -F: '{ print $1 }'); fi
 
-if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
+if [ -e "$part" ]; then
+	mknod -m660 /dev/loop15 b 7 480
+	losetup -P /dev/loop15 "$part"
+	bootdevice=/dev/loop15
+	partpath=/dev/loop15p
+elif [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 	mkdir /mainroot
 	fstype=$(blkid -s TYPE -o value "$img_part")
 	if [ "$fstype" == "ntfs" ]; then

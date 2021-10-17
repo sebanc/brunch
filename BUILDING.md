@@ -4,20 +4,18 @@ The Brunch framework purpose is to create a generic x86_64 ChromeOS image from a
 
 The source directory is composed of:
 - the build.sh script used to build the framework,
-- the Brunch Linux kernel based on ChromiumOS release including specific ChromeOS and surface devices patches (in the kernel directory),
-- An "efi-mods" folder containing shim and GRUB (both issued from Fedora) and the specific GRUB config,
-- A "firmware-mods" directory to include firmware files which are not available in the mainline kernel firmware git (the mainline kernel firmware files are downloaded during the build process),
+- Different Brunch Linux kernels based on ChromiumOS release including specific ChromeOS and surface devices patches (in the kernels directory),
+- An "efi-partition" folder containing shim and GRUB and the specific GRUB config,
+- An "extra-firmwares" directory to include firmware files which are not available in the mainline kernel firmware git (the mainline kernel firmware files are downloaded during the build process),
 - A script folder which contains sub-scripts used during the build process and the Brunch initramfs script,
 - A patches folder which contains the patches which will be applied by the initramfs to the ChromeOS rootfs,
-- An "alsa-ucm-mods" folder which contains common alsa ucm files for better sound support.
+- An "alsa-ucm-conf" folder which contains common alsa ucm files for better sound support.
+- A few additional binaries in the "packages" folder.
 
-The build script will copy the rootfs from a ChromeOS recovery image, chroot into it, and install the Chromebrew framework in order to:
-- download from git and build the swtpm and its dependencies. (stored in ROOTC image),
-- download and install the standard mainline kernel firmware files. (stored in ROOTC image),
-- build busybox from its git and create the initramfs. (stored in ROOTC image),
+The build script will copy the rootfs from a ChromeOS recovery image, chroot into it, and install the brunch toolchain in order to:
+- build a few programs (notably efibootmgr, swtpm, nano)
 - copy all added alsa ucm files, firmware files and patches. (stored in ROOTC image),
 - copy the install script which will be used to create the ChromeOS image (chromeos-install.sh),
-- create a ChromeOS partition table with an added 1GB ROOTC partition (maingpt.img file),
 - create the ROOTC partition image,
 - create 2 different efi partitions ("efi_secure.img" with secure boot support and "efi_legacy.img" for older devices).
 
@@ -40,7 +38,7 @@ Building the framework is currently only possible under Linux (should work with 
 
 The build process consist of 4 successive steps:
 - getting the source,
-- building the Kernel,
+- building the kernels,
 - signing the kernel and GRUB for Secure Boot,
 - building the install package.
 
@@ -58,7 +56,7 @@ cd brunch
 ## Building the kernel
 
 1. Install all packages required to build the Linux kernel (refer to your distro's online resources).
-2. From the path where you extracted the source files, launch the kernel build (in a subdirectory named out).
+2. Launch the kernel build in each kernel subfolder:
 ```
 cd kernel
 make -j$(nproc) O=out chromeos_defconfig
@@ -80,7 +78,7 @@ To build the release package, you need to have:
 - 16 GB free disk space available,
 - an internet connection.
 
-1. Download the "samus" ChromeOS recovery image from here (https://cros-updates-serving.appspot.com/).
+1. Download the "rammus" ChromeOS recovery image from here (https://cros-updates-serving.appspot.com/).
 
 2. Make sure you have 16GB of free space available for the build.
 
@@ -88,7 +86,5 @@ To build the release package, you need to have:
 ```
 sudo bash build.sh < path to the ChromeOS recovery image >
 ```
-4. Verify that everything worked well. You should have an "out" directory containing 2 tar.gz files:
-- brunch_< version >.tar.gz which contains the brunch package.
-- sources_< version >.tar.gz which contains the sources that were used for building binaries inside the chroot (only for backup/history purpose).
+4. Verify that everything worked well. You should have an "out" directory containing the brunch_< version >_<date>.tar.gz archive.
 

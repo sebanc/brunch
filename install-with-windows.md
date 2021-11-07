@@ -138,7 +138,7 @@ If secure boot is enabled, a blue screen saying `Verification failed: (15) Acces
 
 ## Getting Started
   
-This guide is for installing Brunch to a disk using a Brunch USB. This guide requires having a working Brunch USB to initiate the install, you can made one by following the [guide above][brunch-usb-guide-win]. To begin, boot into a working Brunch USB. 
+This guide is for installing Brunch to a disk using a Brunch USB. This guide requires having a working Brunch USB to initiate the install, you can make one by following the [guide above][brunch-usb-guide-win]. To begin, boot into a working Brunch USB. 
 Log into ChromeOS, and open a Crosh Shell with **Ctrl + Alt + T**, then enter `shell` at the prompt.
 
 ### Selecting a Target Disk
@@ -202,7 +202,7 @@ It is normal for the first boot to take a very long time, please be patient.
 
 ## Getting Started
   
-This guide is for installing Brunch to a partition using a Brunch USB. This guide requires having a working Brunch USB to initiate the install, you can made one by following the [guide above][brunch-usb-guide-win]. To begin, boot into a working Brunch USB. 
+This guide is for installing Brunch to a partition using a Brunch USB. This guide requires having a working Brunch USB to initiate the install, you can make one by following the [guide above][brunch-usb-guide-win]. To begin, boot into a working Brunch USB. 
 Log into ChromeOS, and open a Crosh Shell with **Ctrl + Alt + T**, then enter `shell` at the prompt.
 
 ## Selecting a Target Partition
@@ -293,7 +293,7 @@ It is normal for the first boot to take a very long time, please be patient.
 * Some PCs require a key to be held when booting to boot from USB or that USB booting is enabled in the BIOS
 * The first boot can take up to an hour on some hardware. Brunch does not typically freeze on the Brunch logo. If you are seeing the Brunch logo, the system is _probably_ still booting.
 * If your PC is stuck on the ChromeOS logo (White background), it is likely that you've got an incompatible dedicated GPU.
-* If you get a blue screen saying "Verification failed" you can either disable secure boot in your bios settings, or [enroll the secure boot key][secure-boot].
+* If you get a blue screen saying "Verification failed" you can either disable secure boot in your bios settings, or enroll the key from the USB.
   * To enroll the key directly from a USB, select OK -> Enroll key from disk -> EFI-SYSTEM -> brunch.der -> Continue and reboot.
 * If the system reboots _itself_ when booting normally, then Brunch has run into an error and you may need to do some advanced troubleshooting.
 

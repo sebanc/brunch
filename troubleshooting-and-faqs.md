@@ -65,7 +65,7 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
 # Brunch Configuration Menu
 
 <details>
-  <summary> Click to learn the Brunch Configuration Menu </summary>
+  <summary> Click to learn about the Brunch Configuration Menu, Kernels, Framework Options and more! </summary>
   
 ***
   

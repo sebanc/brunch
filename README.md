@@ -2,10 +2,7 @@
 
 <!-- Shields/Logos -->
 [![License][license-shield]][license-url]
-[![Forks][forks-shield]][forks-url]
-[![Stars][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-[![Pulls][pulls-shield]][pulls-url]
 [![Discord][discord-shield]][discord-url]
 [![Reddit][reddit-shield]][reddit-url]
 [![Telegram][telegram-shield]][telegram-url]
@@ -98,6 +95,7 @@ Additional troubleshooting and FAQs can be found at the following page:
 [telegram-url]: https://t.me/chromeosforpc
 [reddit-shield]: https://img.shields.io/badge/Reddit-Join-FF5700?style=flat-square&logo=reddit&logoColor=%23FFFFFF
 [reddit-url]: https://www.reddit.com/r/Brunchbook
+
 <!-- Outbound Links -->
 [croissant]: https://github.com/imperador/chromefy
 [swtpm]: https://github.com/stefanberger/swtpm
@@ -116,6 +114,10 @@ Additional troubleshooting and FAQs can be found at the following page:
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils
+[auto-brightness]: https://chromium.googlesource.com/chromiumos/platform2/+/master/power_manager/docs/screen_brightness.md
+[brunch-toolkit]: https://github.com/WesBosch/brunch-toolkit
+[bite-dasher]: https://github.com/BiteDasher/brcr-update
+
 <!-- Images -->
 [decon-icon-24]: ./images/decon_icon-24.png
 [decon-icon-512]: ./images/decon_icon-512.png
@@ -124,6 +126,7 @@ Additional troubleshooting and FAQs can be found at the following page:
 [settings-icon-512]: ./images/settings_icon-512.png
 [windows-img]: https://img.icons8.com/color/24/000000/windows-10.png
 [linux-img]: https://img.icons8.com/color/24/000000/linux--v1.png
+
 <!-- Internal Links -->
 [cpu-wiki]: https://github.com/sebanc/brunch/wiki/CPUs-&-Recoveries
 [windows-guide]: ./install-with-windows.md
@@ -137,3 +140,5 @@ Additional troubleshooting and FAQs can be found at the following page:
 [mbr-patch]: https://github.com/sebanc/brunch/raw/master/mbr_support.tar.gz
 [brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
 [secure-boot]: ./install-with-linux.md#secure-boot
+[brunch-pwa-info]: https://github.com/sebanc/brunch/wiki/Brunch-PWA-Guide
+

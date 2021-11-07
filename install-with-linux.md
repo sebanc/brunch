@@ -15,10 +15,10 @@
 <h1 align="center">Install Brunch with Linux</h1>
 
 <!-- Installation Guides -->
-# Singleboot and USB installations
+# USB installations
 
 <details>
-  <summary>Click to open singleboot guide</summary>
+  <summary>Click to open Brunch USB guide</summary>
 
 ### Requirements
 - Root access.
@@ -54,7 +54,7 @@ When downloading a release, select the brunch...tar.gz file from the assets at t
 Once both files have been downloaded, the Brunch release and your chosen ChromeOS recovery, open a terminal. In most Linux distros you can just press **ctrl + alt + t** to open it quickly.
 * Make sure that pv, cgpt, tar and unzip are installed.
 
-```sudo apt -y install pv cgpt tar unzip```
+```sudo apt update && sudo apt -y install pv cgpt tar unzip```
   * My example uses `apt`, a package manager for Debian and Ubuntu based distros. If you use Arch, you will need [vboot-utils][vboot-utils] for access to cgpt and a different package manager may be needed to install the rest.
 
 * Some Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
@@ -120,10 +120,73 @@ If you installed using a Linux Live USB or installed to a second internal disk, 
 * The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option.
 
   </details>
+ 
+***
+
+
+# Singleboot installations
+
+<details>
+  <summary>Click to open singleboot guide</summary>
+
+### Requirements
+- Root access.
+- Target Disk must be 16 GB minimum.
+- Working Brunch USB.
+- A [compatible PC][compatibility] to boot Brunch on.
+- An entry level understanding of the linux terminal.
+  - This guide aims to make this process as easy as possible, but knowing the basics is expected.
+
+## Getting Started
+  
+This guide is for installing Brunch to a disk using a Brunch USB. This guide requires having a working Brunch USB to initiate the install, you can make one by following the [guide above][brunch-usb-guide-lin]. To begin, boot into a working Brunch USB. 
+Log into ChromeOS, and open a Crosh Shell with **Ctrl + Alt + T**, then enter `shell` at the prompt.
+
+### Selecting a Target Disk
+  
+Before continuing, you will need to know what disk you want to install to. Be absolutely sure **before** you continue, this installation will erase **everything** on that disk, including other partitions. The disk must be at least 16 GB, or the installation will fail. There are several ways to determine which disk is your target, in my example I'll be using `lsblk`.
+  
+```lsblk -e7```
+  
+This command will show your disks, and the partitions on them. It will also show their sizes and if they are currently mounted. Use this information to determine which disk is your target.
   
 ***
+  
+#### Tips:
+  
+* Your target will **never** be zram or a loop device.
+* Some PCs may require RAID to be disabled before showing your disks correctly.
+* For this installation, a USB is treated the same as any HDD or SSD.
+* If there is an EFI mountpoint on a disk that disk is your boot disk.
+  * You **cannot** install Brunch directly onto the same disk you are currently booting from.
+* When doing a singleboot installation, your target will **not** be a partition. This method installs to the *entire* disk.
+  
+  ***
+  
+### Install Brunch
+  
+* Once you've determined your target disk, you're ready to install Brunch.
+  * You will replace `disk` with your target disk. (Such as `sdb`, `mmcblk0` or `nvme0n1` for example)
+  
+```sudo chromeos-install -dst /dev/disk -s size```
+  
+The script will ask for confirmation. If you're ready to install, type `yes` into the prompt.
+  
+The installation may take some time depending on the speed of your target disk, please be patient. There may be a couple of GPT Header errors, which can be safely ignored. 
+  
+The installation will report that ChromeOS was installed when it is finished. Before closing the terminal, make sure that there are no additional errors in the terminal. If there are no errors, then you are good to go!
+
+### Next Steps
+  
+It is normal for the first boot to take a very long time, please be patient.
+
+* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option.
+  
+</details>  
+  
+  ***
  
-# DualBoot installations
+# Dualboot installations
 
 <details>
   <summary>Click to open dualboot guide</summary>
@@ -163,7 +226,7 @@ When downloading a release, select the brunch...tar.gz file from the assets at t
 Once both files have been downloaded, the Brunch release and your chosen ChromeOS recovery, open a terminal. In most Linux distros you can just press **ctrl + alt + t** to open it quickly.
 * Make sure that pv, cgpt, tar and unzip are installed.
 
-```sudo apt -y install pv cgpt tar unzip```
+```sudo apt update && sudo apt -y install pv cgpt tar unzip```
   * My example uses `apt`, a package manager for Debian and Ubuntu based distros. If you use Arch, you will need [vboot-utils][vboot-utils] for access to cgpt and a different package manager may be needed to install the rest.
 
 * Some Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
@@ -324,6 +387,9 @@ Additional troubleshooting and FAQs can be found at the following page:
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils
+[rufus-link]: https://rufus.ie/
+[etcher-link]: https://www.balena.io/etcher/
+[grub2win]: https://sourceforge.net/projects/grub2win/
 
 <!-- Images -->
 [decon-icon-24]: ./images/decon_icon-24.png
@@ -347,3 +413,5 @@ Additional troubleshooting and FAQs can be found at the following page:
 [mbr-patch]: https://github.com/sebanc/brunch/raw/master/mbr_support.tar.gz
 [brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
 [secure-boot]: ./install-with-linux.md#secure-boot
+[brunch-usb-guide-win]:  ./install-with-windows.md#usb-installations
+[brunch-usb-guide-lin]:  ./install-with-linux.md#usb-installations

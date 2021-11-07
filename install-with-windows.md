@@ -185,7 +185,7 @@ It is normal for the first boot to take a very long time, please be patient.
   
   ***
  
-# DualBoot installations
+# Dualboot installations
 
 <details>
   <summary>Click to open dualboot guide</summary>

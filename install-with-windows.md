@@ -43,6 +43,7 @@ Download a recovery suitable for your CPU. The list below can help you select on
 * ["grunt" is suggested for Stoney Ridge & Bristol Ridge.][recovery-grunt]
 * ["zork" is suggested for Ryzen.][recovery-zork]
   * [Ryzen 4xxx devices need kernel 5.10][changing-kernels]
+
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] or the [cros-updates-serving][cros-official] site and searching for the recovery you want.
 
 After selecting the recovery you want, you can select a specific release. Posted releases may be behind the current release, this is normal and you can update into the current release later. It is usually suggested to use the latest release avaliable.

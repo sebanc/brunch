@@ -64,7 +64,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 
 ✔ Base Requirements:
 - x86_64 based computer with UEFI boot support.
-  - MBR/Legacy devices may be supported with the [MBR Patch][mbr-patch]
+  - MBR/Legacy devices may be supported with the MBR patch
 - Administrative privleges on the device.
 - An entry level understanding of the linux terminal.
   - This guide aims to make this process as easy as possible, but knowing the basics is expected.
@@ -103,7 +103,9 @@ Additional troubleshooting and FAQs can be found at the following page:
 ### [![Troubleshooting][decon-icon-24]][troubleshooting-and-faqs]  [Troubleshooting and FAQs][troubleshooting-and-faqs]
 
 
+
 <!-- Reference Links -->
+<!-- Badges -->
 [license-shield]: https://img.shields.io/github/license/sebanc/brunch?label=License&logo=Github&style=flat-square
 [license-url]: ./LICENSE
 [forks-shield]: https://img.shields.io/github/forks/sebanc/brunch?label=Forks&logo=Github&style=flat-square
@@ -120,29 +122,42 @@ Additional troubleshooting and FAQs can be found at the following page:
 [telegram-url]: https://t.me/chromeosforpc
 [reddit-shield]: https://img.shields.io/badge/Reddit-Join-FF5700?style=flat-square&logo=reddit&logoColor=%23FFFFFF
 [reddit-url]: https://www.reddit.com/r/Brunchbook
-
+<!-- Outbound Links -->
 [croissant]: https://github.com/imperador/chromefy
 [swtpm]: https://github.com/stefanberger/swtpm
 [linux-surface]: https://github.com/linux-surface/linux-surface
 [chromebrew]: https://github.com/skycocker/chromebrew
-
 [intel-cpus]: https://en.wikipedia.org/wiki/Intel_Core
 [intel-list]: https://en.wikipedia.org/wiki/List_of_Intel_CPU_microarchitectures
 [atom-cpus]: https://en.wikipedia.org/wiki/Intel_Atom
 [atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
 [amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
 [amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
-[mbr-patch]: #limited-support-for-mbr-and-legacy-devices
-[cpu-wiki]: https://github.com/sebanc/brunch/wiki/CPUs-&-Recoveries
-
+[recovery-rammus]: https://cros.tech/device/rammus
+[recovery-volteer]: https://cros.tech/device/volteer
+[recovery-grunt]: https://cros.tech/device/grunt
+[recovery-zork]: https://cros.tech/device/zork
+[cros-tech]: https://cros.tech/
+[cros-official]: https://cros-updates-serving.appspot.com/
+[vboot-utils]: https://aur.archlinux.org/packages/vboot-utils
+<!-- Images -->
 [decon-icon-24]: ./images/decon_icon-24.png
 [decon-icon-512]: ./images/decon_icon-512.png
 [terminal-icon-24]: ./images/terminal_icon-24.png
 [terminal-icon-512]: ./images/terminal_icon-512.png
 [settings-icon-512]: ./images/settings_icon-512.png
-
-[windows-guide]: ./install-with-windows.md
 [windows-img]: https://img.icons8.com/color/24/000000/windows-10.png
-[linux-guide]: ./install-with-linux.md
 [linux-img]: https://img.icons8.com/color/24/000000/linux--v1.png
+<!-- Internal Links -->
+[cpu-wiki]: https://github.com/sebanc/brunch/wiki/CPUs-&-Recoveries
+[windows-guide]: ./install-with-windows.md
+[linux-guide]: ./install-with-linux.md
 [troubleshooting-and-faqs]: ./troubleshooting-and-faqs.md
+[compatibility]: ./README.md#supported-hardware
+[changing-kernels]: ./troubleshooting-and-faqs.md#kernels
+[framework-options]: ./troubleshooting-and-faqs.md#framework-options
+[releases-tab]: https://github.com/sebanc/brunch/releases
+[latest-release]: https://github.com/sebanc/brunch/releases/latest
+[mbr-patch]: https://github.com/sebanc/brunch/raw/master/mbr_support.tar.gz
+[brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
+[secure-boot]: ./install-with-linux.md#secure-boot

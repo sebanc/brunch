@@ -18,30 +18,6 @@
 </p>
 <h1 align="center">Brunch Framework</h1>
 
-<!-- Table of Contents -->
-
-## Table of Contents
-<details>
- <summary>Click to Expand</summary>
- <ol>
-  <li>
-   <a href="#special-thanks">Special Thanks</a>
-  </li>
-  <li>
-   <a href="#about-this-project">About The Project</a>
-  </li>
-  <li>
-   <a href="#supported-hardware">Supported Hardware</a>
-  </li>
-  <li>
-   <a href="#install-instructions">Install Instructions</a>
-  </li>
-  <li>
-   <a href="#troubleshooting-and-support">Troubleshooting and Support</a>
-  </li>
- </ol>
- </details>
- 
 <!-- Special Thanks -->
 
 ## Special Thanks

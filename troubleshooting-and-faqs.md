@@ -53,7 +53,7 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
   * ChromeOS updates can be unpredictable, especially on Brunch devices. Even if it's declaired safe by other users, you should *always* have backups ready in case there is an issue while updating or if the update has serious bugs on your hardware. 
   
   ### My Touchpad, Touchscreen, Wifi or other hardware is not working properly!
-  * ChromeOS is not optimized for every device. Brunch has several avaliable [framework options][framework-options] and multiple customized [kernels][changing-kernels] avaliable to help with these issues. If you're still having issues, you can reach out to other users on one of our communities for help.
+  * ChromeOS is not optimized for every device. Brunch has several avaliable framework options and multiple customized kernels avaliable further down on this page to help with these issues. If you're still having issues, you can reach out to other users on one of our communities for help.
 
 [![Discord][discord-shield]][discord-url]
 [![Reddit][reddit-shield]][reddit-url]
@@ -69,7 +69,7 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
   
 ***
   
-The BRunch Configuration menu is a new feature avaliable in Brunch 93 and higher, this menu will allow users to set and controll options easily without needing to manually edit files themselves. The Brunch Configuration Menu can be accessed directly from Grub using the "ChromeOS (settings)" boot option or while logged into ChromeOS using the `sudo edit-brunch-config` command in the crosh shell.
+The Brunch Configuration menu is a new feature avaliable in Brunch 93 and higher, this menu will allow users to set and controll options easily without needing to manually edit files themselves. The Brunch Configuration Menu can be accessed directly from Grub using the "ChromeOS (settings)" boot option or while logged into ChromeOS using the `sudo edit-brunch-config` command in the crosh shell.
   * To access the crosh shell, press **Ctrl + Alt + T** and type `shell` at the invite.
 
   

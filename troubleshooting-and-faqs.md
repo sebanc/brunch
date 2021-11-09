@@ -13,12 +13,9 @@
    <img src="./images/settings_icon-512.png" width="128px" alt="Logo"/>
   </a>
 </p>
-<h1 align="center">Troubleshooting and FAQs</h1>
+<h1 align="center">Troubleshooting and Support</h1>
   
 # Common Issues
-
-<details>
-  <summary> Click to learn about common issues </summary>
   
   ***
 <!-- This *** line creates a divider so that the dropdown looks nice. 
@@ -59,14 +56,8 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
 [![Reddit][reddit-shield]][reddit-url]
 [![Telegram][telegram-shield]][telegram-url]
 
-  
-</details>
-
 # Brunch Configuration Menu
 
-<details>
-  <summary> Click to learn about the Brunch Configuration Menu, Kernels, Framework Options and more! </summary>
-  
 ***
   
 The Brunch Configuration menu is a new feature avaliable in Brunch 93 and higher, this menu will allow users to set and controll options easily without needing to manually edit files themselves. The Brunch Configuration Menu can be accessed directly from Grub using the "ChromeOS (settings)" boot option or while logged into ChromeOS using the `sudo edit-brunch-config` command in the crosh shell.
@@ -171,12 +162,8 @@ Brunch Bootsplashes can be selected using the Brunch Configuration Menu, these d
 
 </details>
 
-</details>
 
 # Updates
-  
-<details>
-<summary> Click to learn about updates </summary>
   
   ***
   
@@ -226,8 +213,6 @@ It is currently recommended to only update ChromeOS when the matching version of
  * Restart ChromeOS after the update finishes.
   
   Brunch can also be updated with the [Brunch Toolkit][brunch-toolkit]
-  
-  </details>
   
   </details>
 

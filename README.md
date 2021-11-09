@@ -71,9 +71,9 @@ In case you run into issues while installing or using Brunch, below are the main
 [![Reddit][reddit-shield]][reddit-url]
 [![Telegram][telegram-shield]][telegram-url]
 
-Additional troubleshooting and FAQs can be found at the following page:
+Additional troubleshooting and support tips can be found at the following page:
 
-### [![Troubleshooting][decon-icon-24]][troubleshooting-and-faqs]  [Troubleshooting and FAQs][troubleshooting-and-faqs]
+### [![Troubleshooting][decon-icon-24]][troubleshooting-and-faqs]  [Troubleshooting and Support][troubleshooting-and-faqs]
 
 
 

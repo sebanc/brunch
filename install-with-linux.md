@@ -171,7 +171,7 @@ This command will show your disks, and the partitions on them. It will also show
 3. Once you've determined your target disk, you're ready to install Brunch.
   * You will replace `disk` with your target disk. (Such as `sdb`, `mmcblk0` or `nvme0n1` for example)
   
-```sudo chromeos-install -dst /dev/disk -s size```
+```sudo chromeos-install -dst /dev/disk```
   
 The script will ask for confirmation. If you're ready to install, type `yes` into the prompt.
   

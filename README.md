@@ -38,7 +38,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 ✔ Base Requirements:
 - x86_64 based computer with UEFI boot support.
   - MBR/Legacy devices may be supported with the MBR patch
-- Administrative privleges on the device.
+- Administrative privileges on the device.
 - An entry level understanding of the linux terminal.
   - This guide aims to make this process as easy as possible, but knowing the basics is expected.
 

@@ -1,0 +1,5 @@
+config RTL8723BU
+	tristate "Realtek 8723B USB WiFi"
+	depends on USB
+	---help---
+	  Help message of RTL8723BU

@@ -1,0 +1,141 @@
+#!/bin/bash
+
+list=""
+
+listmods() {
+	key=$1 ; shift
+	ex=
+	while [ "$1" ]; do
+		[ "$ex" ] && ex="$ex|$1" || ex="$1"
+		shift
+	done
+	for ln in $(grep "$key" /tmp/modules-stripped | sed 's|^insmod ||g'); do
+		if [ "$ex" ]; then
+			echo $ln | egrep -v "$ex" | sed -ne "s#^/.*/\(.*\)\.ko.*#\1#p"
+		else
+			echo $ln | sed -ne "s#^/.*/\(.*\)\.ko.*#\1#p"
+		fi
+	done
+}
+showlist() {
+	#echo -n "CATEGORY=$1 "
+	shift
+	for i in $*; do
+	#	echo -n " $i"
+		if [ -z "$list" ] && [ ! -z "$i" ]; then
+			list="$i"
+		elif [ ! -z "$i" ]; then
+			list="$list $i"
+		fi
+	done
+	#echo -e ""
+}
+
+base()
+{
+	showlist "AGP      " $(listmods agp/)
+	showlist "ACPI     " $(listmods acpi/)
+	showlist "BLOCK    " $(listmods ata/pata pata_acpi) $(listmods ata/ata_piix) \
+			     $(listmods virtio/virtio_pci) $(listmods scsi/) $(listmods message/fusion/) $(listmods drivers/block/ nbd pktcdvd sx8 floppy) \
+			     $(listmods ata/ pata ata_generic) $(listmods drivers/block/sx8) \
+			     $(listmods usb/ usb/input) $(listmods firewire/) $(listmods ieee1394/) $(listmods nvme/)
+	showlist "BLUETOOTH" $(listmods bluetooth/)
+	showlist "CDROM    " $(listmods cdrom/)
+	showlist "CPUFREQ  " $(listmods cpufreq/)
+	showlist "CRYPTO   " $(listmods crypto/)
+        showlist "DCA      " $(listmods dca/)
+	showlist "DMA      " $(listmods dma/)
+	#showlist "DRM      " $(listmods drm/)
+	showlist "EDAC     " $(listmods edac/)
+        showlist "EVENTS   " $(listmods events/)
+	showlist "HWMON    " $(listmods hwmon/)
+	showlist "I2C      " $(listmods i2c/)
+	showlist "INPUT    " $(listmods input/ pcspkr) $(listmods hid/) $(listmods mac_hid)
+	showlist "IPMI     " $(listmods ipmi/)
+	showlist "IRDA     " $(listmods irda/)
+	showlist "ISDN     " $(listmods isdn/)
+	showlist "KVM      " $(listmods kvm/)
+	showlist "MEDIA    " $(listmods media/)
+        showlist "MEI      " $(listmods mei/)
+	showlist "MFD      " $(listmods mfd/)			
+	showlist "MTD      " $(listmods mtd/)
+	#showlist "NET      " $(listmods net/ irda/)
+	showlist "PARPORT  " $(listmods parport/)
+	showlist "PCMCIA   " $(listmods pcmcia/)
+        showlist "PLATFORM " $(listmods platform/)
+	showlist "POWERCAP " $(listmods powercap/)
+	showlist "SERIAL   " $(listmods serial/)
+	showlist "SOUND    " $(listmods pcspkr) $(listmods sound/)
+	showlist "STAGING  " $(listmods staging/)
+	showlist "THERMAL  " $(listmods thermal/)
+	showlist "TPM      " $(listmods tpm/)
+	showlist "VIDEO    " $(listmods video/)
+	showlist "VIRT     " $(listmods virt/)
+	showlist "WATCHDOG " $(listmods watchdog/)
+	showlist "OTHER    " $(listmods modules/ agp/ acpi/ scsi/ message/fusion block/sx8 block/cciss block/cpqarray block/DAC960 block/virtio virtio/virtio_pci ata/ \
+				usb/ ieee1394 bluetooth/ cdrom/ cpufreq/ crypto/ dca/ dma/ edac/ events/ net/ hwmon/ i2c/ isdn/ input/ ipmi/ irda/ kvm/ mac_hid media/ mei/ \
+				mfd/ mtd/ parport/ platform/ pcmcia/ powercap/ sound/ thermal/ tpm/ drm/ firewire/ hid/ serial/ staging/ video/ virt/ watchdog/)
+}
+
+drm()
+{
+	showlist "DRM      " $(listmods drm/)
+	showlist "SOUND    " $(listmods pcspkr) $(listmods sound/)
+}
+
+net()
+{
+	showlist "NET      " $(listmods net/ irda/)
+}
+
+usage()
+{
+	echo ""
+	echo "brunch-hwprobe: load kernel modules"
+	echo "Usage: brunch-hwprobe [ --base | --drm | --net ]"
+	echo "--base : Load the main modules"
+	echo "--drm : Load the drm modules"
+	echo "--net : Load the net modules"
+	echo "--help : Display this menu"
+}
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--base)
+		aliases=$(find /sys/ -name modalias  -exec cat {} +)
+		modprobe -i -a --show-depends $aliases >> /tmp/modules-plain 2>/dev/null
+		sort -u /tmp/modules-plain >> /tmp/modules-stripped
+		base
+		echo "Loading modules $list"
+		modprobe -a $list
+		rm /tmp/modules-plain
+		rm /tmp/modules-stripped
+		;;
+		--drm)
+		aliases=$(find /sys/ -name modalias  -exec cat {} +)
+		modprobe -i -a --show-depends $aliases >> /tmp/modules-plain 2>/dev/null
+		sort -u /tmp/modules-plain >> /tmp/modules-stripped
+		drm
+		echo "Loading modules $list"
+		modprobe -a $list
+		rm /tmp/modules-plain
+		rm /tmp/modules-stripped
+		;;
+		--net)
+		aliases=$(find /sys/ -name modalias  -exec cat {} +)
+		modprobe -i -a --show-depends $aliases >> /tmp/modules-plain 2>/dev/null
+		sort -u /tmp/modules-plain >> /tmp/modules-stripped
+		net
+		echo "Loading modules $list"
+		modprobe -a $list
+		rm /tmp/modules-plain
+		rm /tmp/modules-stripped
+		;;
+		*)
+		echo "$1 argument is not valid"
+		usage
+		exit 1
+	esac
+	shift
+done
+

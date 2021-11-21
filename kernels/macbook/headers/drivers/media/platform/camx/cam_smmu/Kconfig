@@ -1,0 +1,7 @@
+config QTI_CAMERA_SMMU
+	bool "Qualcomm System Memory Management Unit (SMMU)"
+	default y
+	depends on (IOMMU_DMA)
+	help
+	  Say Y here to enable selecting module
+	  Support for memory pools and context banks

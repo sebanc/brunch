@@ -1,0 +1,12 @@
+What:		/config/*/ufs_config_desc_X
+Date:		Jun 2018
+KernelVersion:	4.20
+Description:
+		This file shows bytes of the current ufs configuration descriptor
+		with index X (where X = 0/1/2/3) set in device. This can be used to
+		provision ufs device if bConfigDescrLock is 0.
+		For more details, refer 14.1.6.3 Configuration Descriptor and
+		table 14-12 - Unit Descriptor configurable parameters from specs for
+		description and format of each configuration descriptor parameter.
+		Parameters of Configuration descriptor buffer for respective index
+		needs to be passed as bytes in space separated format.

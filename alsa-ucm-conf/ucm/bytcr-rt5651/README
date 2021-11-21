@@ -1,0 +1,9 @@
+To enable UCM on RT5651 platforms, 
+
+1. copy directory to UCM location
+sudo cp -rf ../bytcr-rt5651 /usr/share/alsa/ucm
+
+2. update asound.state
+sudo cp asound.state /var/lib/alsa
+
+UCM files should be detected and use with Pulseaudio 4.0 and above

@@ -1,0 +1,26 @@
+#!/usr/bin/make -f
+# See debhelper(7) (uncomment to enable)
+# output every command that modifies files on the build system.
+#export DH_VERBOSE = 1
+
+DRIVER_NAME := rtl8814au
+VERSION := $(shell dpkg-parsechangelog | grep '^Version:' | cut -d' ' -f2 | cut -d- -f1 | cut -d\: -f2)
+
+BDATE=$(shell date +%Y%m%d)
+GDATE=${BDATE}_$(shell git rev-parse HEAD)
+
+%:
+	dh "$@" --with dkms
+
+override_dh_install:
+	dh_install core hal include Kconfig Makefile os_dep platform usr/src/rtl8814au-$(VERSION)/
+	find debian/rtl8814au-dkms/usr/src/rtl8814au-$(VERSION) -type f -exec chmod 644 {} \;
+
+override_dh_dkms:
+	dh_dkms -V $(VERSION)
+
+override_dh_auto_configure:
+	$(shell sed -i 's/^#define BUILDNO.*/#define BUILDNO "${GDATE}"/' ./os_dep/linux/os_intfs.c)
+	
+	
+override_dh_auto_build override_dh_auto_test override_dh_auto_install override_dh_auto_c:

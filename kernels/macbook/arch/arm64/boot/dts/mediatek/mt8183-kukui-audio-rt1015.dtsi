@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Google Kukui (and derivatives) audio fragment for rt1015p.
+ *
+ * Copyright 2020 Google LLC.
+ */
+
+&i2c6 {
+	rt1015@28 {
+		compatible = "realtek,rt1015";
+		reg = <0x28>;
+	};
+
+	rt1015@29 {
+		compatible = "realtek,rt1015";
+		reg = <0x29>;
+	};
+};

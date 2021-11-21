@@ -1,0 +1,40 @@
+Source: rtl8821cu
+Section: misc
+Priority: optional
+Maintainer: Marc Leeman <m.leeman@televic.com>
+Build-Depends: debhelper (>= 10),
+                dkms,
+                bc,
+                linux-kbuild-4.19
+Standards-Version: 4.3.0
+Vcs-Browser: https://github.com/brektrou/rtl8821CU
+Vcs-Git: https://github.com/brektrou/rtl8821CU.git
+
+Package: rtl8821cu-dkms
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Provides: rtl8821cu-module
+Description: DKMS files to build and install rtl8821cu
+ The rtl8821cu driver provides the driver for Realtek RTL8811CU/RTL8821CU
+ USB wifi adapter.
+ .
+ This package contains the DKMS files to build and install rtl8821cu.
+ .
+ To install this package, you have to install the header files for your
+ current kernel manually (usually included in the "linux-headers-<your
+ architecture>").
+
+Package: rtl8821cu-src
+Architecture: all
+Depends: module-assistant,
+         debhelper (>= 5.0.37),
+         xz-utils,
+         ${misc:Depends}
+Description: Source of the compressed rtl8821cu module
+ The rtl8821cu driver provides the driver for Realtek RTL8811CU/RTL8821CU
+ USB wifi adapter.
+ .
+ You can use module-assistant or make-kpkg to build a modules package
+ for specific kernel.
+

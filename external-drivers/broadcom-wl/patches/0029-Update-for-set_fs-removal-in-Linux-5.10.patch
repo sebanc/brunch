@@ -1,0 +1,194 @@
+From 91bfe09c1239d916195f53380b56361f631f74b2 Mon Sep 17 00:00:00 2001
+From: Seth Forshee <seth.forshee@canonical.com>
+Date: Fri, 12 Mar 2021 08:32:26 -0600
+Subject: [PATCH] Update for set_fs() removal in Linux 5.10
+
+The driver uses set_fs() to allow internal use of ioctls with
+kernel memory instead of userspace memory. This is always for the
+SIOCDEVPRIVATE ioctl, so add an internal function to handle these
+operations without any copy_(to|from0_user calls.
+
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ src/wl/sys/wl_cfg80211_hybrid.c | 26 ++-------------------
+ src/wl/sys/wl_iw.c              | 25 ++-------------------
+ src/wl/sys/wl_linux.c           | 40 ++++++++++++++++++++++++++++-----
+ src/wl/sys/wl_linux.h           |  3 +++
+ 4 files changed, 42 insertions(+), 52 deletions(-)
+
+diff --git a/src/wl/sys/wl_cfg80211_hybrid.c b/src/wl/sys/wl_cfg80211_hybrid.c
+index 5f74e66b147b..dcc18ce5ec61 100644
+--- a/src/wl/sys/wl_cfg80211_hybrid.c
++++ b/src/wl/sys/wl_cfg80211_hybrid.c
+@@ -38,6 +38,7 @@
+ #include <wlioctl.h>
+ #include <proto/802.11.h>
+ #include <wl_cfg80211_hybrid.h>
++#include <wl_linux.h>
+ 
+ #define EVENT_TYPE(e) dtoh32((e)->event_type)
+ #define EVENT_FLAGS(e) dtoh16((e)->flags)
+@@ -444,30 +445,7 @@ static void key_endian_to_host(struct wl_wsec_key *key)
+ static s32
+ wl_dev_ioctl(struct net_device *dev, u32 cmd, void *arg, u32 len)
+ {
+-	struct ifreq ifr;
+-	struct wl_ioctl ioc;
+-	mm_segment_t fs;
+-	s32 err = 0;
+-
+-	BUG_ON(len < sizeof(int));
+-
+-	memset(&ioc, 0, sizeof(ioc));
+-	ioc.cmd = cmd;
+-	ioc.buf = arg;
+-	ioc.len = len;
+-	strcpy(ifr.ifr_name, dev->name);
+-	ifr.ifr_data = (caddr_t)&ioc;
+-
+-	fs = get_fs();
+-	set_fs(get_ds());
+-#if defined(WL_USE_NETDEV_OPS)
+-	err = dev->netdev_ops->ndo_do_ioctl(dev, &ifr, SIOCDEVPRIVATE);
+-#else
+-	err = dev->do_ioctl(dev, &ifr, SIOCDEVPRIVATE);
+-#endif
+-	set_fs(fs);
+-
+-	return err;
++	return wlc_ioctl_kernel(dev, cmd, arg, len);
+ }
+ 
+ static s32
+diff --git a/src/wl/sys/wl_iw.c b/src/wl/sys/wl_iw.c
+index c4c610bbcf73..41436cee044c 100644
+--- a/src/wl/sys/wl_iw.c
++++ b/src/wl/sys/wl_iw.c
+@@ -37,6 +37,7 @@ typedef const struct si_pub	si_t;
+ 
+ #include <wl_dbg.h>
+ #include <wl_iw.h>
++#include <wl_linux.h>
+ 
+ extern bool wl_iw_conn_status_str(uint32 event_type, uint32 status,
+ 	uint32 reason, char* stringBuf, uint buflen);
+@@ -103,29 +104,7 @@ dev_wlc_ioctl(
+ 	int len
+ )
+ {
+-	struct ifreq ifr;
+-	wl_ioctl_t ioc;
+-	mm_segment_t fs;
+-	int ret;
+-
+-	memset(&ioc, 0, sizeof(ioc));
+-	ioc.cmd = cmd;
+-	ioc.buf = arg;
+-	ioc.len = len;
+-
+-	strcpy(ifr.ifr_name, dev->name);
+-	ifr.ifr_data = (caddr_t) &ioc;
+-
+-	fs = get_fs();
+-	set_fs(get_ds());
+-#if defined(WL_USE_NETDEV_OPS)
+-	ret = dev->netdev_ops->ndo_do_ioctl(dev, &ifr, SIOCDEVPRIVATE);
+-#else
+-	ret = dev->do_ioctl(dev, &ifr, SIOCDEVPRIVATE);
+-#endif
+-	set_fs(fs);
+-
+-	return ret;
++	return wlc_ioctl_kernel(*dev, cmd, arg, len);
+ }
+ 
+ static int
+diff --git a/src/wl/sys/wl_linux.c b/src/wl/sys/wl_linux.c
+index 2bcc8cda1550..d5d49fb761f6 100644
+--- a/src/wl/sys/wl_linux.c
++++ b/src/wl/sys/wl_linux.c
+@@ -1659,10 +1659,7 @@ wl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+ 		goto done2;
+ 	}
+ 
+-	if (segment_eq(get_fs(), KERNEL_DS))
+-		buf = ioc.buf;
+-
+-	else if (ioc.buf) {
++	if (ioc.buf) {
+ 		if (!(buf = (void *) MALLOC(wl->osh, MAX(ioc.len, WLC_IOCTL_MAXLEN)))) {
+ 			bcmerror = BCME_NORESOURCE;
+ 			goto done2;
+@@ -1683,7 +1680,7 @@ wl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+ 	WL_UNLOCK(wl);
+ 
+ done1:
+-	if (ioc.buf && (ioc.buf != buf)) {
++	if (ioc.buf) {
+ 		if (copy_to_user(ioc.buf, buf, ioc.len))
+ 			bcmerror = BCME_BADADDR;
+ 		MFREE(wl->osh, buf, MAX(ioc.len, WLC_IOCTL_MAXLEN));
+@@ -1696,6 +1693,39 @@ done2:
+ 	return (OSL_ERROR(bcmerror));
+ }
+ 
++/*
++ * SIOCDEVPRIVATE ioctl support for internal driver use, when no userspace
++ * memory copies are required.
++ */
++int
++wlc_ioctl_kernel(struct net_device *dev, uint cmd, void *buf, uint len)
++{
++	wl_info_t *wl;
++	wl_if_t *wlif;
++	int bcmerror;
++
++	if (!dev)
++		return -ENETDOWN;
++
++	wl = WL_INFO(dev);
++	wlif = WL_DEV_IF(dev);
++	if (wlif == NULL || wl == NULL || wl->dev == NULL)
++		return -ENETDOWN;
++
++	WL_LOCK(wl);
++	if (!capable(CAP_NET_ADMIN)) {
++		bcmerror = BCME_EPERM;
++	} else {
++		bcmerror = wlc_ioctl(wl->wlc, cmd, buf, len, wlif->wlcif);
++	}
++	WL_UNLOCK(wl);
++
++	ASSERT(VALID_BCMERROR(bcmerror));
++	if (bcmerror != 0)
++		wl->pub->bcmerror = bcmerror;
++	return (OSL_ERROR(bcmerror));
++}
++
+ static struct net_device_stats*
+ wl_get_stats(struct net_device *dev)
+ {
+diff --git a/src/wl/sys/wl_linux.h b/src/wl/sys/wl_linux.h
+index 5b1048e5af46..26516b871a4c 100644
+--- a/src/wl/sys/wl_linux.h
++++ b/src/wl/sys/wl_linux.h
+@@ -21,6 +21,8 @@
+ #ifndef _wl_linux_h_
+ #define _wl_linux_h_
+ 
++#include <siutils.h>
++#include <wlc_pub.h>
+ #include <wlc_types.h>
+ 
+ typedef struct wl_timer {
+@@ -187,6 +189,7 @@ extern irqreturn_t wl_isr(int irq, void *dev_id, struct pt_regs *ptregs);
+ extern int __devinit wl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
+ extern void wl_free(wl_info_t *wl);
+ extern int  wl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
++extern int wlc_ioctl_kernel(struct net_device *dev, uint cmd, void *buf, uint len);
+ extern struct net_device * wl_netdev_get(wl_info_t *wl);
+ 
+ #endif 
+-- 
+2.30.0
+

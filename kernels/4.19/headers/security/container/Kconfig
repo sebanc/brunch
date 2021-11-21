@@ -1,0 +1,16 @@
+config SECURITY_CONTAINER_MONITOR
+	bool "Monitor containerized processes"
+	depends on SECURITY
+	depends on VSOCKETS=y
+	select SECURITYFS
+	help
+	  Instrument the Linux kernel to collect more information about containers
+	  and identify security threats.
+
+config SECURITY_CONTAINER_MONITOR_DEBUG
+    bool "Enable debug pr_devel logs"
+	depends on SECURITY_CONTAINER_MONITOR
+	help
+	  Define DEBUG for CSM files to compile verbose debugging messages.
+
+	  Only for debugging/testing do not enable for production.

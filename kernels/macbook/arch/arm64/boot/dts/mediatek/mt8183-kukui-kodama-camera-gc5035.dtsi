@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2020 Google LLC
+ *
+ * SKU bit 8: Camera: 1 (GC5035)
+ */
+
+ &i2c2 {
+	sensor_main: sensor_main@37 {
+		compatible = "galaxycore,gc5035";
+		reg = <0x37>;
+
+		clocks = <&topckgen CLK_TOP_MUX_CAMTG>;
+		clock-names = "mclk";
+		clock-frequency = <24000000>;
+
+		assigned-clocks = <&topckgen CLK_TOP_MUX_CAMTG>;
+		assigned-clock-parents = <&topckgen CLK_TOP_UNIVP_192M_D8>;
+
+		resetb-gpios = <&pio 111 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&camera_pins_cam0>;
+
+		avdd28-supply = <&mt6358_vcama2_reg>;
+		dvdd12-supply = <&mt6358_vcamd_reg>;
+		iovdd-supply = <&mt6358_vcamio_reg>;
+
+		lens-focus = <&camera_main_af>;
+
+		port {
+			gc5035_endpoint: endpoint {
+				data-lanes = <1 3>;
+				remote-endpoint = <&seninf_port0_endpoint>;
+				link-frequencies = /bits/ 64 <438000000>;
+			};
+		};
+	};
+};
+
+&seninf {
+	status = "okay";
+
+	ports {
+		port@0 {
+			reg = <0>;
+
+			seninf_port0_endpoint: endpoint {
+				data-lanes = <1 3>;
+				remote-endpoint = <&gc5035_endpoint>;
+			};
+		};
+	};
+};
+

@@ -1,0 +1,53 @@
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  fetchKernelData:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+    - id: set-matrix
+      run: |
+        JSON=$(curl https://www.kernel.org/releases.json)
+        VERSIONSARRAY=$(echo $JSON | jq -c '[.releases[] | {version: .version, moniker: .moniker} | select(.moniker != "linux-next") | .version]')
+        echo ::set-output name=matrix::${VERSIONSARRAY}
+
+  build:
+    needs: fetchKernelData
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: 
+        version: ${{fromJson(needs.fetchKernelData.outputs.matrix)}}
+        #version: [4.9.248, 4.4.248]
+        include:
+          #Version 4.15.x requested to test Ubuntu 18.04 LTS version
+          - os: ubuntu-18.04
+            version: 4.15.0-20-generic
+            use_apt: true
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: download-Kernel
+      env: 
+        VERSION: ${{matrix.version }}
+      if: ${{ !matrix.use_apt }}
+      run: |
+        KERNEL_URL=https://kernel.ubuntu.com/~kernel-ppa/mainline/
+        KERNEL_URL_DETAILS=$(wget --quiet -O - ${KERNEL_URL}v${VERSION}/ | grep -A8 "Build for amd64\|Test amd64")
+        ALL_DEB=$(echo "$KERNEL_URL_DETAILS" |  grep -m1 'all.deb' | cut -d '"' -f 2)
+        KVER=$(echo $ALL_DEB | cut -d '_' -f 2 | rev | cut -c14- | rev)-generic
+        wget ${KERNEL_URL}v${VERSION}/$(echo "$KERNEL_URL_DETAILS" | grep -m1 "amd64.deb" | cut -d '"' -f 2)
+        wget ${KERNEL_URL}v${VERSION}/$ALL_DEB
+        sudo dpkg --force-all -i *.deb
+        sudo wget https://raw.githubusercontent.com/torvalds/linux/master/scripts/module.lds.S -O /usr/src/linux-headers-$KVER/scripts/module.lds
+        sudo sed -i '$ d' /usr/src/linux-headers-$KVER/scripts/module.lds
+        echo "KVER=$KVER" >> $GITHUB_ENV
+    - name: apt-linux-headers
+      if: ${{ matrix.use_apt }}
+      run: |
+        sudo apt-get install linux-headers-${{matrix.version }}
+        echo "KVER=${{matrix.version }}" >> $GITHUB_ENV
+    - name: build
+      run: make KVER=$KVER

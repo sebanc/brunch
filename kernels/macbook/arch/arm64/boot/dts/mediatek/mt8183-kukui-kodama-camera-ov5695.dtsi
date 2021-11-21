@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2020 Google LLC
+ *
+ * SKU bit 8: Camera: 0 (OV5695)
+ */
+
+&i2c2 {
+	sensor_main: sensor_main@36 {
+		compatible = "ovti,ov5695";
+		reg = <0x36>;
+
+		clocks = <&topckgen CLK_TOP_MUX_CAMTG>,
+			 <&topckgen CLK_TOP_UNIVP_192M_D8>;
+		clock-names = "xvclk", "freq_mux";
+
+		assigned-clocks = <&topckgen CLK_TOP_MUX_CAMTG>,
+				  <&topckgen CLK_TOP_UNIVP_192M_D8>;
+		assigned-clock-parents = <&topckgen CLK_TOP_UNIVP_192M_D8>;
+		assigned-clock-rates = <0>, <24000000>;
+
+		reset-gpios = <&pio 111 1>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&camera_pins_cam0>;
+
+		avdd-supply = <&mt6358_vcama2_reg>;
+		dvdd-supply = <&mt6358_vcamd_reg>;
+		dovdd-supply = <&mt6358_vcamio_reg>;
+
+		lens-focus = <&camera_main_af>;
+
+		port {
+			ov5695_endpoint: endpoint {
+				data-lanes = <1 3>;
+				remote-endpoint = <&seninf_port0_endpoint>;
+			};
+		};
+	};
+};
+
+&seninf {
+	status = "okay";
+
+	ports {
+		port@0 {
+			reg = <0>;
+
+			seninf_port0_endpoint: endpoint {
+				data-lanes = <1 3>;
+				remote-endpoint = <&ov5695_endpoint>;
+			};
+		};
+	};
+};
+

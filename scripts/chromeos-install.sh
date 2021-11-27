@@ -432,7 +432,7 @@ else
 	check_args
 	if [[ "$destination" == *"/"* ]] && ([ -z "$(realpath $destination 2> /dev/null)" ] || [ ! -d "$(echo $(realpath $destination) | sed 's![^/]*$!!')" ]); then echo "Desination path does not exist, please provide an existing path."; exit 1; fi
 	rm -rf "$destination"
-	if [[ ! "$destination" == *"/"* ]]; then path="."; else path="$(echo $(realpath $destination) | sed 's![^/]*$!!')"; fi
+	if [[ ! "$destination" == *"/"* ]]; then path="$PWD"; else path="$(echo $(realpath $destination) | sed 's![^/]*$!!')"; fi
 	if [ ! -z "$wsl" ] && [ ! -z "${path##/mnt/*}" ]; then echo "The ChromeOS disk image has to be installed outside of the WSL VM, please specify a path such as /mnt/<drive letter>/..."; exit 1; fi
 	if [ $(( ($(df -k --output=avail "$path" | sed 1d) / 1024 / 1024) - $image_size )) -lt 0 ]; then echo "Not enough space to create image file, available space is $(( ($(df -k --output=avail $path | sed 1d) / 1024 / 1024) )) GB. If you think that this is incorrect, verify that you have correctly mounted the destination partition or if the partition is in ext4 format that there is no reserved space (cf. https://odzangba.wordpress.com/2010/02/20/how-to-free-reserved-space-on-ext4-partitions)"; exit 1; fi
 	echo "Creating image file"

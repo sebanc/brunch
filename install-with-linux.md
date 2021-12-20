@@ -267,7 +267,6 @@ This command will show your disks, and the partitions on them. It will also show
 * Your target will **never** be zram or a loop device.
 * Some PCs may require RAID to be disabled before showing your disks correctly.
 * If there is an EFI mountpoint on a disk that disk is your boot disk.
-  * You **cannot** install Brunch directly onto the same disk you are currently booting from.
 * When doing a dualboot installation, your target will be a partition. This method creates an img file on that partition.
 * The target partition does *not* need to be on the same disk as your linux install.
 * If you have not made a partition yet, *make one before continuing.*

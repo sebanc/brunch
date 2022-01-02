@@ -33,7 +33,7 @@ This guide is for installing Brunch to a USB (or other disk) using Linux. This g
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["rammus" is suggested for 1st gen -> 9th gen.][recovery-rammus]
+* ["rammus" is suggested for 2nd gen -> 9th gen.][recovery-rammus]
 * ["volteer" is suggested for 10th & 11th gen.][recovery-volteer]
   * [11th gen (and some 10th gen) may need kernel 5.10][changing-kernels] 
 #### AMD

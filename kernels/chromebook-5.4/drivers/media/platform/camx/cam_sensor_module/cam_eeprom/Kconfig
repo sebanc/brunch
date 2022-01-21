@@ -1,0 +1,6 @@
+config QTI_EEPROM
+	bool "Camera EEPROM driver"
+	default y
+	help
+	  Say Y here to enable selecting module
+	  Support for the Camera eeprom driver

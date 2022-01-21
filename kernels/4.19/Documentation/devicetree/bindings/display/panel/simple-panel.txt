@@ -1,0 +1,50 @@
+Simple display panel
+====================
+
+panel node
+----------
+
+Required properties:
+- power-supply: See panel-common.txt
+
+Optional properties:
+- ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+- enable-gpios: GPIO pin to enable or disable the panel
+- backlight: phandle of the backlight device attached to the panel
+- no-hpd: This panel is supposed to communicate that it's ready via HPD
+  (hot plug detect) signal, but the signal isn't hooked up so we should
+  hardcode the max delay from the panel spec when powering up the panel.
+
+panel-timing subnode
+--------------------
+
+This optional subnode is for devices which require a mode differing
+from the panel's "typical" display timing.
+
+Format information on the panel-timing subnode can be found in
+display-timing.txt.
+
+
+Example:
+
+	panel: panel {
+		compatible = "cptt,claa101wb01";
+		ddc-i2c-bus = <&panelddc>;
+
+		power-supply = <&vdd_pnl_reg>;
+		enable-gpios = <&gpio 90 0>;
+
+		backlight = <&backlight>;
+
+		panel-timing {
+			clock-frequency = <266604720>;
+			hactive = <2400>;
+			hfront-porch = <48>;
+			hback-porch = <84>;
+			hsync-len = <32>;
+			vactive = <1600>;
+			vfront-porch = <3>;
+			vback-porch = <120>;
+			vsync-len = <10>;
+		};
+	};

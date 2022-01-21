@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/devfreq/mt8183-cci.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: CCI_DEVFREQ driver for MT8183.
+
+maintainers:
+  - Andrew-sh.Cheng <andrew-sh.cheng@mediatek.com>
+
+description: |
+  This module is used to create CCI DEVFREQ.
+  The performance will depend on both CCI frequency and CPU frequency.
+  For MT8183, CCI co-buck with Little core.
+  Contain CCI opp table for voltage and frequency scaling.
+
+properties:
+  compatible:
+    const: "mediatek,mt8183-cci"
+
+  clocks:
+    maxItems: 1
+
+  clock-names:
+    const: "cci"
+
+  operating-points-v2: true
+  opp-table: true
+
+  proc-supply:
+    description:
+      Phandle of the regulator that provides the supply voltage.
+
+required:
+  - compatible
+  - clocks
+  - clock-names
+  - proc-supply
+
+examples:
+  - |
+    #include <dt-bindings/clock/mt8183-clk.h>
+    cci: cci {
+      compatible = "mediatek,mt8183-cci";
+      clocks = <&apmixedsys CLK_APMIXED_CCIPLL>;
+      clock-names = "cci";
+      operating-points-v2 = <&cci_opp>;
+      proc-supply = <&mt6358_vproc12_reg>;
+    };
+

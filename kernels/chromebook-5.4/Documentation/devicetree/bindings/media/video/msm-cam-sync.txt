@@ -1,0 +1,14 @@
+* Qualcomm Technologies, Inc. MSM Camera SYNC
+
+Camera SYNC device provides synchronization of the requests.
+
+Required properties:
+- compatible :
+    - "qcom,sync"
+
+Example:
+
+   sync: qcom,sync {
+       compatible = "qcom,cam-sync";
+       status = "ok";
+   };

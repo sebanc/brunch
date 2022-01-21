@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2020 Google LLC
+ */
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/mt8192-pinfunc.h>
+
+/ {
+	rt1015p {
+		pinctrl-names = "default";
+		pinctrl-0 = <&rt1015p_pins_default>;
+		compatible = "realtek,rt1015p";
+		sdb-gpios = <&pio 147 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&pio {
+	rt1015p_pins_default: rt1015p_pins {
+		pins {
+			pinmux = <PINMUX_GPIO147__FUNC_GPIO147>;
+			output-low;
+		};
+	};
+};
+
+&sound {
+	compatible = "mediatek,mt8192_mt6359_rt1015p_rt5682";
+};

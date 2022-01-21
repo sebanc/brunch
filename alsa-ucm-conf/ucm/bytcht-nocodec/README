@@ -1,0 +1,6 @@
+To enable UCM on NOCODEC platforms, 
+
+1. copy directory to UCM location
+sudo cp -rf ../bytcht-nocodec /usr/share/alsa/ucm
+
+UCM files should be detected and use with Pulseaudio 4.0 and above

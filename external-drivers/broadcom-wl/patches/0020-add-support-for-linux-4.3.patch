@@ -1,0 +1,27 @@
+From c5c5852b37aa74e39658054ef7ba7b141bbc8ae1 Mon Sep 17 00:00:00 2001
+From: Alberto Milone <alberto.milone@canonical.com>
+Date: Mon, 16 Nov 2015 17:32:17 +0100
+Subject: [PATCH 1/1] Add support for Linux 4.3
+
+---
+ src/shared/linux_osl.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/shared/linux_osl.c b/src/shared/linux_osl.c
+index d540636..e622c5c 100644
+--- a/src/shared/linux_osl.c
++++ b/src/shared/linux_osl.c
+@@ -932,6 +932,10 @@ osl_getcycles(void)
+ 	uint cycles;
+ 
+ #if defined(__i386__)
++#ifndef rdtscl
++#define rdtscl(low) \
++ ((low) = (u32)rdtsc())
++#endif
+ 	rdtscl(cycles);
+ #else
+ 	cycles = 0;
+-- 
+1.9.1
+

@@ -1,0 +1,8 @@
+config QTI_CAMERA_CRM
+	bool "Qualcomm Camera Request Manager (CRM)"
+	default y
+	depends on (QTI_CAMERA_SYNC && QTI_CAMERA_SMMU)
+	select VIDEOBUF2_DMA_SG
+	help
+	  Say Y here to enable selecting module
+	  Support for camera drivers memory requests

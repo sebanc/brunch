@@ -1,0 +1,26 @@
+From c51168b8481e84743b50d3d5cba18a4a0a188448 Mon Sep 17 00:00:00 2001
+From: Alberto Milone <alberto.milone@canonical.com>
+Date: Fri, 22 Nov 2013 10:07:33 +0100
+Subject: [PATCH 1/1] Change the network interface name from eth to wlan
+
+Thanks to Shuduo Sang for the patch.
+---
+ src/wl/sys/wl_linux.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/wl/sys/wl_linux.c b/src/wl/sys/wl_linux.c
+index 3ead3c3..b662ff7 100644
+--- a/src/wl/sys/wl_linux.c
++++ b/src/wl/sys/wl_linux.c
+@@ -235,7 +235,7 @@ module_param(nompc, int, 0);
+ #define to_str(s) #s
+ #define quote_str(s) to_str(s)
+ 
+-#define BRCM_WLAN_IFNAME eth%d
++#define BRCM_WLAN_IFNAME wlan%d
+ 
+ static char intf_name[IFNAMSIZ] = quote_str(BRCM_WLAN_IFNAME);
+ 
+-- 
+1.7.9.5
+

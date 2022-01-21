@@ -1,0 +1,18 @@
+#
+# Copyright (c) 2015 - 2018 DisplayLink (UK) Ltd.
+#
+# This file is subject to the terms and conditions of the GNU General Public
+# License v2. See the file COPYING in the main directory of this archive for
+# more details.
+#
+
+config DRM_EVDI
+	tristate "Extensible Virtual Display Interface"
+	depends on DRM
+	select DRM_KMS_HELPER
+	help
+		This is a KMS interface driver allowing user-space programs to
+		register a virtual display (that imitates physical monitor) and
+		retrieve contents (as a frame buffer) that system renders on it.
+		Say M/Y to add support for these devices via DRM/KMS interfaces.
+

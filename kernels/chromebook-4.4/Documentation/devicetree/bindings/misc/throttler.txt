@@ -1,0 +1,13 @@
+Throttler driver
+
+The Throttler is used for non-thermal throttling of system components like
+CPUs or devfreq devices.
+
+Required properties:
+- throttler-opps	Array of OPP-v2 phandles with the OPPs used for
+			throttling.
+
+Example:
+	throttler {
+		 throttler-opps = <&cpu0_opp03, &cpu1_opp02, &gpu_opp03>;
+	};

@@ -1,0 +1,6 @@
+config QTI_CAMERA_SYNC
+bool "Qualcomm camera SYNC driver"
+	default y
+	help
+	  Say Y here to enable selecting module
+	  Support for camera drivers synchronization

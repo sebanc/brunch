@@ -1,0 +1,13 @@
+The scheduler in this tree has been modified with the core-scheduling v5 series
+obtained from https://github.com/digitalocean/linux-coresched
+(63c3d49741078..64a3bb3346b90) branch do/coresched/v5-v5.6.y.
+
+This is the same as the core scheduling v5 series posted upstream.
+
+The following additions are made:
+1. IRQ / softirq mitigations.
+2. A prctl(2) interface to tag per-thread.
+3. RCU-related crash fixes.
+4. Various fixups to make it build on SMT and SMP.
+5. Optimization of select_idle_cpu() to not scan an idle core.
+6. Backports related to simplification/clarification of change pattern.

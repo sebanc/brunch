@@ -1,0 +1,61 @@
+From cd39fb95882ca7707946848f7dc24d4e2915dbf5 Mon Sep 17 00:00:00 2001
+From: Marcelo Henrique Cerri <marcelo.cerri@canonical.com>
+Date: Fri, 15 Dec 2017 18:09:01 +0000
+Subject: [PATCH 26/26] add support for Linux 4.15
+
+Signed-off-by: Marcelo Henrique Cerri <marcelo.cerri@canonical.com>
+---
+ src/wl/sys/wl_linux.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/src/wl/sys/wl_linux.c b/src/wl/sys/wl_linux.c
+index 0d05100cfac7..165ea7c64c86 100644
+--- a/src/wl/sys/wl_linux.c
++++ b/src/wl/sys/wl_linux.c
+@@ -93,7 +93,11 @@ struct iw_statistics *wl_get_wireless_stats(struct net_device *dev);
+ 
+ #include <wlc_wowl.h>
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
++static void wl_timer(struct timer_list *tl);
++#else
+ static void wl_timer(ulong data);
++#endif
+ static void _wl_timer(wl_timer_t *t);
+ static struct net_device *wl_alloc_linux_if(wl_if_t *wlif);
+ 
+@@ -2298,9 +2302,17 @@ wl_timer_task(wl_task_t *task)
+ }
+ 
+ static void
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
++wl_timer(struct timer_list *tl)
++#else
+ wl_timer(ulong data)
++#endif
+ {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
++	wl_timer_t *t = from_timer(t, tl, timer);
++#else
+ 	wl_timer_t *t = (wl_timer_t *)data;
++#endif
+ 
+ 	if (!WL_ALL_PASSIVE_ENAB(t->wl))
+ 		_wl_timer(t);
+@@ -2352,9 +2364,13 @@ wl_init_timer(wl_info_t *wl, void (*fn)(void *arg), void *arg, const char *tname
+ 
+ 	bzero(t, sizeof(wl_timer_t));
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
++	timer_setup(&t->timer, wl_timer, 0);
++#else
+ 	init_timer(&t->timer);
+ 	t->timer.data = (ulong) t;
+ 	t->timer.function = wl_timer;
++#endif
+ 	t->wl = wl;
+ 	t->fn = fn;
+ 	t->arg = arg;
+-- 
+2.14.1
+

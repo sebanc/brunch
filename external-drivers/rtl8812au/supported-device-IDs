@@ -1,0 +1,67 @@
+USB Vendor and Device ID List for rtl8812au chipset based USB WiFi Adapters
+
+To determine your Device ID:
+
+$ lsusb
+
+Example output:
+
+Bus 003 Device 011: ID 0bda:8812 Realtek Semiconductor Corp.
+
+ID VendorID:DeviceID = 0bda:8812
+
+We can search the list of driver supported IDs shown below.
+
+Realtek default IDs
+
+ID 0BDA:8812 - Default ID
+ID 0BDA:881A - Default ID
+ID 0BDA:881B - Default ID
+ID 0BDA:881C - Default ID
+
+Seller specific IDs
+
+ID 050D:1106
+ID 7392:A822
+ID 0DF6:0074
+ID 04BB:0952
+ID 0789:016E
+ID 0409:0408
+ID 0B05:17D2
+ID 0E66:0022
+ID 0586:3426
+ID 2001:3313
+ID 1058:0632
+ID 1740:0100
+ID 2019:AB30
+ID 07B8:8812
+ID 0846:9051
+ID 2001:330E
+ID 2001:3313
+ID 2001:3315
+ID 2001:3316
+ID 13B1:003F
+ID 2357:0101
+ID 2357:0103
+ID 2357:010D
+ID 2357:010E
+ID 2357:010F
+ID 2357:0122
+ID 20F4:805B
+ID 0411:025D
+ID 050D:1109
+ID 148F:9097
+ID 2604:0012
+
+If your adapter matches one of the default or seller specific
+IDs then this is the driver to use.
+
+Info: location of file that contains the IDs: /os_dep/linux/usb_intf.c
+
+If you are sure that your adapter contains a rtl8812au chipset and the
+ID is not shown above, please provide the follow information so that I
+can include your adapter in the driver source code so that the driver will
+work with your adapter:
+
+1. VendorID:DeviceID
+2. Link to device on internet

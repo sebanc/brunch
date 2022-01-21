@@ -1,0 +1,9 @@
+http://linuxwireless.org/en/users/Drivers/b43/#If_you_are_using_the_b43_driver_from_3.2_kernel_or_newer:
+
+- download and extract http://www.lwfinger.com/b43-firmware/broadcom-wl-5.100.138.tar.bz2
+- git clone git clone git://git.bues.ch/b43-tools.git
+- cd b43-tools/fwcutter
+- make
+- cd ../..
+- mkdir ./fw
+- ./b43-tools/fwcutter/b43-fwcutter -w ./fw/ ./broadcom-wl-5.100.138/linux/wl_apsta.o 

@@ -1,0 +1,190 @@
+From 165f72491ffe0ffdf21c45ec7d5d29e16e2b6256 Mon Sep 17 00:00:00 2001
+From: Alberto Milone <alberto.milone@canonical.com>
+Date: Mon, 25 Mar 2013 14:08:51 +0100
+Subject: [PATCH 1/1] Add support for Linux 3.8
+
+---
+ src/include/bcmutils.h          |    5 +++-
+ src/wl/sys/wl_cfg80211_hybrid.c |   61 +++++++++++++++++++++++++++++++++++++--
+ src/wl/sys/wl_linux.c           |    4 +++
+ 3 files changed, 67 insertions(+), 3 deletions(-)
+
+diff --git a/src/include/bcmutils.h b/src/include/bcmutils.h
+index 494de15..8843d8b 100644
+--- a/src/include/bcmutils.h
++++ b/src/include/bcmutils.h
+@@ -611,11 +611,14 @@ extern void printbig(char *buf);
+ extern void prhex(const char *msg, uchar *buf, uint len);
+ 
+ extern bcm_tlv_t *BCMROMFN(bcm_next_tlv)(bcm_tlv_t *elt, int *buflen);
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ extern bcm_tlv_t *BCMROMFN(bcm_parse_tlvs)(void *buf, int buflen, uint key);
++#else
++extern bcm_tlv_t *BCMROMFN(bcm_parse_tlvs)(const void *buf, int buflen, uint key);
++#endif
+ extern bcm_tlv_t *BCMROMFN(bcm_parse_ordered_tlvs)(void *buf, int buflen, uint key);
+ 
+ extern const char *bcmerrorstr(int bcmerror);
+-extern bcm_tlv_t *BCMROMFN(bcm_parse_tlvs)(void *buf, int buflen, uint key);
+ 
+ typedef uint32 mbool;
+ #define mboolset(mb, bit)		((mb) |= (bit))		
+diff --git a/src/wl/sys/wl_cfg80211_hybrid.c b/src/wl/sys/wl_cfg80211_hybrid.c
+index 7ab4d34..ffa1ceb 100644
+--- a/src/wl/sys/wl_cfg80211_hybrid.c
++++ b/src/wl/sys/wl_cfg80211_hybrid.c
+@@ -62,14 +62,25 @@ static int wl_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
+ static s32 wl_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev, u16 reason_code);
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ static s32 wl_cfg80211_set_tx_power(struct wiphy *wiphy,
+            enum nl80211_tx_power_setting type, s32 dbm);
+ #else
++static int wl_cfg80211_set_tx_power(struct wiphy *wiphy,
++           struct wireless_dev *wdev,
++           enum nl80211_tx_power_setting type, int dbm);
++#endif /* 3.8 */
++#else
+ static s32 wl_cfg80211_set_tx_power(struct wiphy *wiphy,
+            enum tx_power_setting type, s32 dbm);
+ #endif
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy, s32 *dbm);
++#else
++static int wl_cfg80211_get_tx_power(struct wiphy *wiphy,
++		   struct wireless_dev *wdev, int *dbm);
++#endif
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 38)
+ static s32 wl_cfg80211_config_default_key(struct wiphy *wiphy,
+@@ -695,7 +706,11 @@ wl_cfg80211_join_ibss(struct wiphy *wiphy, struct net_device *dev,
+ 	else
+ 		memset(&join_params.params.bssid, 0, ETHER_ADDR_LEN);
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 	wl_ch_to_chanspec(params->channel, &join_params, &join_params_size);
++#else
++	wl_ch_to_chanspec(params->chandef.chan, &join_params, &join_params_size);
++#endif
+ 
+ 	err = wl_dev_ioctl(dev, WLC_SET_SSID, &join_params, join_params_size);
+ 	if (err) {
+@@ -1050,9 +1065,15 @@ wl_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev, u16 reason_c
+ }
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ static s32
+ wl_cfg80211_set_tx_power(struct wiphy *wiphy, enum nl80211_tx_power_setting type, s32 dbm)
+ #else
++static int
++wl_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
++						enum nl80211_tx_power_setting type, int dbm)
++#endif /* 3.8 */
++#else
+ #define NL80211_TX_POWER_AUTOMATIC TX_POWER_AUTOMATIC
+ #define NL80211_TX_POWER_LIMITED TX_POWER_LIMITED
+ #define NL80211_TX_POWER_FIXED TX_POWER_FIXED
+@@ -1103,24 +1124,41 @@ wl_cfg80211_set_tx_power(struct wiphy *wiphy, enum tx_power_setting type, s32 db
+ 	}
+ 	wl->conf->tx_power = dbm;
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 	return err;
++#else
++	return (int) err;
++#endif
+ }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy, s32 *dbm)
++#else
++static int wl_cfg80211_get_tx_power(struct wiphy *wiphy,
++			struct wireless_dev *wdev, int *dbm)
++#endif
+ {
+ 	struct wl_cfg80211_priv *wl = wiphy_to_wl(wiphy);
+ 	struct net_device *ndev = wl_to_ndev(wl);
+ 	s32 txpwrdbm;
+ 	u8 result;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 	s32 err = 0;
+-
++#else
++	int err = 0;
++#endif
+ 	err = wl_dev_intvar_get(ndev, "qtxpower", &txpwrdbm);
+ 	if (err) {
+ 		WL_ERR(("error (%d)\n", err));
+ 		return err;
+ 	}
+ 	result = (u8) (txpwrdbm & ~WL_TXPWR_OVERRIDE);
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 	*dbm = (s32) bcm_qdbm_to_mw(result);
++#else
++	*dbm = (int) bcm_qdbm_to_mw(result);
++#endif
+ 
+ 	return err;
+ }
+@@ -1949,9 +1987,14 @@ static s32 wl_update_bss_info(struct wl_cfg80211_priv *wl)
+ 	struct wlc_ssid *ssid;
+ 	struct bcm_tlv *tim;
+ 	s32 dtim_period;
++	s32 err = 0;
+ 	size_t ie_len;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 	u8 *ie;
+-	s32 err = 0;
++#else
++	const u8 *ie;
++	const struct cfg80211_bss_ies *ies;
++#endif
+ 
+ 	ssid = &wl->profile->ssid;
+ 	bss = cfg80211_get_bss(wl_to_wiphy(wl), NULL, (s8 *)&wl->bssid,
+@@ -1980,8 +2023,22 @@ static s32 wl_update_bss_info(struct wl_cfg80211_priv *wl)
+ 		ie_len = bi->ie_length;
+ 	} else {
+ 		WL_DBG(("Found the AP in the list - BSSID %pM\n", bss->bssid));
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ 		ie = bss->information_elements;
+ 		ie_len = bss->len_information_elements;
++#else
++		rcu_read_lock();
++		ies = (const struct cfg80211_bss_ies*)rcu_dereference(bss->ies);
++		if (!ies) {
++			/* This should never happen */
++			rcu_read_unlock();
++			err = -EIO;
++			goto update_bss_info_out;
++		}
++		ie = ies->data;
++		ie_len = (size_t)(ies->len);
++		rcu_read_unlock();
++#endif
+ 		cfg80211_put_bss(bss);
+ 	}
+ 
+diff --git a/src/wl/sys/wl_linux.c b/src/wl/sys/wl_linux.c
+index e32f5ab..c977549 100644
+--- a/src/wl/sys/wl_linux.c
++++ b/src/wl/sys/wl_linux.c
+@@ -910,7 +910,11 @@ wl_remove(struct pci_dev *pdev)
+ 	pci_set_drvdata(pdev, NULL);
+ }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+ static struct pci_driver wl_pci_driver = {
++#else
++static struct pci_driver wl_pci_driver __refdata = {
++#endif
+ 	name:		"wl",
+ 	probe:		wl_pci_probe,
+ 	suspend:	wl_suspend,
+-- 
+1.7.9.5
+

@@ -1,0 +1,82 @@
+config DRM_PANEL
+	bool
+	depends on DRM
+	help
+	  Panel registration and lookup framework.
+
+menu "Display Panels"
+	depends on DRM && DRM_PANEL
+
+config DRM_PANEL_SIMPLE
+	tristate "support for simple panels"
+	depends on OF
+	depends on BACKLIGHT_CLASS_DEVICE
+	select VIDEOMODE_HELPERS
+	help
+	  DRM panel driver for dumb panels that need at most a regulator and
+	  a GPIO to be powered up. Optionally a backlight can be attached so
+	  that it can be automatically turned off when the panel goes into a
+	  low power state.
+
+config DRM_PANEL_INNOLUX_P079ZCA
+	tristate "Innolux P079ZCA or P097PFG panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for Innolux P079ZCA or
+	  Innolux P097PFG panel. They provide a MIPI DSI interface to
+	  the host and have a built-in LED backlight.
+
+config DRM_PANEL_KINGDISPLAY_KD097D04
+	tristate "Kingdisplay KD097D04 panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for Kingdisplay KD097D04
+	  TFT-LCD modules. The panel has a 1536x2048 resolution and uses
+	  24 bit RGB per pixel. It provides a MIPI DSI interface to
+	  the host and has a built-in LED backlight.
+
+config DRM_PANEL_SAMSUNG_LD9040
+	tristate "Samsung LD9040 RGB/SPI panel"
+	depends on OF && SPI
+	select VIDEOMODE_HELPERS
+
+config DRM_PANEL_LG_LG4573
+	tristate "LG4573 RGB/SPI panel"
+	depends on OF && SPI
+	select VIDEOMODE_HELPERS
+	help
+	  Say Y here if you want to enable support for LG4573 RGB panel.
+	  To compile this driver as a module, choose M here.
+
+config DRM_PANEL_SAMSUNG_S6E8AA0
+	tristate "Samsung S6E8AA0 DSI video mode panel"
+	depends on OF
+	select DRM_MIPI_DSI
+	select VIDEOMODE_HELPERS
+
+config DRM_PANEL_SHARP_LQ101R1SX01
+	tristate "Sharp LQ101R1SX01 panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for Sharp LQ101R1SX01
+	  TFT-LCD modules. The panel has a 2560x1600 resolution and uses
+	  24 bit RGB per pixel. It provides a dual MIPI DSI interface to
+	  the host and has a built-in LED backlight.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called panel-sharp-lq101r1sx01.
+
+config DRM_PANEL_BOE_TV097QXM_NU0
+	tristate "support for boe tv097qxm nu0"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	help
+	  DRM panel driver for boe tv097qxm nu0
+
+endmenu

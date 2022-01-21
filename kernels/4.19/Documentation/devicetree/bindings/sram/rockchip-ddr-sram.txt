@@ -1,0 +1,29 @@
+Rockchip SRAM for DDR frequency changes:
+----------------------------------------
+
+In order to change the frequency that SDRAM is running at we need a
+bit of space (16K) in SRAM to contain the code for the frequency change.
+
+Therefore a reserved section sub-node has to be added to the mmio-sram
+declaration.
+
+Required sub-node properties:
+- compatible : should be "rockchip,rk3288-ddr-sram"
+
+The rest of the properties should follow the generic mmio-sram discription
+found in Documentation/devicetree/bindings/sram/sram.txt
+
+Example:
+
+	bus_intmem@ff700000 {
+		compatible = "mmio-sram";
+		reg = <0x0 0xff700000 0x0 0x18000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0x0 0xff700000 0x18000>;
+
+		ddr_sram: ddr-sram@1000 {
+			compatible = "rockchip,rk3288-ddr-sram";
+			reg = <0x1000 0x4000>;
+		};
+	};

@@ -1,0 +1,19 @@
+--- kernel/printk/printk.c	2021-01-09 13:46:25.000000000 +0100
++++ kernel/printk/printk.c	2021-03-20 09:20:34.000000000 +0100
+@@ -2189,8 +2189,15 @@
+ 	char *s, *options, *brl_options = NULL;
+ 	int idx;
+ 
+-	if (str[0] == 0)
++	/*
++	 * console="" or console=null have been suggested as a way to
++	 * disable console output. Use ttynull that has been created
++	 * for exacly this purpose.
++	 */
++	if (str[0] == 0 || strcmp(str, "null") == 0) {
++		__add_preferred_console("ttynull", 0, NULL, NULL);
+ 		return 1;
++	}
+ 
+ 	if (_braille_console_setup(&str, &brl_options))
+ 		return 1;

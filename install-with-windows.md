@@ -265,6 +265,7 @@ Make a directory to install Brunch, for example:
   - run `mkdir /mnt/c/Users/username/brunch` if you want to install brunch in your home folder on C: partition.
   - or `mkdir /mnt/d/brunch` if you want to install brunch in the D: partition.
 
+  Then launch the installer providing "-dst" argument with the name of the image file to be created (in your brunch directory):
 ```sudo bash chromeos-install.sh -src chromeos_filename.bin -dst /mnt/c/Users/username/brunch/chromeos.img -s size```
 
 The installation may take some time depending on the speed of your target disk, please be patient. There may be a couple of GPT Header errors, which can be safely ignored. If you are told that there is not enough space to install, reduce the number at the end of your command until it fits. It is normal that the img cannot take the entire space of the partition, as some of that space is reserved by the system.
@@ -282,6 +283,14 @@ The installation will report that ChromeOS was installed when it is finished. Be
   
   * Click `Ok` and `Apply` to save your entries into Grub2win.
     * Your entry will not be saved unless you click *both* `Ok` *and* `Apply`.
+
+### Prevent Windows from locking the NTFS partition
+12. Disable encryption / hibernation
+
+ChromeOS will not be bootable and / or stable if you do not perform the below actions (Refer to Windows online resources if needed):
+  - Ensure that bitlocker is disabled on the drive which contains the ChromeOS image or disable it.
+  - Disable fast startup.
+  - Disable hibernation.
   
 At this point, you are ready to reboot and you'll be greeted by the Grub2win menu instead of booting into Windows. 
 

@@ -188,93 +188,97 @@ It is normal for the first boot to take a very long time, please be patient.
   ***
  
 # Dualboot installations
-This guide is for installing Brunch to a partition using a Brunch USB. This guide requires having a working Brunch USB to initiate the install, you can make one by following the [guide above][brunch-usb-guide-win]. To begin, boot into a working Brunch USB and click the dropdown below to continue. 
+This guide is for installing Brunch to a partition using Windows WSL2.
 
 <details>
   <summary>Click to open dualboot guide</summary>
 
 ### Requirements
 - Administrator access.
-- Target Partition must be 16 GB minimum.
-- Working Brunch USB.
+- Target partition must be 16gb minimum, unencrypted (bitlocker disabled), and formatted as NTFS.
+- A linux installation vis WSL2
+- `pv`, `tar`, `unzip` and `cgpt` packages.
 - A [compatible PC][compatibility] to boot Brunch on.
 - An entry level understanding of the linux terminal.
   - This guide aims to make this process as easy as possible, but knowing the basics is expected.
-- [Grub2Win][grub2win] Bootloader.
-- Hibernate and Fast Startup must be **disabled**.
 
-## Selecting a Target Partition
+### Recoveries
+1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
-1. Log into ChromeOS, and open a Crosh Shell with **Ctrl + Alt + T**, then enter `shell` at the prompt.
-  
-2. Before continuing, you will need to know what partition you want to install to. The partition must be at least 16 GB, or the installation will fail. There are several ways to determine which partition is your target, in my example I'll be using `lsblk`.
+#### Intel
+* ["rammus" is suggested for 1st gen -> 9th gen.][recovery-rammus]
+* ["volteer" is suggested for 10th & 11th gen.][recovery-volteer]
+  * [11th gen (and some 10th gen) may need kernel 5.10][changing-kernels] 
+#### AMD
+* ["grunt" is suggested for Stoney Ridge & Bristol Ridge.][recovery-grunt]
+* ["zork" is suggested for Ryzen.][recovery-zork]
+  * [Ryzen 4xxx devices need kernel 5.10][changing-kernels]
 
-```lsblk -e7```
+Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] or the [cros-updates-serving][cros-official] site and searching for the recovery you want.
+
+After selecting the recovery you want, you can select a specific release. Posted releases may be behind the current release, this is normal and you can update into the current release later. It is usually suggested to use the latest release avaliable.
+
+### Gathering Files
+2. Download the Brunch files from this GitHub repository. Do not use files found on other sites or linked in videos online. The [releases tab][releases-tab] can be found at the bottom of the right-hand column on the main GitHub page, but it is generally suggested to use the [latest release][latest-release].
+
+When downloading a release, select the brunch...tar.gz file from the assets at the bottom of the release post. You do not need the source code files, do not download them.
+
+Before continuing, you will need a linux distro installed from the Microsoft Store using WSL2, and the distro must be set up and ready to use. Please refer to online resources for this as the setup can be complicated for some systems.
+
+### Prepare the Terminal
+3. Once both files have been downloaded, the Brunch release and your chosen ChromeOS recovery, Launch WSL2.
+4. Make sure that pv, cgpt, tar and unzip are installed.
+
+```sudo apt update && sudo apt -y install pv cgpt tar unzip```
+  * My example uses `apt`, a package manager for Debian and Ubuntu based distros. If you use Arch, you will need [vboot-utils][vboot-utils] for access to cgpt and a different package manager may be needed to install the rest.
+
+4b. Some Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
+
+```sudo add-apt-repository universe```
   
-This command will show your disks, and the partitions on them. It will also show their sizes and if they are currently mounted. Use this information to determine which partition is your target.
+5. After all dependencies have been installed, `cd` into the directory where your files were downloaded.
+  * Replace `username` with your *Windows* username.
+  * The linux terminal is Case Sensitive, be mindful of capital letters.
+
+```cd /mnt/c/Users/username/Downloads```
   
-***
+6. Extract the Brunch archive using `tar`
+  * Replace `brunch_filename.tar.gz` with the file's actual filename.
+
+```tar zxvf brunch_filename.tar.gz```
   
-#### Tips:
-  
-* Your target will **never** be zram or a loop device.
-* Some PCs may require RAID to be disabled before showing your disks correctly.
-* If there is an EFI mountpoint on a disk that disk is your boot disk.
-* When doing a dualboot installation, your target will be a partition. This method creates an img file on that partition.
-* The target partition does *not* need to be on the same disk as your linux install.
-* If you have not made a partition yet, *make one before continuing.*
-* To access the partition from Windows, the partition must be formatted as NTFS.
-  
-*** 
-  
-### Mount the Partition
-  
-3. After determining your target partition, make a directory to mount it onto.
-  
-```mkdir -p ~/tmpmount```
-  
-4. Then mount the partition to that mountpoint.
-  * Replace `part` with the partition's actual name. (Such as `sda3`, `mmcblk0p5` or `nvme0n1p4` for example)
-  
-```sudo mount /dev/part ~/tmpmount```
-  
+7. Extract the ChromeOS recovery using `unzip`
+  * Replace `chromeos_filename.bin.zip` with the file's actual filename.
+
+```unzip chromeos_filename.bin.zip```
+
+Once completed, you will have 4 new files from the brunch archive, and a recovery bin that we will use in the next step.
+
 ### Install Brunch
-  
-5. Once you've mounted your target partition, you're ready to install Brunch.
-  * You will replace `size` with a whole number. (Such as `14`, `20`, or `100` for example)
+
+8. Once you've got your files ready, you're ready to install Brunch.
+  * As before, replace `chromeos_filename.bin` with the bin file's actual filename.
+  * You will also replace `size` with a whole number. (Such as `14`, `20`, or `100` for example)
     * The number must be a *minimum* of 14, but *less* than the avaliable space on your partition in GB.
-  
-```sudo chromeos-install -dst ~/tmpmount/chromeos.img -s size```
-  
-The script will ask for confirmation. If you're ready to install, type `yes` into the prompt.
-  
+
+Make a directory to install Brunch, for example:  
+  - run `mkdir /mnt/c/Users/username/brunch` if you want to install brunch in your home folder on C: partition.
+  - or `mkdir /mnt/d/brunch` if you want to install brunch in the D: partition.
+
+```sudo bash chromeos-install.sh -src chromeos_filename.bin -dst /mnt/c/Users/username/brunch/chromeos.img -s size```
+
 The installation may take some time depending on the speed of your target disk, please be patient. There may be a couple of GPT Header errors, which can be safely ignored. If you are told that there is not enough space to install, reduce the number at the end of your command until it fits. It is normal that the img cannot take the entire space of the partition, as some of that space is reserved by the system.
 
+When the installer asks you for the type of install, type "dualboot" in the terminal and press "Enter" to continue.
+
 The installation will report that ChromeOS was installed when it is finished. Before continuing, make sure that there are no additional errors in the terminal. If there are no errors, then you are good to continue!
-  
-### Save the Grub Config
-  
-6. Copy the Grub Boot Entries that are displayed in the terminal. (All of the text *between* the lines of asterisks `********`) There will be two of them together, you should copy both entries as they are both used by Brunch. 
-  
-7. To make these boot entries accessible to Windows, we will copy them into a text file on your target partiton.
-  
-  ```sudo nano ~/tmpmount/chromeos.grub.txt````
-  
-8. Paste the boot entries you copied before, then exit with **Ctrl + X**, then press **Y** to save and **Enter** to confirm.
-  
-9. At this point we can safely unmount the target partition.
-  
-  ```sudo umount ~/tmpmount```
   
 ### Set up Grub2Win
 10. Reboot into Windows and install [Grub2win][grub2win] if you have not already, then launch the program.
   
 11. Click on the `Manage Boot Menu` button, then `Add A New Entry`.
   
-  * Select `Submenu` from the 'Type' section, and input `ChromeOS` as the title.
-  
-  * Now, click `Edit Custom Code`. This will open a text file. Open the chromeos.grub.txt file we saved earlier, it's on the same partiton as your chromeos.img. Copy the grub boot entries saved in that file and copy them into Grub2win.
-    * At this point, it is suggested that you **remove** the `rmmod tpm` line.
+  * Select `Create user section` from the 'Type' section. This will open a text file. Open the chromeos.grub.txt file we saved earlier, it's in the same directory as your chromeos.img. Copy the grub boot entries saved in that file and copy them into Grub2win.
   
   * Click `Ok` and `Apply` to save your entries into Grub2win.
     * Your entry will not be saved unless you click *both* `Ok` *and* `Apply`.

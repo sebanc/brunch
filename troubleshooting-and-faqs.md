@@ -290,7 +290,7 @@ Currently avaliable bootsplashes are below, the "light" options will show as a f
   
 ***
   
-The last page of the Brunch Configuration Menu is allow you to confirm your changes. Upon hitting enter, your PC will reboot. The next time you boot into Brunch, it *will* be a long boot. (Just like when you first installed) This is normal. If the options you selected were not correct, or you want to change things back, you can reopen the Brunch Configuration Menu and start over.
+The last page of the Brunch Configuration Menu will allow you to confirm your changes. Upon hitting enter, your PC will reboot. The next time you boot into Brunch, it *will* be a long boot. (Just like when you first installed) This is normal. If the options you selected were not correct, or you want to change things back, you can reopen the Brunch Configuration Menu and start over.
 ![Summary][bcm-summary]
   
 </details>

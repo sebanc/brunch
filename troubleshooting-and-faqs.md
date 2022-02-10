@@ -32,7 +32,7 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
   * Video guides are very frequently out of date or use potentially dangerous scripts. For the most up to date information and guides, be sure to read over this github page thouroughly *before* asking for help. 
   
   ### My computer will not boot a Brunch USB, and I've followed all of the instructions correctly!
-  * Some devices (notably Surface Go) will not boot a valid USB flash drive / SD card with secure boot on even if the shim binary is signed. For those devices, you will need to disable secure boot in your bios settings and use the legacy EFI bootloader by adding the `-l` parameter when running the chromeos-install.sh script.
+  * Some devices (notably Surface Go) will not boot a valid USB flash drive / SD card with secure boot on even if the shim binary is signed. For those devices, you will need to disable secure boot in your bios settings and use the legacy EFI bootloader by adding the `-l` parameter when running the chromeos-install.sh script. Other devices require using the MBR script (linked in the install instructions) Check your device to see if one of these may be needed.
   
   ###  The first boot and the ones after a framework change or an update are incredibly long! 
   * Unfortunately, the Brunch framework has to rebuild itself by copying the original rootfs, modules and firmware files after each significant change. The time this process takes depends mostly on your USB flash drive / SD card write speed. You may try with one that has better write speed or use the dual boot method to install it on your HDD.
@@ -56,32 +56,34 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
 [![Reddit][reddit-shield]][reddit-url]
 [![Telegram][telegram-shield]][telegram-url]
 
+***
+
 # Brunch Configuration Menu
 
 ***
   
-The Brunch Configuration menu is a new feature avaliable in Brunch 93 and higher, this menu will allow users to set and controll options easily without needing to manually edit files themselves. The Brunch Configuration Menu can be accessed directly from Grub using the "ChromeOS (settings)" boot option or while logged into ChromeOS using the `sudo edit-brunch-config` command in the crosh shell.
-  * To access the crosh shell, press **Ctrl + Alt + T** and type `shell` at the invite.
+The Brunch Configuration menu is a new feature avaliable in Brunch 93 and higher, this menu will allow users to set and controll options easily without needing to manually edit files themselves. 
 
-  
-## Kernels
-  
+## How to Use
+
 <details>
-<summary> Click to learn about kernels </summary>
+<summary> Click for Screenshots and Instructions </summary>
+
+***
+
+The Brunch Configuration Menu can be accessed directly from Grub using the "ChromeOS (settings)" boot option or while logged into ChromeOS using the `sudo edit-brunch-config` command in the crosh shell.
+  * To access the crosh shell, press **Ctrl + Alt + T** and type `shell` at the invite.
+![Crosh][bcm-crosh]
   
-*** 
-
-Several kernels can be enabled throught the configuration menu:
-- kernel 5.4: Default kernel which is considered to be the most stable.
-- kernel 5.10: Most recent kernel, needed for Intel Gen 10+ and AMD Ryzen Gen 4+ devices.
-- kernel 4.19: Previous brunch kernel.
-- kernel chromebook-5.4: Kernel with the best support for chromebooks.
-- kernel chromebook-4.4: Kernel compatible with some older chromebooks models.
-- kernel macbook: 5.10 kernel with specific patches for different generations of macbooks
-
-WARNING: Changing kernel can prevent you from logging into your ChromeOS account, in which case a powerwash is the only solution (**Ctrl + Alt + Shift + R** at the login screen). Therefore, before switching to a different kernel, make sure you have a backup of all your data.
-
- </details>
+ Once you've entered the Brunch Configuration Menu you will be greeted by several pages of options.
+  * Use the arrow keys to move the cursor up or down.
+  * Use the spacebar to select an option.
+    * An empty set [ ] means the option is *not* selected.
+    * A filled set [x] means the option *has* been selected.
+  * When you're ready to continue, press the Enter key.
+    * You won't be able to go back, but this menu can be opened again later.
+    * You *do not* need to select something from every page.
+</details>
   
 ## Framework Options
   
@@ -89,6 +91,10 @@ WARNING: Changing kernel can prevent you from logging into your ChromeOS account
 <summary> Click to learn about framework options </summary>
   
 *** 
+  
+The first two pages of the Brunch Configuration Menu are for selecting Framework Options. These options act as patches and can be used to add more features or support to your installation, you can select multiple with the Spacebar, or use the Enter key to continue. Continue scrolling for details about what each option does.
+![Framework Options 1][bcm-fo1]
+![Framework Options 2][bcm-fo2]
 
 Some device specific options can be enabled through brunch configuration menu:
 - "enable_updates": allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
@@ -134,6 +140,29 @@ Some device specific options can be enabled through brunch configuration menu:
 
  </details>
 
+## Kernels
+  
+<details>
+<summary> Click to learn about kernels </summary>
+  
+*** 
+
+Brunch has several precompiled kernels avaliable for users, you can select one from the Brunch Configuration Menu by highlighting the kernel you want, then pressing enter. If you are unsure which to choose, 5.4 is the default kernel for Brunch. Continue scrolling for more information about each avaliable option.
+
+WARNING: Changing kernel can prevent you from logging into your ChromeOS account, in which case a powerwash is the only solution (**Ctrl + Alt + Shift + R** at the login screen). Therefore, before switching to a different kernel, make sure you have a backup of all your data. 
+![Kernels][bcm-kernel]
+  
+Several kernels can be enabled throught the configuration menu:
+- kernel 5.4: Default kernel which is considered to be the most stable.
+- kernel 5.10: Most recent kernel, needed for Intel Gen 10+ and AMD Ryzen Gen 4+ devices.
+- kernel 4.19: Previous brunch kernel.
+- kernel chromebook-5.4: Kernel with the best support for chromebooks.
+- kernel chromebook-4.4: Kernel compatible with some older chromebooks models.
+- kernel macbook: 5.10 kernel with specific patches for different generations of macbooks
+
+ </details>
+ 
+
 ## Kernel command line parameters
   
 <details>
@@ -141,6 +170,10 @@ Some device specific options can be enabled through brunch configuration menu:
   
 *** 
 
+These are optional parameters that are not needed by every user. Some commonly used options are selectable, and more can be input manually. If you do not need any command line parameters, you can just press Enter to skip these sections.
+![Command Line Paramters][bcm-cmd1]
+![Custom Parameters][bcm-cmd2]
+  
 The most common kernel command line parameters are listed below:
 - "enforce_hyperthreading=1": improve performance by disabling a ChromeOS security feature and forcing hyperthreading everywhere (even in crositini).
 - "i915.enable_fbc=0 i915.enable_psr=0": if you want to use crouton (needed with kernel 5.4).
@@ -151,17 +184,118 @@ Additional kernel parameters can also be added manually from the configuration m
   
 </details>
 
-## Brunch Bootsplashes
-  
+## Verbose Mode
+
 <details>
-<summary> Click to learn about Brunch bootsplashes </summary>
+  <summary> Click to learn about Verbose Mode </summary>
   
-  ***
+***
   
-Brunch Bootsplashes can be selected using the Brunch Configuration Menu, these determine the logo visible while Brunch is booting. (before the ChromeOS logo appears) You can preview the different bootsplashes by switching the branch of this repository to your brunch version and browsing the folder named "bootsplashes".
+Brunch has a Verbose Mode, formerly called Debug Mode. Enabling this boot option will disable any selected Brunch Bootsplash and display a log while booting. This is particularly useful for debugging and solving issues that may prevent your system from booting. To enable Verbose Mode you must enter `yes` at the prompt, then press enter.
+![Verbose Mode][bcm-debug]
 
 </details>
 
+## Brunch Bootsplashes
+  
+<details>
+<summary> Click to learn about Brunch Bootsplashes </summary>
+  
+  ***
+  
+Brunch Bootsplashes can be selected using the Brunch Configuration Menu, these determine the logo visible while Brunch is booting. (before the ChromeOS logo appears) These bootsplashes *will not appear* if you have enabled Verbose Mode above. You can select any of these options with the Enter key.
+![Brunch Bootsplash][bcm-splash]  
+
+<details>
+<summary> Click for previews of each avaliable bootsplash option </summary>
+    
+  ***
+  
+Currently avaliable bootsplashes are below, the "light" options will show as a framed window while booting.
+  
+<details>
+<summary>   Default </summary>
+      
+![bs-default1]
+![bs-default2]
+</details>
+    
+<details>
+<summary>   Blank </summary>
+      
+![bs-blank]
+
+(What did you expect?)
+</details>
+    
+<details>
+<summary>   Brunchbook </summary>
+      
+![bs-bb1]
+![bs-bb2]
+</details>
+    
+<details>
+<summary>   Colorful </summary>
+      
+![bs-color1]
+![bs-color2]
+</details>
+    
+<details>
+<summary>   Croissant </summary>
+      
+![bs-croi1]
+![bs-croi2]
+</details>
+    
+<details>
+<summary>   Neon Blue </summary>
+      
+![bs-nb1]
+![bs-nb2]
+</details>
+    
+<details>
+<summary>   Neon Green </summary>
+      
+![bs-ng1]
+![bs-ng2]
+</details>
+    
+<details>
+<summary>   Neon Pink </summary>
+      
+![bs-np1]
+![bs-np2]
+</details>
+    
+<details>
+<summary>   Neon Red </summary>
+      
+![bs-nr1]
+![bs-nr2]
+</details>
+    
+</details>
+
+</details>
+
+</details>
+
+## Saving Changes
+
+<details>
+  <summary> Click for more info </summary>
+  
+***
+  
+The last page of the Brunch Configuration Menu will allow you to confirm your changes. Upon hitting enter, your PC will reboot. The next time you boot into Brunch, it *will* be a long boot. (Just like when you first installed) This is normal. If the options you selected were not correct, or you want to change things back, you can reopen the Brunch Configuration Menu and start over.
+![Summary][bcm-summary]
+  
+</details>
+
+  ***
 
 # Updates
   
@@ -265,6 +399,36 @@ It is currently recommended to only update ChromeOS when the matching version of
 [settings-icon-512]: ./images/settings_icon-512.png
 [windows-img]: https://img.icons8.com/color/24/000000/windows-10.png
 [linux-img]: https://img.icons8.com/color/24/000000/linux--v1.png
+  
+ <!-- Brunch Configuration Menu Examples -->
+[bcm-crosh]: ./images/brunch-config-menu/edit-brunch-config.png
+[bcm-fo1]: ./images/brunch-config-menu/framework-options-1.png
+[bcm-fo2]: ./images/brunch-config-menu/framework-options-2.png
+[bcm-kernel]: ./images/brunch-config-menu/select-kernel.png
+[bcm-cmd1]: ./images/brunch-config-menu/cmd-line-params.png
+[bcm-cmd2]: ./images/brunch-config-menu/custom-params.png
+[bcm-debug]: ./images/brunch-config-menu/verbose-mode.png
+[bcm-splash]: ./images/brunch-config-menu/select-bootsplash.png
+[bcm-summary]: ./images/brunch-config-menu/summary.png
+
+<!-- Brunch Bootsplash Examples -->
+[bs-default1]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/default_dark/main.png
+[bs-default2]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/default_light/main.png
+[bs-blank]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/blank/main.png
+[bs-bb1]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/brunchbook_dark/main.png
+[bs-bb2]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/brunchbook_light/main.png
+[bs-color1]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/colorful_dark/main.png
+[bs-color2]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/colorful_light/main.png
+[bs-croi1]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/croissant_dark/main.png
+[bs-croi2]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/croissant_light/main.png
+[bs-nb1]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/neon_blue_dark/main.png
+[bs-nb2]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/neon_blue_light/main.png
+[bs-ng1]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/neon_green_dark/main.png
+[bs-ng2]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/neon_green_light/main.png
+[bs-np1]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/neon_pink_dark/main.png
+[bs-np2]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/neon_pink_light/main.png
+[bs-nr1]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/neon_red_dark/main.png
+[bs-nr2]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/neon_red_light/main.png
 
 <!-- Internal Links -->
 [cpu-wiki]: https://github.com/sebanc/brunch/wiki/CPUs-&-Recoveries

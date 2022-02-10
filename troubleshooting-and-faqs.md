@@ -92,7 +92,7 @@ The Brunch Configuration Menu can be accessed directly from Grub using the "Chro
   
 *** 
   
-The first two pages of the Brunch Configuration Menu are for selecting Framework Options. These options act as patches and can be used to add more features or support to your installation. Continue scrolling for details about what each option does.
+The first two pages of the Brunch Configuration Menu are for selecting Framework Options. These options act as patches and can be used to add more features or support to your installation, you can select multiple with the Spacebar, or use the Enter key to continue. Continue scrolling for details about what each option does.
 ![Framework Options 1][bcm-fo1]
 ![Framework Options 2][bcm-fo2]
 
@@ -203,7 +203,7 @@ Brunch has a Verbose Mode, formerly called Debug Mode. Enabling this boot option
   
   ***
   
-Brunch Bootsplashes can be selected using the Brunch Configuration Menu, these determine the logo visible while Brunch is booting. (before the ChromeOS logo appears) These bootsplashes *will not appear* if you have enabled Verbose Mode above. 
+Brunch Bootsplashes can be selected using the Brunch Configuration Menu, these determine the logo visible while Brunch is booting. (before the ChromeOS logo appears) These bootsplashes *will not appear* if you have enabled Verbose Mode above. You can select any of these options with the Enter key.
 ![Brunch Bootsplash][bcm-splash]  
 
 <details>

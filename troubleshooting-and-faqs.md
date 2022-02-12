@@ -104,6 +104,8 @@ Some device specific options can be enabled through brunch configuration menu:
 - "mount_internal_drives": allows automatic mounting of HDD partitions in ChromeOS 
   - Android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data),
   - Partition label will be used if it exists,
+- "chromebook_audio": enable audio on EOL chromebook devices using the brunch recommended recovery image,
+- "native_chromebook_image": enable it to use brunch on a non-EOL chromebook using its official recovery image,
 - "broadcom_wl": enable this option if you need the broadcom_wl module,
 - "iwlwifi_backport": enable this option if your intel wireless card is not supported natively in the kernel,
 - "rtl8188eu": enable this option if you have a rtl8188eu wireless card/adapter,
@@ -127,10 +129,8 @@ Some device specific options can be enabled through brunch configuration menu:
 - "acpi_power_button": try this option if long pressing the power button does not display the power menu,
 - "alt_touchpad_config": try this option if you have touchpad issues,
 - "alt_touchpad_config2": another option to try if you have touchpad issues,
-- "disable_intel_hda": some Chromebooks need to blacklist the snd_hda_intel module, use this option to reproduce it,
-- "internal_mic_fix": allows to forcefully enable internal mic on some devices,
-- "asus_c302": applies asus c302 specific firmwares and fixes,
-- "baytrail_chromebook": applies baytrail chromebooks specific audio fixes,
+- "internal_mic_fix": fix for internal mic on some devices,
+- "internal_mic_fix2": alternative fix for internal mic on some devices,
 - "sysfs_tablet_mode": allow to control tablet mode from sysfs 
   - `echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to activate it or use 0 to disable it,
 - "force_tablet_mode": same as above except tablet mode is enabled by default on boot,

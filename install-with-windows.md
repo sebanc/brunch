@@ -16,7 +16,7 @@
 
 <!-- Installation Guides -->
 # USB installations
-This guide is for installing Brunch to a USB (or other disk) using Windows. This guide is also required when singlebooting or dualbooting. To begin, boot into Windows and click the dropdown below to continue.
+This guide is for installing Brunch to a USB (or other disk) using Windows. This guide is also required when singlebooting. To begin, boot into Windows and click the dropdown below to continue.
 
 <details>
   <summary>Click to open Brunch USB guide</summary>
@@ -275,7 +275,7 @@ When the installer asks you for the type of install, type "dualboot" in the term
 The installation will report that ChromeOS was installed when it is finished. Before continuing, make sure that there are no additional errors in the terminal. If there are no errors, then you are good to continue!
   
 ### Set up Grub2Win
-10. Reboot into Windows and install [Grub2win][grub2win] if you have not already, then launch the program.
+10. Install [Grub2win][grub2win] if you have not already, then launch the program.
   
 11. Click on the `Manage Boot Menu` button, then `Add A New Entry`.
   

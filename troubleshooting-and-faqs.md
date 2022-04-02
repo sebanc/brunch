@@ -52,6 +52,10 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
   ### My Touchpad, Touchscreen, Wifi or other hardware is not working properly!
   * ChromeOS is not optimized for every device. Brunch has several avaliable framework options and multiple customized kernels avaliable further down on this page to help with these issues. If you're still having issues, you can reach out to other users on one of our communities for help.
 
+
+  ### Brunch won't boot, and in verbose mode I see an error about a bad magic number
+  * This probably means there was an error making the img file. Download both the recovery and brunch files and try the creation script again.
+
 [![Discord][discord-shield]][discord-url]
 [![Reddit][reddit-shield]][reddit-url]
 [![Telegram][telegram-shield]][telegram-url]

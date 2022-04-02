@@ -99,7 +99,7 @@ The first two pages of the Brunch Configuration Menu are for selecting Framework
 Some device specific options can be enabled through brunch configuration menu:
 - "enable_updates": allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
 - "pwa": use this option to enable the brunch PWA 
-  - You can install it from https://sebanc.github.io/brunch-pwa/ or see a preview [on the wiki][brunch-pwa-info],
+  - You can install the original one from https://sebanc.github.io/brunch-pwa/ (see a preview [on the wiki][brunch-pwa-info]) or the ITESaurabh version available at: https://itesaurabh.github.io/brunch-pwa,
 - "android_init_fix": alternative init to support devices on which the android container fails to start with the standard init,
 - "mount_internal_drives": allows automatic mounting of HDD partitions in ChromeOS 
   - Android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data),

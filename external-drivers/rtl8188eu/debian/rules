@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+include /usr/share/dpkg/default.mk
+
+export DH_VERBOSE = 1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+VERSION ?= $(shell dpkg-parsechangelog | sed -rne 's/^Version: ([0-9.]+).*$$/\1/p')
+
+%:
+	dh $@ --with dkms
+
+override_dh_auto_install:
+	dh_install -prtl8188eu-dkms -X.o -X.ko hostapd-0.8/		usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms -X.o -X.ko include/			usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms -X.o -X.ko os_dep/			usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms -X.o -X.ko core/			usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms -X.o -X.ko .git/			usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms -X.o -X.ko hal/				usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms rtl_hostapd.conf			usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms rtl8188eufw.bin				usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms control_ap					usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms dkms.conf					usr/src/8188eu-$(VERSION)
+	dh_install -prtl8188eu-dkms Makefile					usr/src/8188eu-$(VERSION)
+
+
+override_dh_dkms:
+	dh_dkms -V
+
+override_dh_auto_build:
+	:

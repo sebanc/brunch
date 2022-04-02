@@ -1,0 +1,210 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright (C) 2021 MediaTek Inc.
+ * Author: Seiya Wang <seiya.wang@mediatek.com>
+ */
+/dts-v1/;
+#include "mt8195.dtsi"
+
+/ {
+	model = "MediaTek MT8195 evaluation board";
+	compatible = "mediatek,mt8195-evb", "mediatek,mt8195";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		stdout-path = "serial0:921600n8";
+	};
+
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0 0x40000000 0 0x80000000>;
+	};
+};
+
+&auxadc {
+	status = "okay";
+};
+
+&i2c0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c0_pin>;
+	clock-frequency = <100000>;
+	status = "okay";
+};
+
+&i2c1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c1_pin>;
+	clock-frequency = <400000>;
+	status = "okay";
+};
+
+&i2c2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2_pin>;
+	status = "disabled";
+};
+
+&i2c3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c3_pin>;
+	status = "disabled";
+};
+
+&i2c4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c4_pin>;
+	clock-frequency = <400000>;
+	status = "okay";
+};
+
+&i2c5 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c5_pin>;
+	status = "disabled";
+};
+
+&i2c6 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c6_pin>;
+	clock-frequency = <400000>;
+	status = "disabled";
+};
+
+&nor_flash {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&nor_pins_default>;
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+	};
+};
+
+&pio {
+	pinctrl-names = "default";
+	i2c0_pin: i2c0_pin {
+		pins_bus {
+			pinmux = <PINMUX_GPIO8__FUNC_SDA0>,
+				 <PINMUX_GPIO9__FUNC_SCL0>;
+			bias-pull-up = <1>;
+			mediatek,rsel = <7>;
+			mediatek,drive-strength-adv = <0>;
+			drive-strength = <MTK_DRIVE_6mA>;
+		};
+	};
+	i2c1_pin: i2c1_pin {
+		pins_bus {
+			pinmux = <PINMUX_GPIO10__FUNC_SDA1>,
+				 <PINMUX_GPIO11__FUNC_SCL1>;
+			bias-pull-up = <1>;
+			mediatek,rsel = <7>;
+			mediatek,drive-strength-adv = <0>;
+			drive-strength = <MTK_DRIVE_6mA>;
+		};
+	};
+	i2c2_pin: i2c2_pin {
+		pins_bus {
+			pinmux = <PINMUX_GPIO12__FUNC_SDA2>,
+				 <PINMUX_GPIO13__FUNC_SCL2>;
+			bias-pull-up = <1>;
+			mediatek,rsel = <7>;
+			mediatek,drive-strength-adv = <7>;
+		};
+	};
+	i2c3_pin: i2c3_pin {
+		pins_bus {
+			pinmux = <PINMUX_GPIO14__FUNC_SDA3>,
+				 <PINMUX_GPIO15__FUNC_SCL3>;
+			bias-pull-up = <1>;
+			mediatek,rsel = <7>;
+			mediatek,drive-strength-adv = <7>;
+		};
+	};
+	i2c4_pin: i2c4_pin {
+		pins_bus {
+			pinmux = <PINMUX_GPIO16__FUNC_SDA4>,
+				 <PINMUX_GPIO17__FUNC_SCL4>;
+			bias-pull-up = <1>;
+			mediatek,rsel = <7>;
+			mediatek,drive-strength-adv = <7>;
+		};
+	};
+	i2c5_pin: i2c5_pin {
+		pins_bus {
+			pinmux = <PINMUX_GPIO29__FUNC_SCL5>,
+				 <PINMUX_GPIO30__FUNC_SDA5>;
+			bias-pull-up = <1>;
+			mediatek,rsel = <7>;
+			mediatek,drive-strength-adv = <7>;
+		};
+	};
+	i2c6_pin: i2c6_pin {
+		pins_bus {
+			pinmux = <PINMUX_GPIO25__FUNC_SDA6>,
+				 <PINMUX_GPIO26__FUNC_SCL6>;
+			bias-pull-up = <1>;
+		};
+	};
+	i2c7_pin: i2c7_pin {
+		pins_bus {
+			pinmux = <PINMUX_GPIO27__FUNC_SCL7>,
+				 <PINMUX_GPIO28__FUNC_SDA7>;
+			bias-pull-up = <1>;
+		};
+	};
+	nor_pins_default: nordefault {
+		pins0 {
+			pinmux = <PINMUX_GPIO142__FUNC_SPINOR_IO0>,
+					 <PINMUX_GPIO141__FUNC_SPINOR_CK>,
+					 <PINMUX_GPIO143__FUNC_SPINOR_IO1>;
+			bias-pull-down;
+		};
+		pins1 {
+			pinmux = <PINMUX_GPIO140__FUNC_SPINOR_CS>,
+				     <PINMUX_GPIO130__FUNC_SPINOR_IO2>,
+				     <PINMUX_GPIO131__FUNC_SPINOR_IO3>;
+			bias-pull-up;
+		};
+	};
+	uart0_pin: uart0_pin {
+		uart_pins {
+			pinmux = <PINMUX_GPIO98__FUNC_UTXD0>,
+				<PINMUX_GPIO99__FUNC_URXD0>;
+		};
+	};
+};
+
+&u2port0 {
+	status = "okay";
+};
+
+&u2port1 {
+	status = "okay";
+};
+
+&u3phy0 {
+	status="okay";
+};
+
+&u3phy1 {
+	status="okay";
+};
+
+&u3port0 {
+	status = "okay";
+};
+
+&u3port1 {
+	status = "okay";
+};
+
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0_pin>;
+	status = "okay";
+};

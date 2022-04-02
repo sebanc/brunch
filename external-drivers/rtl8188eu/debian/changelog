@@ -1,0 +1,5 @@
+rtl8188eu (4.1.4-1) unstable; urgency=medium
+
+  * Add driver package to build DEB package support in Debian DKMS format.
+
+ -- liuxin <liuxin@uniontech.com>  Sat, 15 May 2021 14:47:26 +0800

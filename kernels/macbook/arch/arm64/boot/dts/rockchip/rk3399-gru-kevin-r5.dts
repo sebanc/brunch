@@ -1,0 +1,65 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Google Gru-Kevin Rev 5 board device tree source
+ *
+ * Copyright 2016 Google, Inc
+ */
+
+/dts-v1/;
+/*
+ * Include the standard Kevin device tree for simplicity instead of
+ * trying to split out the common parts.
+ */
+#include "rk3399-gru-kevin.dts"
+
+/ {
+	model = "Google Kevin";
+	compatible = "google,kevin-rev5", "google,kevin",
+		     "google,gru", "rockchip,rk3399";
+};
+
+/* Adjust DVFS rails back to wider range */
+
+&ppvar_bigcpu_pwm {
+	regulator-min-microvolt = <800000>;
+	regulator-max-microvolt = <1500000>;
+};
+
+&ppvar_bigcpu {
+	regulator-min-microvolt = <800000>;
+	regulator-max-microvolt = <1500000>;
+	ctrl-voltage-range = <800000 1500000>;
+};
+
+&ppvar_litcpu_pwm {
+	regulator-min-microvolt = <800000>;
+	regulator-max-microvolt = <1500000>;
+};
+
+&ppvar_litcpu {
+	regulator-min-microvolt = <800000>;
+	regulator-max-microvolt = <1500000>;
+	ctrl-voltage-range = <800000 1500000>;
+};
+
+&ppvar_gpu_pwm {
+	regulator-min-microvolt = <800000>;
+	regulator-max-microvolt = <1500000>;
+};
+
+&ppvar_gpu {
+	regulator-min-microvolt = <800000>;
+	regulator-max-microvolt = <1500000>;
+	ctrl-voltage-range = <800000 1500000>;
+};
+
+&ppvar_centerlogic_pwm {
+	regulator-min-microvolt = <800000>;
+	regulator-max-microvolt = <1500000>;
+};
+
+&ppvar_centerlogic {
+	regulator-min-microvolt = <800000>;
+	regulator-max-microvolt = <1500000>;
+	ctrl-voltage-range = <800000 1500000>;
+};

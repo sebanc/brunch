@@ -1,0 +1,30 @@
+From 05dd11abffe27c2fd8f618e79036be026f71b20c Mon Sep 17 00:00:00 2001
+From: Brian Norris <computersforpeace@gmail.com>
+Date: Tue, 26 Aug 2014 01:21:19 -0800
+
+Subject: [PATCH] Add support for Linux 3.17
+
+---
+ src/wl/sys/wl_linux.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/src/wl/sys/wl_linux.c b/src/wl/sys/wl_linux.c
+index 3a5e46b..6384e58 100644
+--- a/src/wl/sys/wl_linux.c
++++ b/src/wl/sys/wl_linux.c
+@@ -1351,7 +1351,12 @@
+ 	dev->priv = priv_link;
+ #else
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0))
+ 	dev = alloc_netdev(sizeof(priv_link_t), intf_name, ether_setup);
++#else
++	dev = alloc_netdev(sizeof(priv_link_t), intf_name, NET_NAME_UNKNOWN,
++			   ether_setup);
++#endif
+ 	if (!dev) {
+ 		WL_ERROR(("wl%d: %s: alloc_netdev failed\n",
+ 			(wl->pub)?wl->pub->unit:wlif->subunit, __FUNCTION__));
+-- 
+1.9.1
+

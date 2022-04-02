@@ -1,0 +1,128 @@
+* Rockchip rk3288 DMC (Dynamic Memory Controller) device
+
+Required properties:
+- compatible: "rockchip,rk3288-dmc", "syscon"
+- rockchip,cru: this driver should access cru regs, so need get cru here
+- rockchip,grf: this driver should access grf regs, so need get grf here
+- rockchip,pmu: this driver should access pmu regs, so need get pmu here
+- rockchip,service_bus: this driver should access service bus regs
+- rockchip,sgrf: this driver should access sgrf regs, so need get sgrf here
+- rockchip,sram: a handle to 16K of sram to use for ddr frequency changes.
+- reg: dynamic ram protocol controller(PCTL) address and phy controller(PHYCTL)
+       address
+- clock: must include clock specifiers corresponding to entries in the
+         clock-names property.
+- clock-names: names of the clocks we need
+    Must contain:
+      pclk_ddrupctl0: support clock for access protocol controller registers
+                      of channel 0
+      pclk_publ0: support clock for access phy controller registers of channel 0
+      pclk_ddrupctl1: support clock for access protocol controller registers
+                      of channel 1
+      pclk_publ1: support clock for access phy controller registers of channel 1
+      arm_clk: for get arm frequency
+- logic-supply: this driver should adjust VDD_LOGIC according to dmc frequency,
+                so need get logic-supply here
+- rockchip,odt-disable-freq: if ddr clock frequency low than odt-disable-freq,
+                             this driver should disable DDR ODT
+- rockchip,dll-disable-freq: if ddr clock frequency low than dll-disable-freq,
+                             this driver should disable DDR DLL
+- rockchip,sr-enable-freq: if ddr clock frequency high than sr-enable-freq,
+                           this driver should enable the automatic self refresh
+                           function
+- rockchip,pd-enable-freq: if ddr clock frequency high than pd-enable-freq,
+                           this driver should enable the automatic power down
+                           function
+- rockchip,auto-self-refresh-cnt: Self Refresh idle period. Memories are placed
+                                  into Self-Refresh mode if the NIF is idle in
+                                  Access state for:
+                                     auto-self-refresh-cnt * 32 * n_clk cycles
+                                  The automatic self refresh function is
+                                  disabled when auto-self-refresh-cnt=0.
+- rockchip,auto-power-down-cnt: Power-down idle period. Memories are placed
+                                into power-down mode if the NIF is idle for
+                                auto-power-down-cnt n_clk cycles. The
+                                automatic power down function is disabled
+                                when auto-power-down-cnt=0.
+- rockchip,ddr-speed-bin: DDR3 type, AC timing parameters from the memory
+                          data-sheet
+        0.DDR3_800D (5-5-5)
+        1.DDR3_800E (6-6-6)
+        2.DDR3_1066E (6-6-6)
+        3.DDR3_1066F (7-7-7)
+        4.DDR3_1066G (8-8-8)
+        5.DDR3_1333F (7-7-7)
+        6.DDR3_1333G (8-8-8)
+        7.DDR3_1333H (9-9-9)
+        8.DDR3_1333J (10-10-10)
+        9.DDR3_1600G (8-8-8)
+        10.DDR3_1600H (9-9-9)
+        11.DDR3_1600J (10-10-10)
+        12.DDR3_1600K (11-11-11)
+        13.DDR3_1866J (10-10-10)
+        14.DDR3_1866K (11-11-11)
+        15.DDR3_1866L (12-12-12)
+        16.DDR3_1866M (13-13-13)
+        17.DDR3_2133K (11-11-11)
+        18.DDR3_2133L (12-12-12)
+        19.DDR3_2133M (13-13-13)
+        20.DDR3_2133N (14-14-14)
+        21.DDR3_DEFAULT
+      rockchip,trcd: tRCD,AC timing parameters from the memory data-sheet
+      rockchip,trp: tRP,AC timing parameters from the memory data-sheet
+
+Optional properties:
+- rockchip,dmc-disable-freq: set ddr frequency to dmc-disable-freq when
+  disable dmc
+- #cooling-cells = <2>: to allow ddr frequency to help cool the device
+  the two cells will be min and max.
+
+Required sub-nodes:
+- operating-points
+
+
+Example:
+	dmc: dmc@ff610000 {
+		compatible = "rockchip,rk3288-dmc", "syscon";
+		reg = <0x0 0xff610000 0x0 0x3fc
+		       0x0 0xff620000 0x0 0x294
+		       0x0 0xff630000 0x0 0x3fc
+		       0x0 0xff640000 0x0 0x294>;
+		rockchip,cru = <&cru>;
+		rockchip,grf = <&grf>;
+		rockchip,pmu = <&pmu>;
+		rockchip,service_bus = <&service_bus>;
+		rockchip,sgrf = <&sgrf>;
+		rockchip,sram = <&ddr_sram>;
+		clocks = <&cru PCLK_DDRUPCTL0>, <&cru PCLK_PUBL0>,
+			 <&cru PCLK_DDRUPCTL1>, <&cru PCLK_PUBL1>,
+			 <&cru ARMCLK>;
+		clock-names = "pclk_ddrupctl0", "pclk_publ0",
+			      "pclk_ddrupctl1", "pclk_publ1",
+			      "arm_clk";
+	};
+
+	&dmc {
+		logic-supply = <&vdd_logic>;
+
+		rockchip,odt-disable-freq = <333000000>;
+		rockchip,dll-disable-freq = <333000000>;
+		rockchip,sr-enable-freq = <333000000>;
+		rockchip,auto-self-refresh-cnt = <0>;
+		rockchip,auto-power-down-cnt = <64>;
+		rockchip,ddr-speed-bin = <21>;
+		rockchip,trcd = <10>;
+		rockchip,trp = <10>;
+
+		rockchip,dmc-disable-freq = <433000000>;
+
+		#cooling-cells = <2>;
+
+		operating-points = <
+			/* KHz    uV */
+			200000 1050000
+			333000 1100000
+			433000 1125000
+			533000 1150000
+		>;
+	};

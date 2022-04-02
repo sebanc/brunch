@@ -1,0 +1,30 @@
+#
+# Qualcomm camera configuration
+#
+
+menuconfig SPECTRA_CAMERA
+	bool "Qualcomm Technologies, Inc. Spectra Camera"
+	depends on (ARCH_QCOM)
+	depends on (MEDIA_SUPPORT && MEDIA_CONTROLLER && V4L_PLATFORM_DRIVERS)
+	depends on (VIDEO_DEV && VIDEO_V4L2=y)
+	depends on ARM64
+	depends on SC_CAMCC_7180
+	help
+	  Say Y here to enable selecting the video adapters for
+	  Qualcomm Technologies, Inc. Spectra camera and video capture.
+	  Enabling this adds support for the camera driver stack including sensor,
+	  IFE and postprocessing drivers.
+
+if SPECTRA_CAMERA
+
+source "drivers/media/platform/camx/cam_sync/Kconfig"
+source "drivers/media/platform/camx/cam_smmu/Kconfig"
+source "drivers/media/platform/camx/cam_req_mgr/Kconfig"
+source "drivers/media/platform/camx/cam_isp/Kconfig"
+source "drivers/media/platform/camx/cam_icp/Kconfig"
+source "drivers/media/platform/camx/cam_cpas/Kconfig"
+source "drivers/media/platform/camx/cam_jpeg/Kconfig"
+source "drivers/media/platform/camx/cam_lrme/Kconfig"
+source "drivers/media/platform/camx/cam_sensor_module/Kconfig"
+
+endif

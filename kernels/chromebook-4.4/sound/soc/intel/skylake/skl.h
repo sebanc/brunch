@@ -1,0 +1,153 @@
+/*
+ *  skl.h - HD Audio skylake defintions.
+ *
+ *  Copyright (C) 2015 Intel Corp
+ *  Author: Jeeja KP <jeeja.kp@intel.com>
+ *  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; version 2 of the License.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  General Public License for more details.
+ *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ */
+
+#ifndef __SOUND_SOC_SKL_H
+#define __SOUND_SOC_SKL_H
+
+#include <sound/hda_register.h>
+#include <sound/hdaudio_ext.h>
+#include "skl-nhlt.h"
+#include "skl-ssp-clk.h"
+
+#define SKL_SUSPEND_DELAY 2000
+
+/* Vendor Specific Registers */
+#define AZX_REG_VS_EM1			0x1000
+#define AZX_REG_VS_INRC			0x1004
+#define AZX_REG_VS_OUTRC		0x1008
+#define AZX_REG_VS_FIFOTRK		0x100C
+#define AZX_REG_VS_FIFOTRK2		0x1010
+#define AZX_REG_VS_EM2			0x1030
+#define AZX_REG_VS_EM3L			0x1038
+#define AZX_REG_VS_EM3U			0x103C
+#define AZX_REG_VS_EM4L			0x1040
+#define AZX_REG_VS_EM4U			0x1044
+#define AZX_REG_VS_LTRC			0x1048
+#define AZX_REG_VS_D0I3C		0x104A
+#define AZX_REG_VS_PCE			0x104B
+#define AZX_REG_VS_L2MAGC		0x1050
+#define AZX_REG_VS_L2LAHPT		0x1054
+#define AZX_REG_VS_SDXDPIB_XBASE	0x1084
+#define AZX_REG_VS_SDXDPIB_XINTERVAL	0x20
+#define AZX_REG_VS_SDXEFIFOS_XBASE	0x1094
+#define AZX_REG_VS_SDXEFIFOS_XINTERVAL	0x20
+
+#define AZX_PCIREG_PGCTL		0x44
+#define AZX_PGCTL_LSRMD_MASK		(1 << 4)
+#define AZX_PCIREG_CGCTL		0x48
+#define AZX_CGCTL_MISCBDCGE_MASK	(1 << 6)
+/* D0I3C Register fields */
+#define AZX_REG_VS_D0I3C_CIP      0x1 /* Command in progress */
+#define AZX_REG_VS_D0I3C_I3       0x4 /* D0i3 enable */
+#define SKL_MAX_DMACTRL_CFG	18
+#define DMA_CLK_CONTROLS	1
+#define DMA_TRANSMITION_START	2
+#define DMA_TRANSMITION_STOP	3
+
+#define AZX_VS_EM2_DUM			BIT(23)
+
+struct skl_dsp_resource {
+	u32 max_mcps;
+	u32 max_mem;
+	u32 mcps;
+	u32 mem;
+};
+
+struct skl {
+	struct hdac_ext_bus ebus;
+	struct pci_dev *pci;
+
+	unsigned int init_done:1; /* delayed init status */
+	struct platform_device *dmic_dev;
+	struct platform_device *i2s_dev;
+	struct platform_device *clk_dev;
+	struct snd_soc_platform *platform;
+
+	struct nhlt_acpi_table *nhlt; /* nhlt ptr */
+	struct skl_sst *skl_sst; /* sst skl ctx */
+
+	struct skl_dsp_resource resource;
+	struct list_head ppl_list;
+	struct list_head bind_list;
+
+	const char *fw_name;
+	char tplg_name[64];
+	unsigned short pci_id;
+	const struct firmware *tplg;
+
+	int supend_active;
+
+	struct work_struct probe_work;
+	struct sst_acpi_mach *mach;
+};
+
+#define skl_to_ebus(s)	(&(s)->ebus)
+#define ebus_to_skl(sbus) \
+	container_of(sbus, struct skl, sbus)
+
+/* to pass dai dma data */
+struct skl_dma_params {
+	u32 format;
+	u8 stream_tag;
+};
+
+/* to pass dmic data */
+struct skl_machine_pdata {
+	u32 dmic_num;
+};
+
+struct skl_dsp_ops {
+	int id;
+	unsigned int num_cores;
+	struct skl_dsp_loader_ops (*loader_ops)(void);
+	int (*init)(struct device *dev, void __iomem *mmio_base,
+			int irq, const char *fw_name,
+			struct skl_dsp_loader_ops loader_ops,
+			struct skl_sst **skl_sst);
+	int (*init_fw)(struct device *dev, struct skl_sst *ctx);
+	void (*cleanup)(struct device *dev, struct skl_sst *ctx);
+};
+
+int skl_platform_unregister(struct device *dev);
+int skl_platform_register(struct device *dev);
+
+struct nhlt_acpi_table *skl_nhlt_init(struct device *dev);
+void skl_nhlt_free(struct nhlt_acpi_table *addr);
+struct nhlt_specific_cfg *skl_get_ep_blob(struct skl *skl, u32 instance,
+			u8 link_type, u8 s_fmt, u8 no_ch, u32 s_rate, u8 dirn);
+
+int skl_get_dmic_geo(struct skl *skl);
+int skl_nhlt_update_topology_bin(struct skl *skl);
+int skl_init_dsp(struct skl *skl);
+int skl_free_dsp(struct skl *skl);
+int skl_suspend_late_dsp(struct skl *skl);
+int skl_suspend_dsp(struct skl *skl);
+int skl_resume_dsp(struct skl *skl);
+void skl_cleanup_resources(struct skl *skl);
+const struct skl_dsp_ops *skl_get_dsp_ops(int pci_id);
+void skl_update_d0i3c(struct device *dev, bool enable);
+int skl_nhlt_create_sysfs(struct skl *skl);
+void skl_nhlt_remove_sysfs(struct skl *skl);
+void skl_get_clks(struct skl *skl, struct skl_ssp_clk *ssp_clks);
+struct skl_clk_parent_src *skl_get_parent_clk(u8 clk_id);
+int skl_dsp_set_dma_control(struct skl_sst *ctx, u32 *caps,
+				u32 caps_size, u32 node_id);
+
+#endif /* __SOUND_SOC_SKL_H */

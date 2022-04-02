@@ -1,0 +1,10 @@
+--- drivers/gpu/drm/panel/panel-samsung-sofef00.c	2021-12-08 09:04:57.000000000 +0100
++++ drivers/gpu/drm/panel/panel-samsung-sofef00.c	2021-12-23 08:35:28.000000000 +0100
+@@ -302,6 +302,7 @@
+ 	ret = mipi_dsi_attach(dsi);
+ 	if (ret < 0) {
+ 		dev_err(dev, "Failed to attach to DSI host: %d\n", ret);
++		drm_panel_remove(&ctx->panel);
+ 		return ret;
+ 	}
+ 

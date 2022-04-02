@@ -1,0 +1,178 @@
+# Copyright 2017 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+[MASTER]
+
+load-plugins=chromite.cli.cros.lint
+
+# Configure quote preferences.
+string-quote = single-avoid-escape
+triple-quote = double
+docstring-quote = double
+
+[MESSAGES CONTROL]
+
+enable=
+    apply-builtin,
+    backtick,
+    bad-python3-import,
+    buffer-builtin,
+    cmp-builtin,
+    cmp-method,
+    coerce-builtin,
+    coerce-method,
+    delslice-method,
+    deprecated-itertools-function,
+    deprecated-str-translate-call,
+    deprecated-string-function,
+    deprecated-types-field,
+    dict-items-not-iterating,
+    dict-iter-method,
+    dict-keys-not-iterating,
+    dict-values-not-iterating,
+    dict-view-method,
+    div-method,
+    exception-message-attribute,
+    execfile-builtin,
+    file-builtin,
+    filter-builtin-not-iterating,
+    getslice-method,
+    hex-method,
+    idiv-method,
+    import-star-module-level,
+    indexing-exception,
+    input-builtin,
+    intern-builtin,
+    invalid-str-codec,
+    long-builtin,
+    map-builtin-not-iterating,
+    metaclass-assignment,
+    next-method-called,
+    next-method-defined,
+    nonzero-method,
+    oct-method,
+    old-raise-syntax,
+    parameter-unpacking,
+    print-statement,
+    raising-string,
+    range-builtin-not-iterating,
+    raw_input-builtin,
+    rdiv-method,
+    reduce-builtin,
+    reload-builtin,
+    setslice-method,
+    standarderror-builtin,
+    sys-max-int,
+    unichr-builtin,
+    unpacking-in-except,
+    using-cmp-argument,
+    xrange-builtin,
+    zip-builtin-not-iterating,
+
+disable=
+    too-many-lines,
+    too-many-branches,
+    too-many-statements,
+    too-few-public-methods,
+    too-many-instance-attributes,
+    too-many-public-methods,
+    too-many-locals,
+    too-many-arguments,
+    locally-enabled,
+    locally-disabled,
+    fixme,
+    bad-continuation,
+    invalid-name,
+
+[REPORTS]
+
+# Tells whether to display a full report or only the messages
+# CHANGE: No report.
+reports=no
+
+# Activate the evaluation score.
+score=no
+
+
+[FORMAT]
+
+# Maximum number of characters on a single line.
+max-line-length=80
+
+
+[TYPECHECK]
+
+# List of members which are set dynamically and missed by pylint inference
+# system, and so shouldn't trigger E0201 when accessed.
+# CHANGE: Added 'AndReturn', 'InAnyOrder' and 'MultipleTimes' for pymox.
+# CHANGE: Added tempdir for @osutils.TempDirDecorator.
+generated-members=REQUEST,acl_users,aq_parent,AndReturn,InAnyOrder,MultipleTimes,tempdir
+
+
+[BASIC]
+
+# List of builtins function names that should not be used, separated by a comma.
+# exit & quit are for the interactive interpreter shell only.
+# https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module
+bad-functions=
+    apply,
+    exit,
+    filter,
+    input,
+    map,
+    quit,
+    raw_input,
+    reduce,
+
+# Regular expression which should only match correct function names
+#
+# CHANGE: The ChromiumOS standard is different than PEP-8, so we need to
+# redefine this.
+#
+# Common exceptions to ChromiumOS standard:
+# - main: Standard for main function
+function-rgx=([A-Z_][a-zA-Z0-9]{2,30}|main)$
+
+# Regular expression which should only match correct method names
+#
+# CHANGE: The ChromiumOS standard is different than PEP-8, so we need to
+# redefine this. Here's what we allow:
+# - CamelCaps, starting with a capital letter.  No underscores in function
+#   names.  Can also have a "_" prefix (private method) or a "test" prefix
+#   (unit test).
+# - Methods that look like __xyz__, which are used to do things like
+#   __init__, __del__, etc.
+# - setUp, tearDown: For unit tests.
+method-rgx=((_|test)?[A-Z][a-zA-Z0-9]{2,30}|__[a-z]+__|setUp|tearDown)$
+
+
+[SIMILARITIES]
+
+# Minimum lines number of a similarity.
+min-similarity-lines=8
+
+
+[IMPORTS]
+
+# Deprecated modules which should not be used, separated by a comma.
+# Bastion: Dropped in Python 3.
+# mox: Use the 'mock' module instead.
+# optparse: Use the 'argparse' module instead.
+# regsub: Use the 're' module instead.
+# rexec: Dropped in Python 3.
+# TERMIOS: Use the 'termios' module instead.
+deprecated-modules=
+    Bastion,
+    mox,
+    optparse,
+    regsub,
+    rexec,
+    TERMIOS,
+
+
+[LOGGING]
+
+# Apply logging string format checks to calls on these modules.
+logging-modules=
+    logging,

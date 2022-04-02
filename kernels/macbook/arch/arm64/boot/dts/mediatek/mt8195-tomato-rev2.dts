@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright (C) 2021 MediaTek Inc.
+ */
+/dts-v1/;
+#include "mt8195-cherry.dtsi"
+#include "mt8195-tomato.dtsi"
+
+/ {
+	model = "MediaTek Tomato board";
+	compatible = "google,tomato-rev2", "google,tomato", "mediatek,mt8195";
+};
+
+&pio_default {
+	low_power_no_hdmi_pins {
+		pinmux = <PINMUX_GPIO31__FUNC_GPIO31>,
+			 <PINMUX_GPIO32__FUNC_GPIO32>,
+			 <PINMUX_GPIO33__FUNC_GPIO33>,
+			 <PINMUX_GPIO34__FUNC_GPIO34>,
+			 <PINMUX_GPIO35__FUNC_GPIO35>;
+		input-enable;
+		bias-pull-down;
+	};
+};
+
+&sound {
+	compatible = "mediatek,mt8195_mt6359_rt1019_rt5682";
+	model = "mt8195_r1019_5682";
+	mediatek,dptx-codec = <&dp_tx>;
+};
+
+&rt1019p {
+	status = "okay";
+};
+
+&rt5682 {
+	status = "okay";
+};

@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2020 Google LLC
+ */
+
+&i2c1 {
+	rt1015@28 {
+		compatible = "realtek,rt1015";
+		reg = <0x28>;
+	};
+
+	rt1015@29 {
+		compatible = "realtek,rt1015";
+		reg = <0x29>;
+	};
+};
+
+&sound {
+	compatible = "mediatek,mt8192_mt6359_rt1015_rt5682";
+};

@@ -1,0 +1,29 @@
+From b14ac6e4b871b5e15f63389ba63d1fc23a54c58b Mon Sep 17 00:00:00 2001
+From: Tim Gardner <tim.gardner@canonical.com>
+Date: Tue, 4 Aug 2015 09:02:10 -0600
+Subject: [PATCH] cfg80211_disconnected
+
+Signed-off-by: Tim Gardner <tim.gardner@canonical.com>
+---
+ bcmwl-6.30.223.248+bdcom/src/src/wl/sys/wl_cfg80211_hybrid.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/wl/sys/wl_cfg80211_hybrid.c b/src/wl/sys/wl_cfg80211_hybrid.c
+index ea0726f..0131f01 100644
+--- a/src/wl/sys/wl_cfg80211_hybrid.c
++++ b/src/wl/sys/wl_cfg80211_hybrid.c
+@@ -2047,7 +2047,11 @@ wl_notify_connect_status(struct wl_cfg80211_priv *wl, struct net_device *ndev,
+ 		}
+ 		else if ((event == WLC_E_LINK && ~(flags & WLC_EVENT_MSG_LINK)) ||
+ 			event == WLC_E_DEAUTH_IND || event == WLC_E_DISASSOC_IND) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0)
+ 			cfg80211_disconnected(ndev, 0, NULL, 0, GFP_KERNEL);
++#else
++			cfg80211_disconnected(ndev, 0, NULL, 0, false, GFP_KERNEL);
++#endif
+ 			clear_bit(WL_STATUS_CONNECTED, &wl->status);
+ 			wl_link_down(wl);
+ 			wl_init_prof(wl->profile);
+-- 
+2.5.0
+

@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright (C) 2022 MediaTek Inc.
+ */
+
+/ {
+	pwmleds {
+		compatible = "pwm-leds";
+		keyboard_backlight: keyboard-backlight {
+			label = "cros_ec::kbd_backlight";
+			pwms = <&cros_ec_pwm 3>;
+			max-brightness = <1023>;
+		};
+	};
+};
+
+&cros_ec {
+	mt_pmic_vmc_ldo_reg: regulator@0 {
+		compatible = "google,cros-ec-regulator";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <3600000>;
+		reg = <0>;
+	};
+	mt_pmic_vmch_ldo_reg: regulator@1 {
+		compatible = "google,cros-ec-regulator";
+		regulator-min-microvolt = <2700000>;
+		regulator-max-microvolt = <3600000>;
+		reg = <1>;
+	};
+};
+
+&cros_ec_pwm {
+	status = "okay";
+};
+
+&keyboard_controller {
+	function-row-physmap = <
+		MATRIX_KEY(0x00, 0x02, 0)	/* T1 */
+		MATRIX_KEY(0x03, 0x02, 0)	/* T2 */
+		MATRIX_KEY(0x02, 0x02, 0)	/* T3 */
+		MATRIX_KEY(0x01, 0x02, 0)	/* T4 */
+		MATRIX_KEY(0x03, 0x04, 0)	/* T5 */
+		MATRIX_KEY(0x02, 0x04, 0)	/* T6 */
+		MATRIX_KEY(0x01, 0x04, 0)	/* T7 */
+		MATRIX_KEY(0x02, 0x09, 0)	/* T8 */
+		MATRIX_KEY(0x01, 0x09, 0)	/* T9 */
+		MATRIX_KEY(0x00, 0x04, 0)	/* T10 */
+	>;
+	linux,keymap = <
+		MATRIX_KEY(0x00, 0x02, KEY_BACK)
+		MATRIX_KEY(0x03, 0x02, KEY_REFRESH)
+		MATRIX_KEY(0x02, 0x02, KEY_ZOOM)
+		MATRIX_KEY(0x01, 0x02, KEY_SCALE)
+		MATRIX_KEY(0x03, 0x04, KEY_SYSRQ)
+		MATRIX_KEY(0x02, 0x04, KEY_BRIGHTNESSDOWN)
+		MATRIX_KEY(0x01, 0x04, KEY_BRIGHTNESSUP)
+		MATRIX_KEY(0x02, 0x09, KEY_MUTE)
+		MATRIX_KEY(0x01, 0x09, KEY_VOLUMEDOWN)
+		MATRIX_KEY(0x00, 0x04, KEY_VOLUMEUP)
+
+		CROS_STD_MAIN_KEYMAP
+	>;
+};
+
+&pcie0 {
+	status = "okay";
+};
+
+&pio_default{
+	low_power_pu_pd_pins {
+		pinmux = <PINMUX_GPIO8__FUNC_GPIO8>,
+			 <PINMUX_GPIO9__FUNC_GPIO9>,
+			 <PINMUX_GPIO25__FUNC_GPIO25>,
+			 <PINMUX_GPIO26__FUNC_GPIO26>,
+			 <PINMUX_GPIO46__FUNC_GPIO46>,
+			 <PINMUX_GPIO47__FUNC_GPIO47>,
+			 <PINMUX_GPIO48__FUNC_GPIO48>,
+			 <PINMUX_GPIO65__FUNC_GPIO65>,
+			 <PINMUX_GPIO66__FUNC_GPIO66>,
+			 <PINMUX_GPIO67__FUNC_GPIO67>,
+			 <PINMUX_GPIO68__FUNC_GPIO68>,
+			 <PINMUX_GPIO128__FUNC_GPIO128>,
+			 <PINMUX_GPIO129__FUNC_GPIO129>;
+		input-enable;
+		bias-pull-down;
+	};
+};
+
+&i2c4 {
+	/delete-node/ touchscreen@10;
+
+	touchscreen: touchscreen@15 {
+		compatible = "hid-over-i2c";
+		reg = <0x15>;
+		interrupt-parent = <&pio>;
+		interrupts = <92 IRQ_TYPE_LEVEL_LOW>;
+		interrupts-extended = <&pio 92 IRQ_TYPE_LEVEL_LOW>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&touchscreen_pins>;
+
+		post-power-on-delay-ms = <10>;
+		hid-descr-addr = <0x0001>;
+
+		vdd-supply = <&pp3300_s3>;
+	};
+};

@@ -1,0 +1,67 @@
+config IWL7000
+	tristate "Intel Wireless WiFi 7000 series driver (new version)"
+
+	# normal iwlwifi dependencies
+	depends on PCI && HAS_IOMEM
+	select FW_LOADER
+
+	# this is because we don't depend on mac80211
+	depends on CFG80211
+
+	# we don't support or test on non-x86 platforms
+	depends on X86_64
+
+	# things mac80211 selects
+	select CRYPTO
+	select CRYPTO_ARC4
+	select CRYPTO_AES
+	select CRYPTO_CCM
+	select CRC32
+	select AVERAGE
+
+	# enable devcoredump framework
+	select WANT_DEV_COREDUMP
+
+	# we can't really be modular ... at least I was too lazy for it
+	depends on m
+
+config IWL7000_LEDS
+	def_bool y
+	depends on IWL7000
+	select NEW_LEDS
+	select LEDS_CLASS
+	select LEDS_TRIGGERS
+
+config IWL7000_DEBUGFS
+	def_bool y
+	depends on IWL7000
+	depends on CFG80211_DEBUGFS
+
+config IWL7000_TRACING
+	def_bool y
+	depends on IWL7000
+	depends on EVENT_TRACING
+
+config IWL7000_TESTMODE
+	def_bool y
+	depends on IWL7000
+	depends on NL80211_TESTMODE
+
+config IWL7000_XVT
+	tristate "Enable IWL7000 XVT (production test) code"
+	depends on 64BIT
+	default m
+	depends on IWL7000
+	depends on IWL7000_TESTMODE
+
+config IWL7000_VENDOR_CMDS
+	bool "enable vendor commands"
+	depends on IWL7000
+	default y
+	help
+	  This option enables support for vendor commands, including some
+	  that don't have their own Kconfig option. Other Kconfig options
+	  depend on this one as well.
+
+	  This option mostly exists for non-upstream tagging, so best
+	  leave it set to Y.

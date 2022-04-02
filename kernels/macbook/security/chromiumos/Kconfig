@@ -1,0 +1,45 @@
+config SECURITY_CHROMIUMOS
+	bool "Chromium OS Security Module"
+	depends on SECURITY
+	depends on X86_64 || ARM64
+	help
+	  The purpose of the Chromium OS security module is to reduce attacking
+	  surface by preventing access to general purpose access modes not
+	  required by Chromium OS. Currently: the mount operation is
+	  restricted by requiring a mount point path without symbolic links,
+	  and loading modules is limited to only the root filesystem. This
+	  LSM is stacked ahead of any primary "full" LSM.
+
+config SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
+	bool "Chromium OS Security: prohibit mount to symlinked target"
+	depends on SECURITY_CHROMIUMOS
+	default y
+	help
+	  When enabled mount() syscall will return ELOOP whenever target path
+	  contains any symlinks.
+
+config SECURITY_CHROMIUMOS_NO_UNPRIVILEGED_UNSAFE_MOUNTS
+	bool "Chromium OS Security: prohibit unsafe mounts in unprivileged user namespaces"
+	depends on SECURITY_CHROMIUMOS
+	default y
+	help
+	  When enabled, mount() syscall will return EPERM whenever a new mount
+	  is attempted that would cause the filesystem to have the exec, suid,
+	  or dev flags if the caller does not have the CAP_SYS_ADMIN capability
+	  in the init namespace.
+
+config ALT_SYSCALL_CHROMIUMOS
+	bool "Chromium OS Alt-Syscall Tables"
+	depends on ALT_SYSCALL
+	help
+	  Register restricted, alternate syscall tables used by Chromium OS
+	  using the alt-syscall infrastructure.  Alternate syscall tables
+	  can be selected with prctl(PR_ALT_SYSCALL).
+
+config SECURITY_CHROMIUMOS_READONLY_PROC_SELF_MEM
+	bool "Force /proc/<pid>/mem paths to be read-only"
+	default y
+	help
+	  When enabled, attempts to open /proc/self/mem for write access
+	  will always fail.  Write access to this file allows bypassing
+	  of memory map permissions (such as modifying read-only code).

@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ "${1}" == "pre" ]; then
+  modprobe -rv rtw89pci
+elif [ "${1}" == "post" ]; then
+  modprobe -v rtw89pci
+fi

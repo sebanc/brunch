@@ -1,0 +1,43 @@
+Broadcom Bluetooth Chips
+---------------------
+
+This documents the binding structure and common properties for serial
+attached Broadcom devices.
+
+Serial attached Broadcom devices shall be a child node of the host UART
+device the slave device is attached to.
+
+Required properties:
+
+ - compatible: should contain one of the following:
+   * "brcm,bcm43438-bt"
+   * "brcm,bcm43540-bt"
+
+Optional properties:
+
+ - max-speed: see Documentation/devicetree/bindings/serial/slave-device.txt
+ - shutdown-gpios: GPIO specifier, used to enable the BT module
+ - device-wakeup-gpios: GPIO specifier, used to wakeup the controller
+ - host-wakeup-gpios: GPIO specifier, used to wakeup the host processor
+ - clocks: clock specifier if external clock provided to the controller
+ - clock-names: should be "extclk"
+ - brcm,bt-pcm-int-params: configure PCM parameters via a 5-byte array
+    - sco-routing: 0 = PCM, 1 = Transport, 2 = Codec, 3 = I2S
+    - pcm-interface-rate: 128KBps, 256KBps, 512KBps, 1024KBps, 2048KBps
+    - pcm-frame-type: short, long
+    - pcm-sync-mode: slave, master
+    - pcm-clock-mode: slave, master
+
+
+Example:
+
+&uart2 {
+       pinctrl-names = "default";
+       pinctrl-0 = <&uart2_pins>;
+
+       bluetooth {
+               compatible = "brcm,bcm43438-bt";
+               max-speed = <921600>;
+               brcm,bt-pcm-int-params = [01 02 00 01 01];
+       };
+};

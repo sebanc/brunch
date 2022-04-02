@@ -1,0 +1,30 @@
+/*
+ * Copyright 2016 MediaTek Inc.
+ * Author: Eddie Huang <eddie.huang@mediatek.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+#include "mt8173-elm.dtsi"
+
+/ {
+	model = "Mediatek Elm rev2, rev1 board";
+	compatible = "google,elm-rev2", "google,elm-rev1",
+		     "google,elm", "mediatek,mt8173";
+};
+
+&mt6397_vgp6_reg {
+	/delete-property/regulator-always-on;
+};
+
+&trackpad {
+	/delete-property/vcc-supply;
+};

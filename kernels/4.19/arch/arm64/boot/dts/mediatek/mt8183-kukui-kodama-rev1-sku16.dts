@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2019 Bitland Information Technology Co.LTD
+ *
+ * SKU: 0x10 => 16
+ *  - bit 8: Camera: 0 (OV5695)
+ *  - bits 7..4: Panel ID: 0x1 (AUO)
+ */
+
+/dts-v1/;
+#include "mt8183-kukui-kodama.dtsi"
+#include "mt8183-kukui-kodama-panel-auo.dtsi"
+#include "mt8183-kukui-kodama-camera-ov5695.dtsi"
+
+/ {
+	model = "MediaTek kodama rev1 sku16 board";
+	compatible = "google,kodama-rev1-sku16", "google,kodama-sku16",
+		"google,kodama", "mediatek,mt8183";
+};
+
+&spi2 {
+	cros_ec: ec@0 {
+		i2c_tunnel: i2c-tunnel {
+			google,remote-bus = <1>;
+		};
+	};
+};

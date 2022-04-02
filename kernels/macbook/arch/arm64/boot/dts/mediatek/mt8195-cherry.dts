@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright (C) 2021 MediaTek Inc.
+ */
+/dts-v1/;
+#include "mt8195-cherry.dtsi"
+
+/ {
+	model = "MediaTek Cherry board";
+	compatible = "google,cherry", "mediatek,mt8195";
+};
+
+&pcie0 {
+	status = "okay";
+};
+
+&subpmic_mtk_regulator {
+	mt_pmic_vmc_ldo_reg: ldo3 {
+		regulator-compatible = "LDO3";
+		regulator-name = "mt6360,ldo3";
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <3600000>;
+		regulator-allowed-modes = <0 2>;
+	};
+
+	mt_pmic_vmch_ldo_reg: ldo5 {
+		regulator-compatible = "LDO5";
+		regulator-name = "mt6360,ldo5";
+		regulator-min-microvolt = <2700000>;
+		regulator-max-microvolt = <3600000>;
+		regulator-allowed-modes = <0 2>;
+	};
+};
+
+&sound {
+	compatible = "mediatek,mt8195_mt6359_rt1019_rt5682";
+	model = "mt8195_r1019_5682";
+	mediatek,dptx-codec = <&dp_tx>;
+	mediatek,hdmi-codec = <&hdmi0>;
+};
+
+&rt1019p {
+	status = "okay";
+};
+
+&rt5682 {
+	status = "okay";
+};
+
+&disp_dpi1 {
+	status = "okay";
+};
+
+&hdmi_phy {
+	status = "okay";
+};
+
+&hdmiddc0 {
+	status = "okay";
+};
+
+&hdmi0 {
+	status = "okay";
+};

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# See this page for more details:
+# http://dev.chromium.org/chromium-os/how-tos-and-troubleshooting/kernel-configuration
+
+if [[ -z "${CHROMEOS_KERNEL_FAMILY}" ]]; then
+    echo "CHROMEOS_KERNEL_FAMILY env variable not set; see crrev.com/c/3398813" 1>&2
+    echo "If running manually, try CHROMEOS_KERNEL_FAMILY=chromeos" 1>&2
+    exit 1
+fi
+
+family="${CHROMEOS_KERNEL_FAMILY}"
+
+flavourconf=$(find chromeos/config/${family} -name $1.flavour.config)
+if [ ! -f "${flavourconf}" ]; then
+    echo "Found no flavour configuration for '$1'." 1>&2
+    exit 1
+fi
+
+outputfile="${2:-.config}"
+
+archconfdir=$(dirname ${flavourconf})
+arch=$(basename ${archconfdir})
+
+# Generate .config
+cat "chromeos/config/${family}/base.config" \
+    "${archconfdir}/common.config" \
+    "${flavourconf}" > "${outputfile}"

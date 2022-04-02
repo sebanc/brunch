@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+/*
+ * Copyright 2020 Google LLC
+ */
+
+/dts-v1/;
+#include "mt8183-kukui-kakadu.dtsi"
+#include "mt8183-kukui-audio-da7219.dtsi"
+#include "mt8183-kukui-audio-rt1015.dtsi"
+
+/ {
+	model = "MediaTek kakadu rev0/rev1 board";
+	compatible = "google,kakadu-rev1", "google,kakadu-rev0",
+			"google,kakadu", "mediatek,mt8183";
+};
+
+&sound {
+	compatible = "mediatek,mt8183_da7219_rt1015";
+};
+

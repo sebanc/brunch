@@ -1,0 +1,17 @@
+--- drivers/gpu/drm/panel/panel-kingdisplay-kd097d04.c	2021-12-08 09:04:57.000000000 +0100
++++ drivers/gpu/drm/panel/panel-kingdisplay-kd097d04.c	2021-12-23 08:35:28.000000000 +0100
+@@ -406,7 +406,13 @@
+ 	if (err < 0)
+ 		return err;
+ 
+-	return mipi_dsi_attach(dsi);
++	err = mipi_dsi_attach(dsi);
++	if (err < 0) {
++		kingdisplay_panel_del(kingdisplay);
++		return err;
++	}
++
++	return 0;
+ }
+ 
+ static int kingdisplay_panel_remove(struct mipi_dsi_device *dsi)

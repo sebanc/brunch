@@ -1,0 +1,14 @@
+#!/bin/bash
+
+DRV_NAME=8188eu
+DRV_VERSION=4.1.4
+
+
+dkms add -m ${DRV_NAME} -v ${DRV_VERSION}
+dkms build -m ${DRV_NAME} -v ${DRV_VERSION}
+dkms install -m ${DRV_NAME} -v ${DRV_VERSION}
+RESULT=$?
+
+echo "Finished running dkms install steps."
+
+exit $RESULT

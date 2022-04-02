@@ -1,0 +1,10 @@
+obj-$(CONFIG_SURFACE_SAM_SSH)		+= surface_sam_ssh.o
+obj-$(CONFIG_SURFACE_SAM_SAN)		+= surface_sam_san.o
+obj-$(CONFIG_SURFACE_SAM_DTX)		+= surface_sam_dtx.o
+obj-$(CONFIG_SURFACE_SAM_HPS)		+= surface_sam_hps.o
+obj-$(CONFIG_SURFACE_SAM_VHF)		+= surface_sam_vhf.o
+obj-$(CONFIG_SURFACE_SAM_SID)		+= surface_sam_sid.o
+obj-$(CONFIG_SURFACE_SAM_SID_GPELID)	+= surface_sam_sid_gpelid.o
+obj-$(CONFIG_SURFACE_SAM_SID_PERFMODE)	+= surface_sam_sid_perfmode.o
+obj-$(CONFIG_SURFACE_SAM_SID_POWER)	+= surface_sam_sid_power.o
+obj-$(CONFIG_SURFACE_SAM_SID_VHF)	+= surface_sam_sid_vhf.o

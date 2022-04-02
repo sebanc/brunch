@@ -1,0 +1,10 @@
+What:		/sys/class/chromeos/<ec-device-name>/pd_update/firmware_images
+Date:		August 2015
+KernelVersion:	4.2
+Description:
+		List the names of the available firmware images for USB PD
+    that use cros_ec OS.
+    Each line contains a slot, PD major/minor and firmware name:
+    0: 1.1 cros-pd/zinger_v1.7.539-91a0fa2.bin
+
+    The images are in the kernel firmware images directory.

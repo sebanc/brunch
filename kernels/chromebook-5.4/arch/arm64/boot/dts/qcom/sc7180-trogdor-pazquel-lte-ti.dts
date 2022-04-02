@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Google Pazquel board device tree source
+ *
+ * Copyright 2021 Google LLC.
+ */
+
+/dts-v1/;
+
+#include "sc7180.dtsi"
+#include "sc7180-trogdor-ti-sn65dsi86.dtsi"
+#include "sc7180-trogdor-pazquel.dtsi"
+#include "sc7180-trogdor-lte-sku.dtsi"
+
+/ {
+	model = "Google Pazquel (TI,LTE)";
+	compatible = "google,pazquel-sku0", "google,pazquel-sku2", "qcom,sc7180";
+};
+
+&ap_sar_sensor {
+	compatible = "semtech,sx9324";
+	status = "okay";
+	semtech,ph0-pin = <1 2 3>;
+	semtech,ph1-pin = <3 2 1>;
+	semtech,ph2-pin = <1 2 3>;
+	semtech,ph3-pin = <3 2 1>;
+	semtech,ph01-resolution = <256>;
+	semtech,ph23-resolution = <256>;
+	semtech,startup-sensor = <1>;
+	semtech,ph01-proxraw-strength = <2>;
+	semtech,ph23-proxraw-strength = <2>;
+	semtech,avg-pos-strength = <64>;
+	vdd-supply = <&pp1800_prox>;
+	label = "proximity-lte";
+};
+
+&ap_sar_sensor_i2c {
+	status = "okay";
+};

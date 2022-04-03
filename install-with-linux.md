@@ -41,7 +41,7 @@ This guide is for installing Brunch to a USB (or other disk) using Linux. This g
 * ["zork" is suggested for Ryzen.][recovery-zork]
   * [Ryzen 4xxx devices need kernel 5.10][changing-kernels]
 
-Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] or the [cros-updates-serving][cros-official] site and searching for the recovery you want.
+Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] or the [ https://chromiumdash.appspot.com/serving-builds?deviceCategory=Chrome%20OS ][ Chromium Dash ] <s>[cros-updates-serving][cros-official]</s> site and searching for the recovery you want.
 
 After selecting the recovery you want, you can select a specific release. Posted releases may be behind the current release, this is normal and you can update into the current release later. It is usually suggested to use the latest release avaliable.
 

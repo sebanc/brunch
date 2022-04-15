@@ -324,9 +324,30 @@ It is currently recommended to only update ChromeOS when the matching version of
 ```sudo chromeos-update -r ~/Downloads/recovery.bin -f ~/Downloads/brunch_archive.tar.gz```
  * Restart ChromeOS after the update finishes.
   
-  Brunch and ChromeOS can also be updated with the [BiteDasher's Script][bite-dasher]
+  Brunch and ChromeOS can also be updated with [BiteDasher's Script][bite-dasher]
   
   </details>
+  
+  
+ ## How to update ChromeOS
+  
+<details>
+<summary> Click to learn how to update ChromeOS </summary>
+  
+  ***
+ 
+ The easiest way to update ChromeOS is to enable the `enable_updates` framework option, then update directly from the Settings page.
+ 
+ To enable the framework option: 
+ * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Enter `sudo edit-brunch-config` to open the Brunch Configuration Menu described above.
+ * Select `enable_updates` with the spacebar, then continue through the menu with the enter key.
+ * When finished, the Brunch Configuration Menu will prompt to restart ChromeOS.
+ * Update from the standard ChromeOS settings page after rebooting.
+  
+  </details>
+  
+  
   
  ## How to update Brunch
   
@@ -345,8 +366,6 @@ It is currently recommended to only update ChromeOS when the matching version of
 
 ```sudo chromeos-update -f ~/Downloads/brunch_archive.tar.gz```
  * Restart ChromeOS after the update finishes.
-  
-  Brunch can also be updated with the [Brunch Toolkit][brunch-toolkit]
   
   </details>
 

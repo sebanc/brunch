@@ -51,7 +51,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 
 
 ❌ Unsupported Hardware:
-- Nvidia GPUs are not supported
+- dGPUs are not supported
 - Virtual Machines are not supported
 - ARM CPUs are not supported
 - Intel Core 2 Duo *and older* are not supported

@@ -54,11 +54,17 @@ When downloading a release, select the brunch...tar.gz file from the assets at t
 3. Once both files have been downloaded, the Brunch release and your chosen ChromeOS recovery, open a terminal. In most Linux distros you can just press **ctrl + alt + t** to open it quickly.
 4. Make sure that pv, cgpt, tar and unzip are installed.
 
-```sudo apt update && sudo apt -y install pv cgpt tar unzip```
-  
-  * My example uses `apt`, a package manager for Debian and Ubuntu based distros. If you use Arch, you will need [vboot-utils][vboot-utils] for access to cgpt and a different package manager may be needed to install the rest.
+On Ubuntu/Debian/Linux Mint:<br/>
+```sudo apt update && sudo apt -y install pv cgpt tar unzip```<br/><br/>
+Or on Arch Linux:<br/>
+```sudo pacman -Syy && sudo pacman -S pv tar unzip```<br/>
+For cgpt, you have to use a AUR helper like yay or pamac 
 
-4b. Some Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
+```yay -S cgpt```<br/>
+or:<br/>
+```pamac install cgpt```
+  
+4b. Some Debian based Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
 
 ```sudo add-apt-repository universe```
   
@@ -127,13 +133,11 @@ If you installed using a Linux Live USB or installed to a second internal disk, 
   </details>
  
 ***
-
-
 # Singleboot installations
 This guide is for installing Brunch to a disk using a Brunch USB. This guide requires having a working Brunch USB to initiate the install, you can make one by following the [guide above][brunch-usb-guide-lin]. To begin, boot into a working Brunch USB and click the dropdown below to continue. 
-
 <details>
   <summary>Click to open singleboot guide</summary>
+
 
 ### Requirements
 - Root access.
@@ -230,11 +234,17 @@ When downloading a release, select the brunch...tar.gz file from the assets at t
 3. Once both files have been downloaded, the Brunch release and your chosen ChromeOS recovery, open a terminal. In most Linux distros you can just press **ctrl + alt + t** to open it quickly.
 4. Make sure that pv, cgpt, tar and unzip are installed.
 
-```sudo apt update && sudo apt -y install pv cgpt tar unzip```
-  
-  * My example uses `apt`, a package manager for Debian and Ubuntu based distros. If you use Arch, you will need [vboot-utils][vboot-utils] for access to cgpt and a different package manager may be needed to install the rest.
+On Ubuntu/Debian/Linux Mint:<br/>
+```sudo apt update && sudo apt -y install pv cgpt tar unzip```<br/><br/>
+Or on Arch Linux:<br/>
+```sudo pacman -Syy && sudo pacman -S pv tar unzip```<br/>
+For cgpt, you have to use a AUR helper like yay or pamac 
 
-4b. Some Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
+```yay -S cgpt```<br/>
+or:<br/>
+```pamac install cgpt```
+  
+4b. Some Debian based Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
 
 ```sudo add-apt-repository universe```
   
@@ -316,7 +326,9 @@ The installation will report that ChromeOS was installed when it is finished. Be
 
 17. After saving, commit the new entries to Grub.
 
-```sudo update-grub```
+```sudo update-grub``` <br/> 
+  or if that dosen't work(Or if you're on Arch Linux), <br/>
+```sudo grub-mkconfig -o /boot/grub/grub.cfg```
   
 18. At this point, you can unmount the target partition.
 
@@ -337,7 +349,7 @@ It is normal for the first boot to take a very long time, please be patient.
  
   </details>
  
- ***
+***
  
 # [Troubleshooting and Support][troubleshooting-and-faqs]
 

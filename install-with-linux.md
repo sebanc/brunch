@@ -19,7 +19,7 @@
 This guide is for installing Brunch to a USB (or other disk) using Linux. This guide should be compatible with Linux Live USBs for quick installations as well. To begin, boot into the Linux distro of your choice and click the dropdown below to continue.
 
 <details>
-  <summary>Click to open Brunch USB guide(Debian/Ubuntu)</summary>
+  <summary>Click to open Brunch USB guide</summary>
 
 ### Requirements
 - Root access.
@@ -54,9 +54,9 @@ When downloading a release, select the brunch...tar.gz file from the assets at t
 3. Once both files have been downloaded, the Brunch release and your chosen ChromeOS recovery, open a terminal. In most Linux distros you can just press **ctrl + alt + t** to open it quickly.
 4. Make sure that pv, cgpt, tar and unzip are installed.
 
-On ubuntu/debian/linux mint<br/>
+On Ubuntu/Debian/Linux Mint:<br/>
 ```sudo apt update && sudo apt -y install pv cgpt tar unzip```<br/><br/>
-Or on arch:<br/>
+Or on Arch Linux:<br/>
 ```sudo pacman -Syy && sudo pacman -S pv tar unzip```<br/>
 For cgpt, you have to use a AUR helper like yay or pamac 
 
@@ -64,7 +64,7 @@ For cgpt, you have to use a AUR helper like yay or pamac
 or:<br/>
 ```pamac install cgpt```
   
-4b. Some Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
+4b. Some Debian based Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
 
 ```sudo add-apt-repository universe```
   
@@ -234,9 +234,9 @@ When downloading a release, select the brunch...tar.gz file from the assets at t
 3. Once both files have been downloaded, the Brunch release and your chosen ChromeOS recovery, open a terminal. In most Linux distros you can just press **ctrl + alt + t** to open it quickly.
 4. Make sure that pv, cgpt, tar and unzip are installed.
 
-On ubuntu/debian/linux mint<br/>
+On Ubuntu/Debian/Linux Mint:<br/>
 ```sudo apt update && sudo apt -y install pv cgpt tar unzip```<br/><br/>
-Or on arch:<br/>
+Or on Arch Linux:<br/>
 ```sudo pacman -Syy && sudo pacman -S pv tar unzip```<br/>
 For cgpt, you have to use a AUR helper like yay or pamac 
 
@@ -244,7 +244,7 @@ For cgpt, you have to use a AUR helper like yay or pamac
 or:<br/>
 ```pamac install cgpt```
   
-4b. Some Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
+4b. Some Debian based Linux releases may require the `universe` repo to install some of the above dependencies. If you get any errors about a dependency being unavaliable, add the `universe` repo with this command, and then try the previous step again afterwards.
 
 ```sudo add-apt-repository universe```
   
@@ -327,7 +327,7 @@ The installation will report that ChromeOS was installed when it is finished. Be
 17. After saving, commit the new entries to Grub.
 
 ```sudo update-grub``` <br/> 
-  or if that dosent work, <br/>
+  or if that dosen't work(Or if you're on Arch Linux), <br/>
 ```sudo grub-mkconfig -o /boot/grub/grub.cfg```
   
 18. At this point, you can unmount the target partition.

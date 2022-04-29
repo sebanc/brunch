@@ -24,6 +24,7 @@ First of all, thanks goes to [Project Croissant][croissant], the [swtpm][swtpm] 
 <!-- About This Project -->
 ## About This Project
 Semi-private repository for me to restore ChromeOS after I nuke my install yet again.
+
 The purpose of the Brunch framework is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
 
 **Warning: Brunch is not the intended way for ChromeOS to work, at some point ChromeOS could potentially become incompatible with Brunch and delete data unexpectedly (even on non-ChromeOS partitions). By installing Brunch you agree to take those risks and I cannot be held responsible for anything bad that would happen to your device including data loss.

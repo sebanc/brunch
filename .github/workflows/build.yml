@@ -1,0 +1,112 @@
+name: Build Brunch using Github Actions
+on: [push, pull_request]
+jobs:
+  list-kernels:
+    name: Get the list of kernels to build
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set detected kernel folders as output
+        id: set-matrix
+        run: echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
+  build-kernel:
+    name: Build kernel
+    needs: list-kernels
+    runs-on: ubuntu-latest
+    strategy:
+        matrix:
+            kernel: ${{ fromJson(needs.list-kernels.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install pv cgpt libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf
+      - name: Compile kernel
+        run: |
+          cd kernels/${{ matrix.kernel }}
+          make -j$(nproc) O=out chromeos_defconfig
+          make -j$(nproc) O=out
+      - name: Compress output files
+        run: tar zcvf artifacts-${{ matrix.kernel }}.tar.gz kernels/${{ matrix.kernel }}/out
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts-${{ matrix.kernel }}
+          path: artifacts-${{ matrix.kernel }}.tar.gz
+  build-brunch:
+    name: Build brunch
+    needs: build-kernel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Workaround to provide additional free space to the compilation VM
+        run: |
+          df -h
+          # https://github.com/actions/virtual-environments/issues/2840
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/local/lib/android
+          df -h
+      - uses: actions/download-artifact@v3
+      - name: Copy built "out" directories to their kernel dirs
+        run: |
+          for file in artifacts-*/artifacts-*.tar.gz
+          do
+            tar zxvf $file
+            rm -rf $file
+          done
+      - name: Install dependencies
+        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install pv cgpt
+      - name: Download ChromeOS Recovery
+        run: |
+          RECOVERY_FILE=chromeos_14526.89.0_rammus_recovery_stable-channel_mp-v2.bin
+          curl -L https://dl.google.com/dl/edgedl/chromeos/recovery/$RECOVERY_FILE.zip -o ./chromeos_recovery.zip
+          unzip chromeos_recovery.zip && rm -rf chromeos_recovery.zip
+          echo "RECOVERY_FILE=$RECOVERY_FILE" >> $GITHUB_ENV
+      - name: Run build.sh script
+        run: sudo bash build.sh ${{ env.RECOVERY_FILE }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: brunch-artifact
+          path: out/brunch_*.tar.gz
+          if-no-files-found: error
+  release:
+    name: Make a release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: build-brunch
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: brunch-artifact
+          path: artifacts
+      - name: Get build tag from brunch tar.gz file
+        run: |
+          ls artifacts
+          BRUNCH_FILE=$(find artifacts/ -name 'brunch_*.tar.gz')
+          echo "BRUNCH_FILE=$BRUNCH_FILE" >> $GITHUB_ENV
+          echo "Found brunch tar.gz file at: $BRUNCH_FILE"
+          BUILD_TAG=$(echo $BRUNCH_FILE | grep -o -P '(?<=brunch_).*(?=.tar.gz)')
+          echo "BUILD_TAG=$BUILD_TAG" >> $GITHUB_ENV
+          echo "Detected build tag $BUILD_TAG"
+      - name: Calculate (and echo) checksum of generated file
+        run: |
+          sha256sum ${{ env.BRUNCH_FILE }} > ${{ env.BRUNCH_FILE }}.sha256
+          echo "Generated SHA256SUM:" && cat ${{ env.BRUNCH_FILE }}.sha256
+      - name: Create a release and upload artifacts as assets
+        if: ${{ github.event_name == 'push' }} # Do not create a release for pull-requests, only pushes
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "${{ env.BRUNCH_FILE }},${{ env.BRUNCH_FILE }}.sha256"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: true # When reaching releases/latest API endpoing prereleases are ignored
+          tag: "${{ env.BUILD_TAG }}"
+          name: "Brunch ${{ env.BUILD_TAG }}"
+          commit: ${{ github.ref_name }}
+          body: "Built branch `${{ github.ref_name }}` on commit ${{ github.sha }}. Full compilation log at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}."

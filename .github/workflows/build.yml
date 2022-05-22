@@ -16,20 +16,15 @@ jobs:
         run: |
           sudo ln -s $RUNNER_TEMP /persist
           mkdir /persist/keys
-          echo "$BRUNCHPRIV" | base64 -d > /persist/keys/brunch.priv
-          echo "$BRUNCHPEM" | base64 -d > /persist/keys/brunch.pem
+          echo $BRUNCHPRIV | base64 -d > /persist/keys/brunch.priv
+          echo $BRUNCHPEM | base64 -d > /persist/keys/brunch.pem
       - name: Install dependencies
         run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install pv cgpt libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Compile kernel
-        run: ./build_kernels.sh
+        run: build_kernels.sh github-actions
       - name: Clear keys
         run: rm -r /persist/keys
-  build-brunch:
-    name: Build brunch
-    needs: build-kernels
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run build.sh script
+      - name: Build brunch
         run: sudo bash build_brunch.sh
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
@@ -42,7 +37,7 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    needs: build-brunch
+    needs: build-kernels
     steps:
       - name: Download built artifacts
         uses: actions/download-artifact@v2

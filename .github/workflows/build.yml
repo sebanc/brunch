@@ -1,0 +1,74 @@
+name: Build Brunch using Github Actions
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build-kernels:
+    name: Build kernels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Secure Boot certificate
+        env:
+          BRUNCHPRIV: ${{ secrets.BRUNCHPRIV }}
+          BRUNCHPEM: ${{ secrets.BRUNCHPEM }}
+        run: |
+          sudo ln -s $RUNNER_TEMP /persist
+          mkdir /persist/keys
+          echo $BRUNCHPRIV | base64 -d > /persist/keys/brunch.priv
+          echo $BRUNCHPEM | base64 -d > /persist/keys/brunch.pem
+      - name: Install dependencies
+        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install pv cgpt libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
+      - name: Compile kernel
+        run: build_kernels.sh
+      - name: Clear keys
+        run: rm -r /persist/keys
+  build-brunch:
+    name: Build brunch
+    needs: build-kernels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run build.sh script
+        run: sudo bash build_brunch.sh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: brunch-artifact
+          path: out/brunch_*.tar.gz
+          if-no-files-found: error
+  release:
+    name: Make a release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: build-brunch
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: brunch-artifact
+          path: artifacts
+      - name: Get build tag from brunch tar.gz file
+        run: |
+          RELEASE_FILE=$(find artifacts/ -name 'brunch_*.tar.gz')
+          echo "Found brunch release: ${{ env.RELEASE_FILE }}"
+          RELEASE_VERSION=$(echo "$BRUNCH_FILE" | cut -d'_' -f2)
+          RELEASE_DATE=$(echo "$BRUNCH_FILE" | cut -d'_' -f3)
+          echo "RELEASE_FILE=$RELEASE_FILE" >> $GITHUB_ENV
+          echo "RELEASE_TAG=\"$RELEASE_VERSION-unstable-$RELEASE_DATE\"" >> $GITHUB_ENV
+          echo "RELEASE_NAME=\"Brunch $RELEASE_VERSION unstable $RELEASE_DATE\"" >> $GITHUB_ENV          
+      - name: Calculate (and echo) checksum of generated file
+        run: |
+          sha256sum ${{ env.RELEASE_FILE }} > ${{ env.RELEASE_FILE }}.sha256
+          echo "Generated SHA256SUM:" && cat ${{ env.RELEASE_FILE }}.sha256
+      - name: Create a release and upload artifacts as assets
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "${{ env.RELEASE_FILE }},${{ env.RELEASE_FILE }}.sha256"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: false
+          tag: "${{ env.RELEASE_TAG }}"
+          name: "${{ env.RELEASE_NAME }}"
+          commit: ${{ github.ref_name }}
+          body: "Built branch `${{ github.ref_name }}` on commit ${{ github.sha }}. Full compilation log at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}."

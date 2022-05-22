@@ -1,0 +1,208 @@
+# Use case Configuration for byt-rt5640
+
+SectionVerb {
+
+	EnableSequence [
+	]
+
+	DisableSequence [
+	]
+
+	# ALSA PCM
+	Value {
+		# ALSA PCM device for HiFi
+		PlaybackPCM "hw:bytrt5640"
+		CapturePCM "hw:bytrt5640"
+	}
+}
+
+SectionDevice."DigitalMics" {
+	Comment "DigitalMics capture, NOT TESTED"
+
+	ConflictingDevice [
+		"InternalMics"
+		"HeadsetMic"
+	]
+
+	EnableSequence [
+		cdev "hw:bytrt5640"
+
+		cset "name='Stereo ADC2 Mux' DMIC1"
+		cset "name='Stereo ADC MIXL ADC2 Switch' on"
+		cset "name='Stereo ADC MIXR ADC2 Switch' on"
+		cset "name='Internal Switch' on"
+
+	]
+
+	DisableSequence [
+		cdev "hw:bytrt5640"
+
+		cset "name='Stereo ADC MIXL ADC2 Switch' off"
+		cset "name='Stereo ADC MIXR ADC2 Switch' off"
+		cset "name='Internal Switch' on"
+
+	]
+
+	Value {
+		CaptureChannels 2
+	}
+}
+
+SectionDevice."HeadsetMic" {
+	Comment "Headset Mic capture"
+
+	ConflictingDevice [
+		"InternalMics"
+		"Headset Mic"
+	]
+
+	EnableSequence [
+		cdev "hw:bytrt5640"
+
+		cset "name='Headset Mic Switch' on"
+
+		# default for IN2 Boost seems to saturate
+		cset "name='IN2 Boost' 1"
+
+		cset "name='RECMIXL BST2 Switch' on"
+		cset "name='RECMIXR BST2 Switch' on"
+
+		cset "name='Stereo ADC1 Mux' ADC"
+		cset "name='Stereo ADC MIXL ADC1 Switch' on"
+		cset "name='Stereo ADC MIXR ADC1 Switch' on"
+
+	]
+
+	DisableSequence [
+		cdev "hw:bytrt5640"
+
+		cset "name='Stereo ADC MIXL ADC1 Switch' off"
+		cset "name='Stereo ADC MIXR ADC1 Switch' off"
+		cset "name='Headset Mic Switch' off"
+
+	]
+
+	Value {
+		CaptureChannels 2
+	}
+}
+
+SectionDevice."InternalMics" {
+	Comment "Internal Mic capture"
+
+	ConflictingDevice [
+		"DigitalMics"
+		"Headset Mic"
+	]
+
+	EnableSequence [
+		cdev "hw:bytrt5640"
+
+		cset "name='Internal Mic Switch' on"
+
+		# default for IN1 Boost seems to saturate
+		cset "name='IN1 Boost' 1"
+
+		cset "name='RECMIXL BST1 Switch' on"
+		cset "name='RECMIXR BST1 Switch' on"
+
+		cset "name='Stereo ADC1 Mux' ADC"
+		cset "name='Stereo ADC MIXL ADC1 Switch' on"
+		cset "name='Stereo ADC MIXR ADC1 Switch' on"
+
+	]
+
+	DisableSequence [
+		cdev "hw:bytrt5640"
+
+		cset "name='Stereo ADC MIXL ADC1 Switch' off"
+		cset "name='Stereo ADC MIXR ADC1 Switch' off"
+		cset "name='Internal Mic Switch' off"
+
+	]
+
+	Value {
+		CaptureChannels 2
+	}
+}
+
+SectionDevice."Headphones" {
+	Comment "Headphones playback"
+
+	ConflictingDevice [
+		"Speaker"
+	]
+
+	EnableSequence [
+		cdev "hw:bytrt5640"
+
+ 		cset "name='DAC MIXL INF1 Switch'  on"
+ 		cset "name='DAC MIXR INF1 Switch'  on"
+ 		cset "name='Stereo DAC MIXL DAC L1 Switch'  on"
+ 		cset "name='Stereo DAC MIXR DAC R1 Switch'  on"
+ 		cset "name='HPO MIX HPVOL Switch'  on"
+ 		cset "name='Headphone Switch'  on"
+		cset "name='HP Channel Switch' on"	
+ 		cset "name='Speaker Switch' off"
+		cset "name='HP L Playback Switch' on"
+		cset "name='HP R Playback Switch' on"
+		cset "name='HP Playback Volume' 29"
+
+	]
+
+	DisableSequence [
+		cdev "hw:bytrt5640"
+		cset "name='Headphone Switch' off"
+		cset "name='HP Channel Switch' off"
+		cset "name='HP L Playback Switch' off"
+		cset "name='HP R Playback Switch' off"
+		cset "name='HP Playback Volume' 0"
+	]
+
+	Value {
+		PlaybackChannels "2"
+	}
+}
+
+SectionDevice."Speaker" {
+	Comment "Speaker playback"
+
+	ConflictingDevice [
+		"Headphones"
+	]
+
+	EnableSequence [
+		cdev "hw:bytrt5640"
+
+		cset "name='DAC MIXL INF1 Switch' on"
+		cset "name='DAC MIXR INF1 Switch' on"
+		cset "name='Stereo DAC MIXL DAC L1 Switch' on"
+		cset "name='Stereo DAC MIXR DAC R1 Switch' on"
+		cset "name='SPK MIXL DAC L1 Switch' on"
+		cset "name='SPK MIXR DAC R1 Switch' on"
+		cset "name='SPOL MIX SPKVOL L Switch' on"
+		cset "name='SPOR MIX SPKVOL R Switch' on"
+		cset "name='Speaker Switch' on"
+		cset "name='Speaker Channel Switch' on"
+		cset "name='Headphone Switch' off"
+		cset "name='Speaker L Playback Switch' on"
+		cset "name='Speaker R Playback Switch' on"
+		cset "name='Speaker Playback Volume' 29"
+
+	]
+
+	DisableSequence [
+		cdev "hw:bytrt5640"
+		cset "name='Speaker Switch' off"
+		cset "name='Speaker Channel Switch' off"
+		cset "name='Speaker L Playback Switch' off"
+		cset "name='Speaker R Playback Switch' off"
+		cset "name='Speaker Playback Volume' 0"
+	]
+
+	Value {
+		PlaybackChannels "2"
+	}
+}
+
+

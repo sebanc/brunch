@@ -1,0 +1,297 @@
+#!/bin/bash
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export HOME=/home/chronos
+export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib:/lib64:/lib
+export C_INCLUDE_PATH=/usr/local/include/ncurses:/usr/local/include:/usr/include
+export GCONV_PATH=/usr/local/lib64/gconv
+export PERL5LIB=/usr/local/lib/perl5/5.32.0
+export PKG_CONFIG_PATH=/home/chronos/inih-pkg/usr/lib64/pkgconfig:/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig
+export PYTHON=/usr/local/bin/python3
+export PYTHONHOME=/usr/local
+export SGML_CATALOG_FILES="/usr/local/etc/sgml/catalog"
+export XML_CATALOG_FILES="/usr/local/etc/xml/catalog"
+export LANGUAGE=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+cd /home/chronos/
+
+version="$(/opt/google/chrome/chrome --version)"
+version=r"${version:14:3}"
+[ ! "$version" == "" ] || { echo "Failed to identify ChromeOS version"; exit 1; }
+echo "Entered chroot with recovery version $version"
+
+sudo chown 1000:1000 /usr/local || { echo "Failed to change ownership of /usr/local"; exit 1; }
+
+if [ ! -f brunch_toolchain.tar.gz ]; then
+curl -L https://github.com/sebanc/brunch-toolchain/releases/download/20210529/brunch_toolchain_20210529.tar.gz -o brunch_toolchain.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
+fi
+tar zxf brunch_toolchain.tar.gz -C /usr/local || { echo "Failed to extract the brunch toolchain"; exit 1; }
+sudo rm -f /usr/lib64/libc.so /usr/lib64/libm.so /usr/lib64/libpthread.so
+
+# Temporary fixes
+if [ ! -f /lib64/libnsl.so.2 ]; then sudo ln -s libnsl.so.1 /lib64/libnsl.so.2; fi
+yes | perl -MCPAN -e 'install Autom4te::ChannelDefs'
+
+mkdir -p ./version-pkg/etc || { echo "Failed to make the brunch version package"; exit 1; }
+echo "Brunch $version $(date +"%Y%m%d")" > ./version-pkg/etc/brunch_version || { echo "Failed to make the brunch version package"; exit 1; }
+cd ./version-pkg || { echo "Failed to make the brunch version package"; exit 1; }
+tar zcvf ../rootc/packages/version.tar.gz * --owner=0 --group=0 || { echo "Failed to make the brunch version package"; exit 1; }
+cd .. || { echo "Failed to make the brunch version package"; exit 1; }
+rm -rf ./version-pkg || { echo "Failed to make the brunch version package"; exit 1; }
+
+mkdir -p ./initramfs/{bin,lib64,sbin} || { echo "Failed to make initramfs directories"; exit 1; }
+mkdir -p ./binaries-pkg/usr/bin ./binaries-pkg/usr/sbin || { echo "Failed to make binaries package directories"; exit 1; }
+
+git clone --depth=1 -b master https://git.code.sf.net/p/linuxconsole/code linuxconsole || { echo "Failed to make inputattach"; exit 1; }
+cd linuxconsole/utils || { echo "Failed to make inputattach"; exit 1; }
+make -j$(($(nproc)-1)) inputattach || bash || { echo "Failed to make inputattach"; exit 1; }
+cp inputattach ../../binaries-pkg/usr/sbin/ || { echo "Failed to make inputattach"; exit 1; }
+cd ../.. || { echo "Failed to make inputattach"; exit 1; }
+rm -rf ./linuxconsole || { echo "Failed to make inputattach"; exit 1; }
+
+git clone --depth=1 -b msr-tools-1.3 https://github.com/intel/msr-tools.git || { echo "Failed to make msr-tools"; exit 1; }
+cd msr-tools || { echo "Failed to make msr-tools"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make msr-tools"; exit 1; }
+cp cpuid ../binaries-pkg/usr/sbin/ || { echo "Failed to make msr-tools"; exit 1; }
+cp rdmsr ../binaries-pkg/usr/sbin/ || { echo "Failed to make msr-tools"; exit 1; }
+cp wrmsr ../binaries-pkg/usr/sbin/ || { echo "Failed to make msr-tools"; exit 1; }
+cd .. || { echo "Failed to make msr-tools"; exit 1; }
+rm -rf ./msr-tools || { echo "Failed to make msr-tools"; exit 1; }
+
+git clone --depth=1 -b master https://github.com/joewalnes/websocketd.git || { echo "Failed to make websocketd"; exit 1; }
+cd ./websocketd || { echo "Failed to make websocketd"; exit 1; }
+make -j$(($(nproc)-1)) websocketd || { echo "Failed to make websocketd"; exit 1; }
+cp ./websocketd ../binaries-pkg/usr/sbin/ || { echo "Failed to make websocketd"; exit 1; }
+cd .. || { echo "Failed to make websocketd"; exit 1; }
+rm -rf ./websocketd || { echo "Failed to make websocketd"; exit 1; }
+
+git clone --depth=1 -b master https://github.com/icetee/pv || { echo "Failed to make pv"; exit 1; }
+cd ./pv || { echo "Failed to make pv"; exit 1; }
+./configure --prefix=/usr || { echo "Failed to make pv"; exit 1; }
+make || { echo "Failed to make pv"; exit 1; }
+sudo make install || { echo "Failed to make pv"; exit 1; }
+make DESTDIR=/home/chronos/pv-pkg install || { echo "Failed to make pv"; exit 1; }
+cp /home/chronos/pv-pkg/usr/bin/pv ../binaries-pkg/usr/bin/ || { echo "Failed to make pv"; exit 1; }
+cp /home/chronos/pv-pkg/usr/bin/pv ../initramfs/sbin/ || { echo "Failed to make pv"; exit 1; }
+cd .. || { echo "Failed to make pv"; exit 1; }
+rm -rf ./pv || { echo "Failed to make pv"; exit 1; }
+
+cd ./binaries-pkg || { echo "Failed to make binaries package archive"; exit 1; }
+cp /usr/local/bin/ldd ./usr/bin/ || { echo "Failed to make binaries package archive"; exit 1; }
+cp /usr/local/bin/strings ./usr/bin/ || { echo "Failed to make binaries package archive"; exit 1; }
+tar zcvf ../rootc/packages/binaries.tar.gz * --owner=0 --group=0 || { echo "Failed to make binaries package archive"; exit 1; }
+cd .. || { echo "Failed to make binaries package archive"; exit 1; }
+rm -rf ./binaries-pkg || { echo "Failed to make binaries package archive"; exit 1; }
+
+git clone --depth=1 -b master https://github.com/godspeed1989/fbv.git fbv || { echo "Failed to make fbv"; exit 1; }
+cd ./fbv || { echo "Failed to make fbv"; exit 1; }
+./configure --prefix=/ || { echo "Failed to make fbv"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make fbv"; exit 1; }
+cp ./fbv ../initramfs/bin/ || { echo "Failed to make fbv"; exit 1; }
+for i in $(ldd ./fbv | cut -d' ' -f3); do cp "$i" ../initramfs/lib64/ || { echo "Failed to make fbv"; exit 1; }; done
+cd .. || { echo "Failed to make fbv"; exit 1; }
+rm -rf ./fbv || { echo "Failed to make fbv"; exit 1; }
+
+git clone --depth=1 -b master https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
+cd iptsd || { echo "Failed to make iptsd"; exit 1; }
+meson --prefix="/usr" -Dservice_manager="" -Dsample_config=false build/ || { echo "Failed to make iptsd"; exit 1; }
+DESTDIR=/home/chronos/ipts-pkg ninja -C build/ install || { echo "Failed to make iptsd"; exit 1; }
+cd .. || { echo "Failed to make iptsd"; exit 1; }
+rm -rf ./iptsd || { echo "Failed to make iptsd"; exit 1; }
+cd ./ipts-pkg || { echo "Failed to make iptsd"; exit 1; }
+tar zcvf ../rootc/packages/ipts.tar.gz * --owner=0 --group=0 || { echo "Failed to make iptsd"; exit 1; }
+cd .. || { echo "Failed to make iptsd"; exit 1; }
+rm -rf ./ipts-pkg || { echo "Failed to make iptsd"; exit 1; }
+
+git clone --depth=1 -b master https://github.com/jirka-h/haveged.git || { echo "Failed to make haveged"; exit 1; }
+cd haveged || { echo "Failed to make haveged"; exit 1; }
+./configure --prefix=/usr --libdir=/usr/lib64 --disable-init --enable-tune=no || { echo "Failed to make haveged"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make haveged"; exit 1; }
+make DESTDIR=/home/chronos/haveged-pkg install || { echo "Failed to make haveged"; exit 1; }
+cp ../haveged-pkg/usr/sbin/haveged ../initramfs/sbin/ || { echo "Failed to make haveged"; exit 1; }
+cp ../haveged-pkg/usr/lib64/libhavege.so* ../initramfs/lib64/ || { echo "Failed to make haveged"; exit 1; }
+cd .. || { echo "Failed to make haveged"; exit 1; }
+rm -rf ./haveged || { echo "Failed to make haveged"; exit 1; }
+
+git clone --depth=1 -b popt-1.18-release https://github.com/rpm-software-management/popt.git || { echo "Failed to make popt"; exit 1; }
+cd ./popt || { echo "Failed to make popt"; exit 1; }
+./autogen.sh || { echo "Failed to make popt"; exit 1; }
+./configure --prefix=/usr --libdir=/usr/lib64 || { echo "Failed to make popt"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make popt"; exit 1; }
+make DESTDIR=/home/chronos/efibootmgr-pkg install || { echo "Failed to make popt"; exit 1; }
+cd .. || { echo "Failed to make popt"; exit 1; }
+rm -rf ./popt || { echo "Failed to make popt"; exit 1; }
+
+git clone --depth=1 -b 37 https://github.com/rhboot/efivar.git || { echo "Failed to make efivar"; exit 1; }
+cd ./efivar || { echo "Failed to make efivar"; exit 1; }
+#sed -i -z 's@# define __HAVE_FLOAT128 0\n#else@# define __HAVE_FLOAT128 1\n#else@g' /usr/local/include/bits/floatn.h
+sed -i "s# --add-needed##g" ./gcc.specs || { echo "Failed to make efivar"; exit 1; }
+make -j$(($(nproc)-1)) CFLAGS="-Wno-address-of-packed-member" || { echo "Failed to make efivar"; exit 1; }
+make DESTDIR=/home/chronos/efibootmgr-pkg install || { echo "Failed to make efivar"; exit 1; }
+sed -i "s#/usr#/home/chronos/efibootmgr-pkg/usr#g" /home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig/* || { echo "Failed to make efivar"; exit 1; }
+#sed -i -z 's@# define __HAVE_FLOAT128 1\n#else@# define __HAVE_FLOAT128 0\n#else@g' /usr/local/include/bits/floatn.h
+cd .. || { echo "Failed to make efivar"; exit 1; }
+rm -rf ./efivar || { echo "Failed to make efivar"; exit 1; }
+
+git clone --depth=1 -b 17 https://github.com/rhboot/efibootmgr.git || { echo "Failed to make efibootmgr"; exit 1; }
+cd ./efibootmgr || { echo "Failed to make efibootmgr"; exit 1; }
+sed -i "s#extern int efi_set_verbose#extern void efi_set_verbose#g" ./src/efibootmgr.c || { echo "Failed to make efibootmgr"; exit 1; }
+make -j$(($(nproc)-1)) EFIDIR=boot EFI_LOADER=grubx64.efi CFLAGS="-Wno-pointer-sign" C_INCLUDE_PATH=/home/chronos/efibootmgr-pkg/usr/include || { echo "Failed to make efibootmgr"; exit 1; }
+make EFIDIR=boot EFI_LOADER=grubx64.efi DESTDIR=/home/chronos/efibootmgr-pkg install || { echo "Failed to make efibootmgr"; exit 1; }
+cd .. || { echo "Failed to make efibootmgr"; exit 1; }
+rm -rf ./efibootmgr || { echo "Failed to make efibootmgr"; exit 1; }
+
+cd ./efibootmgr-pkg || { echo "Failed to make efibootmgr package"; exit 1; }
+sed -i "s#/home/chronos/efibootmgr-pkg/usr#/usr#g" /home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig/* || { echo "Failed to make efibootmgr package"; exit 1; }
+tar zcvf ../rootc/packages/efibootmgr.tar.gz * --owner=0 --group=0 || { echo "Failed to make efibootmgr package"; exit 1; }
+cd .. || { echo "Failed to make efibootmgr package"; exit 1; }
+rm -rf ./efibootmgr-pkg || { echo "Failed to make efibootmgr package"; exit 1; }
+
+git clone --depth=1 -b master https://github.com/stefanberger/libtpms.git || { echo "Failed to make libtpms"; exit 1; }
+cd ./libtpms || { echo "Failed to make libtpms"; exit 1; }
+./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib64 --with-openssl --with-tpm2 || { echo "Failed to make libtpms"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make libtpms"; exit 1; }
+make install || { echo "Failed to make libtpms"; exit 1; }
+cd .. || { echo "Failed to make libtpms"; exit 1; }
+rm -rf ./libtpms || { echo "Failed to make libtpms"; exit 1; }
+
+git clone --depth=1 -b master https://github.com/stefanberger/swtpm.git || { echo "Failed to make swtpm"; exit 1; }
+cd ./swtpm || { echo "Failed to make swtpm"; exit 1; }
+sed -i '/AC_CONFIG_SRCDIR/ a AC_CONFIG_AUX_DIR([.])' ./configure.ac || { echo "Failed to make swtpm"; exit 1; }
+./autogen.sh --prefix=/usr --libdir=/usr/lib64 --disable-python-installation with_swtpm_setup=no with_seccomp=no with_gnutls=no with_cuse=no || { echo "Failed to make swtpm"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make swtpm"; exit 1; }
+make DESTDIR=/home/chronos/swtpm-pkg install || { echo "Failed to make swtpm"; exit 1; }
+for i in $(ldd ../swtpm-pkg/usr/bin/swtpm | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../swtpm-pkg/usr/lib64/ || { echo "Failed to make swtpm"; exit 1; }; fi; done
+cd .. || { echo "Failed to make swtpm"; exit 1; }
+rm -rf ./swtpm || { echo "Failed to make swtpm"; exit 1; }
+
+cd ./swtpm-pkg/usr/lib64 || { echo "Failed to make swtpm package"; exit 1; }
+mv ./swtpm/* ./ || { echo "Failed to make swtpm package"; exit 1; }
+rm -r `ls | grep -v '.so'` || { echo "Failed to make swtpm package"; exit 1; }
+cd ../bin || { echo "Failed to make swtpm package"; exit 1; }
+rm -r `ls swtpm_* | grep -v 'swtpm_ioctl'` || { echo "Failed to make swtpm package"; exit 1; }
+cd ../.. || { echo "Failed to make swtpm package"; exit 1; }
+mkdir -p ./etc/init || { echo "Failed to make swtpm package"; exit 1; }
+
+#mkdir -p ./swtpm-pkg/etc/init ./swtpm-pkg/usr/bin ./swtpm-pkg/usr/lib64
+#cd ./swtpm-pkg
+#cp /usr/local/bin/swtpm /usr/local/bin/swtpm_ioctl ./usr/bin/
+#for i in $(ldd /usr/local/bin/swtpm | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ./usr/lib64/; fi; done
+
+cat >./etc/init/swtpm.conf <<'SWTPM'
+start on stopped startup
+
+script
+   modprobe tpm_vtpm_proxy
+   mkdir -p /var/lib/swtpm
+   if [ -f "/etc/init/trunksd.conf" ]; then
+   	swtpm chardev --vtpm-proxy --tpm2 --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001 --flags startup-clear
+   else
+   	swtpm chardev --vtpm-proxy --tpmstate dir=/var/lib/swtpm --ctrl type=tcp,port=10001 --flags startup-clear
+   fi
+   swtpm_ioctl --tcp :10001 -i
+end script
+SWTPM
+[ -f ./etc/init/swtpm.conf ] || { echo "Failed to make swtpm package"; exit 1; }
+tar zcvf ../rootc/packages/swtpm.tar.gz * --owner=0 --group=0 || { echo "Failed to make swtpm package"; exit 1; }
+cd .. || { echo "Failed to make swtpm package"; exit 1; }
+rm -rf ./swtpm-pkg || { echo "Failed to make swtpm package"; exit 1; }
+
+git clone --depth=1 -b master https://github.com/mirror/ncurses.git || { echo "Failed to make ncurses"; exit 1; }
+cd ./ncurses || { echo "Failed to make ncurses"; exit 1; }
+./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal || { echo "Failed to make ncurses"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make ncurses"; exit 1; }
+make DESTDIR=/home/chronos/ncurses-pkg install || { echo "Failed to make ncurses"; exit 1; }
+cd ../ncurses-pkg || { echo "Failed to make ncurses"; exit 1; }
+tar zcvf ../rootc/packages/ncurses.tar.gz * --owner=0 --group=0 || { echo "Failed to make ncurses"; exit 1; }
+cd .. || { echo "Failed to make ncurses"; exit 1; }
+rm -rf ./ncurses || { echo "Failed to make ncurses"; exit 1; }
+
+git clone --depth=1 -b master https://git.savannah.gnu.org/git/nano.git || { echo "Failed to make nano"; exit 1; }
+cd ./nano || { echo "Failed to make nano"; exit 1; }
+./autogen.sh || { echo "Failed to make nano"; exit 1; }
+./configure --prefix=/usr --libdir=/usr/lib64 || { echo "Failed to make nano"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make nano"; exit 1; }
+make DESTDIR=/home/chronos/nano-pkg install || { echo "Failed to make nano"; exit 1; }
+mkdir -p ../nano-pkg/usr/lib64 || { echo "Failed to make nano"; exit 1; }
+for i in $(ldd ../nano-pkg/usr/bin/nano | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../nano-pkg/usr/lib64/ || { echo "Failed to make nano"; exit 1; }; fi; done
+cd ../nano-pkg || { echo "Failed to make nano"; exit 1; }
+tar zcvf ../rootc/packages/nano.tar.gz * --owner=0 --group=0 || { echo "Failed to make nano"; exit 1; }
+cd .. || { echo "Failed to make nano"; exit 1; }
+rm -rf ./ncurses-pkg ./nano ./nano-pkg || { echo "Failed to make nano"; exit 1; }
+
+git clone --depth=1 -b master https://github.com/plougher/squashfs-tools.git || { echo "Failed to make squashfs-tools"; exit 1; }
+cd squashfs-tools/squashfs-tools || { echo "Failed to make squashfs-tools"; exit 1; }
+sed "s/#XZ_SUPPORT/XZ_SUPPORT/" -i Makefile || { echo "Failed to make squashfs-tools"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make squashfs-tools"; exit 1; }
+for i in $(ldd mksquashfs | cut -d' ' -f3); do cp "$i" ../../initramfs/lib64/ || { echo "Failed to make squashfs-tools"; exit 1; }; done
+cp mksquashfs ../../initramfs/bin/ || { echo "Failed to make squashfs-tools"; exit 1; }
+for i in $(ldd unsquashfs | cut -d' ' -f3); do cp "$i" ../../initramfs/lib64/ || { echo "Failed to make squashfs-tools"; exit 1; }; done
+cp unsquashfs ../../initramfs/bin/ || { echo "Failed to make squashfs-tools"; exit 1; }
+cd ../.. || { echo "Failed to make squashfs-tools"; exit 1; }
+rm -rf ./squashfs-tools || { echo "Failed to make squashfs-tools"; exit 1; }
+
+git clone --depth=1 -b 1_33_stable https://github.com/mirror/busybox.git || { echo "Failed to make busybox"; exit 1; }
+cd busybox || { echo "Failed to make busybox"; exit 1; }
+make defconfig || { echo "Failed to make busybox"; exit 1; }
+sed -i 's/CONFIG_MODPROBE_SMALL=y/# CONFIG_MODPROBE_SMALL is not set/g' .config || { echo "Failed to make busybox"; exit 1; }
+sed -i 's/# CONFIG_INSTALL_NO_USR is not set/CONFIG_INSTALL_NO_USR=y/g' .config || { echo "Failed to make busybox"; exit 1; }
+sed -i 's/# CONFIG_STATIC is not set/CONFIG_STATIC=y/g' .config || { echo "Failed to make busybox"; exit 1; }
+make -j$(($(nproc)-1)) || { echo "Failed to make busybox"; exit 1; }
+cd .. || { echo "Failed to make busybox"; exit 1; }
+
+cd initramfs || { echo "Failed to finalise initramfs"; exit 1; }
+mkdir -p bin etc lib64 proc sbin sys tmp usr || { echo "Failed to finalise initramfs"; exit 1; }
+ln -s ./roota/lib ./lib || { echo "Failed to finalise initramfs"; exit 1; }
+cp ../busybox/busybox ./bin/busybox || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /bin/bash | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /bin/bash ./bin/ || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /sbin/blkid | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /sbin/blkid ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /usr/bin/cgpt | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /usr/bin/cgpt ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /sbin/e2fsck | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /sbin/e2fsck ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /sbin/losetup | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /sbin/losetup ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /sbin/mkfs.ext4 | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /sbin/mkfs.ext4 ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /sbin/modprobe | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /sbin/modprobe ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /usr/bin/ntfs-3g | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /usr/bin/ntfs-3g ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /sbin/resize2fs | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /sbin/resize2fs ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
+cp /lib64/ld-linux-x86-64.so.2 ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }
+cp /usr/lib64/libgcc_s.so.1 ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }
+sudo chmod 0755 ./sbin/* || { echo "Failed to finalise initramfs"; exit 1; }
+find . | cpio -o -H newc | gzip > ../rootc/initramfs.img || { echo "Failed to finalise initramfs"; exit 1; }
+cd .. || { echo "Failed to finalise initramfs"; exit 1; }
+rm -rf ./busybox || { echo "Failed to finalise initramfs"; exit 1; }
+
+cd ./image
+dd if=/dev/zero of=../brunch/rootc.img bs=1G seek=1 count=0 || { echo "Failed to create rootc image"; exit 1; }
+yes | sudo mkfs.ext4 -F -b 4096 -L "ROOT-C" ../brunch/rootc.img || { echo "Failed to format rootc image"; exit 1; }
+sudo mount ../brunch/rootc.img ./tmp || { echo "Failed to mount rootc image"; exit 1; }
+sudo cp -r ../rootc/* ./tmp/ || { echo "Failed to copy files to rootc image"; exit 1; }
+sudo umount ./tmp || { echo "Failed to umount rootc image"; exit 1; }
+dd if=/dev/zero of=../brunch/efi_secure.img bs=32M seek=1 count=0 || { echo "Failed to create efi_secure image"; exit 1; }
+yes | sudo mkfs.fat ../brunch/efi_secure.img || { echo "Failed to format efi_secure image"; exit 1; }
+sudo mount ../brunch/efi_secure.img ./tmp || { echo "Failed to mount efi_secure image"; exit 1; }
+sudo cp -r ./efi-partition/* ./tmp/ || { echo "Failed to copy files to efi_secure image"; exit 1; }
+sudo umount ./tmp || { echo "Failed to umount efi_secure image"; exit 1; }
+dd if=/dev/zero of=../brunch/efi_legacy.img bs=32M seek=1 count=0 || { echo "Failed to create efi_legacy image"; exit 1; }
+yes | sudo mkfs.fat ../brunch/efi_legacy.img || { echo "Failed to format efi_legacy image"; exit 1; }
+sudo mount ../brunch/efi_legacy.img ./tmp || { echo "Failed to mount efi_legacy image"; exit 1; }
+sudo cp -r ./efi-partition/* ./tmp/ || { echo "Failed to copy files to efi_legacy image"; exit 1; }
+sudo rm ./tmp/efi/boot/bootx64.efi || { echo "Failed to copy files to efi_legacy image"; exit 1; }
+sudo mv ./tmp/efi/boot/grubx64.efi ./tmp/efi/boot/bootx64.efi || { echo "Failed to copy files to efi_legacy image"; exit 1; }
+sudo umount ./tmp || { echo "Failed to umount efi_legacy image"; exit 1; }
+cd ..
+
+cd ./brunch
+tar zcf /out/brunch_"$version"_"$(date +"%Y%m%d")".tar.gz * --owner=0 --group=0 || { echo "Failed to create brunch archive"; exit 1; }
+cd ..
+
+echo "End of chroot"

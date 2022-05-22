@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: GPL-2.0+
+# (C) Copyright 2018 Raspberry Pi (Trading) Ltd.
+# NVRAM config file for the BCM43430 WiFi/BT chip as found on the
+# Raspberry Pi 3 Model B
+aa2g=1
+ag0=255
+AvVmid_c0=0x0,0xc8
+boardflags=0x00404201
+boardflags3=0x08000000
+boardnum=22
+boardrev=0x1202
+boardtype=0x0726
+btc_mode=1
+btc_params1=0x7530
+btc_params8=0x4e20
+cckbw202gpo=0
+cckpwroffset0=5
+ccode=ALL
+# cldo_pwm is not set
+deadman_to=0xffffffff
+devid=0x43e2
+extpagain2g=0
+il0macaddr=00:90:4c:c5:12:38
+legofdmbw202gpo=0x66111111
+macaddr=00:90:4c:c5:12:38
+manfid=0x2d0
+maxp2ga0=84
+mcsbw202gpo=0x77711111
+muxenab=0x1
+nocrc=1
+ofdmdigfilttype=18
+ofdmdigfilttypebe=18
+pa0itssit=0x20
+pa2ga0=-168,7161,-820
+pacalidx2g=32
+papdendidx=61
+papdepsoffset=-36
+papdmode=1
+papdvalidtest=1
+prodid=0x0726
+propbw202gpo=0xdd
+spurconfig=0x3 
+sromrev=11
+txpwrbckof=6
+vendid=0x14e4
+wl0id=0x431b
+xtalfreq=37400

@@ -1,0 +1,61 @@
+--- a/drivers/block/loop.c	2021-12-08 09:04:57.000000000 +0100
++++ b/drivers/block/loop.c	2021-12-28 11:55:40.142901784 +0100
+@@ -2312,6 +2312,10 @@
+ 	mutex_unlock(&loop_ctl_mutex);
+ 	if (err < 0)
+ 		goto out_free_dev;
++	if (err > 4096) {
++		err = -ENOMEM;
++		goto out_free_dev;
++	}
+ 	i = err;
+ 
+ 	err = -ENOMEM;
+@@ -2363,7 +2367,7 @@
+ 	 * complicated, are too static, inflexible and may surprise
+ 	 * userspace tools. Parameters like this in general should be avoided.
+ 	 */
+-	if (!part_shift)
++	if (!part_shift && i != 4096)
+ 		disk->flags |= GENHD_FL_NO_PART_SCAN;
+ 	disk->flags |= GENHD_FL_EXT_DEVT;
+ 	atomic_set(&lo->lo_refcnt, 0);
+@@ -2373,13 +2377,19 @@
+ 	spin_lock_init(&lo->lo_work_lock);
+ 	disk->major		= LOOP_MAJOR;
+ 	disk->first_minor	= i << part_shift;
+-	disk->minors		= 1 << part_shift;
++	if (i != 4096)
++		disk->minors		= 1 << part_shift;
++	else
++		disk->minors		= 1 << fls(16);
+ 	disk->fops		= &lo_fops;
+ 	disk->private_data	= lo;
+ 	disk->queue		= lo->lo_queue;
+ 	disk->events		= DISK_EVENT_MEDIA_CHANGE;
+ 	disk->event_flags	= DISK_EVENT_FLAG_UEVENT;
+-	sprintf(disk->disk_name, "loop%d", i);
++	if (i != 4096)
++		sprintf(disk->disk_name, "loop%d", i);
++	else
++		sprintf(disk->disk_name, "sdz");
+ 	/* Make this loop device reachable from pathname. */
+ 	add_disk(disk);
+ 	/* Show this loop device. */
+@@ -2529,7 +2539,7 @@
+ 	int err;
+ 
+ 	part_shift = 0;
+-	if (max_part > 0) {
++	if (0 && max_part > 0) {
+ 		part_shift = fls(max_part);
+ 
+ 		/*
+@@ -2579,6 +2589,7 @@
+ 	/* pre-create number of devices given by config or max_loop */
+ 	for (i = 0; i < nr; i++)
+ 		loop_add(i);
++	loop_add(4096);
+ 
+ 	printk(KERN_INFO "loop: module loaded\n");
+ 	return 0;

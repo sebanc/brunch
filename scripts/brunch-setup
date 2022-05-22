@@ -1,0 +1,282 @@
+#!/bin/bash
+
+function singleselect {
+    # little helpers for terminal print control and key input
+    ESC=$( printf "\033")
+    cursor_blink_on()   { printf "$ESC[?25h"; }
+    cursor_blink_off()  { printf "$ESC[?25l"; }
+    cursor_to()         { printf "$ESC[$1;${2:-1}H"; }
+    print_inactive()    { printf "$2 $1 "; }
+    print_active()      { printf "$2$ESC[7m $1 $ESC[27m"; }
+    get_cursor_row()    { IFS=';' read -sdR -p $'\E[6n' ROW COL; echo ${ROW#*[}; }
+    key_input()         {
+      local key
+      IFS= read -rsn1 key 2>/dev/null >&2
+      if [[ $key = ""      ]]; then echo enter; fi;
+      if [[ $key = $'\x20' ]]; then echo space; fi;
+      if [[ $key = $'\x1b' ]]; then
+        read -rsn2 key
+        if [[ $key = [A ]]; then echo up;    fi;
+        if [[ $key = [B ]]; then echo down;  fi;
+      fi 
+    }
+
+    local options
+    local selected=()
+
+    IFS=';' read -r -a options <<< "$1"
+
+    for ((i=0; i<${#options[@]}; i++)); do
+      selected+=("")
+      printf "\n"
+    done
+
+    # determine current screen position for overwriting the options
+    local lastrow=`get_cursor_row`
+    local startrow=3
+
+    # ensure cursor and input echoing back on upon a ctrl+c during read -s
+    trap "cursor_blink_on; stty echo -opost; printf '\n'; exit" 2
+    cursor_blink_off
+
+    local active=0
+    while true; do
+        # print options by overwriting the last lines
+        local idx=0
+        for option in "${options[@]}"; do
+            local prefix=""
+            cursor_to $(($startrow + $idx))
+            if [ $idx -eq $active ]; then
+                print_active "$option" "$prefix"
+            else
+                print_inactive "$option" "$prefix"
+            fi
+            ((idx++))
+        done
+        # user key control
+        case `key_input` in
+            enter)  break;;
+            up)     ((active--));
+                    if [ $active -lt 0 ]; then active=$((${#options[@]} - 1)); fi;;
+            down)   ((active++));
+                    if [ $active -ge ${#options[@]} ]; then active=0; fi;;
+        esac
+    done
+
+    # cursor position back to normal
+    cursor_to $lastrow
+    printf "\n"
+    cursor_blink_on
+    
+    returned_values=${options[$active]}
+}
+
+function multiselect {
+    # little helpers for terminal print control and key input
+    ESC=$( printf "\033")
+    cursor_blink_on()   { printf "$ESC[?25h"; }
+    cursor_blink_off()  { printf "$ESC[?25l"; }
+    cursor_to()         { printf "$ESC[$1;${2:-1}H"; }
+    print_inactive()    { printf "$2 $1 "; }
+    print_active()      { printf "$2$ESC[7m $1 $ESC[27m"; }
+    get_cursor_row()    { IFS=';' read -sdR -p $'\E[6n' ROW COL; echo ${ROW#*[}; }
+    key_input()         {
+      local key
+      IFS= read -rsn1 key 2>/dev/null >&2
+      if [[ $key = ""      ]]; then echo enter; fi;
+      if [[ $key = $'\x20' ]]; then echo space; fi;
+      if [[ $key = $'\x1b' ]]; then
+        read -rsn2 key
+        if [[ $key = [A ]]; then echo up;    fi;
+        if [[ $key = [B ]]; then echo down;  fi;
+      fi 
+    }
+    toggle_option()    {
+      local arr_name=$1
+      eval "local arr=(\"\${${arr_name}[@]}\")"
+      local option=$2
+      if [[ ${arr[option]} == true ]]; then
+        arr[option]=
+      else
+        arr[option]=true
+      fi
+      eval $arr_name='("${arr[@]}")'
+    }
+
+    local options
+    local selected=()
+
+    IFS=';' read -r -a options <<< "$1"
+
+    for ((i=0; i<${#options[@]}; i++)); do
+      selected+=("")
+      printf "\n"
+    done
+
+    # determine current screen position for overwriting the options
+    local lastrow=`get_cursor_row`
+    local startrow=3
+
+    # ensure cursor and input echoing back on upon a ctrl+c during read -s
+    trap "cursor_blink_on; stty echo -opost; printf '\n'; exit" 2
+    cursor_blink_off
+
+    local active=0
+    while true; do
+        # print options by overwriting the last lines
+        local idx=0
+        for option in "${options[@]}"; do
+            local prefix="[ ]"
+            if [[ ${selected[idx]} == true ]]; then
+              prefix="[x]"
+            fi
+
+            cursor_to $(($startrow + $idx))
+            if [ $idx -eq $active ]; then
+                print_active "$option" "$prefix"
+            else
+                print_inactive "$option" "$prefix"
+            fi
+            ((idx++))
+        done
+        # user key control
+        case `key_input` in
+            space)  toggle_option selected $active;;
+            enter)  break;;
+            up)     ((active--));
+                    if [ $active -lt 0 ]; then active=$((${#options[@]} - 1)); fi;;
+            down)   ((active++));
+                    if [ $active -ge ${#options[@]} ]; then active=0; fi;;
+        esac
+    done
+
+    # cursor position back to normal
+    cursor_to $lastrow
+    printf "\n"
+    cursor_blink_on
+    
+    num=0
+    test=""
+        for option in "${options[@]}"; do
+            if [[ ${selected[num]} == true ]]; then
+              test="$test""$option""$2"
+            fi
+            ((num++))
+        done
+        returned_values="${test%?}"
+}
+
+if [ -x "$(command -v tput)" ]; then
+nbligns=$(tput lines)
+if [ $nbligns -lt 20 ]; then echo "Please maximize the terminal window before using this program."; exit 0; fi
+fi
+
+reset
+
+echo -e "Welcome to the brunch configuration menu.\n\nThis menu will allow you to customize brunch with framework options, specific kernels, bootsplashes...\n\nTo have more information on the framework options, please refer to the brunch github.\n\nTo complete the configuration, you will have to go through the 7 pages of this menu by pressing ENTER after making your selection on each page (you do not necessarily need to select something on every page).\n\n"
+
+read -rp "Press ENTER to start the brunch configuration."
+
+reset
+
+returned_values=""
+
+available_kernels="5.15;5.10;5.4;4.19;macbook;chromebook-5.4;chromebook-4.14;chromebook-4.4"
+echo "Select your kernel (press ENTER to validate your choice)"
+singleselect "$available_kernels"
+selected_kernel="$returned_values"
+
+reset
+
+case "$selected_kernel" in
+	5.15)
+options_page1="enable_updates;pwa;android_init_fix;mount_internal_drives;chromebook_audio;native_chromebook_image;broadcom_wl;rtl8188eu;rtl8188fu;rtl8192eu;rtl8723bs;rtl8723bu;rtl8723du;rtl8812au;rtl8814au;rtl8821ce;rtl8821cu;rtl88x2bu;rtl8852ae;rtbth"
+options_page2="ipts;no_camera_config;invert_camera_order;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
+	;;
+	5.10)
+options_page1="enable_updates;pwa;android_init_fix;mount_internal_drives;chromebook_audio;native_chromebook_image;broadcom_wl;iwlwifi_backport;rtl8188eu;rtl8188fu;rtl8192eu;rtl8723bs;rtl8723bu;rtl8723de;rtl8723du;rtl8812au;rtl8814au;rtl8821ce;rtl8821cu;rtl88x2bu;rtl8852ae;rtbth"
+options_page2="ipts;goodix;no_camera_config;invert_camera_order;oled_display;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
+	;;
+	5.4)
+options_page1="enable_updates;pwa;android_init_fix;mount_internal_drives;chromebook_audio;native_chromebook_image;broadcom_wl;iwlwifi_backport;rtl8188eu;rtl8188fu;rtl8192eu;rtl8723bu;rtl8723de;rtl8723du;rtl8812au;rtl8814au;rtl8821ce;rtl8821cu;rtl88x2bu;rtl8852ae;rtbth"
+options_page2="ipts;goodix;no_camera_config;invert_camera_order;oled_display;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
+	;;
+	4.19) options_page1="enable_updates;pwa;android_init_fix;mount_internal_drives;chromebook_audio;native_chromebook_image;broadcom_wl;iwlwifi_backport;rtl8188eu;rtl8188fu;rtl8192eu;rtl8723bu;rtl8723de;rtl8723du;rtl8812au;rtl8814au;rtl8821ce;rtl8821cu;rtl88x2bu;rtbth"
+options_page2="goodix;no_camera_config;invert_camera_order;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
+	;;
+	macbook)
+options_page1="enable_updates;pwa;android_init_fix;mount_internal_drives;chromebook_audio;native_chromebook_image;no_camera_config;invert_camera_order;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
+	;;
+	chromebook-5.4)
+options_page1="enable_updates;pwa;android_init_fix;mount_internal_drives;chromebook_audio;native_chromebook_image;no_camera_config;invert_camera_order;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
+	;;
+	chromebook-4.14)
+options_page1="enable_updates;pwa;android_init_fix;mount_internal_drives;chromebook_audio;native_chromebook_image;no_camera_config;invert_camera_order;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
+	;;
+	chromebook-4.4)
+options_page1="enable_updates;pwa;android_init_fix;mount_internal_drives;chromebook_audio;native_chromebook_image;no_camera_config;invert_camera_order;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
+	;;
+esac
+
+if [ -z "$options_page2" ]; then
+	echo "Select your options (press SPACE to select an item and ENTER to validate your choice)"
+else
+	echo "Select your options (press SPACE to select an item and ENTER to validate your choice) PAGE 1/2"
+fi
+multiselect "$options_page1" ","
+selected_options="$returned_values"
+
+reset
+
+if [ ! -z "$options_page2" ]; then
+
+echo "Select your options (press SPACE to select an item and ENTER to validate your choice) PAGE 2/2"
+multiselect "$options_page2" ","
+if [ ! -z "$returned_values" ]; then if [ ! -z "$selected_options" ]; then selected_options="$selected_options,$returned_values"; else selected_options="$returned_values"; fi; fi
+
+reset
+
+fi
+
+available_cmdline_params="enforce_hyperthreading=1;i915.enable_fbc=0 i915.enable_psr=0;psmouse.elantech_smbus=1;psmouse.synaptics_intertouch=1"
+echo "Select your kernel commandline parameters (press SPACE to select an item and ENTER to validate your choice)"
+multiselect "$available_cmdline_params" " "
+selected_cmdline_params="$returned_values"
+
+reset
+
+read -rp "If needed, input here additional kernel command line parameters (press ENTER to continue) " returned_values
+selected_cmdline_params="$selected_cmdline_params $returned_values"
+
+reset
+
+read -rp "Do you need to boot brunch in verbose mode for debugging purpose ? (if so type \"yes\", otherwise press ENTER to continue) " returned_values
+if [ ! -z "$returned_values" ] && [ "$returned_values" == "yes" ]; then
+	verbose_mode=1
+else
+	verbose_mode=0
+	reset
+	echo "Select the brunch bootsplash to use (press ENTER to validate your choice)"
+	available_bootsplashes="default_dark;default_light;blank;brunchbook_dark;brunchbook_light;colorful_dark;colorful_light;croissant_dark;croissant_light;neon_blue_dark;neon_blue_light;neon_green_dark;neon_green_light;neon_pink_dark;neon_pink_light;neon_red_dark;neon_red_light"
+	singleselect "$available_bootsplashes"
+	selected_bootsplash="$returned_values"
+fi
+
+reset
+
+echo "Summary of the configuration:"
+echo "options: $selected_options"
+echo "kernel: $selected_kernel"
+echo "kernel commandline parameters: $selected_cmdline_params"
+echo "verbose mode: $verbose_mode"
+echo "brunch bootsplash: $selected_bootsplash"
+echo ""
+
+cp /mnt/stateful_partition/unencrypted/brunch_config/efi/boot/template.cfg /mnt/stateful_partition/unencrypted/brunch_config/efi/boot/settings.cfg
+sed -i "s@options=\"\"@options=\"$selected_options\"@g" /mnt/stateful_partition/unencrypted/brunch_config/efi/boot/settings.cfg
+sed -i "s@kernel=\"/kernel\"@kernel=\"/kernel-$selected_kernel\"@g" /mnt/stateful_partition/unencrypted/brunch_config/efi/boot/settings.cfg
+sed -i "s@cmdline_params=\"\"@cmdline_params=\"$selected_cmdline_params\"@g" /mnt/stateful_partition/unencrypted/brunch_config/efi/boot/settings.cfg
+sed -i "s@verbose=0@verbose=$verbose_mode@g" /mnt/stateful_partition/unencrypted/brunch_config/efi/boot/settings.cfg
+sed -i "s@brunch_bootsplash=\"default\"@brunch_bootsplash=\"$selected_bootsplash\"@g" /mnt/stateful_partition/unencrypted/brunch_config/efi/boot/settings.cfg
+
+echo "Brunch configuration saved."

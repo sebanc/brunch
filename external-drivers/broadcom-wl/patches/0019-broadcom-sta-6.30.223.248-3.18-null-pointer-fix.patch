@@ -1,0 +1,27 @@
+Description: Fixing null pointer crash
+
+Origin: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=773713
+Bug-Ubuntu: https://launchpad.net/bugs/1415880
+Last-Update: 2015-08-18
+
+---
+ src/wl/sys/wl_linux.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/wl/sys/wl_linux.c b/src/wl/sys/wl_linux.c
+index 860b935..295156f 100644
+--- a/src/wl/sys/wl_linux.c
++++ b/src/wl/sys/wl_linux.c
+@@ -2157,8 +2157,8 @@ wl_start(struct sk_buff *skb, struct net_device *dev)
+ 	wlif = WL_DEV_IF(dev);
+ 	wl = WL_INFO(dev);
+ 
++	skb->prev = NULL;
+ 	if (WL_ALL_PASSIVE_ENAB(wl) || (WL_RTR() && WL_CONFIG_SMP())) {
+-		skb->prev = NULL;
+ 
+ 		TXQ_LOCK(wl);
+ 
+-- 
+1.9.1
+

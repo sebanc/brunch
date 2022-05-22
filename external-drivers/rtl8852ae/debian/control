@@ -1,0 +1,21 @@
+Source: rtw89
+Section: misc
+Priority: optional
+Maintainer: lwfinger <Larry.Finger@lwfinger.net>
+Build-Depends: debhelper (>= 11),
+                dkms,
+                bc,
+                module-assistant
+Standards-Version: 4.1.3
+Vcs-Browser: https://github.com/lwfinger/rtlrtw89
+Vcs-Git: https://github.com/lwfinger/rtlrtw89.git
+
+Package: rtw89-dkms
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: DKMS files to build and install rtl8852be
+ The rtl8852ae driver provides the driver for USB wifi adapter.
+ This package contains the DKMS files to build and install rtl8852be.
+ To install this package, you have to install the header files for your
+ current kernel manually (usually included in the "linux-headers-<your
+ architecture>").

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+DRV_NAME=8188eu
+DRV_VERSION=4.1.4
+
+dkms remove ${DRV_NAME}/${DRV_VERSION} --all
+
+RESULT=$?
+if [[ "$RESULT" != "0" ]]; then
+  echo "Error occurred while running dkms remove." 2>&1
+else
+  echo "Finished running dkms removal steps."
+fi
+
+exit $RESULT

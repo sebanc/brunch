@@ -1,0 +1,54 @@
+--- a/drivers/block/loop.c	2021-12-01 09:23:36.000000000 +0100
++++ b/drivers/block/loop.c	2021-12-28 12:36:09.911623898 +0100
+@@ -2024,6 +2024,10 @@
+ 	}
+ 	if (err < 0)
+ 		goto out_free_dev;
++	if (err > 4096) {
++		err = -ENOMEM;
++		goto out_free_dev;
++	}
+ 	i = err;
+ 
+ 	err = -ENOMEM;
+@@ -2057,7 +2061,10 @@
+ 	blk_queue_flag_set(QUEUE_FLAG_NOMERGES, lo->lo_queue);
+ 
+ 	err = -ENOMEM;
+-	disk = lo->lo_disk = alloc_disk(1 << part_shift);
++	if (i != 4096)
++		disk = lo->lo_disk = alloc_disk(1 << part_shift);
++	else
++		disk = lo->lo_disk = alloc_disk(1 << fls(16));
+ 	if (!disk)
+ 		goto out_free_queue;
+ 
+@@ -2090,7 +2097,10 @@
+ 	disk->fops		= &lo_fops;
+ 	disk->private_data	= lo;
+ 	disk->queue		= lo->lo_queue;
+-	sprintf(disk->disk_name, "loop%d", i);
++	if (i != 4096)
++		sprintf(disk->disk_name, "loop%d", i);
++	else
++		sprintf(disk->disk_name, "sdz");
+ 	add_disk(disk);
+ 	*l = lo;
+ 	return lo->lo_number;
+@@ -2246,7 +2256,7 @@
+ 	int err;
+ 
+ 	part_shift = 0;
+-	if (max_part > 0) {
++	if (0 && max_part > 0) {
+ 		part_shift = fls(max_part);
+ 
+ 		/*
+@@ -2303,6 +2313,7 @@
+ 	mutex_lock(&loop_ctl_mutex);
+ 	for (i = 0; i < nr; i++)
+ 		loop_add(&lo, i);
++	loop_add(&lo, 4096);
+ 	mutex_unlock(&loop_ctl_mutex);
+ 
+ 	printk(KERN_INFO "loop: module loaded\n");

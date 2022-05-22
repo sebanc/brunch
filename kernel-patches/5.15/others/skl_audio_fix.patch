@@ -1,0 +1,16 @@
+--- a/sound/soc/intel/skylake/skl-topology.c	2022-04-25 08:49:30.100399819 -0400
++++ b/sound/soc/intel/skylake/skl-topology.c	2022-04-25 14:29:50.599746038 -0400
+@@ -1853,6 +1853,13 @@ 
+ 		pipe_fmt = &pipe->configs[pipe->pipe_config_idx].in_fmt;
+ 
+ 	/* update the blob based on virtual bus_id*/
++	if (!pipe_fmt->bps) {
++		dev_dbg(dai->dev, "Pipe params are NULL, using passed in parms.\n");
++		pipe_fmt->bps      = params->s_fmt;
++		pipe_fmt->channels = params->ch;
++		pipe_fmt->freq     = params->s_freq;
++	}
++
+ 	cfg = skl_get_ep_blob(skl, mconfig->vbus_id, link_type,
+ 					pipe_fmt->bps, pipe_fmt->channels,
+ 					pipe_fmt->freq, pipe->direction,

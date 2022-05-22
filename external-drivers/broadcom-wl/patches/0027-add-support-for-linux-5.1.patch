@@ -1,0 +1,30 @@
+From 20bb1a6da26c496572ee63d310cdf69a2f1553f8 Mon Sep 17 00:00:00 2001
+From: Seth Forshee <seth.forshee@canonical.com>
+Date: Fri, 17 May 2019 20:32:20 +0000
+Subject: [PATCH] add support for linux 5.1
+
+get_ds() was removed and replaced universally with KERNEL_DS.
+Provide a version of get_ds() to do likewise for 5.1 and later.
+
+Signed-off-by: Seth Forshee <seth.forshee@canonical.com>
+---
+ src/include/linuxver.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/include/linuxver.h b/src/include/linuxver.h
+index b05bc32..2b88b30 100644
+--- a/src/include/linuxver.h
++++ b/src/include/linuxver.h
+@@ -591,4 +591,9 @@ do {									\
+ #define netdev_priv(dev) dev->priv
+ #endif 
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
++#include <linux/uaccess.h>
++#define get_ds() (KERNEL_DS)
++#endif
++
+ #endif 
+-- 
+2.20.1
+

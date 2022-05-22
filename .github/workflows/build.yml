@@ -16,8 +16,8 @@ jobs:
         run: |
           sudo ln -s $RUNNER_TEMP /persist
           mkdir /persist/keys
-          echo $BRUNCHPRIV | base64 -d > /persist/keys/brunch.priv
-          echo $BRUNCHPEM | base64 -d > /persist/keys/brunch.pem
+          echo "$BRUNCHPRIV" | base64 -d > /persist/keys/brunch.priv
+          echo "$BRUNCHPEM" | base64 -d > /persist/keys/brunch.pem
       - name: Install dependencies
         run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install pv cgpt libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Compile kernel

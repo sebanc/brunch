@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install pv cgpt libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Compile kernel
-        run: build_kernels.sh
+        run: ./build_kernels.sh
       - name: Clear keys
         run: rm -r /persist/keys
   build-brunch:

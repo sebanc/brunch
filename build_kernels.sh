@@ -122,7 +122,6 @@ done
 
 build_kernels()
 {
-if [ ! "$1" == "github-actions" ]; then
 kernels=$(ls -d ./kernels/* | sed 's#./kernels/##g')
 for kernel in $kernels; do
 	echo "Building kernel $kernel"
@@ -154,7 +153,10 @@ for kernel in $kernels; do
 	(cd $objtree; tar -c -f - -T -) < "$objtree/hdrobjfiles" | (cd $destdir; tar -xf -)
 	cp $objtree/.config $destdir/.config
 done
-else
+}
+
+build_kernels_github()
+{
 kernels=$(ls -d ./kernels/* | sed 's#./kernels/##g')
 for kernel in $kernels; do
 	echo "Building kernel $kernel"
@@ -186,7 +188,6 @@ for kernel in $kernels; do
 	(cd $objtree; tar -c -f - -T -) < "$objtree/hdrobjfiles" | (cd $destdir; tar -xf -)
 	cp $objtree/.config $destdir/.config
 done
-fi
 }
 
 rm -rf ./kernels
@@ -194,4 +195,8 @@ mkdir ./kernels
 
 chromeos_version="R103"
 download_and_patch_kernels
+if [ ! "$1" == "github-actions" ]; then
 build_kernels
+else
+build_kernels_github
+fi

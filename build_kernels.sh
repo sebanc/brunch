@@ -155,7 +155,7 @@ for kernel in $kernels; do
 done
 }
 
-if [ -z "$RUNNER_TEMP" ]; then NTHREADS=$(($(nproc)-1)); else NTHREADS=4; fi
+if [ -d /home/runner/work ]; then NTHREADS=$(($(nproc)-1)); else NTHREADS=4; fi
 
 rm -rf ./kernels
 mkdir ./kernels

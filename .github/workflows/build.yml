@@ -4,8 +4,8 @@ on:
     branches:
       - main
 jobs:
-  build-kernels:
-    name: Build kernels
+  build-brunch:
+    name: Build Brunch
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -19,9 +19,9 @@ jobs:
           echo "$BRUNCHPRIV" | base64 -d > /persist/keys/brunch.priv
           echo "$BRUNCHPEM" | base64 -d > /persist/keys/brunch.pem
       - name: Install dependencies
-        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install pv cgpt libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
-      - name: Compile kernel
-        run: ./build_kernels.sh github-actions
+        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
+      - name: Build kernels
+        run: ./build_kernels.sh
       - name: Clear keys
         run: rm -r /persist/keys
       - name: Build brunch
@@ -37,7 +37,7 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    needs: build-kernels
+    needs: build-brunch
     steps:
       - name: Download built artifacts
         uses: actions/download-artifact@v2

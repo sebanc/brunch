@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ -d /home/runner/work ]; then NTHREADS=$(($(nproc)-1)); else NTHREADS=4; fi
+if [ ! -d /home/runner/work ]; then NTHREADS=$(($(nproc)-1)); else NTHREADS=8; fi
 
 kernels=$(ls -d ./kernels/* | sed 's#./kernels/##g')
 for kernel in $kernels; do

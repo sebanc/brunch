@@ -8,7 +8,6 @@ for kernel in $kernels; do
 done
 if ( ! test -z {,} ); then echo "Must be ran with \"sudo bash\""; exit 1; fi
 if [ $(whoami) != "root" ]; then echo "Please run with sudo"; exit 1; fi
-if [ -z $(which cgpt) ]; then echo "The cgpt package/binary has to be installed first"; exit 1; fi
 
 if mountpoint -q ./chroot/dev/shm; then umount ./chroot/dev/shm; fi
 if mountpoint -q ./chroot/dev; then umount ./chroot/dev; fi

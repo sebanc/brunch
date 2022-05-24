@@ -22,16 +22,16 @@ case "$1" in
 		make -C "./kernels/$1" O=out allyesconfig || { echo "Kernel configuration failed"; exit 1; }
 		sed '/CONFIG_ATA\|CONFIG_CROS\|CONFIG_HOTPLUG\|CONFIG_MDIO\|CONFIG_PCI\|CONFIG_SATA\|CONFIG_SERI\|CONFIG_USB_STORAGE\|CONFIG_USB_XHCI\|CONFIG_USB_OHCI\|CONFIG_USB_EHCI\|CONFIG_VIRTIO/!d' "./kernels/$1/out/.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
 		sed -i '/_DBG\|_DEBUG\|_MOCKUP\|_NOCODEC\|_WARNINGS\|TEST\|USB_OTG\|_PLTFM\|_PLATFORM/d' "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
-		sed '/CONFIG_ATH\|CONFIG_IWL\|CONFIG_MOUSE/d' "./kernels/$1/chromeos/config$config_subfolder/base.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
-		sed '/CONFIG_ATH\|CONFIG_IWL\|CONFIG_MOUSE/d' "./kernels/$1/chromeos/config$config_subfolder/x86_64/common.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
+		sed '/CONFIG_ATH\|CONFIG_IWL\|CONFIG_MODULE_COMPRESS\|CONFIG_MOUSE/d' "./kernels/$1/chromeos/config$config_subfolder/base.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
+		sed '/CONFIG_ATH\|CONFIG_IWL\|CONFIG_MODULE_COMPRESS\|CONFIG_MOUSE/d' "./kernels/$1/chromeos/config$config_subfolder/x86_64/common.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
 		cat "./kernel-patches/$1/brunch_configs"  >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
 		make -C "./kernels/$1" O=out chromeos_defconfig || { echo "Kernel configuration failed"; exit 1; }
 		cp "./kernels/$1/out/.config" "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
 	;;
 	*)
-		cat "./kernels/$1/chromeos/config$config_subfolder/base.config" > "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
-		cat "./kernels/$1/chromeos/config$config_subfolder/x86_64/common.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
-		cat "./kernels/$1/chromeos/config$config_subfolder/x86_64/chromeos-intel-pineview.flavour.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
+		sed '/CONFIG_MODULE_COMPRESS/d' "./kernels/$1/chromeos/config$config_subfolder/base.config" > "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
+		sed '/CONFIG_MODULE_COMPRESS/d' "./kernels/$1/chromeos/config$config_subfolder/x86_64/common.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
+		sed '/CONFIG_MODULE_COMPRESS/d' "./kernels/$1/chromeos/config$config_subfolder/x86_64/chromeos-intel-pineview.flavour.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
 		cat "./kernel-patches/$1/brunch_configs"  >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }
 		make -C "./kernels/$1" O=out chromeos_defconfig || { echo "Kernel configuration failed"; exit 1; }
 		cp "./kernels/$1/out/.config" "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel configuration failed"; exit 1; }

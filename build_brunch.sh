@@ -305,18 +305,6 @@ rm -r ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kern
 
 fi
 
-if [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
-
-cd ./chroot/tmp/kernel || { echo "Failed to build external oled module for kernel $kernel"; exit 1; }
-patch -p1 --no-backup-if-mismatch -N < ../../../external-drivers/oled/oled-"$kernel".patch || { echo "Failed to build external oled module for kernel $kernel"; exit 1; }
-if [ "$kernel" == "5.4" ]; then cec="drivers/media/cec/cec.ko"; else cec="drivers/media/cec/core/cec.ko"; fi
-make -j"$NTHREADS" O=out drivers/acpi/video.ko drivers/char/agp/intel-gtt.ko drivers/gpu/drm/drm.ko drivers/gpu/drm/drm_kms_helper.ko drivers/gpu/drm/i915/i915.ko drivers/i2c/algos/i2c-algo-bit.ko "$cec" || { echo "Failed to build external oled module for kernel $kernel"; exit 1; }
-cp ./out/drivers/gpu/drm/drm_kms_helper.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/drm_kms_helper-oled.ko || { echo "Failed to build external oled module for kernel $kernel"; exit 1; }
-cp ./out/drivers/gpu/drm/i915/i915.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/i915-oled.ko || { echo "Failed to build external oled module for kernel $kernel"; exit 1; }
-cd ../../.. || { echo "Failed to build external oled module for kernel $kernel"; exit 1; }
-
-fi
-
 fi
 
 cd ./chroot/home/chronos/kernel || { echo "Failed to enter directory for kernel $kernel"; exit 1; }

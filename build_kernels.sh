@@ -155,7 +155,7 @@ for kernel in $kernels; do
 done
 }
 
-if [ ! -d /home/runner/work ]; then NTHREADS=$(($(nproc)-1)); else $(($(nproc)*2)); fi
+if [ ! -d /home/runner/work ]; then NTHREADS=$(($(nproc)-1)); else NTHREADS=$(($(nproc)*2)); fi
 
 rm -rf ./kernels
 mkdir ./kernels

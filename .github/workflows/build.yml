@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
         matrix:
-            kernel: ${{ fromJson(needs.list-kernels.outputs.matrix) }}
+            kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
     steps:
       - name: Checkout Brunch source code
         uses: actions/checkout@v2

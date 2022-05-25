@@ -19,7 +19,8 @@ jobs:
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
-        run: echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
+        run: echo "::set-output name=matrix::[chromebook-4.4]"
+        #run: echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
       - name: Compress kernels source files
         run: tar zcf /tmp/kernels-source.tar.gz kernels
       - name: Upload kernels source
@@ -105,9 +106,9 @@ jobs:
           RELEASE_FILE=$(find out/ -name 'brunch_*.tar.gz')
           RELEASE_VERSION=$(echo "$RELEASE_FILE" | cut -d'.' -f1 | cut -d'_' -f2)
           RELEASE_DATE=$(echo "$RELEASE_FILE" | cut -d'.' -f1 | cut -d'_' -f3)
-          echo "Found brunch release: ${{ env.RELEASE_FILE }} with version ${{ env.RELEASE_VERSION }} and date  ${{ env.RELEASE_DATE }}"
-          mv "out/brunch_$RELEASE_VERSION_$RELEASE_DATE.tar.gz" "out/brunch_$RELEASE_VERSION_$RELEASE_VERSION_TYPE_$RELEASE_DATE.tar.gz"
-          echo "Brunch release renamed from brunch_$RELEASE_VERSION_$RELEASE_DATE.tar.gz to brunch_$RELEASE_VERSION_$RELEASE_VERSION_TYPE_$RELEASE_DATE.tar.gz"
+          echo "Found brunch release: ${RELEASE_FILE} with version ${RELEASE_VERSION} and date ${RELEASE_DATE}"
+          mv "out/brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz" "out/brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
+          echo "Brunch release renamed from brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz to brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -130,12 +131,12 @@ jobs:
         run: |
           RELEASE_FILE=$(find out/ -name 'brunch_*.tar.gz')
           echo "Found brunch release: ${{ env.RELEASE_FILE }}"
-          RELEASE_VERSION=$(echo "$BRUNCH_FILE" | cut -d'_' -f2)
-          RELEASE_VERSION_TYPE=$(echo "$BRUNCH_FILE" | cut -d'_' -f3)
-          RELEASE_DATE=$(echo "$BRUNCH_FILE" | cut -d'_' -f4)
-          echo "RELEASE_FILE=$RELEASE_FILE" >> $GITHUB_ENV
-          echo "RELEASE_TAG=\"$RELEASE_VERSION-$RELEASE_VERSION_TYPE-$RELEASE_DATE\"" >> $GITHUB_ENV
-          echo "RELEASE_NAME=\"Brunch $RELEASE_VERSION $RELEASE_VERSION_TYPE $RELEASE_DATE\"" >> $GITHUB_ENV          
+          RELEASE_VERSION=$(echo "$BRUNCH_FILE" | cut -d'.' -f1 | cut -d'_' -f2)
+          RELEASE_VERSION_TYPE=$(echo "$BRUNCH_FILE" | cut -d'.' -f1 | cut -d'_' -f3)
+          RELEASE_DATE=$(echo "$BRUNCH_FILE" | cut -d'.' -f1 | cut -d'_' -f4)
+          echo "RELEASE_FILE=${RELEASE_FILE}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=\"${RELEASE_VERSION}-${RELEASE_VERSION_TYPE}-${RELEASE_DATE}\"" >> $GITHUB_ENV
+          echo "RELEASE_NAME=\"Brunch ${RELEASE_VERSION} ${RELEASE_VERSION_TYPE} ${RELEASE_DATE}\"" >> $GITHUB_ENV          
       - name: Calculate (and echo) checksum of generated file
         run: |
           sha256sum ${{ env.RELEASE_FILE }} > ${{ env.RELEASE_FILE }}.sha256

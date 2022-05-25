@@ -51,13 +51,13 @@ jobs:
           rm -f /tmp/kernels-source.tar.gz
       - name: Install Secure Boot certificate
         env:
-          BRUNCHPRIV: ${{ secrets.BRUNCHPRIV }}
-          BRUNCHPEM: ${{ secrets.BRUNCHPEM }}
+          BRUNCH_PRIV: ${{ secrets.BRUNCH_PRIV }}
+          BRUNCH_PEM: ${{ secrets.BRUNCH_PEM }}
         run: |
           sudo ln -s $RUNNER_TEMP /persist
           mkdir /persist/keys
-          echo "$BRUNCHPRIV" | base64 -d > /persist/keys/brunch.priv
-          echo "$BRUNCHPEM" | base64 -d > /persist/keys/brunch.pem
+          echo "$BRUNCH_PRIV" | base64 -d > /persist/keys/brunch.priv
+          echo "$BRUNCH_PEM" | base64 -d > /persist/keys/brunch.pem
       - name: Build kernels
         run: ./build_kernels.sh ${{ matrix.kernel }}
       - name: Clear keys

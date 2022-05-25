@@ -80,7 +80,6 @@ jobs:
       - name: Download built kernels
         uses: actions/download-artifact@v2
         with:
-          name: built-kernel-*
           path: /tmp
       - name: Copy built kernels
         run: |

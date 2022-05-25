@@ -13,8 +13,8 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Download kernels and apply patches
-        run: ls -l
+      - name: Checkout Brunch source code
+        uses: actions/checkout@v2
       - name: Download kernels and apply patches
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
@@ -36,6 +36,8 @@ jobs:
         matrix:
             kernel: ${{ fromJson(needs.list-kernels.outputs.matrix) }}
     steps:
+      - name: Checkout Brunch source code
+        uses: actions/checkout@v2
       - name: Install Secure Boot certificate
         env:
           BRUNCHPRIV: ${{ secrets.BRUNCHPRIV }}
@@ -73,6 +75,8 @@ jobs:
     needs: build-kernels
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Brunch source code
+        uses: actions/checkout@v2
       - name: Download built kernels
         uses: actions/download-artifact@v2
         with:

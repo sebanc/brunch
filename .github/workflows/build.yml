@@ -7,11 +7,33 @@ concurrency:
   group: environment-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  build-brunch:
-    name: Build Brunch
+  prepare-kernels:
+    name: Prepare Kernels
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v2
+      - name: Download kernels and apply patches
+        run: ./prepare_kernels.sh
+      - name: Define kernels matrix
+        id: kernels
+        run: echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
+      - name: Compress kernels source files
+        run: tar zcvf /tmp/kernels-source.tar.gz kernels
+      - name: Upload kernels source
+        uses: actions/upload-artifact@v2
+        with:
+          name: kernels-source
+          path: /tmp/kernels-source.tar.gz
+          if-no-files-found: error
+  build-kernels:
+    name: Build Kernels
+    needs: prepare-kernels
+    runs-on: ubuntu-latest
+    strategy:
+        matrix:
+            kernel: ${{ fromJson(needs.list-kernels.outputs.matrix) }}
+    steps:
       - name: Install Secure Boot certificate
         env:
           BRUNCHPRIV: ${{ secrets.BRUNCHPRIV }}
@@ -21,26 +43,60 @@ jobs:
           mkdir /persist/keys
           echo "$BRUNCHPRIV" | base64 -d > /persist/keys/brunch.priv
           echo "$BRUNCHPEM" | base64 -d > /persist/keys/brunch.pem
+      - name: Download kernels source
+        uses: actions/download-artifact@v2
+        with:
+          name: kernels-source
+          path: /tmp
+      - name: Extract kernels source files
+        run: |
+          tar -zxf /tmp/kernels-source.tar.gz
+          rm -f /tmp/kernels-source.tar.gz
       - name: Install dependencies
         run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Build kernels
-        run: ./build_kernels.sh
+        run: ./build_kernels.sh ${{ matrix.kernel }}
       - name: Clear keys
         run: rm -r /persist/keys
+      - name: Compress built kernel
+        run: tar zcvf /tmp/kernel-${{ matrix.kernel }}.tar.gz kernels/${{ matrix.kernel }}
+      - name: Upload kernels source
+        uses: actions/upload-artifact@v2
+        with:
+          name: built-kernel-${{ matrix.kernel }}
+          path: /tmp/built-kernel-${{ matrix.kernel }}.tar.gz
+          if-no-files-found: error
+  build-brunch:
+    name: Build Brunch
+    needs: build-kernels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built kernels
+        uses: actions/download-artifact@v2
+        with:
+          name: built-kernel-*
+          path: /tmp
+      - name: Copy built kernels
+        run: |
+          for file in /tmp/built-kernel-*.tar.gz
+          do
+            tar zxvf $file
+            rm -f $file
+          done
       - name: Build brunch
         run: sudo bash build_brunch.sh
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2
         with:
           name: brunch-artifact
           path: out/brunch_*.tar.gz
           if-no-files-found: error
   release:
-    name: Make a release
+    name: Make a Brunch release
     permissions:
       contents: write
-    runs-on: ubuntu-latest
     needs: build-brunch
+    runs-on: ubuntu-latest
     steps:
       - name: Download built artifacts
         uses: actions/download-artifact@v2

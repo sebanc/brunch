@@ -14,6 +14,8 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Download kernels and apply patches
+        run: ls -l
+      - name: Download kernels and apply patches
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels

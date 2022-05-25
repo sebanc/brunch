@@ -19,7 +19,7 @@ jobs:
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
-        run: echo "::set-output name=matrix::[chromebook-4.4]"
+        run: echo "::set-output name=matrix::[\"chromebook-4.4\"]"
         #run: echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
       - name: Compress kernels source files
         run: tar zcf /tmp/kernels-source.tar.gz kernels

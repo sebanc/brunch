@@ -83,11 +83,12 @@ jobs:
           path: /tmp
       - name: Copy built kernels
         run: |
-          for file in /tmp/built-kernel-*.tar.gz
+          for file in /tmp/built-kernel-*/built-kernel-*.tar.gz
           do
-            tar zxvf $file
+            tar zxf $file
             rm -f $file
           done
+          rm -r /tmp/kernels-source/kernels-source.tar.gz
       - name: Build brunch
         run: sudo bash build_brunch.sh
       - name: Identify custom version

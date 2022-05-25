@@ -13,17 +13,13 @@ jobs:
     outputs:
       matrix: ${{ steps.kernels.outputs.matrix }}
     steps:
-      - name: Install dependencies
-        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
-        run: |
-          echo "$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
-          echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
+        run: echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
       - name: Compress kernels source files
         run: tar zcf /tmp/kernels-source.tar.gz kernels
       - name: Upload kernels source
@@ -40,17 +36,10 @@ jobs:
         matrix:
             kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
     steps:
+      - name: Install dependencies
+        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
-      - name: Install Secure Boot certificate
-        env:
-          BRUNCHPRIV: ${{ secrets.BRUNCHPRIV }}
-          BRUNCHPEM: ${{ secrets.BRUNCHPEM }}
-        run: |
-          sudo ln -s $RUNNER_TEMP /persist
-          mkdir /persist/keys
-          echo "$BRUNCHPRIV" | base64 -d > /persist/keys/brunch.priv
-          echo "$BRUNCHPEM" | base64 -d > /persist/keys/brunch.pem
       - name: Download kernels source
         uses: actions/download-artifact@v2
         with:
@@ -60,14 +49,21 @@ jobs:
         run: |
           tar -zxf /tmp/kernels-source.tar.gz
           rm -f /tmp/kernels-source.tar.gz
-      - name: Install dependencies
-        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
+      - name: Install Secure Boot certificate
+        env:
+          BRUNCHPRIV: ${{ secrets.BRUNCHPRIV }}
+          BRUNCHPEM: ${{ secrets.BRUNCHPEM }}
+        run: |
+          sudo ln -s $RUNNER_TEMP /persist
+          mkdir /persist/keys
+          echo "$BRUNCHPRIV" | base64 -d > /persist/keys/brunch.priv
+          echo "$BRUNCHPEM" | base64 -d > /persist/keys/brunch.pem
       - name: Build kernels
         run: ./build_kernels.sh ${{ matrix.kernel }}
       - name: Clear keys
         run: rm -r /persist/keys
       - name: Compress built kernel
-        run: tar zcf /tmp/kernel-${{ matrix.kernel }}.tar.gz kernels/${{ matrix.kernel }}
+        run: tar zcf /tmp/built-kernel-${{ matrix.kernel }}.tar.gz kernels/${{ matrix.kernel }}
       - name: Upload kernels source
         uses: actions/upload-artifact@v2
         with:
@@ -95,6 +91,23 @@ jobs:
           done
       - name: Build brunch
         run: sudo bash build_brunch.sh
+      - name: Identify custom version
+        if: ${{ (github.repository != 'sebanc/brunch') && (github.repository != 'sebanc/brunch-unstable') }}
+        run: RELEASE_VERSION_TYPE=custom
+      - name: Identify unstable version
+        if: ${{ (github.repository == 'sebanc/brunch-unstable') }}
+        run: RELEASE_VERSION_TYPE=unstable
+      - name: Identify stable version
+        if: ${{ (github.repository == 'sebanc/brunch-stable') }}
+        run: RELEASE_VERSION_TYPE=stable
+      - name: Include release version
+        run: |
+          RELEASE_FILE=$(find out/ -name 'brunch_*.tar.gz')
+          RELEASE_VERSION=$(echo "$BRUNCH_FILE" | cut -d'_' -f2)
+          RELEASE_DATE=$(echo "$BRUNCH_FILE" | cut -d'_' -f3)
+          echo "Found brunch release: ${{ env.RELEASE_FILE }} with version ${{ env.RELEASE_VERSION }} and date  ${{ env.RELEASE_DATE }}"
+          mv "out/brunch_$RELEASE_VERSION_$RELEASE_DATE.tar.gz" "out/brunch_$RELEASE_VERSION_$RELEASE_VERSION_TYPE_$RELEASE_DATE.tar.gz"
+          echo "Brunch release renamed from brunch_$RELEASE_VERSION_$RELEASE_DATE.tar.gz to brunch_$RELEASE_VERSION_$RELEASE_VERSION_TYPE_$RELEASE_DATE.tar.gz"
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -112,16 +125,17 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: brunch-artifact
-          path: artifacts
-      - name: Get build tag from brunch tar.gz file
+          path: out
+      - name: Generate release details
         run: |
-          RELEASE_FILE=$(find artifacts/ -name 'brunch_*.tar.gz')
+          RELEASE_FILE=$(find out/ -name 'brunch_*.tar.gz')
           echo "Found brunch release: ${{ env.RELEASE_FILE }}"
           RELEASE_VERSION=$(echo "$BRUNCH_FILE" | cut -d'_' -f2)
-          RELEASE_DATE=$(echo "$BRUNCH_FILE" | cut -d'_' -f3)
+          RELEASE_VERSION_TYPE=$(echo "$BRUNCH_FILE" | cut -d'_' -f3)
+          RELEASE_DATE=$(echo "$BRUNCH_FILE" | cut -d'_' -f4)
           echo "RELEASE_FILE=$RELEASE_FILE" >> $GITHUB_ENV
-          echo "RELEASE_TAG=\"$RELEASE_VERSION-unstable-$RELEASE_DATE\"" >> $GITHUB_ENV
-          echo "RELEASE_NAME=\"Brunch $RELEASE_VERSION unstable $RELEASE_DATE\"" >> $GITHUB_ENV          
+          echo "RELEASE_TAG=\"$RELEASE_VERSION-$RELEASE_VERSION_TYPE-$RELEASE_DATE\"" >> $GITHUB_ENV
+          echo "RELEASE_NAME=\"Brunch $RELEASE_VERSION $RELEASE_VERSION_TYPE $RELEASE_DATE\"" >> $GITHUB_ENV          
       - name: Calculate (and echo) checksum of generated file
         run: |
           sha256sum ${{ env.RELEASE_FILE }} > ${{ env.RELEASE_FILE }}.sha256

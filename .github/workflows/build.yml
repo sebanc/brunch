@@ -13,15 +13,19 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - name: Install dependencies
+        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
-        run: echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
+        run: |
+          echo "$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
+          echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
       - name: Compress kernels source files
-        run: tar zcvf /tmp/kernels-source.tar.gz kernels
+        run: tar zcf /tmp/kernels-source.tar.gz kernels
       - name: Upload kernels source
         uses: actions/upload-artifact@v2
         with:
@@ -63,7 +67,7 @@ jobs:
       - name: Clear keys
         run: rm -r /persist/keys
       - name: Compress built kernel
-        run: tar zcvf /tmp/kernel-${{ matrix.kernel }}.tar.gz kernels/${{ matrix.kernel }}
+        run: tar zcf /tmp/kernel-${{ matrix.kernel }}.tar.gz kernels/${{ matrix.kernel }}
       - name: Upload kernels source
         uses: actions/upload-artifact@v2
         with:

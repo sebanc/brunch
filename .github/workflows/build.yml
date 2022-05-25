@@ -103,8 +103,8 @@ jobs:
       - name: Include release version
         run: |
           RELEASE_FILE=$(find out/ -name 'brunch_*.tar.gz')
-          RELEASE_VERSION=$(echo "$BRUNCH_FILE" | cut -d'_' -f2)
-          RELEASE_DATE=$(echo "$BRUNCH_FILE" | cut -d'_' -f3)
+          RELEASE_VERSION=$(echo "$RELEASE_FILE" | cut -d'.' -f1 | cut -d'_' -f2)
+          RELEASE_DATE=$(echo "$RELEASE_FILE" | cut -d'.' -f1 | cut -d'_' -f3)
           echo "Found brunch release: ${{ env.RELEASE_FILE }} with version ${{ env.RELEASE_VERSION }} and date  ${{ env.RELEASE_DATE }}"
           mv "out/brunch_$RELEASE_VERSION_$RELEASE_DATE.tar.gz" "out/brunch_$RELEASE_VERSION_$RELEASE_VERSION_TYPE_$RELEASE_DATE.tar.gz"
           echo "Brunch release renamed from brunch_$RELEASE_VERSION_$RELEASE_DATE.tar.gz to brunch_$RELEASE_VERSION_$RELEASE_VERSION_TYPE_$RELEASE_DATE.tar.gz"

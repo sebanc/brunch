@@ -19,8 +19,6 @@ jobs:
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
-        #run: echo "::set-output name=matrix::[\"chromebook-4.4\"]"
-        #run: echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
         run: echo "::set-output name=matrix::$(echo [\"$(ls -d ./kernels/*  | cut -f3 -d'/' | sed -Ez '$ s/\n+$//' | sed -z 's#\n#","#g')\"])"
       - name: Compress kernels source files
         run: tar zcf /tmp/kernels-source.tar.gz kernels
@@ -97,7 +95,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: brunch-build
-          path: out/brunch_*.tar.gz
+          path: out/brunch_r*.tar.gz
           if-no-files-found: error
   release:
     name: Make a Brunch release
@@ -110,7 +108,6 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: brunch-build
-#          path: out
       - name: Identify custom version
         if: ${{ (github.repository != 'sebanc/brunch') && (github.repository != 'sebanc/brunch-unstable') }}
         run: echo "RELEASE_VERSION_TYPE=custom" >> $GITHUB_ENV
@@ -128,7 +125,7 @@ jobs:
           echo "Found brunch release: ${RELEASE_FILE} with version ${RELEASE_VERSION} and date ${RELEASE_DATE}"
           mv "brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz" "brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
           echo "Brunch release renamed from brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz to brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
-          echo "RELEASE_FILE=out/brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz" >> $GITHUB_ENV
+          echo "RELEASE_FILE=brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz" >> $GITHUB_ENV
           echo "RELEASE_TAG=${RELEASE_VERSION}-${RELEASE_VERSION_TYPE}-${RELEASE_DATE}" >> $GITHUB_ENV
           echo "RELEASE_NAME=Brunch ${RELEASE_VERSION} ${RELEASE_VERSION_TYPE} ${RELEASE_DATE}" >> $GITHUB_ENV          
       - name: Calculate (and echo) checksum of generated file

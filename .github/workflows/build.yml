@@ -94,13 +94,13 @@ jobs:
         run: sudo bash build_brunch.sh
       - name: Identify custom version
         if: ${{ (github.repository != 'sebanc/brunch') && (github.repository != 'sebanc/brunch-unstable') }}
-        run: RELEASE_VERSION_TYPE=custom
+        run: echo "RELEASE_VERSION_TYPE=custom" >> $GITHUB_ENV
       - name: Identify unstable version
         if: ${{ (github.repository == 'sebanc/brunch-unstable') }}
-        run: RELEASE_VERSION_TYPE=unstable
+        run: echo "RELEASE_VERSION_TYPE=unstable" >> $GITHUB_ENV
       - name: Identify stable version
         if: ${{ (github.repository == 'sebanc/brunch-stable') }}
-        run: RELEASE_VERSION_TYPE=stable
+        run: echo "RELEASE_VERSION_TYPE=stable" >> $GITHUB_ENV
       - name: Include release version
         run: |
           RELEASE_FILE=$(find out/ -name 'brunch_*.tar.gz')
@@ -130,13 +130,13 @@ jobs:
       - name: Generate release details
         run: |
           RELEASE_FILE=$(find out/ -name 'brunch_*.tar.gz')
-          echo "Found brunch release: ${{ env.RELEASE_FILE }}"
           RELEASE_VERSION=$(echo "$BRUNCH_FILE" | cut -d'.' -f1 | cut -d'_' -f2)
           RELEASE_VERSION_TYPE=$(echo "$BRUNCH_FILE" | cut -d'.' -f1 | cut -d'_' -f3)
           RELEASE_DATE=$(echo "$BRUNCH_FILE" | cut -d'.' -f1 | cut -d'_' -f4)
+          echo "Found brunch release: ${RELEASE_FILE} with version ${RELEASE_VERSION}, version type $RELEASE_VERSION_TYPE and date ${RELEASE_DATE}"
           echo "RELEASE_FILE=${RELEASE_FILE}" >> $GITHUB_ENV
-          echo "RELEASE_TAG=\"${RELEASE_VERSION}-${RELEASE_VERSION_TYPE}-${RELEASE_DATE}\"" >> $GITHUB_ENV
-          echo "RELEASE_NAME=\"Brunch ${RELEASE_VERSION} ${RELEASE_VERSION_TYPE} ${RELEASE_DATE}\"" >> $GITHUB_ENV          
+          echo "RELEASE_TAG=${RELEASE_VERSION}-${RELEASE_VERSION_TYPE}-${RELEASE_DATE}" >> $GITHUB_ENV
+          echo "RELEASE_NAME=Brunch ${RELEASE_VERSION} ${RELEASE_VERSION_TYPE} ${RELEASE_DATE}" >> $GITHUB_ENV          
       - name: Calculate (and echo) checksum of generated file
         run: |
           sha256sum ${{ env.RELEASE_FILE }} > ${{ env.RELEASE_FILE }}.sha256

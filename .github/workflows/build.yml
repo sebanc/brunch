@@ -127,7 +127,7 @@ jobs:
           echo "Found brunch release: ${RELEASE_FILE} with version ${RELEASE_VERSION} and date ${RELEASE_DATE}"
           mv "out/brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz" "out/brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
           echo "Brunch release renamed from brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz to brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
-          echo "RELEASE_FILE=${RELEASE_FILE}" >> $GITHUB_ENV
+          echo "RELEASE_FILE=brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz" >> $GITHUB_ENV
           echo "RELEASE_TAG=${RELEASE_VERSION}-${RELEASE_VERSION_TYPE}-${RELEASE_DATE}" >> $GITHUB_ENV
           echo "RELEASE_NAME=Brunch ${RELEASE_VERSION} ${RELEASE_VERSION_TYPE} ${RELEASE_DATE}" >> $GITHUB_ENV          
       - name: Calculate (and echo) checksum of generated file

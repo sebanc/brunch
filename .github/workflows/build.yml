@@ -19,8 +19,9 @@ jobs:
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
-        run: echo "::set-output name=matrix::[\"chromebook-4.4\"]"
+        #run: echo "::set-output name=matrix::[\"chromebook-4.4\"]"
         #run: echo "::set-output name=matrix::$(ls kernels/ | jq -R -s -c 'split("\n")[:-1]')"
+        run: echo "::set-output name=matrix::$(echo [\"$(ls -d ./kernels/*  | cut -f3 -d'/' | sed -Ez '$ s/\n+$//' | sed -z 's#\n#","#g')\"])"
       - name: Compress kernels source files
         run: tar zcf /tmp/kernels-source.tar.gz kernels
       - name: Upload kernels source
@@ -95,7 +96,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: brunch-artifact
+          name: brunch-build
           path: out/brunch_*.tar.gz
           if-no-files-found: error
   release:
@@ -108,8 +109,8 @@ jobs:
       - name: Download built artifacts
         uses: actions/download-artifact@v2
         with:
-          name: brunch-artifact
-          path: out
+          name: brunch-build
+#          path: out
       - name: Identify custom version
         if: ${{ (github.repository != 'sebanc/brunch') && (github.repository != 'sebanc/brunch-unstable') }}
         run: echo "RELEASE_VERSION_TYPE=custom" >> $GITHUB_ENV
@@ -121,11 +122,11 @@ jobs:
         run: echo "RELEASE_VERSION_TYPE=stable" >> $GITHUB_ENV
       - name: Generate release details
         run: |
-          RELEASE_FILE=$(find out/ -name 'brunch_*.tar.gz')
+          RELEASE_FILE=$(ls brunch_r*.tar.gz)
           RELEASE_VERSION=$(echo "$RELEASE_FILE" | cut -d'.' -f1 | cut -d'_' -f2)
           RELEASE_DATE=$(echo "$RELEASE_FILE" | cut -d'.' -f1 | cut -d'_' -f3)
           echo "Found brunch release: ${RELEASE_FILE} with version ${RELEASE_VERSION} and date ${RELEASE_DATE}"
-          mv "out/brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz" "out/brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
+          mv "brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz" "brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
           echo "Brunch release renamed from brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz to brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
           echo "RELEASE_FILE=out/brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz" >> $GITHUB_ENV
           echo "RELEASE_TAG=${RELEASE_VERSION}-${RELEASE_VERSION_TYPE}-${RELEASE_DATE}" >> $GITHUB_ENV

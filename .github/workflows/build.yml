@@ -130,14 +130,15 @@ jobs:
           echo "RELEASE_FILE=brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz" >> $GITHUB_ENV
           echo "RELEASE_TAG=${RELEASE_VERSION}-${RELEASE_VERSION_TYPE}-${RELEASE_DATE}" >> $GITHUB_ENV
           echo "RELEASE_NAME=Brunch ${RELEASE_VERSION} ${RELEASE_VERSION_TYPE} ${RELEASE_DATE}" >> $GITHUB_ENV          
-      - name: Calculate (and echo) checksum of generated file
-        run: |
-          sha256sum ${{ env.RELEASE_FILE }} > ${{ env.RELEASE_FILE }}.sha256
-          echo "Generated SHA256SUM:" && cat ${{ env.RELEASE_FILE }}.sha256
+      #- name: Calculate (and echo) checksum of generated file
+      #  run: |
+      #    sha256sum ${{ env.RELEASE_FILE }} > ${{ env.RELEASE_FILE }}.sha256
+      #    echo "Generated SHA256SUM:" && cat ${{ env.RELEASE_FILE }}.sha256
       - name: Create a release and upload artifacts as assets
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "${{ env.RELEASE_FILE }},${{ env.RELEASE_FILE }}.sha256"
+      #    artifacts: "${{ env.RELEASE_FILE }},${{ env.RELEASE_FILE }}.sha256"
+          artifacts: "${{ env.RELEASE_FILE }}"
           token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: false
           tag: "${{ env.RELEASE_TAG }}"

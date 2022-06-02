@@ -32,7 +32,7 @@ losetup -d "$recovery_image" || { echo "Failed to detach loop device"; exit 1; }
 else
 git clone -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
 cd rootfs
-curl -L https://dl.google.com/chromeos/rammus/14588.98.0/stable-channel/chromeos_14588.98.0_rammus_stable-channel_full_mp-v2.bin-gyzdomzygzrdm3oqtidbfe3hzrisljwu.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
+curl -L https://dl.google.com/chromeos/rammus/14695.85.0/stable-channel/chromeos_14695.85.0_rammus_stable-channel_full_mp-v2.bin-gyzdqzrugy3tof32bmsye2k4oz6hvv4f.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
 python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
 cd ..
 [ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }

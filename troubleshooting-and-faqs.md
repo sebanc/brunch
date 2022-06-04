@@ -316,7 +316,7 @@ It is currently recommended to only update ChromeOS when the matching version of
  To manually update Brunch and ChromeOS together: 
  * Download the [latest Brunch release][latest-release]
  * Download the [latest recovery][cros-tech] matching your install and extract the bin.
- * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Open the Crosh Shell with **Ctrl + Alt + T** and enter `shell` at the prompt.
  * Run the built in command to update Brunch.
    * Replace `brunch_archive.tar.gz` with the file's actual filename.
    * Replace `recovery.bin` with the file's actual filename.
@@ -339,7 +339,7 @@ It is currently recommended to only update ChromeOS when the matching version of
  The easiest way to update ChromeOS is to enable the `enable_updates` framework option, then update directly from the Settings page.
  
  To enable the framework option: 
- * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Open the Crosh Shell with **Ctrl + Alt + T** and enter `shell` at the prompt.
  * Enter `sudo edit-brunch-config` to open the Brunch Configuration Menu described above.
  * Select `enable_updates` with the spacebar, then continue through the menu with the enter key.
  * When finished, the Brunch Configuration Menu will prompt to restart ChromeOS.
@@ -360,7 +360,7 @@ It is currently recommended to only update ChromeOS when the matching version of
  
  To manually update Brunch: 
  * Download the [latest Brunch release][latest-release]
- * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Open the Crosh Shell with **Ctrl + Alt + T** and enter `shell` at the prompt.
  * Run the built in command to update Brunch.
    * Replace `brunch_archive.tar.gz` with the file's actual filename.
 

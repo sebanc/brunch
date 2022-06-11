@@ -71527,8 +71527,8 @@ diff -ruN a/include/uapi/linux/dma-buf.h b/include/uapi/linux/dma-buf.h
  
 @@ -94,5 +128,6 @@
  #define DMA_BUF_SET_NAME	_IOW(DMA_BUF_BASE, 1, const char *)
- #define DMA_BUF_SET_NAME_A	_IOW(DMA_BUF_BASE, 1, u32)
- #define DMA_BUF_SET_NAME_B	_IOW(DMA_BUF_BASE, 1, u64)
+ #define DMA_BUF_SET_NAME_A	_IOW(DMA_BUF_BASE, 1, __u32)
+ #define DMA_BUF_SET_NAME_B	_IOW(DMA_BUF_BASE, 1, __u64)
 +#define DMA_BUF_IOCTL_EXPORT_SYNC_FILE	_IOWR(DMA_BUF_BASE, 2, struct dma_buf_export_sync_file)
  
  #endif
@@ -73143,9 +73143,9 @@ diff -ruN a/kernel/cpu.c b/kernel/cpu.c
 --- a/kernel/cpu.c	2021-12-08 09:04:57.000000000 +0100
 +++ b/kernel/cpu.c	2021-12-23 08:35:57.000000000 +0100
 @@ -34,6 +34,7 @@
- #include <linux/scs.h>
  #include <linux/percpu-rwsem.h>
  #include <linux/cpuset.h>
+ #include <linux/random.h>
 +#include <uapi/linux/sched/types.h>
  
  #include <trace/events/power.h>

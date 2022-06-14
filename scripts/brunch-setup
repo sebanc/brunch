@@ -257,7 +257,7 @@ else
 	verbose_mode=0
 	reset
 	echo "Select the brunch bootsplash to use (press ENTER to validate your choice)"
-	available_bootsplashes="default_dark;default_light;blank;brunchbook_dark;brunchbook_light;colorful_dark;colorful_light;croissant_dark;croissant_light;neon_blue_dark;neon_blue_light;neon_green_dark;neon_green_light;neon_pink_dark;neon_pink_light;neon_red_dark;neon_red_light"
+	available_bootsplashes="default_dark;default_light;blank;brunchbook_dark;brunchbook_light;colorful_dark;colorful_light;croissant_dark;croissant_light;neon_blue_dark;neon_blue_light;neon_green_dark;neon_green_light;neon_pink_dark;neon_pink_light;neon_red_dark;neon_red_light;brunch-logo-dark;brunch-logo-light;simple-dark;simple-light"
 	singleselect "$available_bootsplashes"
 	selected_bootsplash="$returned_values"
 fi

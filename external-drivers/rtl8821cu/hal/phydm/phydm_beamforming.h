@@ -26,11 +26,7 @@
 #ifndef __INC_PHYDM_BEAMFORMING_H
 #define __INC_PHYDM_BEAMFORMING_H
 
-#ifndef BEAMFORMING_SUPPORT
-#define BEAMFORMING_SUPPORT 0
-#endif
-
-/*Beamforming Related*/
+/*@Beamforming Related*/
 #include "txbf/halcomtxbf.h"
 #include "txbf/haltxbfjaguar.h"
 #include "txbf/haltxbf8192e.h"
@@ -38,7 +34,7 @@
 #include "txbf/haltxbf8822b.h"
 #include "txbf/haltxbfinterface.h"
 
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
 
@@ -49,7 +45,7 @@
 
 #define MAX_BEAMFORMEE_SU 2
 #define MAX_BEAMFORMER_SU 2
-#if (RTL8822B_SUPPORT == 1)
+#if ((RTL8822B_SUPPORT == 1) || (RTL8812F_SUPPORT == 1))
 #define MAX_BEAMFORMEE_MU 6
 #define MAX_BEAMFORMER_MU 1
 #else
@@ -61,7 +57,7 @@
 #define BEAMFORMER_ENTRY_NUM (MAX_BEAMFORMER_SU + MAX_BEAMFORMER_MU)
 
 #if (DM_ODM_SUPPORT_TYPE == ODM_CE)
-/*for different naming between WIN and CE*/
+/*@for different naming between WIN and CE*/
 #define BEACON_QUEUE BCN_QUEUE_INX
 #define NORMAL_QUEUE MGT_QUEUE_INX
 #define RT_DISABLE_FUNC RTW_DISABLE_FUNC
@@ -91,10 +87,10 @@ enum beamforming_cap {
 	BEAMFORMING_CAP_NONE = 0x0,
 	BEAMFORMER_CAP_HT_EXPLICIT = BIT(1),
 	BEAMFORMEE_CAP_HT_EXPLICIT = BIT(2),
-	BEAMFORMER_CAP_VHT_SU = BIT(5), /* Self has er Cap, because Reg er  & peer ee */
-	BEAMFORMEE_CAP_VHT_SU = BIT(6), /* Self has ee Cap, because Reg ee & peer er */
-	BEAMFORMER_CAP_VHT_MU = BIT(7), /* Self has er Cap, because Reg er  & peer ee */
-	BEAMFORMEE_CAP_VHT_MU = BIT(8), /* Self has ee Cap, because Reg ee & peer er */
+	BEAMFORMER_CAP_VHT_SU = BIT(5), /* @Self has er Cap, because Reg er  & peer ee */
+	BEAMFORMEE_CAP_VHT_SU = BIT(6), /* @Self has ee Cap, because Reg ee & peer er */
+	BEAMFORMER_CAP_VHT_MU = BIT(7), /* @Self has er Cap, because Reg er  & peer ee */
+	BEAMFORMEE_CAP_VHT_MU = BIT(8), /* @Self has ee Cap, because Reg ee & peer er */
 	BEAMFORMER_CAP = BIT(9),
 	BEAMFORMEE_CAP = BIT(10),
 };
@@ -132,26 +128,26 @@ struct _RT_BEAMFORMEE_ENTRY {
 	boolean is_sound;
 	u16 aid; /*Used to construct AID field of NDPA packet.*/
 	u16 mac_id; /*Used to Set Reg42C in IBSS mode. */
-	u16 p_aid; /*Used to fill Reg42C & Reg714 to compare with P_AID of Tx DESC. */
+	u16 p_aid; /*@Used to fill Reg42C & Reg714 to compare with P_AID of Tx DESC. */
 	u8 g_id; /*Used to fill Tx DESC*/
 	u8 my_mac_addr[6];
-	u8 mac_addr[6]; /*Used to fill Reg6E4 to fill Mac address of CSI report frame.*/
+	u8 mac_addr[6]; /*@Used to fill Reg6E4 to fill Mac address of CSI report frame.*/
 	enum channel_width sound_bw; /*Sounding band_width*/
 	u16 sound_period;
 	enum beamforming_cap beamform_entry_cap;
 	enum beamforming_entry_state beamform_entry_state;
 	boolean is_beamforming_in_progress;
-	/*u8	log_seq;									// Move to _RT_BEAMFORMER_ENTRY*/
-	/*u16	log_retry_cnt:3;		// 0~4				// Move to _RT_BEAMFORMER_ENTRY*/
-	/*u16	LogSuccessCnt:2;		// 0~2				// Move to _RT_BEAMFORMER_ENTRY*/
-	u16 log_status_fail_cnt : 5; /* 0~21 */
-	u16 default_csi_cnt : 5; /* 0~21 */
+	/*@u8	log_seq;									// Move to _RT_BEAMFORMER_ENTRY*/
+	/*@u16	log_retry_cnt:3;		// 0~4				// Move to _RT_BEAMFORMER_ENTRY*/
+	/*@u16	LogSuccessCnt:2;		// 0~2				// Move to _RT_BEAMFORMER_ENTRY*/
+	u16 log_status_fail_cnt : 5; /* @0~21 */
+	u16 default_csi_cnt : 5; /* @0~21 */
 	u8 csi_matrix[327];
 	u16 csi_matrix_len;
 	u8 num_of_sounding_dim;
 	u8 comp_steering_num_of_bfer;
 	u8 su_reg_index;
-	/*For MU-MIMO*/
+	/*@For MU-MIMO*/
 	boolean is_mu_sta;
 	u8 mu_reg_index;
 	u8 gid_valid[8];
@@ -161,19 +157,19 @@ struct _RT_BEAMFORMEE_ENTRY {
 struct _RT_BEAMFORMER_ENTRY {
 	boolean is_used;
 	/*P_AID of BFer entry is probably not used*/
-	u16 p_aid; /*Used to fill Reg42C & Reg714 to compare with P_AID of Tx DESC. */
+	u16 p_aid; /*@Used to fill Reg42C & Reg714 to compare with P_AID of Tx DESC. */
 	u8 g_id;
 	u8 my_mac_addr[6];
 	u8 mac_addr[6];
 	enum beamforming_cap beamform_entry_cap;
 	u8 num_of_sounding_dim;
-	u8 clock_reset_times; /*Modified by Jeffery @2015-04-10*/
-	u8 pre_log_seq; /*Modified by Jeffery @2015-03-30*/
-	u8 log_seq; /*Modified by Jeffery @2014-10-29*/
-	u16 log_retry_cnt : 3; /*Modified by Jeffery @2014-10-29*/
-	u16 log_success : 2; /*Modified by Jeffery @2014-10-29*/
+	u8 clock_reset_times; /*@Modified by Jeffery @2015-04-10*/
+	u8 pre_log_seq; /*@Modified by Jeffery @2015-03-30*/
+	u8 log_seq; /*@Modified by Jeffery @2014-10-29*/
+	u16 log_retry_cnt : 3; /*@Modified by Jeffery @2014-10-29*/
+	u16 log_success : 2; /*@Modified by Jeffery @2014-10-29*/
 	u8 su_reg_index;
-	/*For MU-MIMO*/
+	/*@For MU-MIMO*/
 	boolean is_mu_ap;
 	u8 gid_valid[8];
 	u8 user_position[16];
@@ -210,7 +206,7 @@ struct _RT_BEAMFORMING_INFO {
 	u8 beamformer_su_cnt;
 	u32 beamformee_su_reg_maping;
 	u32 beamformer_su_reg_maping;
-	/*For MU-MINO*/
+	/*@For MU-MINO*/
 	u8 beamformee_mu_cnt;
 	u8 beamformer_mu_cnt;
 	u32 beamformee_mu_reg_maping;
@@ -224,8 +220,8 @@ struct _RT_BEAMFORMING_INFO {
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
 	void *source_adapter;
 #endif
-	/* Control register */
-	u32 reg_mu_tx_ctrl; /* For USB/SDIO interfaces aync I/O */
+	/* @Control register */
+	u32 reg_mu_tx_ctrl; /* @For USB/SDIO interfaces aync I/O */
 	u8 tx_bf_data_rate;
 	u8 last_usb_hub;
 };
@@ -270,9 +266,7 @@ phydm_acting_determine(
 	void *dm_void,
 	enum phydm_acting_type type);
 
-void beamforming_enter(
-	void *dm_void,
-	u16 sta_idx);
+void beamforming_enter(void *dm_void, u16 sta_idx, u8 *my_mac_addr);
 
 void beamforming_leave(
 	void *dm_void,
@@ -350,9 +344,10 @@ beamforming_send_vht_ndpa_packet(
 	u8 q_idx);
 
 #else
+#if (DM_ODM_SUPPORT_TYPE & (ODM_WIN | ODM_AP))
 #define beamforming_gid_paid(adapter, tcb)
 #define phydm_acting_determine(dm, type) false
-#define beamforming_enter(dm, sta_idx)
+#define beamforming_enter(dm, sta_idx, my_mac_addr)
 #define beamforming_leave(dm, RA)
 #define beamforming_end_fw(dm)
 #define beamforming_control_v1(dm, RA, AID, mode, BW, rate) true
@@ -363,6 +358,6 @@ beamforming_send_vht_ndpa_packet(
 #define phydm_beamforming_control_v2(dm, _idx, _mode, _BW, _period) false
 #define beamforming_watchdog(dm)
 #define phydm_beamforming_watchdog(dm)
-
-#endif
+#endif /*@(DM_ODM_SUPPORT_TYPE & (ODM_CE | ODM_AP))*/
+#endif /*@#ifdef PHYDM_BEAMFORMING_SUPPORT*/
 #endif

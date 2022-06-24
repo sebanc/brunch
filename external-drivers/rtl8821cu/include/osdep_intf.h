@@ -57,33 +57,7 @@ struct intf_priv {
 #endif
 #endif
 
-#ifdef PLATFORM_OS_XP
-#ifdef CONFIG_SDIO_HCI
-	/* below is for io_rwmem... */
-	PMDL pmdl;
-	PSDBUS_REQUEST_PACKET  sdrp;
-	PSDBUS_REQUEST_PACKET  recv_sdrp;
-	PSDBUS_REQUEST_PACKET  xmit_sdrp;
-
-	PIRP		piorw_irp;
-
-#endif
-#ifdef CONFIG_USB_HCI
-	PURB	piorw_urb;
-	PIRP		piorw_irp;
-	u8 io_irp_cnt;
-	u8 bio_irp_pending;
-	_sema io_retevt;
-#endif
-#endif
-
 };
-
-
-#ifdef CONFIG_R871X_TEST
-	int rtw_start_pseudo_adhoc(_adapter *padapter);
-	int rtw_stop_pseudo_adhoc(_adapter *padapter);
-#endif
 
 struct dvobj_priv *devobj_init(void);
 void devobj_deinit(struct dvobj_priv *pdvobj);
@@ -116,9 +90,7 @@ void rtw_os_ndevs_unregister(struct dvobj_priv *dvobj);
 int rtw_os_ndevs_init(struct dvobj_priv *dvobj);
 void rtw_os_ndevs_deinit(struct dvobj_priv *dvobj);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
-u16 rtw_recv_select_queue(struct sk_buff *skb);
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35) */
+u16 rtw_os_recv_select_queue(u8 *msdu, enum rtw_rx_llc_hdl llc_hdl);
 
 int rtw_ndev_notifier_register(void);
 void rtw_ndev_notifier_unregister(void);
@@ -126,6 +98,10 @@ void rtw_inetaddr_notifier_register(void);
 void rtw_inetaddr_notifier_unregister(void);
 
 #include "../os_dep/linux/rtw_proc.h"
+#include "../os_dep/linux/nlrtw.h"
+#ifdef CONFIG_PLATFORM_CMAP_INTFS
+#include "../os_dep/linux/custom_multiap_intfs/custom_multiap_intfs.h"
+#endif
 
 #ifdef CONFIG_IOCTL_CFG80211
 	#include "../os_dep/linux/ioctl_cfg80211.h"

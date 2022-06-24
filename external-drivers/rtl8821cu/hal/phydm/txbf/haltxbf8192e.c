@@ -21,7 +21,7 @@
 #include "mp_precomp.h"
 #include "../phydm_precomp.h"
 
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 #if (RTL8192E_SUPPORT == 1)
 
 void hal_txbf_8192e_set_ndpa_rate(
@@ -52,20 +52,20 @@ void hal_txbf_8192e_rf_mode(
 		/*Path_A*/
 		odm_set_rf_reg(dm, RF_PATH_A, RF_0x30, 0xfffff, 0x18000); /*Select RX mode  0x30=0x18000*/
 		odm_set_rf_reg(dm, RF_PATH_A, RF_0x31, 0xfffff, 0x0000f); /*Set Table data*/
-		odm_set_rf_reg(dm, RF_PATH_A, RF_0x32, 0xfffff, 0x77fc2); /*Enable TXIQGEN in RX mode*/
+		odm_set_rf_reg(dm, RF_PATH_A, RF_0x32, 0xfffff, 0x77fc2); /*@Enable TXIQGEN in RX mode*/
 		/*Path_B*/
 		odm_set_rf_reg(dm, RF_PATH_B, RF_0x30, 0xfffff, 0x18000); /*Select RX mode*/
 		odm_set_rf_reg(dm, RF_PATH_B, RF_0x31, 0xfffff, 0x0000f); /*Set Table data*/
-		odm_set_rf_reg(dm, RF_PATH_B, RF_0x32, 0xfffff, 0x77fc2); /*Enable TXIQGEN in RX mode*/
+		odm_set_rf_reg(dm, RF_PATH_B, RF_0x32, 0xfffff, 0x77fc2); /*@Enable TXIQGEN in RX mode*/
 	} else {
 		/*Path_A*/
 		odm_set_rf_reg(dm, RF_PATH_A, RF_0x30, 0xfffff, 0x18000); /*Select RX mode*/
 		odm_set_rf_reg(dm, RF_PATH_A, RF_0x31, 0xfffff, 0x0000f); /*Set Table data*/
-		odm_set_rf_reg(dm, RF_PATH_A, RF_0x32, 0xfffff, 0x77f82); /*Disable TXIQGEN in RX mode*/
+		odm_set_rf_reg(dm, RF_PATH_A, RF_0x32, 0xfffff, 0x77f82); /*@Disable TXIQGEN in RX mode*/
 		/*Path_B*/
 		odm_set_rf_reg(dm, RF_PATH_B, RF_0x30, 0xfffff, 0x18000); /*Select RX mode*/
 		odm_set_rf_reg(dm, RF_PATH_B, RF_0x31, 0xfffff, 0x0000f); /*Set Table data*/
-		odm_set_rf_reg(dm, RF_PATH_B, RF_0x32, 0xfffff, 0x77f82); /*Disable TXIQGEN in RX mode*/
+		odm_set_rf_reg(dm, RF_PATH_B, RF_0x32, 0xfffff, 0x77f82); /*@Disable TXIQGEN in RX mode*/
 	}
 
 	odm_set_rf_reg(dm, RF_PATH_A, RF_WE_LUT, 0x80000, 0x0); /*RF mode table write disable*/
@@ -124,7 +124,7 @@ void hal_txbf_8192e_download_ndpa(
 	u8 bcn_valid_reg = 0, count = 0, dl_bcn_count = 0;
 	boolean is_send_beacon = false;
 	u8 tx_page_bndy = LAST_ENTRY_OF_TX_PKT_BUFFER_8812;
-	/*default reseved 1 page for the IC type which is undefined.*/
+	/*@default reseved 1 page for the IC type which is undefined.*/
 	struct _RT_BEAMFORMING_INFO *beam_info = &dm->beamforming_info;
 	struct _RT_BEAMFORMEE_ENTRY *p_beam_entry = beam_info->beamformee_entry + idx;
 
@@ -158,25 +158,27 @@ void hal_txbf_8192e_download_ndpa(
 	odm_write_1byte(dm, REG_DWBCN0_CTRL_8192E + 1, head_page);
 
 	do {
-		/*Clear beacon valid check bit.*/
+		/*@Clear beacon valid check bit.*/
 		bcn_valid_reg = odm_read_1byte(dm, REG_DWBCN0_CTRL_8192E + 2);
 		odm_write_1byte(dm, REG_DWBCN0_CTRL_8192E + 2, (bcn_valid_reg | BIT(0)));
 
-		/* download NDPA rsvd page. */
+		/* @download NDPA rsvd page. */
 		beamforming_send_ht_ndpa_packet(dm, p_beam_entry->mac_addr, p_beam_entry->sound_bw, BEACON_QUEUE);
 
 #if (DEV_BUS_TYPE == RT_PCI_INTERFACE)
-		u1b_tmp = odm_read_1byte(dm, REG_MGQ_TXBD_NUM_8192E + 3);
-		count = 0;
-		while ((count < 20) && (u1b_tmp & BIT(4))) {
-			count++;
-			ODM_delay_us(10);
+		if (dm->support_interface == ODM_ITRF_PCIE) {
 			u1b_tmp = odm_read_1byte(dm, REG_MGQ_TXBD_NUM_8192E + 3);
+			count = 0;
+			while ((count < 20) && (u1b_tmp & BIT(4))) {
+				count++;
+				ODM_delay_us(10);
+				u1b_tmp = odm_read_1byte(dm, REG_MGQ_TXBD_NUM_8192E + 3);
+			}
+			odm_write_1byte(dm, REG_MGQ_TXBD_NUM_8192E + 3, u1b_tmp | BIT(4));
 		}
-		odm_write_1byte(dm, REG_MGQ_TXBD_NUM_8192E + 3, u1b_tmp | BIT(4));
 #endif
 
-		/*check rsvd page download OK.*/
+		/*@check rsvd page download OK.*/
 		bcn_valid_reg = odm_read_1byte(dm, REG_DWBCN0_CTRL_8192E + 2);
 		count = 0;
 		while (!(bcn_valid_reg & BIT(0)) && count < 20) {
@@ -195,15 +197,15 @@ void hal_txbf_8192e_download_ndpa(
 	odm_write_1byte(dm, REG_DWBCN0_CTRL_8192E + 1, tx_page_bndy);
 
 	/*To make sure that if there exists an adapter which would like to send beacon.*/
-	/*If exists, the origianl value of 0x422[6] will be 1, we should check this to*/
+	/*@If exists, the origianl value of 0x422[6] will be 1, we should check this to*/
 	/*prevent from setting 0x422[6] to 0 after download reserved page, or it will cause*/
 	/*the beacon cannot be sent by HW.*/
-	/*2010.06.23. Added by tynli.*/
+	/*@2010.06.23. Added by tynli.*/
 	if (is_send_beacon)
 		odm_write_1byte(dm, REG_FWHW_TXQ_CTRL_8192E + 2, tmp_reg422);
 
-	/*Do not enable HW DMA BCN or it will cause Pcie interface hang by timing issue. 2011.11.24. by tynli.*/
-	/*Clear CR[8] or beacon packet will not be send to TxBuf anymore.*/
+	/*@Do not enable HW DMA BCN or it will cause Pcie interface hang by timing issue. 2011.11.24. by tynli.*/
+	/*@Clear CR[8] or beacon packet will not be send to TxBuf anymore.*/
 	u1b_tmp = odm_read_1byte(dm, REG_CR_8192E + 1);
 	odm_write_1byte(dm, REG_CR_8192E + 1, (u1b_tmp & (~BIT(0))));
 
@@ -240,7 +242,7 @@ void hal_txbf_8192e_enter(
 		/*Sounding protocol control*/
 		odm_write_1byte(dm, REG_SND_PTCL_CTRL_8192E, 0xCB);
 
-		/*MAC address/Partial AID of Beamformer*/
+		/*@MAC address/Partial AID of Beamformer*/
 		if (bfer_idx == 0) {
 			for (i = 0; i < 6; i++)
 				odm_write_1byte(dm, (REG_ASSOCIATED_BFMER0_INFO_8192E + i), beamformer_entry.mac_addr[i]);
@@ -249,7 +251,7 @@ void hal_txbf_8192e_enter(
 				odm_write_1byte(dm, (REG_ASSOCIATED_BFMER1_INFO_8192E + i), beamformer_entry.mac_addr[i]);
 		}
 
-		/*CSI report parameters of Beamformer Default use nc = 2*/
+		/*@CSI report parameters of Beamformer Default use nc = 2*/
 		csi_param = 0x03090309;
 
 		odm_write_4byte(dm, REG_CSI_RPT_PARAM_BW20_8192E, csi_param);
@@ -278,9 +280,9 @@ void hal_txbf_8192e_enter(
 		} else
 			odm_write_2byte(dm, REG_TXBF_CTRL_8192E + 2, sta_id | BIT(12) | BIT(14) | BIT(15));
 
-		/*CSI report parameters of Beamformee*/
+		/*@CSI report parameters of Beamformee*/
 		if (bfee_idx == 0) {
-			/*Get BIT24 & BIT25*/
+			/*@Get BIT24 & BIT25*/
 			u8 tmp = odm_read_1byte(dm, REG_ASSOCIATED_BFMEE_SEL_8192E + 3) & 0x3;
 
 			odm_write_1byte(dm, REG_ASSOCIATED_BFMEE_SEL_8192E + 3, tmp | 0x60);
@@ -302,7 +304,7 @@ void hal_txbf_8192e_leave(
 
 	hal_txbf_8192e_rf_mode(dm, beam_info);
 
-	/*	Clear P_AID of Beamformee
+	/*	@Clear P_AID of Beamformee
 	*	Clear MAC addresss of Beamformer
 	*	Clear Associated Bfmee Sel
 	*/
@@ -377,6 +379,6 @@ void hal_txbf_8192e_fw_tx_bf(
 	hal_txbf_8192e_fw_txbf_cmd(dm);
 }
 
-#endif /* #if (RTL8192E_SUPPORT == 1)*/
+#endif /* @#if (RTL8192E_SUPPORT == 1)*/
 
 #endif

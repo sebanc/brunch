@@ -137,6 +137,9 @@ enum rtw_vendor_subcmd {
     LOGGER_GET_TX_PKT_FATES,
     LOGGER_GET_RX_PKT_FATES,
 
+	WIFI_OFFLOAD_SUBCMD_START_MKEEP_ALIVE = ANDROID_NL80211_SUBCMD_WIFI_OFFLOAD_RANGE_START,
+	WIFI_OFFLOAD_SUBCMD_STOP_MKEEP_ALIVE,
+
 	VENDOR_SUBCMD_MAX
 };
 
@@ -380,7 +383,7 @@ typedef struct {
                                  // monotonously increasing integer
 } wifi_ring_buffer_status;
 
-#ifdef CONFIG_RTW_CFGVEDNOR_LLSTATS
+#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS
 #define STATS_MAJOR_VERSION      1
 #define STATS_MINOR_VERSION      0
 #define STATS_MICRO_VERSION      0
@@ -458,14 +461,11 @@ typedef struct {
 // Max number of tx power levels. The actual number vary per device and is specified by |num_tx_levels|
 #define RADIO_STAT_MAX_TX_LEVELS 256
 
-/* radio statistics */
+/* Internal radio statistics structure in the driver */
 typedef struct {
    wifi_radio radio;                      // wifi radio (if multiple radio supported)
    u32 on_time;                           // msecs the radio is awake (32 bits number accruing over time)
    u32 tx_time;                           // msecs the radio is transmitting (32 bits number accruing over time)
-   u32 num_tx_levels;                     // number of radio transmit power levels
-   u32* tx_time_per_levels;               // pointer to an array of radio transmit per power levels in
-                                          // msecs accured over time
    u32 rx_time;                           // msecs the radio is in active receive (32 bits number accruing over time)
    u32 on_time_scan;                      // msecs the radio is awake due to all scan (32 bits number accruing over time)
    u32 on_time_nbd;                       // msecs the radio is awake due to NAN (32 bits number accruing over time)
@@ -475,7 +475,7 @@ typedef struct {
    u32 on_time_hs20;                      // msecs the radio is awake due to HS2.0 scans and GAS exchange (32 bits number accruing over time)
    u32 num_channels;                      // number of channels
    wifi_channel_stat channels[];          // channel statistics
-} wifi_radio_stat;
+} wifi_radio_stat_internal;
 
 /**
  * Packet statistics reporting by firmware is performed on MPDU basi (i.e. counters increase by 1 for each MPDU)
@@ -591,13 +591,6 @@ typedef struct {
    u32 aggressive_statistics_gathering; // set for field debug mode. Driver should collect all statistics regardless of performance impact.
 } wifi_link_layer_params;
 
-/* callback for reporting link layer stats */
-typedef struct {
-  void (*on_link_stats_results) (wifi_request_id id, wifi_iface_stat *iface_stat,
-         int num_radios, wifi_radio_stat *radio_stat);
-} wifi_stats_result_handler;
-
-
 #define RSSI_MONITOR_EVT_VERSION   1
 typedef struct {
     u8 version;
@@ -616,7 +609,7 @@ typedef struct {
 #define WIFI_STATS_IFACE_AC           0x00000040      // all ac statistics (within interface statistics)
 #define WIFI_STATS_IFACE_CONTENTION   0x00000080      // all contention (min, max, avg) statistics (within ac statisctics)
 
-#endif /* CONFIG_RTW_CFGVEDNOR_LLSTATS */
+#endif /* CONFIG_RTW_CFGVENDOR_LLSTATS */
 
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) || defined(RTW_VENDOR_EXT_SUPPORT)
@@ -630,7 +623,7 @@ extern int rtw_cfgvendor_send_hotlist_event(struct wiphy *wiphy,
 #endif
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) || defined(RTW_VENDOR_EXT_SUPPORT) */
 
-#ifdef CONFIG_RTW_CFGVEDNOR_RSSIMONITOR
+#ifdef CONFIG_RTW_CFGVENDOR_RSSIMONITOR
 void rtw_cfgvendor_rssi_monitor_evt(_adapter *padapter);
 #endif
 

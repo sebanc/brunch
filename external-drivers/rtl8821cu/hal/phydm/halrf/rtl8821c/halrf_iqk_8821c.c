@@ -29,10 +29,10 @@
 
 static u32 dpk_result[DPK_BACKUP_REG_NUM_8821C];
 static boolean txgap_done[3] = {false, false, false};
-static boolean overflowflag = false;
+static boolean overflowflag;
 #define dpk_forcein_sram4 1
 #define txgap_ref_index 0x0
-#define txgapK_number 0x7
+#define txgap_k_number 0x7
 
 /*---------------------------Define Local Constant---------------------------*/
 #if !(DM_ODM_SUPPORT_TYPE & ODM_AP)
@@ -86,7 +86,7 @@ _iqk_check_nctl_done_8821c(struct dm_struct *dm, u8 path, u32 IQK_CMD)
 		}
 		if (notready) {
 			/*ODM_sleep_ms(1);*/
-			ODM_delay_ms(1);
+			ODM_delay_us(10);
 			delay_count++;
 		} else {
 			fail = (boolean)odm_get_bb_reg(dm, R_0x1b08, BIT(26));
@@ -95,13 +95,13 @@ _iqk_check_nctl_done_8821c(struct dm_struct *dm, u8 path, u32 IQK_CMD)
 				       "[IQK](1)IQK_CMD =0x%x, Fail, 0x1b08=0x%x, RF08=0x%x, 1b00=0x%x,fail=0x%x, notready=0x%x!!!\n",
 				       IQK_CMD, odm_read_4byte(dm, 0x1b08),
 				       odm_get_rf_reg(dm, path, RF_0x08,
-				       RFREGOFFSETMASK),
+						      RFREGOFFSETMASK),
 				       odm_read_4byte(dm, 0x1b00), fail,
-				       notready);
+						      notready);
 			}
 			break;
 		}
-		if (delay_count >= 50) {
+		if (delay_count >= 50000) {
 			RF_DBG(dm, DBG_RF_IQK, "[IQK]S%d IQK timeout!!!\n",
 			       path);
 			break;
@@ -135,7 +135,7 @@ void phydm_get_read_counter_8821c(struct dm_struct *dm)
 			break;
 		counter++;
 		/*ODM_sleep_ms(1);*/
-		ODM_delay_ms(1);
+		ODM_delay_us(10);
 	};
 	odm_set_rf_reg(dm, RF_PATH_A, RF_0x8, RFREGOFFSETMASK, 0x0);
 	RF_DBG(dm, DBG_RF_IQK, "[IQK]counter = %d\n", counter);
@@ -158,7 +158,7 @@ void _iqk_check_coex_status(struct dm_struct *dm, boolean beforeK)
 		u1b_tmp = odm_read_1byte(dm, 0x49c);
 		while ((u1b_tmp & BIT(1)) && (count < 100)) {
 			/*ODM_sleep_ms(10);*/
-			ODM_delay_ms(10);
+			ODM_delay_us(10);
 			u1b_tmp = odm_read_1byte(dm, 0x49c);
 			count++;
 			RF_DBG(dm, DBG_RF_IQK,
@@ -178,7 +178,7 @@ void _iqk_check_coex_status(struct dm_struct *dm, boolean beforeK)
 #if 0
 			/*ODM_sleep_ms(10);*/
 #endif
-			ODM_delay_ms(10);
+			ODM_delay_us(10);
 			u1b_tmp = odm_read_1byte(dm, 0x49c);
 			count++;
 			RF_DBG(dm, DBG_RF_IQK,
@@ -186,14 +186,15 @@ void _iqk_check_coex_status(struct dm_struct *dm, boolean beforeK)
 			       u1b_tmp, count);
 		}
 
-		if (count >= 100)
+		if (count >= 10000)
 			RF_DBG(dm, DBG_RF_IQK,
 			       "[IQK]Polling 0x49c to 1 for WiFi calibration H2C cmd FAIL! count(%d)\n",
 			       count);
 #endif
 
-	} else
+	} else {
 		odm_set_bb_reg(dm, R_0x49c, BIT(0), 0x0);
+	}
 }
 
 u32 _iqk_indirect_read_reg(struct dm_struct *dm, u16 reg_addr)
@@ -278,8 +279,9 @@ void _iqk_set_gnt_wl_gnt_bt(struct dm_struct *dm, boolean beforeK)
 	if (beforeK) {
 		_iqk_set_gnt_wl_high(dm);
 		_iqk_set_gnt_bt_low(dm);
-	} else
+	} else {
 		_iqk_indirect_write_reg(dm, 0x38, MASKDWORD, iqk_info->tmp_gntwl);
+	}
 }
 
 void _iqk_fail_count_8821c(void *dm_void)
@@ -321,7 +323,7 @@ void _iqk_fill_iqk_report_8821c(void *dm_void, u8 channel)
 
 	for (i = 0; i < SS_8821C; i++)
 		odm_write_4byte(dm, 0x1be8 + (i * 4), (iqk_info->rxiqk_agc[channel][(i * 2) + 1] << 16) | iqk_info->rxiqk_agc[channel][i * 2]);
-	RF_DBG(dm, DBG_RF_IQK, "[IQK] 0x1be8 = %x \n",
+	RF_DBG(dm, DBG_RF_IQK, "[IQK] 0x1be8 = %x\n",
 	       odm_read_4byte(dm, 0x1be8));
 }
 
@@ -373,7 +375,7 @@ void _iqk_backup_rf_8821c(struct dm_struct *dm, u32 RF_backup[][SS_8821C],
 
 	for (i = 0; i < RF_REG_NUM_8821C; i++)
 		for (j = 0; j < SS_8821C; j++)
-			RF_backup[i][j] = odm_get_rf_reg(dm, (u1Byte)j, backup_rf_reg[i], RFREGOFFSETMASK);
+			RF_backup[i][j] = odm_get_rf_reg(dm, (u8)j, backup_rf_reg[i], RFREGOFFSETMASK);
 #if 0
 	/*	RF_DBG(dm, DBG_RF_IQK, "[IQK]BackupRF Success!!!!\n"); */
 #endif
@@ -469,7 +471,6 @@ void _iqk_restore_mac_bb_8821c(struct dm_struct *dm, u32 *MAC_backup,
 		odm_write_4byte(dm, backup_mac_reg[i], MAC_backup[i]);
 	for (i = 0; i < num_backup_bb_reg; i++)
 		odm_write_4byte(dm, backup_bb_reg[i], BB_backup[i]);
-
 #if 0
 	/*	RF_DBG(dm, DBG_RF_IQK, "[IQK]RestoreMacBB Success!!!!\n"); */
 #endif
@@ -492,7 +493,6 @@ void _iqk_restore_rf_8821c(struct dm_struct *dm, u32 *backup_rf_reg,
 		odm_set_rf_reg(dm, RF_PATH_A, backup_rf_reg[i], RFREGOFFSETMASK, RF_backup[i][RF_PATH_A]);
 
 	odm_set_rf_reg(dm, RF_PATH_A, RF_0x1, RFREGOFFSETMASK, (RF_backup[4][RF_PATH_A] & (~BIT(0))));
-
 #if 0
 	/*RF_DBG(dm, DBG_RF_IQK, "[IQK]RestoreRF Success!!!!\n"); */
 #endif
@@ -522,7 +522,7 @@ void _iqk_backup_iqk_8821c(struct dm_struct *dm, u8 step, u8 path)
 				}
 			}
 		}
-		for (i = 0; i < 4; i++) {
+		for (i = 0; i < SS_8821C; i++) {
 			iqk_info->rxiqk_fail_code[0][i] = 0x0;
 			iqk_info->rxiqk_agc[0][i] = 0x0;
 			for (j = 0; j < 2; j++) {
@@ -576,9 +576,9 @@ void _iqk_reload_iqk_setting_8821c(struct dm_struct *dm, u8 channel,
 				odm_write_4byte(dm, 0x1bd8, ((0xc0000000 >> idx) + 0x1) + (i * 4) + (iqk_info->iqk_cfir_imag[channel][path][idx][i] << 9));
 			}
 			if (idx == 0)
-				odm_set_bb_reg(dm, iqk_apply[path], BIT(0), !iqk_info->iqk_fail_report[channel][path][idx]);
+				odm_set_bb_reg(dm, iqk_apply[path], BIT(0), !(iqk_info->iqk_fail_report[channel][path][idx]));
 			else
-				odm_set_bb_reg(dm, iqk_apply[path], BIT(10), !iqk_info->iqk_fail_report[channel][path][idx]);
+				odm_set_bb_reg(dm, iqk_apply[path], BIT(10), !(iqk_info->iqk_fail_report[channel][path][idx]));
 		}
 		odm_set_bb_reg(dm, R_0x1bd8, MASKDWORD, 0x0);
 		odm_set_bb_reg(dm, R_0x1b0c, BIT(13) | BIT(12), 0x0);
@@ -715,9 +715,14 @@ void _iqk_configure_macbb_8821c(struct dm_struct *dm)
 #if 0
 	/*	RF_DBG(dm, DBG_RF_IQK, "[IQK]Set MACBB setting for IQK!!!!\n");*/
 #endif
+	/*disable CCK block*/
+	odm_set_bb_reg(dm, R_0x808, BIT(28), 0x0);
+	/*disable OFDM CCA*/
+	odm_set_bb_reg(dm, R_0x838, BIT(3) | BIT(2) | BIT(1), 0x7);
+
 }
 
-void _iqk_lok_setting_8821c(struct dm_struct *dm, u8 path, u8 uPADindex)
+void _iqk_lok_setting_8821c(struct dm_struct *dm, u8 path, u8 pad_index)
 {
 	u32 LOK0x56_2G = 0x50ef3;
 	u32 LOK0x56_5G = 0x50ee8;
@@ -727,7 +732,7 @@ void _iqk_lok_setting_8821c(struct dm_struct *dm, u8 path, u8 uPADindex)
 
 	struct dm_iqk_info *iqk_info = &dm->IQK_info;
 
-	LOK0x33 = uPADindex;
+	LOK0x33 = pad_index;
 	/*add delay of MAC send packet*/
 
 	if (*dm->mp_mode)
@@ -740,7 +745,7 @@ void _iqk_lok_setting_8821c(struct dm_struct *dm, u8 path, u8 uPADindex)
 		odm_write_1byte(dm, 0x1b23, 0x00);
 		odm_write_1byte(dm, 0x1b2b, 0x80);
 		/*0x78[11:0] = IDAC value*/
-		LOK0x78 = LOK0x78 & (0xe3fff | ((u32)uPADindex << 14));
+		LOK0x78 = LOK0x78 & (0xe3fff | ((u32)pad_index << 14));
 		odm_set_rf_reg(dm, path, RF_0x78, RFREGOFFSETMASK, LOK0x78);
 		odm_set_rf_reg(dm, path, RF_0x5c, RFREGOFFSETMASK, 0x05320);
 		odm_set_rf_reg(dm, path, RF_0x8f, RFREGOFFSETMASK, 0xac018);
@@ -756,7 +761,7 @@ void _iqk_lok_setting_8821c(struct dm_struct *dm, u8 path, u8 uPADindex)
 		switch (*dm->band_type) {
 		case ODM_BAND_2_4G:
 			odm_write_1byte(dm, 0x1b2b, 0x00);
-			LOK0x56_2G = LOK0x56_2G & (0xfff1f | ((u32)uPADindex << 5));
+			LOK0x56_2G = LOK0x56_2G & (0xfff1f | ((u32)pad_index << 5));
 			odm_set_rf_reg(dm, path, RF_0x56, RFREGOFFSETMASK, LOK0x56_2G);
 			odm_set_rf_reg(dm, path, RF_0x8f, RFREGOFFSETMASK, 0xadc18);
 			odm_set_rf_reg(dm, RF_PATH_A, RF_0xef, BIT(4), 0x1);
@@ -764,7 +769,7 @@ void _iqk_lok_setting_8821c(struct dm_struct *dm, u8 path, u8 uPADindex)
 			break;
 		case ODM_BAND_5G:
 			odm_write_1byte(dm, 0x1b2b, 0x00);
-			LOK0x56_5G = LOK0x56_5G & (0xfff1f | ((u32)uPADindex << 5));
+			LOK0x56_5G = LOK0x56_5G & (0xfff1f | ((u32)pad_index << 5));
 			odm_set_rf_reg(dm, path, RF_0x56, RFREGOFFSETMASK, LOK0x56_5G);
 			odm_set_rf_reg(dm, path, RF_0x8f, RFREGOFFSETMASK, 0xadc18);
 			odm_set_rf_reg(dm, RF_PATH_A, RF_0xef, BIT(4), 0x1);
@@ -937,11 +942,11 @@ _iqk_check_cal_8821c(struct dm_struct *dm, u32 IQK_CMD)
 #if 0
 			/*ODM_sleep_ms(1);*/
 #endif
-			ODM_delay_ms(1);
+			ODM_delay_us(10);
 			delay_count++;
 		}
 
-		if (delay_count >= 50) {
+		if (delay_count >= 50000) {
 			fail = true;
 			RF_DBG(dm, DBG_RF_IQK, "[IQK]IQK timeout!!!\n");
 			break;
@@ -999,7 +1004,6 @@ _iqk_rx_iqk_gain_search_fail_8821c(struct dm_struct *dm, u8 path, u8 step)
 #if 0
 	/*ODM_sleep_ms(GS_delay_8821C);*/
 #endif
-	ODM_delay_ms(GS_delay_8821C);
 	fail = _iqk_check_cal_8821c(dm, IQK_CMD);
 	RF_DBG(dm, DBG_RF_IQK, "[IQK]check 0x49c = %x\n",
 	       odm_read_1byte(dm, 0x49c));
@@ -1032,8 +1036,9 @@ _iqk_rx_iqk_gain_search_fail_8821c(struct dm_struct *dm, u8 path, u8 step)
 			else
 				iqk_info->isbnd = true;
 			fail = true;
-		} else
+		} else {
 			fail = false;
+		}
 
 		if (iqk_info->isbnd)
 			fail = false;
@@ -1075,7 +1080,6 @@ void _iqk_rxk2setting_by_toneindex_8821c(struct dm_struct *dm, u8 path,
 					 boolean is_gs, u8 toneindex)
 {
 	struct dm_iqk_info *iqk_info = &dm->IQK_info;
-	u8 tmplna, tmp1bcc;
 
 	if (iqk_info->is_btg) {
 		iqk_info->tmp1bcc = 0x1b;
@@ -1125,7 +1129,6 @@ boolean
 _iqk_rx_iqk_gain_search_fail_by_toneindex_8821c(struct dm_struct *dm, u8 path,
 						u8 step, u8 tone_index)
 {
-	struct dm_iqk_info *iqk_info = &dm->IQK_info;
 	boolean fail = true;
 	u32 IQK_CMD;
 #if 0
@@ -1143,7 +1146,6 @@ _iqk_rx_iqk_gain_search_fail_by_toneindex_8821c(struct dm_struct *dm, u8 path,
 #if 0
 	/*ODM_sleep_ms(GS_delay_8821C);*/
 #endif
-	ODM_delay_ms(GS_delay_8821C);
 	fail = _iqk_check_cal_8821c(dm, IQK_CMD);
 	_iqk_set_gnt_wl_gnt_bt(dm, false);
 
@@ -1151,7 +1153,7 @@ _iqk_rx_iqk_gain_search_fail_by_toneindex_8821c(struct dm_struct *dm, u8 path,
 }
 
 boolean
-_lok_one_shot_8821c(void *dm_void, u8 path, u8 uPADindex)
+_lok_one_shot_8821c(void *dm_void, u8 path, u8 pad_index)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	struct dm_iqk_info *iqk_info = &dm->IQK_info;
@@ -1177,7 +1179,7 @@ _lok_one_shot_8821c(void *dm_void, u8 path, u8 uPADindex)
 #if 0
 	/*ODM_sleep_ms(LOK_delay_8821C);*/
 #endif
-	ODM_delay_ms(LOK_delay_8821C);
+	ODM_delay_us(10);
 
 	delay_count = 0;
 	LOK_notready = true;
@@ -1192,11 +1194,11 @@ _lok_one_shot_8821c(void *dm_void, u8 path, u8 uPADindex)
 #if 0
 			/*ODM_sleep_ms(1);*/
 #endif
-			ODM_delay_ms(1);
+			ODM_delay_us(10);
 			delay_count++;
 		}
 
-		if (delay_count >= 50) {
+		if (delay_count >= 50000) {
 			RF_DBG(dm, DBG_RF_IQK, "[IQK]S%d LOK timeout!!!\n",
 			       path);
 			break;
@@ -1217,6 +1219,7 @@ _lok_one_shot_8821c(void *dm_void, u8 path, u8 uPADindex)
 	} else {
 		RF_DBG(dm, DBG_RF_IQK, "[IQK]==>S%d LOK Fail!!!\n", path);
 	}
+
 	iqk_info->lok_fail[path] = LOK_notready;
 
 	/*fill IDAC LUT table*/
@@ -1297,7 +1300,6 @@ _iqk_one_shot_8821c(void *dm_void, u8 path, u8 idx)
 #if 0
 	/*ODM_sleep_ms(WBIQK_delay_8821C);*/
 #endif
-	ODM_delay_ms(WBIQK_delay_8821C);
 
 	fail = _iqk_check_nctl_done_8821c(dm, path, IQK_CMD);
 
@@ -1318,11 +1320,13 @@ _iqk_one_shot_8821c(void *dm_void, u8 path, u8 idx)
 			       "[IQK]S%d ==> RF0x0 = 0x%x, RF0x%x = 0x%x\n",
 			       path,
 			       odm_get_rf_reg(dm, path, RF_0x0,
-			       RFREGOFFSETMASK),
+					      RFREGOFFSETMASK),
 			       (iqk_info->is_btg) ? 0x78 : 0x56,
-			       (iqk_info->is_btg) ? odm_get_rf_reg(dm, path,
-			       RF_0x78, RFREGOFFSETMASK) : odm_get_rf_reg(dm,
-			       path, RF_0x56, RFREGOFFSETMASK));
+			       (iqk_info->is_btg) ?
+			       odm_get_rf_reg(dm, path, RF_0x78,
+					      RFREGOFFSETMASK) :
+			       odm_get_rf_reg(dm, path, RF_0x56,
+					      RFREGOFFSETMASK));
 	}
 
 	odm_write_4byte(dm, 0x1b00, 0xf8000008 | path << 1);
@@ -1359,8 +1363,6 @@ _iqk_rxiqkbystep_8821c(void *dm_void, u8 path)
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	struct dm_iqk_info *iqk_info = &dm->IQK_info;
 	boolean KFAIL = true, gonext;
-	u8 i;
-	u32 tmp;
 
 #if 1
 	switch (iqk_info->rxiqk_step) {
@@ -1369,9 +1371,9 @@ _iqk_rxiqkbystep_8821c(void *dm_void, u8 path)
 		gonext = false;
 		while (1) {
 			KFAIL = _iqk_rx_iqk_gain_search_fail_8821c(dm, path, RXIQK1);
-			if (KFAIL && iqk_info->gs_retry_count[0][path][0] < 2)
+			if (KFAIL && iqk_info->gs_retry_count[0][path][0] < 2) {
 				iqk_info->gs_retry_count[0][path][0]++;
-			else if (KFAIL) {
+			} else if (KFAIL) {
 				iqk_info->rxiqk_fail_code[0][path] = 0;
 				iqk_info->rxiqk_step = 5;
 				gonext = true;
@@ -1389,9 +1391,9 @@ _iqk_rxiqkbystep_8821c(void *dm_void, u8 path)
 		iqk_info->isbnd = false;
 		while (1) {
 			KFAIL = _iqk_rx_iqk_gain_search_fail_8821c(dm, path, RXIQK2);
-			if (KFAIL && iqk_info->gs_retry_count[0][path][1] < rxiqk_gs_limit)
+			if (KFAIL && iqk_info->gs_retry_count[0][path][1] < rxiqk_gs_limit) {
 				iqk_info->gs_retry_count[0][path][1]++;
-			else {
+			} else {
 				iqk_info->rxiqk_step++;
 				break;
 			}
@@ -1403,9 +1405,9 @@ _iqk_rxiqkbystep_8821c(void *dm_void, u8 path)
 		gonext = false;
 		while (1) {
 			KFAIL = _iqk_one_shot_8821c(dm, path, RXIQK1);
-			if (KFAIL && iqk_info->retry_count[0][path][RXIQK1] < 2)
+			if (KFAIL && iqk_info->retry_count[0][path][RXIQK1] < 2) {
 				iqk_info->retry_count[0][path][RXIQK1]++;
-			else if (KFAIL) {
+			} else if (KFAIL) {
 				iqk_info->rxiqk_fail_code[0][path] = 1;
 				iqk_info->rxiqk_step = 5;
 				gonext = true;
@@ -1423,9 +1425,9 @@ _iqk_rxiqkbystep_8821c(void *dm_void, u8 path)
 		gonext = false;
 		while (1) {
 			KFAIL = _iqk_one_shot_8821c(dm, path, RXIQK2);
-			if (KFAIL && iqk_info->retry_count[0][path][RXIQK2] < 2)
+			if (KFAIL && iqk_info->retry_count[0][path][RXIQK2] < 2) {
 				iqk_info->retry_count[0][path][RXIQK2]++;
-			else if (KFAIL) {
+			} else if (KFAIL) {
 				iqk_info->rxiqk_fail_code[0][path] = 2;
 				iqk_info->rxiqk_step = 5;
 				gonext = true;
@@ -1485,9 +1487,8 @@ void _iqk_iqk_by_path_8821c(void *dm_void, boolean segment_iqk)
 				if (iqk_info->rxiqk_step == 5) {
 					dm->rf_calibrate_info.iqk_step++;
 					iqk_info->rxiqk_step = 1;
-					if (KFAIL) {
+					if (KFAIL)
 						RF_DBG(dm, DBG_RF_IQK, "[IQK]S0RXK fail code: %d!!!\n", iqk_info->rxiqk_fail_code[0][RF_PATH_A]);
-					}
 					break;
 				}
 			}
@@ -1658,7 +1659,7 @@ u8 _txgapk_txpower_compare_8821c(struct dm_struct *dm, u8 path, u32 pw1,
 	else
 		pwr_delta = 0x1a;
 
-	RF_DBG(dm, DBG_RF_IQK, "[TXGAPK] temp =%d, pwr_delta =%x \n", temp,
+	RF_DBG(dm, DBG_RF_IQK, "[TXGAPK] temp =%d, pwr_delta =%x\n", temp,
 	       pwr_delta);
 
 	return pwr_delta;
@@ -1670,7 +1671,7 @@ u32 _txgapk_txgap_compenstion_8821c(struct dm_struct *dm, u8 path,
 	u32 new_txgain_0x56;
 
 	/*	0	1	2	3	4	5	6	7	8	9	10	11	12	13	14 */
-	/*	-3.5	-3 -2.5  -2  -1.5  -1  -0.5    0   0.5	  1 	1.5   2   2.5	  3    3.5 (dB)*/
+	/*	-3.5	-3 -2.5  -2  -1.5  -1  -0.5    0   0.5	  1	1.5   2   2.5	  3    3.5 (dB)*/
 #if 0
 	/* 	pwr_table[0xf]={89,100,112,125,141,158,177,199,223,251,281,316,354,398,446}*/
 #endif
@@ -1842,15 +1843,14 @@ void _txgapk_setting_8821c(struct dm_struct *dm, u8 path)
 			break;
 		}
 	}
-	return;
 }
 
 u32 _txgapk_one_shot_8821c(struct dm_struct *dm_void, u8 path, u32 reg0x56)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	boolean txgapK_notready = true;
+	boolean txgap_k_notready = true;
 	u8 delay_count = 0x0;
-	u32 txgapK_tmp1 = 0x1, txgapK_tmp2 = 0x2;
+	u32 txgap_k_tmp1 = 0x1, txgap_k_tmp2 = 0x2;
 	u8 offset;
 	u32 reg_1bb8;
 	u32 rx_dsp_power;
@@ -1859,7 +1859,7 @@ u32 _txgapk_one_shot_8821c(struct dm_struct *dm_void, u8 path, u32 reg0x56)
 	/*clear the flag*/
 	odm_write_1byte(dm, 0x1bd6, 0x0b);
 	odm_set_bb_reg(dm, R_0x1bfc, BIT(1), 0x0);
-	txgapK_notready = true;
+	txgap_k_notready = true;
 	delay_count = 0x0;
 	/* get tx gain*/
 	odm_write_1byte(dm, 0x1b2b, 0x00);
@@ -1878,14 +1878,14 @@ u32 _txgapk_one_shot_8821c(struct dm_struct *dm_void, u8 path, u32 reg0x56)
 	odm_write_4byte(dm, 0x1b34, 0x0);
 
 #if 1
-	while (txgapK_notready) {
+	while (txgap_k_notready) {
 		odm_write_1byte(dm, 0x1bd6, 0x0b);
-		if ((boolean)odm_get_bb_reg(dm, R_0x1bfc, BIT(1))) {
-			txgapK_notready = false;
-		} else
-			txgapK_notready = true;
+		if ((boolean)odm_get_bb_reg(dm, R_0x1bfc, BIT(1)))
+			txgap_k_notready = false;
+		else
+			txgap_k_notready = true;
 
-		if (txgapK_notready) {
+		if (txgap_k_notready) {
 #if 0
 			/*ODM_sleep_us(100);*/
 #endif
@@ -1897,48 +1897,48 @@ u32 _txgapk_one_shot_8821c(struct dm_struct *dm_void, u8 path, u32 reg0x56)
 			RF_DBG(dm, DBG_RF_IQK,
 			       "[TXGAPK] (3)txgapktimeout,delay_count=0x%x !!!\n",
 			       delay_count);
-			txgapK_notready = false;
+			txgap_k_notready = false;
 			break;
 		}
 	}
 #else
 	ODM_sleep_ms(1);
 	if ((boolean)odm_get_bb_reg(dm, R_0x1bfc, BIT(1)))
-		txgapK_notready = false;
+		txgap_k_notready = false;
 	else
-		txgapK_notready = true;
+		txgap_k_notready = true;
 
 #endif
 
-	if (!txgapK_notready) {
+	if (!txgap_k_notready) {
 		odm_write_1byte(dm, 0x1bd6, 0x5);
-		txgapK_tmp1 = odm_read_4byte(dm, 0x1bfc) >> 27;
+		txgap_k_tmp1 = odm_read_4byte(dm, 0x1bfc) >> 27;
 		odm_write_1byte(dm, 0x1bd6, 0xe);
-		txgapK_tmp2 = odm_read_4byte(dm, 0x1bfc);
+		txgap_k_tmp2 = odm_read_4byte(dm, 0x1bfc);
 
 		RF_DBG(dm, DBG_RF_IQK,
 		       "[TXGAPK] reg0x56 =0x%x, txgapK_tmp1 =0x%x, txgapK_tmp2 =0x%x!!!\n",
-		       reg0x56, txgapK_tmp1, txgapK_tmp2);
+		       reg0x56, txgap_k_tmp1, txgap_k_tmp2);
 
-		if (txgapK_tmp1 == 0)
+		if (txgap_k_tmp1 == 0)
 			offset = 0x0;
-		else if (txgapK_tmp1 < 2)
+		else if (txgap_k_tmp1 < 2)
 			offset = 0x1;
-		else if (txgapK_tmp1 < 4)
+		else if (txgap_k_tmp1 < 4)
 			offset = 0x2;
 		else
 			offset = 0x3;
 
-		if (txgapK_tmp1 == 0x0) {
-			rx_dsp_power = txgapK_tmp2;
+		if (txgap_k_tmp1 == 0x0) {
+			rx_dsp_power = txgap_k_tmp2;
 		} else {
-			txgapK_tmp1 = txgapK_tmp1 << (32 - offset);
-			txgapK_tmp2 = txgapK_tmp2 >> offset;
-			rx_dsp_power = txgapK_tmp1 + txgapK_tmp2;
+			txgap_k_tmp1 = txgap_k_tmp1 << (32 - offset);
+			txgap_k_tmp2 = txgap_k_tmp2 >> offset;
+			rx_dsp_power = txgap_k_tmp1 + txgap_k_tmp2;
 			overflowflag = true;
 			RF_DBG(dm, DBG_RF_IQK,
 			       "[TXGAPK](3) (1)overflowflag = true, txgapK_tmp1 =0x%x, txgapK_tmp2 =0x%x!!!\n",
-			       txgapK_tmp1, txgapK_tmp2);
+			       txgap_k_tmp1, txgap_k_tmp2);
 		}
 	} else {
 		RF_DBG(dm, DBG_RF_IQK, "[TXGAPK](3) txgapK Fail!!!\n");
@@ -1952,29 +1952,29 @@ u32 _txgapk_one_shot_8821c(struct dm_struct *dm_void, u8 path, u32 reg0x56)
 void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	struct dm_iqk_info *iqk_info = &dm->IQK_info;
-	u32 txgain[txgapK_number] = {0, 0, 0, 0, 0, 0, 0};
-	u32 txgain_rf56[txgapK_number] = {0, 0, 0, 0, 0, 0, 0};
-	u8 add_base, txgapk_num = 0x0, psd_delta = 0x0, psd_delta_tmp = 0x0;
-	u8 i, j, bandselect = 0x0;
+	u32 txgain[txgap_k_number] = {0, 0, 0, 0, 0, 0, 0};
+	u32 txgain_rf56[txgap_k_number] = {0, 0, 0, 0, 0, 0, 0};
+	u8 add_base, txgapk_num = 0x0, psd_delta = 0x0;
+	u8 i, bandselect = 0x0;
 	u32 backup_txgap_reg[11] = {0x1b14, 0x1b1c, 0x1b20, 0x1b24, 0x1b28, 0x1b2c, 0x1b38, 0x1b3c, 0x1bd6, 0x1bb8, 0x1bcc};
 	u32 backup_txgap[11];
-	u8 gain_gap_index[txgapK_number] = {0x13, 0x10, 0xd, 0xa, 0x7, 0x4, 0x1};
-	u32 txgainindex[txgapK_number] = {0x26, 0x25, 0x24, 0x23, 0x22, 0x21, 0x20};
-	u32 tmp, tmp1, tmp2, tmp3, tmp4, tmp5;
+	u8 gain_gap_index[txgap_k_number] = {0x13, 0x10, 0xd, 0xa, 0x7, 0x4, 0x1};
+	u32 txgainindex[txgap_k_number] = {0x26, 0x25, 0x24, 0x23, 0x22, 0x21, 0x20};
+	u32 tmp1, tmp2, tmp3, tmp4, tmp5;
 	u8 skip_low_power_index = 0x3;
 
-	s8 psd_single_tone_offset_1dB[3][3] = {{-1, 0, 0}, {-2, -1, -1}, {-1, -1, -1}}; /*5G, L,M,H, index 32,26,20*/
-	static u32 pwr_table_1dB[27] = {590, 630, 668, 707, 749, 794, 841, 891, 944, 1000, 1040, 1096, 1148, 1202, 1258, 1318,
+	s8 psd_single_tone_offset_1db[3][3] = {{-1, 0, 0}, {-2, -1, -1}, {-1, -1, -1} }; /*5G, L,M,H, index 32,26,20*/
+	static u32 pwr_table_1db[27] = {590, 630, 668, 707, 749, 794, 841, 891, 944, 1000, 1040, 1096, 1148, 1202, 1258, 1318,
 					1380, 1412, 1513, 1584, 1678, 1778, 1888, 1995, 2113, 2387, 2391};
-	static u32 pwr_table_3dB[27] = {944, 1000, 1059, 1122, 1185, 1258, 1333, 1412, 1496, 1584, 1659, 1737, 1819, 1905, 1995, 2089,
+	static u32 pwr_table_3db[27] = {944, 1000, 1059, 1122, 1185, 1258, 1333, 1412, 1496, 1584, 1659, 1737, 1819, 1905, 1995, 2089,
 					2187, 2290, 2398, 2511, 2660, 2818, 2985, 3162, 3349, 3548, 3758};
-	boolean txgapkdone = false, txgapktimeout = true;
+	boolean txgapkdone = false;
 	u8 txgap_changed = 0x0;
 	u8 ref_val = 0x0;
 
+	overflowflag = 0;
 	RF_DBG(dm, DBG_RF_IQK,
-	       "[TXGAPK] (1) *dm->band_width = %x, *dm->channel =%d, *dm->band_type=%x \n",
+	       "[TXGAPK] (1) *dm->band_width = %x, *dm->channel =%d, *dm->band_type=%x\n",
 	       *dm->band_width, *dm->channel, *dm->band_type);
 
 	if (!(*dm->mp_mode))
@@ -1993,11 +1993,10 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 		} else if (*dm->channel < 153) {
 			bandselect = 0x1;
 			add_base = 0x40;
-		}
 #if 0
 		/*else if (*dm->channel ==153){*/
 #endif
-		else {
+		} else {
 			bandselect = 0x2;
 			add_base = 0x80;
 		}
@@ -2008,11 +2007,10 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 		} else if (*dm->channel < 151) {
 			bandselect = 0x1;
 			add_base = 0x40;
-		}
 #if 0
 		/*else if (*dm->channel ==151){*/
 #endif
-		else {
+		} else {
 			bandselect = 0x2;
 			add_base = 0x80;
 		}
@@ -2024,11 +2022,10 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 		} else if (*dm->channel < 155) {
 			bandselect = 0x1;
 			add_base = 0x40;
-		}
 #if 0
 		/*else if (*dm->channel ==155){*/
 #endif
-		else {
+		} else {
 			bandselect = 0x2;
 			add_base = 0x80;
 		}
@@ -2044,12 +2041,12 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 	/*step 2*/
 	phydm_clear_kfree_to_rf(dm, RF_PATH_A, 1);
 
-	for (i = 0; i < txgapK_number; i++) {
+	for (i = 0; i < txgap_k_number; i++) {
 		txgain_rf56[i] = _txgapk_get_rf_tx_index_8821c(dm, RF_PATH_A, gain_gap_index[i]);
 		txgain[i] = txgain_rf56[i];
 	}
 
-	for (i = 0; i < txgapK_number; i++) {
+	for (i = 0; i < txgap_k_number; i++) {
 		RF_DBG(dm, DBG_RF_IQK, "[TXGAPK] start txgain1[%x]=0x%x\n", i,
 		       txgain_rf56[i]);
 	}
@@ -2064,7 +2061,7 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 		if (txgapk_num > 2)
 			break;
 
-		for (i = 0; i < txgapK_number - 1 - skip_low_power_index; i++) {
+		for (i = 0; i < txgap_k_number - 1 - skip_low_power_index; i++) {
 			tmp1 = (txgain[i] & 0x000000e0) >> 5;
 			tmp2 = (txgain[i + 1] & 0x000000e0) >> 5;
 			tmp5 = txgain[i + 1];
@@ -2074,25 +2071,25 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 			if (true) {
 				tmp3 = _txgapk_one_shot_8821c(dm, RF_PATH_A, txgain[i] - 2);
 				tmp4 = _txgapk_one_shot_8821c(dm, RF_PATH_A, txgain[i + 1]);
-				if (overflowflag) {
+				if (overflowflag)
+					overflowflag = false;
 #if 0
 					//tmp4 = tmp4>>1;
 #endif
-					overflowflag = false;
-				}
 
 				psd_delta =
-					_txgapk_txpower_compare_8821c(dm, RF_PATH_A, tmp3, tmp4, pwr_table_1dB);
+					_txgapk_txpower_compare_8821c(dm, RF_PATH_A, tmp3, tmp4, pwr_table_1db);
 
-				psd_delta = psd_delta + psd_single_tone_offset_1dB[bandselect][i];
+				psd_delta = psd_delta + psd_single_tone_offset_1db[bandselect][i];
 				RF_DBG(dm, DBG_RF_IQK,
 				       "[TXGAPK] new psd_detla = %x\n",
 				       psd_delta);
 
 				if (psd_delta <= 0xb)
 					txgap_changed++;
-				else if (psd_delta <= 0x11) {
-				} else
+				else if (psd_delta <= 0x11)
+					;
+				else
 					txgap_changed++;
 
 				txgain[i + 1] =
@@ -2107,9 +2104,9 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 		/*2nd*/
 
 		if (txgap_changed > 0x0) {
-			RF_DBG(dm, DBG_RF_IQK, "[TXGAPK] do 3dB check \n");
+			RF_DBG(dm, DBG_RF_IQK, "[TXGAPK] do 3dB check\n");
 
-			for (i = 0; i < txgapK_number - 1 - skip_low_power_index; i++) {
+			for (i = 0; i < txgap_k_number - 1 - skip_low_power_index; i++) {
 				tmp1 = (txgain[i] & 0x000000e0) >> 5;
 				tmp2 = (txgain[i + 1] & 0x000000e0) >> 5;
 
@@ -2125,18 +2122,19 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 						overflowflag = false;
 						RF_DBG(dm, DBG_RF_IQK, "[IQK] tmp3= %x, tmp4= %x\n", tmp3, tmp4);
 					}
-					if (i == 0) {
+					if (i == 0)
 						psd_delta =
-							_txgapk_txpower_compare_8821c(dm, RF_PATH_A, tmp3, tmp4, pwr_table_1dB);
+							_txgapk_txpower_compare_8821c(dm, RF_PATH_A, tmp3, tmp4, pwr_table_1db);
 
-					} else
+					else
 						psd_delta =
-							_txgapk_txpower_compare_8821c(dm, RF_PATH_A, tmp3, tmp4, pwr_table_3dB);
+							_txgapk_txpower_compare_8821c(dm, RF_PATH_A, tmp3, tmp4, pwr_table_3db);
 
 					if (psd_delta <= 0xa)
 						ref_val++;
-					else if (psd_delta <= 0x12) {
-					} else
+					else if (psd_delta <= 0x12)
+						;
+					else
 						ref_val++;
 				} else {
 					RF_DBG(dm, DBG_RF_IQK, "[TXGAPK]skip i=%d, txgain[%x]=0x%x\n", i, i + 1, txgain[i + 1]);
@@ -2148,13 +2146,13 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 				txgap_changed = 0x0;
 			} else {
 				/* restore default rf 0x56 */
-				for (i = 0; i < txgapK_number; i++) {
+				for (i = 0; i < txgap_k_number; i++)
 					txgain[i] = txgain_rf56[i];
-				}
 			}
 
-		} else
+		} else {
 			txgapkdone = true;
+		}
 	}
 
 	/*step 7*/
@@ -2168,7 +2166,7 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 	if (txgapkdone) {
 		odm_set_rf_reg(dm, RF_PATH_A, RF_0xef, RFREGOFFSETMASK, 0x00800);
 
-		for (i = 0; i < txgapK_number; i++) {
+		for (i = 0; i < txgap_k_number; i++) {
 			odm_set_rf_reg(dm, RF_PATH_A, RF_0x33, RFREGOFFSETMASK, txgainindex[i] + add_base);
 			odm_set_rf_reg(dm, RF_PATH_A, RF_0x3f, RFREGOFFSETMASK, txgain[i]);
 		}
@@ -2176,8 +2174,6 @@ void _phy_txgapk_calibrate_8821c(void *dm_void, u8 path)
 		txgap_done[bandselect] = true;
 		txgapkdone = false;
 	}
-
-	return;
 }
 
 #if 0
@@ -2219,15 +2215,14 @@ void _dpk_toggle_rxagc(struct dm_struct *dm, boolean reset)
 #if 0
 	/* 	 ODM_sleep_ms(2);*/
 #endif
-	ODM_delay_ms(2);
+	ODM_delay_us(10);
 	odm_set_bb_reg(dm, R_0xc50, BIT(3) | BIT(2) | BIT(1) | BIT(0), 0x2);
 #if 0
 	/*	 ODM_sleep_ms(2);*/
 #endif
-	ODM_delay_ms(2);
+	ODM_delay_us(10);
 	odm_set_bb_reg(dm, R_0xc50, BIT(3) | BIT(2) | BIT(1) | BIT(0), 0x0);
 	odm_write_4byte(dm, 0xc50, tmp1);
-	return;
 }
 
 void _dpk_set_gain_scaling(struct dm_struct *dm, u8 path)
@@ -2271,8 +2266,6 @@ void _dpk_set_gain_scaling(struct dm_struct *dm, u8 path)
 	       "[IQK] reg_1bfc =0x%x, lut_pw =0x%x, lut_i = 0x%x, lut_q = 0x%x, lut_pw_avg = 0x%x, gain_scaling = 0x%x, 0x1b98 =0x%x!!!\n",
 	       reg_1bfc, lut_pw, lut_i, lut_q, lut_pw_avg, gain_scaling,
 	       odm_read_4byte(dm, 0x1b98));
-
-	return;
 }
 
 void _dpk_set_dpk_pa_scan(struct dm_struct *dm, u8 path)
@@ -2376,8 +2369,6 @@ void _dpk_set_dpk_pa_scan(struct dm_struct *dm, u8 path)
 
 	odm_write_4byte(dm, 0x1bcf, tmp1);
 	odm_write_4byte(dm, 0x1bd4, tmp2);
-
-	return;
 }
 
 void _dpk_disable_bb_dynamic_pwr_threshold(struct dm_struct *dm, boolean flag)
@@ -2397,13 +2388,11 @@ void _dpk_set_dpk_sram_to_10_8821c(struct dm_struct *dm, u8 path)
 	tmp1 = odm_read_4byte(dm, 0x1b00);
 	tmp2 = odm_read_4byte(dm, 0x1b08);
 
-	for (i = 0; i < 64; i++) {
+	for (i = 0; i < 64; i++)
 		odm_write_4byte(dm, 0x1bdc, 0xd0000001 + (i * 2) + 1);
-	}
 
-	for (i = 0; i < 64; i++) {
+	for (i = 0; i < 64; i++)
 		odm_write_4byte(dm, 0x1bdc, 0x90000080 + (i * 2) + 1);
-	}
 
 #if 0
 	/*
@@ -2416,8 +2405,6 @@ void _dpk_set_dpk_sram_to_10_8821c(struct dm_struct *dm, u8 path)
 	odm_write_4byte(dm, 0x1bdc, 0x0);
 	odm_write_4byte(dm, 0x1b00, tmp1);
 	odm_write_4byte(dm, 0x1b08, tmp2);
-
-	return;
 }
 
 void _dpk_set_bbtxagc_8821c(struct dm_struct *dm, u8 path)
@@ -2435,7 +2422,6 @@ void _dpk_set_bbtxagc_8821c(struct dm_struct *dm, u8 path)
 */
 #endif
 	}
-	return;
 }
 
 u8 _dpk_get_txagcindpk_8821c(struct dm_struct *dm, u8 path)
@@ -2771,7 +2757,7 @@ u8 _dpk_get_dpk_tx_agc_8821c(struct dm_struct *dm, u8 path)
 #if 0
 	/*ODM_sleep_ms(1);*/
 #endif
-	ODM_delay_ms(1);
+	ODM_delay_us(10);
 	odm_write_4byte(dm, 0x1b00, IQK_CMD);
 	odm_write_4byte(dm, 0x1b00, IQK_CMD + 1);
 
@@ -2833,16 +2819,15 @@ _dpk_enable_dpk_8821c(struct dm_struct *dm, u8 path, u8 best_tx_agc)
 	boolean fail = true;
 	u32 IQK_CMD = 0xf8000e18;
 
-	if (*dm->band_type == ODM_BAND_5G) {
+	if (*dm->band_type == ODM_BAND_5G)
 		rf_reg00 = 0x40000 + best_tx_agc; /* set TXAGC value*/
-	} else {
+	else
 		rf_reg00 = 0x44000 + best_tx_agc; /* set TXAGC value*/
-	}
 	odm_set_rf_reg(dm, RF_PATH_A, RF_0x00, RFREGOFFSETMASK, rf_reg00);
 	_dpk_set_dpk_pa_scan(dm, RF_PATH_A);
 
 	/*ODM_sleep_ms(1);*/
-	ODM_delay_ms(1);
+	ODM_delay_us(10);
 	odm_set_bb_reg(dm, R_0x1bc8, BIT(31), 0x1);
 	odm_write_4byte(dm, 0x8f8, 0x41400080);
 
@@ -2850,7 +2835,7 @@ _dpk_enable_dpk_8821c(struct dm_struct *dm, u8 path, u8 best_tx_agc)
 		odm_set_rf_reg(dm, path, RF_0x8, RFREGOFFSETMASK, 0x0);
 
 	/*ODM_sleep_ms(1);*/
-	ODM_delay_ms(1);
+	ODM_delay_us(10);
 	odm_write_4byte(dm, 0x1b00, IQK_CMD);
 	odm_write_4byte(dm, 0x1b00, IQK_CMD + 1);
 
@@ -2910,7 +2895,7 @@ _dpk_enable_dpd_8821c(struct dm_struct *dm, u8 path, u8 best_tx_agc)
 	if (odm_get_rf_reg(dm, path, RF_0x08, RFREGOFFSETMASK) != 0x0)
 		odm_set_rf_reg(dm, path, RF_0x8, RFREGOFFSETMASK, 0x0);
 	/*ODM_sleep_ms(1);*/
-	ODM_delay_ms(1);
+	ODM_delay_us(10);
 	odm_write_4byte(dm, 0x1b00, IQK_CMD);
 	odm_write_4byte(dm, 0x1b00, IQK_CMD + 1);
 	fail = _iqk_check_nctl_done_8821c(dm, path, IQK_CMD);
@@ -2921,7 +2906,7 @@ _dpk_enable_dpd_8821c(struct dm_struct *dm, u8 path, u8 best_tx_agc)
 	if (!fail) {
 		odm_write_4byte(dm, 0x1bcf, 0x19);
 		odm_write_4byte(dm, 0x1bdc, 0x0);
-		/*add 2db extrnal for compensate performnace, the reason is unknow*/
+		/*add 2db extrnal for compensate performnace, the reason is unknown*/
 		external_pswf_gain = 0x2;
 		best_tx_agc = best_tx_agc + external_pswf_gain;
 
@@ -2987,7 +2972,7 @@ void _phy_dpd_calibrate_8821c(struct dm_struct *dm, boolean reset)
 	backup_dpdbb[0] = odm_read_4byte(dm, 0x1b2c);
 	backup_dpdbb[1] = odm_read_4byte(dm, 0x1b38);
 	backup_dpdbb[2] = odm_read_4byte(dm, 0x1b3c);
-	RF_DBG(dm, DBG_RF_IQK, "[DPK]In DPD Proces(1), Backup\n");
+	RF_DBG(dm, DBG_RF_IQK, "[DPK]In DPD Process(1), Backup\n");
 
 	/*PDK Init Register setting*/
 	_dpk_clear_sram_8821c(dm, RF_PATH_A);
@@ -3002,7 +2987,7 @@ void _phy_dpd_calibrate_8821c(struct dm_struct *dm, boolean reset)
 	/*ODM_sleep_ms(2);*/
 #endif
 
-	ODM_delay_ms(2);
+	ODM_delay_us(10);
 	RF_DBG(dm, DBG_RF_IQK, "[DPK]In DPD Process(2), Best TXAGC = 0x%x\n",
 	       best_tx_agc);
 
@@ -3013,7 +2998,7 @@ void _phy_dpd_calibrate_8821c(struct dm_struct *dm, boolean reset)
 #if 0
 	/*ODM_sleep_ms(2);*/
 #endif
-	ODM_delay_ms(2);
+	ODM_delay_us(10);
 	if (_dpk_enable_dpd_8821c(dm, RF_PATH_A, best_tx_agc)) {
 		RF_DBG(dm, DBG_RF_IQK,
 		       "[DPK]In DPD Process(4), DPD process is Fail\n");
@@ -3061,9 +3046,8 @@ void _phy_dpd_calibrate_8821c(struct dm_struct *dm, boolean reset)
 		dpk_result[i] = odm_read_4byte(dm, backup_dpk_reg[i]);
 
 	RF_DBG(dm, DBG_RF_IQK,
-	       "[DPK]the DPD calibration Process Finish (6), 0x1bd0 = 0x%x, 0x1b98 = 0x%x, 0x1bbc0= 0x%x \n",
+	       "[DPK]the DPD calibration Process Finish (6), 0x1bd0 = 0x%x, 0x1b98 = 0x%x, 0x1bbc0= 0x%x\n",
 	       dpk_result[0], dpk_result[1], dpk_result[2]);
-	return;
 }
 
 u32 _iqk_tximr_selfcheck_8821c(void *dm_void, u8 tone_index, u8 path)
@@ -3103,7 +3087,7 @@ u32 _iqk_tximr_selfcheck_8821c(void *dm_void, u8 tone_index, u8 path)
 		IQK_CMD = 0x00000800;
 		odm_write_4byte(dm, 0x1b34, IQK_CMD + 1);
 		odm_write_4byte(dm, 0x1b34, IQK_CMD);
-		ODM_delay_ms(1);
+		ODM_delay_us(10);
 		odm_write_4byte(dm, 0x1bd4, 0x00040001);
 		tx_ini_power_H[i] = odm_read_4byte(dm, 0x1bfc);
 		odm_write_4byte(dm, 0x1bd4, 0x000C0001);
@@ -3129,12 +3113,11 @@ u32 _iqk_rximr_selfcheck_8821c(void *dm_void, u8 tone_index, u8 path,
 	u32 rx_ini_power_H[2], rx_ini_power_L[2]; /*[0]: psd tone; [1]: image tone*/
 	u32 tmp1, tmp2, tmp3, tmp4, tmp5;
 	u32 IQK_CMD, tmp1bcc;
-	u8 i, num_k1, rximr_step;
+	u8 i;
 	u32 rximr = 0x0;
-	boolean KFAIL = true;
 
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	struct dm_iqk_info *iqk_info = &dm->IQK_info;
+
 	/*backup*/
 	odm_write_4byte(dm, 0x1b00, 0xf8000008 | path << 1);
 	tmp1 = odm_read_4byte(dm, 0x1b0c);
@@ -3243,7 +3226,7 @@ void _iqk_start_imr_test_8821c(void *dm_void, u8 path)
 	u32 imr_result[2];
 
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	struct dm_iqk_info *iqk_info = &dm->IQK_info;
+
 	/*TX IMR*/
 	if (*dm->band_width == 2)
 		imr_limit = 0xe;
@@ -3274,8 +3257,9 @@ void _iqk_start_imr_test_8821c(void *dm_void, u8 path)
 				odm_write_4byte(dm, 0x1b14, 0xe5);
 				odm_write_4byte(dm, 0x1b14, 0x0);
 				rxk1_tmp1b38[path][i] = odm_read_4byte(dm, 0x1b38);
-			} else
+			} else {
 				rxk1_tmp1b38[path][i] = 0x0;
+			}
 		}
 	}
 	_iqk_rxk2setting_8821c(dm, path, true);
@@ -3295,12 +3279,15 @@ void _iqk_start_imr_test_8821c(void *dm_void, u8 path)
 void _phy_iq_calibrate_8821c(struct dm_struct *dm, boolean reset,
 			     boolean segment_iqk, boolean do_imr_test)
 {
-	u32 MAC_backup[MAC_REG_NUM_8821C], BB_backup[BB_REG_NUM_8821C], RF_backup[RF_REG_NUM_8821C][1];
+	u32 MAC_backup[MAC_REG_NUM_8821C], BB_backup[BB_REG_NUM_8821C];
+	u32 RF_backup[RF_REG_NUM_8821C][1];
 	u32 backup_mac_reg[MAC_REG_NUM_8821C] = {0x520, 0x550, 0x1518};
-	u32 backup_bb_reg[BB_REG_NUM_8821C] = {0x808, 0x90c, 0xc00, 0xcb0, 0xcb4, 0xcbc, 0x1990, 0x9a4, 0xa04};
+	u32 backup_bb_reg[BB_REG_NUM_8821C] = {0x808, 0x90c, 0xc00, 0xcb0,
+						0xcb4, 0xcbc, 0x1990,
+						0x9a4, 0xa04, 0x838};
 	u32 backup_rf_reg[RF_REG_NUM_8821C] = {0xdf, 0xde, 0x8f, 0x0, 0x1};
 	boolean is_mp = false;
-	u64 txgak_time_start = 0x0, txgak_time_process = 0x0;
+	int i = 0;
 
 	struct dm_iqk_info *iqk_info = &dm->IQK_info;
 
@@ -3313,15 +3300,14 @@ void _phy_iq_calibrate_8821c(struct dm_struct *dm, boolean reset,
 	if (!is_mp)
 		if (_iqk_reload_iqk_8821c(dm, reset))
 			return;
-	if (!do_imr_test) {
+	if (!do_imr_test)
 		RF_DBG(dm, DBG_RF_IQK,
 		       "[IQK]==========IQK strat!!!!!==========\n");
-	}
 	RF_DBG(dm, DBG_RF_IQK,
 	       "[IQK]band_type = %s, band_width = %d, ExtPA2G = %d, ext_pa_5g = %d\n",
 	       (*dm->band_type == ODM_BAND_5G) ? "5G" : "2G", *dm->band_width,
 	       dm->ext_pa, dm->ext_pa_5g);
-	RF_DBG(dm, DBG_RF_IQK, "[IQK]Interface = %d, cut_version = %x\n",
+	RF_DBG(dm, DBG_RF_IQK, "[IQK]Interface = %d, Cv = %x\n",
 	       dm->support_interface, dm->cut_version);
 
 	iqk_info->tmp_gntwl = _iqk_indirect_read_reg(dm, 0x38);
@@ -3348,8 +3334,9 @@ void _phy_iq_calibrate_8821c(struct dm_struct *dm, boolean reset,
 		if (do_imr_test) {
 			_iqk_start_imr_test_8821c(dm, 0x0);
 			dm->rf_calibrate_info.iqk_step = 4;
-		} else
+		} else {
 			_iqk_start_iqk_8821c(dm, segment_iqk);
+		}
 		_iqk_afe_setting_8821c(dm, false);
 		_iqk_restore_mac_bb_8821c(dm, MAC_backup, BB_backup, backup_mac_reg, backup_bb_reg, BB_REG_NUM_8821C);
 		_iqk_restore_rf_8821c(dm, backup_rf_reg, RF_backup);
@@ -3370,7 +3357,8 @@ void _phy_iq_calibrate_8821c(struct dm_struct *dm, boolean reset,
 #if 0
 		/*ODM_sleep_ms(50);*/
 #endif
-		ODM_delay_ms(50);
+		for (i = 0; i<1000; i++)
+			ODM_delay_us(10);
 	}
 
 	if (!do_imr_test) {
@@ -3468,7 +3456,7 @@ void _phy_iqk_debug_inner_lpbk_psd_8821c(struct dm_struct *dm, u8 path)
 			odm_write_4byte(dm, 0x1b3c, 0x20000000);
 			odm_write_4byte(dm, 0x1b34, 0x00000801);
 			odm_write_4byte(dm, 0x1b34, 0x00000800);
-			ODM_delay_ms(2);
+			ODM_delay_us(10);
 			/*PSD_bef_K*/
 			odm_write_4byte(dm, 0x1bd4, 0x000c0001);
 			psd_pwr = odm_read_4byte(dm, 0x1bfc);
@@ -3526,7 +3514,7 @@ void do_imr_test_8821c(void *dm_void)
 void phy_iq_calibrate_8821c(void *dm_void, boolean clear, boolean segment_iqk)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	struct _hal_rf_ *rf = &(dm->rf_table);
+	struct _hal_rf_ *rf = &dm->rf_table;
 
 	if (!(*dm->mp_mode))
 		_iqk_check_coex_status(dm, true);
@@ -3562,7 +3550,7 @@ void phy_iq_calibrate_8821c(void *dm_void, boolean clear, boolean segment_iqk)
 void phy_dp_calibrate_8821c(void *dm_void, boolean clear)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	struct _hal_rf_ *rf = &(dm->rf_table);
+	struct _hal_rf_ *rf = &dm->rf_table;
 
 #if (DM_ODM_SUPPORT_TYPE & (ODM_WIN))
 	if (odm_check_power_status(dm) == false)
@@ -3613,11 +3601,10 @@ void phy_dp_calibrate_8821c(void *dm_void, boolean clear)
 		odm_acquire_spin_lock(dm, RT_IQK_SPINLOCK);
 		dm->rf_calibrate_info.is_iqk_in_progress = false;
 		odm_release_spin_lock(dm, RT_IQK_SPINLOCK);
-	} else
+	} else {
 		RF_DBG(dm, DBG_RF_IQK,
 		       "[DPK]== Return the DPK CMD, because the DPK in Progress ==\n");
-
-	return;
+	}
 }
 void phy_txtap_calibrate_8821c(void *dm_void, boolean clear)
 {
@@ -3642,7 +3629,7 @@ void phy_txtap_calibrate_8821c(void *dm_void, boolean clear)
 #endif
 #endif
 
-	struct _hal_rf_ *rf = &(dm->rf_table);
+	struct _hal_rf_ *rf = &dm->rf_table;
 
 #if (DM_ODM_SUPPORT_TYPE == ODM_CE)
 	if (!(rf->rf_supportability & HAL_RF_IQK))
@@ -3667,13 +3654,13 @@ void phy_txtap_calibrate_8821c(void *dm_void, boolean clear)
 #endif
 #endif
 
-	if (!(*(dm->mp_mode)))
+	if (!(*dm->mp_mode))
 		_iqk_check_coex_status(dm, true);
 
 	if ((dm->rf_table.rf_supportability & HAL_RF_TXGAPK))
-		if ((iqk_info->lok_fail[RF_PATH_A] == 0) &&
-		    (iqk_info->iqk_fail_report[0][RF_PATH_A][TXIQK] == 0) &&
-		    (iqk_info->iqk_fail_report[0][RF_PATH_A][RXIQK] == 0)) {
+		if (iqk_info->lok_fail[RF_PATH_A] == 0 &&
+		    iqk_info->iqk_fail_report[0][RF_PATH_A][TXIQK] == 0 &&
+		    iqk_info->iqk_fail_report[0][RF_PATH_A][RXIQK] == 0) {
 			_iqk_backup_iqk_8821c(dm, 0x0, 0x0);
 			_iqk_backup_mac_bb_8821c(dm, MAC_backup, BB_backup, backup_mac_reg, backup_bb_reg, BB_REG_NUM_8821C);
 			_iqk_backup_rf_8821c(dm, RF_backup, backup_rf_reg);
@@ -3694,7 +3681,7 @@ void phy_txtap_calibrate_8821c(void *dm_void, boolean clear)
 void dpk_temperature_compensate_8821c(void *dm_void)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	struct _hal_rf_ *rf = &(dm->rf_table);
+	struct _hal_rf_ *rf = &dm->rf_table;
 #if !(DM_ODM_SUPPORT_TYPE & ODM_AP)
 	void *adapter = dm->adapter;
 	HAL_DATA_TYPE *hal_data = GET_HAL_DATA(((PADAPTER)adapter));
@@ -3704,7 +3691,7 @@ void dpk_temperature_compensate_8821c(void *dm_void)
 	u8 pgthermal = (u8)priv->pmib->dot11RFEntry.ther;
 
 #endif
-	static u8 dpk_tm_trigger = 0;
+	static u8 dpk_tm_trigger;
 	u8 thermal_value = 0, delta_dpk, i = 0;
 	u8 thermal_value_avg_count = 0;
 	u8 thermal_value_avg_times = 2;

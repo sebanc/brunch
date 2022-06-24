@@ -16,7 +16,6 @@
 #ifndef __HALRF_PSD_H__
 #define __HALRF_PSD_H__
 
-#if (DM_ODM_SUPPORT_TYPE & ODM_WIN)
 
 struct _halrf_psd_data {
 	u32 point;
@@ -28,19 +27,19 @@ struct _halrf_psd_data {
 	u32 psd_progress;
 };
 
-enum rt_status
+u32
 halrf_psd_init(
-	struct dm_struct *dm);
+	void *dm_void);
 
-enum rt_status
+u32
 halrf_psd_query(
-	struct dm_struct *dm,
+	void *dm_void,
 	u32 *outbuf,
 	u32 buf_size);
 
-enum rt_status
+u32
 halrf_psd_init_query(
-	struct dm_struct *dm,
+	void *dm_void,
 	u32 *outbuf,
 	u32 point,
 	u32 start_point,
@@ -48,5 +47,4 @@ halrf_psd_init_query(
 	u32 average,
 	u32 buf_size);
 
-#endif /*#if (DM_ODM_SUPPORT_TYPE & ODM_WIN)*/
-#endif /*#ifndef __HALRF_PSD_H__*/
+#endif /*#__HALRF_PSD_H__*/

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2017 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2017 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -43,6 +43,7 @@ download_flash_88xx(struct halmac_adapter *adapter, u8 *fw_bin, u32 size,
 	u16 h2c_info_offset;
 	u32 pkt_size;
 	u32 mem_offset;
+	u32 cnt;
 
 	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
 
@@ -105,12 +106,14 @@ download_flash_88xx(struct halmac_adapter *adapter, u8 *fw_bin, u32 size,
 		mem_offset += pkt_size;
 		size -= pkt_size;
 
-		while (((HALMAC_REG_R8(REG_MCUTST_I)) & BIT(0)) != 0)
+		cnt = 1000;
+		while (((HALMAC_REG_R8(REG_MCUTST_I)) & BIT(0)) != 0) {
+			if (cnt == 0) {
+				PLTFM_MSG_ERR("[ERR]dl flash!!\n");
+				return  HALMAC_RET_DLFW_FAIL;
+			}
+			cnt--;
 			PLTFM_DELAY_US(1000);
-
-		if (((HALMAC_REG_R8(REG_MCUTST_I)) & BIT(0)) != 0) {
-			PLTFM_MSG_ERR("[ERR]dl flash!!\n");
-			return  HALMAC_RET_DLFW_FAIL;
 		}
 	}
 
@@ -131,7 +134,7 @@ download_flash_88xx(struct halmac_adapter *adapter, u8 *fw_bin, u32 size,
  * More details of status code can be found in prototype document
  */
 enum halmac_ret_status
-read_flash_88xx(struct halmac_adapter *adapter, u32 addr, u32 length)
+read_flash_88xx(struct halmac_adapter *adapter, u32 addr, u32 length, u8 *data)
 {
 	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
 	enum halmac_ret_status status;
@@ -140,8 +143,10 @@ read_flash_88xx(struct halmac_adapter *adapter, u32 addr, u32 length)
 	u8 restore[3];
 	u8 h2c_buf[H2C_PKT_SIZE_88XX] = {0};
 	u16 seq_num = 0;
-	u16 h2c_info_addr = adapter->txff_alloc.rsvd_h2c_info_addr;
+	u16 h2c_pg_addr = adapter->txff_alloc.rsvd_h2c_info_addr;
 	u16 rsvd_pg_addr = adapter->txff_alloc.rsvd_boundary;
+	u16 h2c_info_addr;
+	u32 cnt;
 
 	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
 
@@ -160,14 +165,14 @@ read_flash_88xx(struct halmac_adapter *adapter, u32 addr, u32 length)
 	value8 = (u8)(value8 & ~(BIT(6)));
 	HALMAC_REG_W8(REG_FWHW_TXQ_CTRL + 2, value8);
 
-	HALMAC_REG_W16(REG_FIFOPAGE_CTRL_2, h2c_info_addr);
+	HALMAC_REG_W16(REG_FIFOPAGE_CTRL_2, h2c_pg_addr);
 	value8 = HALMAC_REG_R8(REG_MCUTST_I);
 	value8 |= BIT(0);
 	HALMAC_REG_W8(REG_MCUTST_I, value8);
 
 	/* Construct H2C Content */
 	DOWNLOAD_FLASH_SET_SPI_CMD(h2c_buf, 0x03);
-	DOWNLOAD_FLASH_SET_LOCATION(h2c_buf, h2c_info_addr - rsvd_pg_addr);
+	DOWNLOAD_FLASH_SET_LOCATION(h2c_buf, h2c_pg_addr - rsvd_pg_addr);
 	DOWNLOAD_FLASH_SET_SIZE(h2c_buf, length);
 	DOWNLOAD_FLASH_SET_START_ADDR(h2c_buf, addr);
 
@@ -185,14 +190,30 @@ read_flash_88xx(struct halmac_adapter *adapter, u32 addr, u32 length)
 		return status;
 	}
 
-	while (((HALMAC_REG_R8(REG_MCUTST_I)) & BIT(0)) != 0)
+	cnt = 5000;
+	while (((HALMAC_REG_R8(REG_MCUTST_I)) & BIT(0)) != 0) {
+		if (cnt == 0) {
+			PLTFM_MSG_ERR("[ERR]read flash!!\n");
+			return  HALMAC_RET_FAIL;
+		}
+		cnt--;
 		PLTFM_DELAY_US(1000);
+	}
+
+	HALMAC_REG_W8_CLR(REG_MCUTST_I, BIT(0));
 
 	HALMAC_REG_W16(REG_FIFOPAGE_CTRL_2, rsvd_pg_addr);
 	HALMAC_REG_W8(REG_FWHW_TXQ_CTRL + 2, restore[2]);
 	HALMAC_REG_W8(REG_BCN_CTRL, restore[1]);
 	HALMAC_REG_W8(REG_CR + 1, restore[0]);
 
+	h2c_info_addr = h2c_pg_addr << TX_PAGE_SIZE_SHIFT_88XX;
+	status = dump_fifo_88xx(adapter, HAL_FIFO_SEL_TX, h2c_info_addr,
+				length, data);
+	if (status != HALMAC_RET_SUCCESS) {
+		PLTFM_MSG_ERR("[ERR]dump fifo!!\n");
+		return status;
+	}
 	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
 
 	return HALMAC_RET_SUCCESS;
@@ -274,8 +295,11 @@ check_flash_88xx(struct halmac_adapter *adapter, u8 *fw_bin, u32 size,
 	u32 pkt_size;
 	u32 start_page;
 	u32 cnt;
+	u8 *data;
 
 	pg_addr = adapter->txff_alloc.rsvd_h2c_info_addr;
+
+	data = (u8 *)PLTFM_MALLOC(4096);
 
 	while (size != 0) {
 		start_page = ((pg_addr << 7) >> 12) + 0x780;
@@ -286,7 +310,7 @@ check_flash_88xx(struct halmac_adapter *adapter, u8 *fw_bin, u32 size,
 		else
 			pkt_size = size;
 
-		read_flash_88xx(adapter, addr, 4096);
+		read_flash_88xx(adapter, addr, 4096, data);
 
 		cnt = 0;
 		while (cnt < pkt_size) {
@@ -295,6 +319,7 @@ check_flash_88xx(struct halmac_adapter *adapter, u8 *fw_bin, u32 size,
 				value8 = HALMAC_REG_R8(i);
 				if (*fw_bin != value8) {
 					PLTFM_MSG_ERR("[ERR]check flash!!\n");
+					PLTFM_FREE(data, 4096);
 					return HALMAC_RET_FAIL;
 				}
 
@@ -309,6 +334,8 @@ check_flash_88xx(struct halmac_adapter *adapter, u8 *fw_bin, u32 size,
 		addr += pkt_size;
 		size -= pkt_size;
 	}
+
+	PLTFM_FREE(data, 4096);
 
 	return HALMAC_RET_SUCCESS;
 }

@@ -30,21 +30,32 @@
 #include "mp_precomp.h"
 #include "phydm_precomp.h"
 
-/* #if( DM_ODM_SUPPORT_TYPE & (ODM_WIN |ODM_CE)) */
-#if (defined(CONFIG_ANT_DETECTION))
+#ifdef CONFIG_ANT_DETECTION
 
-/* IS_ANT_DETECT_SUPPORT_SINGLE_TONE(adapter)
+/* @IS_ANT_DETECT_SUPPORT_SINGLE_TONE(adapter)
  * IS_ANT_DETECT_SUPPORT_RSSI(adapter)
  * IS_ANT_DETECT_SUPPORT_PSD(adapter) */
 
-/* 1 [1. Single Tone method] =================================================== */
+/* @1 [1. Single Tone method] =================================================== */
 
-/*
+/*@
  * Description:
  *	Set Single/Dual Antenna default setting for products that do not do detection in advance.
  *
  * Added by Joseph, 2012.03.22
  *   */
+void odm_sw_ant_div_construct_scan_chnl(
+	void *adapter,
+	u8 scan_chnl)
+{
+}
+
+u8 odm_sw_ant_div_select_scan_chnl(
+	void *adapter)
+{
+	return 0;
+}
+
 void odm_single_dual_antenna_default_setting(
 	void *dm_void)
 {
@@ -67,7 +78,7 @@ void odm_single_dual_antenna_default_setting(
 		RT_ASSERT(false, ("Incorrect antenna number!!\n"));
 }
 
-/* 2 8723A ANT DETECT
+/* @2 8723A ANT DETECT
  *
  * Description:
  *	Implement IQK single tone for RF DPK loopback and BB PSD scanning.
@@ -100,7 +111,7 @@ odm_single_dual_antenna_detection(
 	if (!IS_ANT_DETECT_SUPPORT_SINGLE_TONE(((PADAPTER)adapter)))
 		return is_result;
 
-	/* 1 Backup Current RF/BB Settings */
+	/* @1 Backup Current RF/BB Settings */
 
 	current_channel = odm_get_rf_reg(dm, RF_PATH_A, ODM_CHANNEL, RFREGOFFSETMASK);
 	rf_loop_reg = odm_get_rf_reg(dm, RF_PATH_A, RF_0x00, RFREGOFFSETMASK);
@@ -112,8 +123,8 @@ odm_single_dual_antenna_detection(
 		reg064 = odm_get_mac_reg(dm, REG_SYM_WLBT_PAPE_SEL, BIT(29));
 		odm_set_bb_reg(dm, REG_DPDT_CONTROL, 0x3, 0x1);
 		odm_set_bb_reg(dm, rfe_ctrl_anta_src, 0xff, 0x77);
-		odm_set_mac_reg(dm, REG_SYM_WLBT_PAPE_SEL, BIT(29), 0x1); /* dbg 7 */
-		odm_set_bb_reg(dm, REG_S0_S1_PATH_SWITCH, 0x3c0, 0x0); /* dbg 8 */
+		odm_set_mac_reg(dm, REG_SYM_WLBT_PAPE_SEL, BIT(29), 0x1); /* @dbg 7 */
+		odm_set_bb_reg(dm, REG_S0_S1_PATH_SWITCH, 0x3c0, 0x0); /* @dbg 8 */
 		odm_set_bb_reg(dm, REG_AGC_TABLE_SELECT, BIT(31), 0x0);
 	}
 
@@ -130,23 +141,23 @@ odm_single_dual_antenna_detection(
 		afe_rrx_wait_cca = odm_get_bb_reg(dm, REG_RX_WAIT_CCA, MASKDWORD);
 
 	/* Set PSD 128 pts */
-	odm_set_bb_reg(dm, REG_FPGA0_PSD_FUNCTION, BIT(14) | BIT15, 0x0); /* 128 pts */
+	odm_set_bb_reg(dm, REG_FPGA0_PSD_FUNCTION, BIT(14) | BIT15, 0x0); /* @128 pts */
 
 	/* To SET CH1 to do */
-	odm_set_rf_reg(dm, RF_PATH_A, ODM_CHANNEL, RFREGOFFSETMASK, 0x7401); /* channel 1 */
+	odm_set_rf_reg(dm, RF_PATH_A, ODM_CHANNEL, RFREGOFFSETMASK, 0x7401); /* @channel 1 */
 
-	/* AFE all on step */
+	/* @AFE all on step */
 	if (dm->support_ic_type & ODM_RTL8723B)
 		odm_set_bb_reg(dm, REG_RX_WAIT_CCA, MASKDWORD, 0x01c00016);
 
-	/* 3 wire Disable */
+	/* @3 wire Disable */
 	odm_set_bb_reg(dm, REG_FPGA0_ANALOG_PARAMETER4, MASKDWORD, 0xCCF000C0);
 
-	/* BB IQK setting */
+	/* @BB IQK setting */
 	odm_set_bb_reg(dm, REG_OFDM_0_TR_MUX_PAR, MASKDWORD, 0x000800E4);
 	odm_set_bb_reg(dm, REG_FPGA0_XCD_RF_INTERFACE_SW, MASKDWORD, 0x22208000);
 
-	/* IQK setting tone@ 4.34Mhz */
+	/* @IQK setting tone@ 4.34Mhz */
 	odm_set_bb_reg(dm, REG_TX_IQK_TONE_A, MASKDWORD, 0x10008C1C);
 	odm_set_bb_reg(dm, REG_TX_IQK, MASKDWORD, 0x01007c00);
 
@@ -162,7 +173,7 @@ odm_single_dual_antenna_detection(
 	odm_set_bb_reg(dm, REG_IQK_AGC_RSP, MASKDWORD, 0x001028d0);
 	odm_set_bb_reg(dm, REG_OFDM_0_XA_AGC_CORE1, 0x7f, initial_gain);
 
-	/* IQK Single tone start */
+	/* @IQK Single tone start */
 	odm_set_bb_reg(dm, REG_FPGA0_IQK, 0xffffff00, 0x808000);
 	odm_set_bb_reg(dm, REG_IQK_AGC_PTS, MASKDWORD, 0xf9000000);
 	odm_set_bb_reg(dm, REG_IQK_AGC_PTS, MASKDWORD, 0xf8000000);
@@ -177,9 +188,8 @@ odm_single_dual_antenna_detection(
 			ant_a_report = PSD_report_tmp;
 	}
 
-	/* change to Antenna B */
+	/* @change to Antenna B */
 	if (dm->support_ic_type & ODM_RTL8723B) {
-		/* odm_set_bb_reg(dm, REG_DPDT_CONTROL, 0x3, 0x2); */
 		odm_set_bb_reg(dm, REG_S0_S1_PATH_SWITCH, 0xfff, 0x280);
 		odm_set_bb_reg(dm, REG_AGC_TABLE_SELECT, BIT(31), 0x1);
 	}
@@ -194,15 +204,15 @@ odm_single_dual_antenna_detection(
 			ant_b_report = PSD_report_tmp;
 	}
 
-	/* Close IQK Single Tone function */
+	/* @Close IQK Single Tone function */
 	odm_set_bb_reg(dm, REG_FPGA0_IQK, 0xffffff00, 0x000000);
 
-	/* 1 Return to antanna A */
+	/* @1 Return to antanna A */
 	if (dm->support_ic_type & ODM_RTL8723B) {
-		/* external DPDT */
+		/* @external DPDT */
 		odm_set_bb_reg(dm, REG_DPDT_CONTROL, MASKDWORD, reg92c);
 
-		/* internal S0/S1 */
+		/* @internal S0/S1 */
 		odm_set_bb_reg(dm, REG_S0_S1_PATH_SWITCH, MASKDWORD, reg948);
 		odm_set_bb_reg(dm, REG_AGC_TABLE_SELECT, MASKDWORD, regb2c);
 		odm_set_bb_reg(dm, rfe_ctrl_anta_src, MASKDWORD, reg930);
@@ -227,7 +237,7 @@ odm_single_dual_antenna_detection(
 		PHYDM_DBG(dm, DBG_ANT_DIV, "psd_report_B[%d]= %d\n", 2416,
 			  ant_b_report);
 
-		/* 2 Test ant B based on ant A is ON */
+		/* @2 Test ant B based on ant A is ON */
 		if (ant_a_report >= 100 && ant_b_report >= 100 && ant_a_report <= 135 && ant_b_report <= 135) {
 			u8 TH1 = 2, TH2 = 6;
 
@@ -263,7 +273,7 @@ odm_single_dual_antenna_detection(
 	return is_result;
 }
 
-/* 1 [2. Scan AP RSSI method] ================================================== */
+/* @1 [2. Scan AP RSSI method] ================================================== */
 
 boolean
 odm_sw_ant_div_check_before_link(
@@ -289,7 +299,7 @@ odm_sw_ant_div_check_before_link(
 	PHYDM_DBG(dm, DBG_ANT_DIV, "ANTA_ON = (( %d )) , ANTB_ON = (( %d ))\n",
 		  dm->dm_swat_table.ANTA_ON, dm->dm_swat_table.ANTB_ON);
 
-	/* if(HP id) */
+	/* @if(HP id) */
 	{
 		if (dm->dm_swat_table.rssi_ant_dect_result == true && dm->support_ic_type == ODM_RTL8723B) {
 			PHYDM_DBG(dm, DBG_ANT_DIV,
@@ -303,7 +313,7 @@ odm_sw_ant_div_check_before_link(
 		}
 	}
 
-	if (dm->adapter == NULL) { /* For BSOD when plug/unplug fast.  //By YJ,120413 */
+	if (dm->adapter == NULL) { /* @For BSOD when plug/unplug fast.  //By YJ,120413 */
 		/* The ODM structure is not initialized. */
 		return false;
 	}
@@ -331,18 +341,18 @@ odm_sw_ant_div_check_before_link(
 		odm_release_spin_lock(dm, RT_RF_STATE_SPINLOCK);
 	PHYDM_DBG(dm, DBG_ANT_DIV, "dm_swat_table->swas_no_link_state = %d\n",
 		  dm_swat_table->swas_no_link_state);
-	/* 1 Run AntDiv mechanism "Before Link" part. */
+	/* @1 Run AntDiv mechanism "Before Link" part. */
 	if (dm_swat_table->swas_no_link_state == 0) {
-		/* 1 Prepare to do Scan again to check current antenna state. */
+		/* @1 Prepare to do Scan again to check current antenna state. */
 
 		/* Set check state to next step. */
 		dm_swat_table->swas_no_link_state = 1;
 
-		/* Copy Current Scan list. */
+		/* @Copy Current Scan list. */
 		mgnt_info->tmpNumBssDesc = mgnt_info->NumBssDesc;
 		PlatformMoveMemory((void *)mgnt_info->tmpbssDesc, (void *)mgnt_info->bssDesc, sizeof(RT_WLAN_BSS) * MAX_BSS_DESC);
 
-		/* Go back to scan function again. */
+		/* @Go back to scan function again. */
 		PHYDM_DBG(dm, DBG_ANT_DIV, "%s: Scan one more time\n",
 			  __func__);
 		mgnt_info->ScanStep = 0;
@@ -403,17 +413,17 @@ odm_sw_ant_div_check_before_link(
 		PlatformSetTimer(adapter, &mgnt_info->ScanTimer, 5);
 
 		return true;
-	} else { /* dm_swat_table->swas_no_link_state == 1 */
-		/* 1 ScanComple() is called after antenna swiched. */
-		/* 1 Check scan result and determine which antenna is going */
-		/* 1 to be used. */
+	} else { /* @dm_swat_table->swas_no_link_state == 1 */
+		/* @1 ScanComple() is called after antenna swiched. */
+		/* @1 Check scan result and determine which antenna is going */
+		/* @1 to be used. */
 
 		PHYDM_DBG(dm, DBG_ANT_DIV, " tmp_num_bss_desc= (( %d ))\n",
-			  mgnt_info->tmpNumBssDesc); /* debug for Dino */
+			  mgnt_info->tmpNumBssDesc); /* @debug for Dino */
 
 		for (index = 0; index < mgnt_info->tmpNumBssDesc; index++) {
-			p_tmp_bss_desc = &mgnt_info->tmpbssDesc[index]; /* Antenna 1 */
-			p_test_bss_desc = &mgnt_info->bssDesc[index]; /* Antenna 2 */
+			p_tmp_bss_desc = &mgnt_info->tmpbssDesc[index]; /* @Antenna 1 */
+			p_test_bss_desc = &mgnt_info->bssDesc[index]; /* @Antenna 2 */
 
 			if (PlatformCompareMemory(p_test_bss_desc->bdBssIdBuf, p_tmp_bss_desc->bdBssIdBuf, 6) != 0) {
 				PHYDM_DBG(dm, DBG_ANT_DIV,
@@ -444,7 +454,7 @@ odm_sw_ant_div_check_before_link(
 						}
 					}
 				}
-			} else { /* 8723B */
+			} else { /* @8723B */
 				if (p_tmp_bss_desc->ChannelNumber == scan_channel) {
 					PHYDM_DBG(dm, DBG_ANT_DIV, "channel_number == scan_channel->(( %d ))\n", p_tmp_bss_desc->ChannelNumber);
 
@@ -457,12 +467,16 @@ odm_sw_ant_div_check_before_link(
 						PHYDM_PRINT_ADDR(dm, DBG_ANT_DIV, "SSID:", p_tmp_bss_desc->bdSsIdBuf);
 						PHYDM_PRINT_ADDR(dm, DBG_ANT_DIV, "BSSID:", p_tmp_bss_desc->bdSsIdBuf);
 
+#if 0
 						/* PHYDM_DBG(dm,DBG_ANT_DIV, "tmp_power_diff: (( %d)),max_power_diff: (( %d)),min_power_diff: (( %d))\n", tmp_power_diff,max_power_diff,min_power_diff); */
+#endif
 						if (tmp_power_diff > max_power_diff)
 							max_power_diff = tmp_power_diff;
 						if (tmp_power_diff < min_power_diff)
 							min_power_diff = tmp_power_diff;
+#if 0
 						/* PHYDM_DBG(dm,DBG_ANT_DIV, "max_power_diff: (( %d)),min_power_diff: (( %d))\n",max_power_diff,min_power_diff); */
+#endif
 
 						PlatformMoveMemory(p_test_bss_desc, p_tmp_bss_desc, sizeof(RT_WLAN_BSS));
 					} else if (p_test_bss_desc->RecvSignalPower > p_tmp_bss_desc->RecvSignalPower) { /* Pow(Ant1) < Pow(Ant2) */
@@ -531,12 +545,12 @@ odm_sw_ant_div_check_before_link(
 					dm->dm_swat_table.rssi_ant_dect_result = false;
 					PHYDM_DBG(dm, DBG_ANT_DIV, "counter=(( 0 )) , [[ Cannot find any AP with Aux-ant ]] ->  Scan Target-channel again\n");
 
-					/* 3 [ Scan again ] */
+					/* @3 [ Scan again ] */
 					odm_sw_ant_div_construct_scan_chnl(adapter, scan_channel);
 					PlatformSetTimer(adapter, &mgnt_info->ScanTimer, 5);
 					return true;
 				} else { /* pre_aux_fail_detec == true */
-					/* 2 [ Single Antenna ] */
+					/* @2 [ Single Antenna ] */
 					dm->dm_swat_table.pre_aux_fail_detec = false;
 					dm->dm_swat_table.rssi_ant_dect_result = true;
 					PHYDM_DBG(dm, DBG_ANT_DIV, "counter=(( 0 )) , [[  Still cannot find any AP ]]\n");
@@ -555,12 +569,12 @@ odm_sw_ant_div_check_before_link(
 					PHYDM_DBG(dm, DBG_ANT_DIV, "counter: (( %d )) ,  power_diff: (( %d ))\n", counter, power_diff);
 					PHYDM_DBG(dm, DBG_ANT_DIV, "[ counter>=4 ] Modified avg_power_diff: (( %d )) , max_power_diff: (( %d )) ,  min_power_diff: (( %d ))\n", avg_power_diff, max_power_diff, min_power_diff);
 
-				} else { /* counter==1,2 */
+				} else { /* @counter==1,2 */
 					avg_power_diff = power_diff / counter;
 					PHYDM_DBG(dm, DBG_ANT_DIV, "avg_power_diff: (( %d )) , counter: (( %d )) ,  power_diff: (( %d ))\n", avg_power_diff, counter, power_diff);
 				}
 
-				/* 2 [ Retry ] */
+				/* @2 [ Retry ] */
 				if (avg_power_diff >= power_target_L && avg_power_diff <= power_target_H) {
 					dm->dm_swat_table.retry_counter++;
 
@@ -568,7 +582,7 @@ odm_sw_ant_div_check_before_link(
 						dm->dm_swat_table.rssi_ant_dect_result = false;
 						PHYDM_DBG(dm, DBG_ANT_DIV, "[[ Low confidence result ]] avg_power_diff= (( %d ))  ->  Scan Target-channel again ]]\n", avg_power_diff);
 
-						/* 3 [ Scan again ] */
+						/* @3 [ Scan again ] */
 						odm_sw_ant_div_construct_scan_chnl(adapter, scan_channel);
 						PlatformSetTimer(adapter, &mgnt_info->ScanTimer, 5);
 						return true;
@@ -578,7 +592,7 @@ odm_sw_ant_div_check_before_link(
 						PHYDM_DBG(dm, DBG_ANT_DIV, "%s: Single antenna\n", __func__);
 					}
 				}
-				/* 2 [ Dual Antenna ] */
+				/* @2 [ Dual Antenna ] */
 				else if ((mgnt_info->NumBssDesc != 0) && (avg_power_diff < power_target_L)) {
 					dm->dm_swat_table.rssi_ant_dect_result = true;
 					if (dm->dm_swat_table.ANTB_ON == false) {
@@ -591,23 +605,27 @@ odm_sw_ant_div_check_before_link(
 					/* set bt coexDM from 1ant coexDM to 2ant coexDM */
 					BT_SetBtCoexAntNum(adapter, BT_COEX_ANT_TYPE_DETECTED, 2);
 
-					/* 3 [ Init antenna diversity ] */
+					/* @3 [ Init antenna diversity ] */
 					dm->support_ability |= ODM_BB_ANT_DIV;
 					odm_ant_div_init(dm);
 				}
-				/* 2 [ Single Antenna ] */
+				/* @2 [ Single Antenna ] */
 				else if (avg_power_diff > power_target_H) {
 					dm->dm_swat_table.rssi_ant_dect_result = true;
 					if (dm->dm_swat_table.ANTB_ON == true) {
 						dm->dm_swat_table.ANTA_ON = true;
 						dm->dm_swat_table.ANTB_ON = false;
-						/* bt_set_bt_coex_ant_num(adapter, BT_COEX_ANT_TYPE_DETECTED, 1); */
+#if 0
+						/* @bt_set_bt_coex_ant_num(adapter, BT_COEX_ANT_TYPE_DETECTED, 1); */
+#endif
 					}
 					PHYDM_DBG(dm, DBG_ANT_DIV, "%s: Single antenna\n", __func__);
 					dm->dm_swat_table.single_ant_counter++;
 				}
 			}
+#if 0
 			/* PHYDM_DBG(dm,DBG_ANT_DIV, "is_result=(( %d ))\n",dm->dm_swat_table.rssi_ant_dect_result); */
+#endif
 			PHYDM_DBG(dm, DBG_ANT_DIV,
 				  "dual_ant_counter = (( %d )), single_ant_counter = (( %d )) , retry_counter = (( %d )) , aux_fail_detec_counter = (( %d ))\n\n\n",
 				  dm->dm_swat_table.dual_ant_counter,
@@ -615,7 +633,7 @@ odm_sw_ant_div_check_before_link(
 				  dm->dm_swat_table.retry_counter,
 				  dm->dm_swat_table.aux_fail_detec_counter);
 
-			/* 2 recover the antenna setting */
+			/* @2 recover the antenna setting */
 
 			if (dm->dm_swat_table.ANTB_ON == false)
 				odm_set_bb_reg(dm, REG_S0_S1_PATH_SWITCH, 0xfff, (dm_swat_table->swas_no_link_bk_reg948));
@@ -626,7 +644,7 @@ odm_sw_ant_div_check_before_link(
 				  dm_swat_table->swas_no_link_bk_reg948);
 		}
 
-		/* Check state reset to default and wait for next time. */
+		/* @Check state reset to default and wait for next time. */
 		dm_swat_table->swas_no_link_state = 0;
 		mgnt_info->bScanAntDetect = false;
 
@@ -640,7 +658,7 @@ odm_sw_ant_div_check_before_link(
 	return false;
 }
 
-/* 1 [3. PSD method] ========================================================== */
+/* @1 [3. PSD method] ========================================================== */
 void odm_single_dual_antenna_detection_psd(
 	void *dm_void)
 {
@@ -668,7 +686,7 @@ void odm_single_dual_antenna_detection_psd(
 
 	PHYDM_DBG(dm, DBG_ANT_DIV, "%s============>\n", __func__);
 
-	/* 2 [ Backup Current RF/BB Settings ] */
+	/* @2 [ Backup Current RF/BB Settings ] */
 
 	channel_ori = odm_get_rf_reg(dm, RF_PATH_A, ODM_CHANNEL, RFREGOFFSETMASK);
 	reg948 = odm_get_bb_reg(dm, REG_S0_S1_PATH_SWITCH, MASKDWORD);
@@ -677,10 +695,10 @@ void odm_single_dual_antenna_detection_psd(
 	regc14 = odm_get_bb_reg(dm, R_0xc14, MASKDWORD);
 	reg908 = odm_get_bb_reg(dm, R_0x908, MASKDWORD);
 
-	/* 2 [ setting for doing PSD function (CH4)] */
-	odm_set_bb_reg(dm, REG_FPGA0_RFMOD, BIT(24), 0); /* disable whole CCK block */
+	/* @2 [ setting for doing PSD function (CH4)] */
+	odm_set_bb_reg(dm, REG_FPGA0_RFMOD, BIT(24), 0); /* @disable whole CCK block */
 	odm_write_1byte(dm, REG_TXPAUSE, 0xFF); /* Turn off TX  ->  Pause TX Queue */
-	odm_set_bb_reg(dm, R_0xc14, MASKDWORD, 0x0); /* [ Set IQK Matrix = 0 ] equivalent to [ Turn off CCA] */
+	odm_set_bb_reg(dm, R_0xc14, MASKDWORD, 0x0); /* @[ Set IQK Matrix = 0 ] equivalent to [ Turn off CCA] */
 
 	/* PHYTXON while loop */
 	odm_set_bb_reg(dm, R_0x908, MASKDWORD, 0x803);
@@ -696,13 +714,13 @@ void odm_single_dual_antenna_detection_psd(
 
 	odm_set_bb_reg(dm, R_0xc50, 0x7f, initial_gain);
 	odm_set_rf_reg(dm, RF_PATH_A, ODM_CHANNEL, 0x7ff, 0x04); /* Set RF to CH4 & 40M */
-	odm_set_bb_reg(dm, REG_FPGA0_ANALOG_PARAMETER4, 0xf00000, 0xf); /* 3 wire Disable    88c[23:20]=0xf */
+	odm_set_bb_reg(dm, REG_FPGA0_ANALOG_PARAMETER4, 0xf00000, 0xf); /* @3 wire Disable    88c[23:20]=0xf */
 	odm_set_bb_reg(dm, REG_FPGA0_PSD_FUNCTION, BIT(14) | BIT15, 0x0); /* 128 pt	 */ /* Set PSD 128 ptss */
 	ODM_delay_us(3000);
 
-	/* 2 [ Doing PSD Function in (CH4)] */
+	/* @2 [ Doing PSD Function in (CH4)] */
 
-	/* Antenna A */
+	/* @Antenna A */
 	PHYDM_DBG(dm, DBG_ANT_DIV, "Switch to Main-ant   (CH4)\n");
 	odm_set_bb_reg(dm, R_0x948, 0xfff, 0x200);
 	ODM_delay_us(10);
@@ -710,33 +728,33 @@ void odm_single_dual_antenna_detection_psd(
 	for (i = 0; i < test_num; i++) {
 		for (tone_idx = 0; tone_idx < tone_lenth_1; tone_idx++) {
 			PSD_report_temp = phydm_get_psd_data(dm, tone_idx_1[tone_idx], initial_gain);
-			/* if(  PSD_report_temp>psd_report_main[tone_idx]  ) */
+			/* @if(  PSD_report_temp>psd_report_main[tone_idx]  ) */
 			psd_report_main[tone_idx] += PSD_report_temp;
 		}
 	}
-	/* Antenna B */
+	/* @Antenna B */
 	PHYDM_DBG(dm, DBG_ANT_DIV, "Switch to Aux-ant   (CH4)\n");
 	odm_set_bb_reg(dm, R_0x948, 0xfff, 0x280);
 	ODM_delay_us(10);
 	for (i = 0; i < test_num; i++) {
 		for (tone_idx = 0; tone_idx < tone_lenth_1; tone_idx++) {
 			PSD_report_temp = phydm_get_psd_data(dm, tone_idx_1[tone_idx], initial_gain);
-			/* if(  PSD_report_temp>psd_report_aux[tone_idx]  ) */
+			/* @if(  PSD_report_temp>psd_report_aux[tone_idx]  ) */
 			psd_report_aux[tone_idx] += PSD_report_temp;
 		}
 	}
-	/* 2 [ Doing PSD Function in (CH8)] */
+	/* @2 [ Doing PSD Function in (CH8)] */
 
-	odm_set_bb_reg(dm, REG_FPGA0_ANALOG_PARAMETER4, 0xf00000, 0x0); /* 3 wire enable    88c[23:20]=0x0 */
+	odm_set_bb_reg(dm, REG_FPGA0_ANALOG_PARAMETER4, 0xf00000, 0x0); /* @3 wire enable    88c[23:20]=0x0 */
 	ODM_delay_us(3000);
 
 	odm_set_bb_reg(dm, R_0xc50, 0x7f, initial_gain);
 	odm_set_rf_reg(dm, RF_PATH_A, ODM_CHANNEL, 0x7ff, 0x04); /* Set RF to CH8 & 40M */
 
-	odm_set_bb_reg(dm, REG_FPGA0_ANALOG_PARAMETER4, 0xf00000, 0xf); /* 3 wire Disable    88c[23:20]=0xf */
+	odm_set_bb_reg(dm, REG_FPGA0_ANALOG_PARAMETER4, 0xf00000, 0xf); /* @3 wire Disable    88c[23:20]=0xf */
 	ODM_delay_us(3000);
 
-	/* Antenna A */
+	/* @Antenna A */
 	PHYDM_DBG(dm, DBG_ANT_DIV, "Switch to Main-ant   (CH8)\n");
 	odm_set_bb_reg(dm, R_0x948, 0xfff, 0x200);
 	ODM_delay_us(10);
@@ -744,12 +762,12 @@ void odm_single_dual_antenna_detection_psd(
 	for (i = 0; i < test_num; i++) {
 		for (tone_idx = 0; tone_idx < tone_lenth_2; tone_idx++) {
 			PSD_report_temp = phydm_get_psd_data(dm, tone_idx_2[tone_idx], initial_gain);
-			/* if(  PSD_report_temp>psd_report_main[tone_idx]  ) */
+			/* @if(  PSD_report_temp>psd_report_main[tone_idx]  ) */
 			psd_report_main[tone_lenth_1 + tone_idx] += PSD_report_temp;
 		}
 	}
 
-	/* Antenna B */
+	/* @Antenna B */
 	PHYDM_DBG(dm, DBG_ANT_DIV, "Switch to Aux-ant   (CH8)\n");
 	odm_set_bb_reg(dm, R_0x948, 0xfff, 0x280);
 	ODM_delay_us(10);
@@ -757,12 +775,12 @@ void odm_single_dual_antenna_detection_psd(
 	for (i = 0; i < test_num; i++) {
 		for (tone_idx = 0; tone_idx < tone_lenth_2; tone_idx++) {
 			PSD_report_temp = phydm_get_psd_data(dm, tone_idx_2[tone_idx], initial_gain);
-			/* if(  PSD_report_temp>psd_report_aux[tone_idx]  ) */
+			/* @if(  PSD_report_temp>psd_report_aux[tone_idx]  ) */
 			psd_report_aux[tone_lenth_1 + tone_idx] += PSD_report_temp;
 		}
 	}
 
-	/* 2 [ Calculate Result ] */
+	/* @2 [ Calculate Result ] */
 
 	PHYDM_DBG(dm, DBG_ANT_DIV, "\nMain PSD Result: (ALL)\n");
 	for (tone_idx = 0; tone_idx < (tone_lenth_1 + tone_lenth_2); tone_idx++) {
@@ -792,15 +810,15 @@ void odm_single_dual_antenna_detection_psd(
 	PHYDM_DBG(dm, DBG_ANT_DIV, "MAX_Aux = (( %d ))\n\n",
 		  max_psd_report_aux);
 
-	/* main_psd_result=main_psd_result-max_psd_report_main; */
-	/* aux_psd_result=aux_psd_result-max_psd_report_aux; */
+	/* @main_psd_result=main_psd_result-max_psd_report_main; */
+	/* @aux_psd_result=aux_psd_result-max_psd_report_aux; */
 	PSD_power_threshold = (main_psd_result * 7) >> 3;
 
 	PHYDM_DBG(dm, DBG_ANT_DIV,
 		  "[ Main_result, Aux_result ] = [ %d , %d ], PSD_power_threshold=(( %d ))\n",
 		  main_psd_result, aux_psd_result, PSD_power_threshold);
 
-	/* 3 [ Dual Antenna ] */
+	/* @3 [ Dual Antenna ] */
 	if (aux_psd_result >= PSD_power_threshold) {
 		if (dm->dm_swat_table.ANTB_ON == false) {
 			dm->dm_swat_table.ANTA_ON = true;
@@ -809,14 +827,16 @@ void odm_single_dual_antenna_detection_psd(
 		PHYDM_DBG(dm, DBG_ANT_DIV,
 			  "odm_sw_ant_div_check_before_link(): Dual antenna\n");
 
+#if 0
 		/* set bt coexDM from 1ant coexDM to 2ant coexDM */
-		/* bt_set_bt_coex_ant_num(adapter, BT_COEX_ANT_TYPE_DETECTED, 2); */
+		/* @bt_set_bt_coex_ant_num(adapter, BT_COEX_ANT_TYPE_DETECTED, 2); */
+#endif
 
-		/* Init antenna diversity */
+		/* @Init antenna diversity */
 		dm->support_ability |= ODM_BB_ANT_DIV;
 		odm_ant_div_init(dm);
 	}
-	/* 3 [ Single Antenna ] */
+	/* @3 [ Single Antenna ] */
 	else {
 		if (dm->dm_swat_table.ANTB_ON == true) {
 			dm->dm_swat_table.ANTA_ON = true;
@@ -826,27 +846,25 @@ void odm_single_dual_antenna_detection_psd(
 			  "odm_sw_ant_div_check_before_link(): Single antenna\n");
 	}
 
-	/* 2 [ Recover all parameters ] */
+	/* @2 [ Recover all parameters ] */
 
 	odm_set_rf_reg(dm, RF_PATH_A, RF_CHNLBW, RFREGOFFSETMASK, channel_ori);
-	odm_set_bb_reg(dm, REG_FPGA0_ANALOG_PARAMETER4, 0xf00000, 0x0); /* 3 wire enable    88c[23:20]=0x0 */
+	odm_set_bb_reg(dm, REG_FPGA0_ANALOG_PARAMETER4, 0xf00000, 0x0); /* @3 wire enable    88c[23:20]=0x0 */
 	odm_set_bb_reg(dm, R_0xc50, 0x7f, regc50);
 
 	odm_set_bb_reg(dm, REG_S0_S1_PATH_SWITCH, MASKDWORD, reg948);
 	odm_set_bb_reg(dm, REG_AGC_TABLE_SELECT, MASKDWORD, regb2c);
 
-	odm_set_bb_reg(dm, REG_FPGA0_RFMOD, BIT(24), 1); /* enable whole CCK block */
+	odm_set_bb_reg(dm, REG_FPGA0_RFMOD, BIT(24), 1); /* @enable whole CCK block */
 	odm_write_1byte(dm, REG_TXPAUSE, 0x0); /* Turn on TX	 */ /* Resume TX Queue */
-	odm_set_bb_reg(dm, R_0xc14, MASKDWORD, regc14); /* [ Set IQK Matrix = 0 ] equivalent to [ Turn on CCA] */
+	odm_set_bb_reg(dm, R_0xc14, MASKDWORD, regc14); /* @[ Set IQK Matrix = 0 ] equivalent to [ Turn on CCA] */
 	odm_set_bb_reg(dm, R_0x908, MASKDWORD, reg908);
 
 	return;
 }
 
-#endif
 void odm_sw_ant_detect_init(void *dm_void)
 {
-#if (defined(CONFIG_ANT_DETECTION))
 #if (RTL8723B_SUPPORT == 1)
 
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
@@ -855,8 +873,8 @@ void odm_sw_ant_detect_init(void *dm_void)
 	if (dm->support_ic_type != ODM_RTL8723B)
 		return;
 
-	/* dm_swat_table->pre_antenna = MAIN_ANT; */
-	/* dm_swat_table->cur_antenna = MAIN_ANT; */
+	/* @dm_swat_table->pre_antenna = MAIN_ANT; */
+	/* @dm_swat_table->cur_antenna = MAIN_ANT; */
 	dm_swat_table->swas_no_link_state = 0;
 	dm_swat_table->pre_aux_fail_detec = false;
 	dm_swat_table->swas_no_link_bk_reg948 = 0xff;
@@ -865,5 +883,6 @@ void odm_sw_ant_detect_init(void *dm_void)
 	phydm_psd_init(dm);
 #endif
 #endif
-#endif
 }
+#endif
+

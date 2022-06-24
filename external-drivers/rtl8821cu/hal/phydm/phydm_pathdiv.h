@@ -25,18 +25,17 @@
 
 #ifndef __PHYDMPATHDIV_H__
 #define __PHYDMPATHDIV_H__
-/*#define PATHDIV_VERSION "2.0" //2014.11.04*/
-#define PATHDIV_VERSION "3.1" /*2015.07.29 by YuChen*/
 
-#if (RTL8822B_SUPPORT == 1)
-struct drp_rtl8822b_struct {
-	enum bb_path path_judge;
-	u16 path_a_cck_fa;
-	u16 path_b_cck_fa;
-};
+#ifdef CONFIG_PATH_DIVERSITY
+/* @2019.03.07 open resp tx path h2c only for 1ss status*/
+#define PATHDIV_VERSION "4.4"
+
+#if (RTL8192F_SUPPORT || RTL8822B_SUPPORT || RTL8822C_SUPPORT ||\
+	RTL8812F_SUPPORT || RTL8197G_SUPPORT)
+	#define PHYDM_CONFIG_PATH_DIV_V2
 #endif
-#if (defined(CONFIG_PATH_DIVERSITY))
-#define USE_PATH_A_AS_DEFAULT_ANT /* for 8814 dynamic TX path selection */
+
+#define USE_PATH_A_AS_DEFAULT_ANT /* @for 8814 dynamic TX path selection */
 
 #define NUM_RESET_DTP_PERIOD 5
 #define ANT_DECT_RSSI_TH 3
@@ -55,7 +54,6 @@ struct drp_rtl8822b_struct {
 enum phydm_dtp_state {
 	PHYDM_DTP_INIT = 1,
 	PHYDM_DTP_RUNNING_1
-
 };
 
 enum phydm_path_div_type {
@@ -63,19 +61,34 @@ enum phydm_path_div_type {
 	PHYDM_4R_PATH_DIV = 2
 };
 
-void phydm_process_rssi_for_path_div(
-	void *dm_void,
-	void *phy_info_void,
-	void *pkt_info_void);
+enum phydm_path_ctrl {
+	TX_PATH_BY_REG = 0,
+	TX_PATH_BY_DESC = 1,
+	TX_PATH_CTRL_INIT
+};
+
+struct path_txdesc_ctrl {
+	u8 ant_map_a : 2;
+	u8 ant_map_b : 2;
+	u8 ntx_map : 4;
+};
 
 struct _ODM_PATH_DIVERSITY_ {
-	u8	resp_tx_path;
-	u8	path_sel[ODM_ASSOCIATE_ENTRY_NUM];
+	boolean stop_path_div; /*@Limit by enabled path number*/
+	boolean path_div_in_progress;
+	boolean	cck_fix_path_en; /*@ BB Reg for Adv-Ctrl (or debug mode)*/
+	boolean	ofdm_fix_path_en; /*@ BB Reg for Adv-Ctrl (or debug mode)*/
+	enum bb_path cck_fix_path_sel; /*@ BB Reg for Adv-Ctrl (or debug mode)*/
+	enum bb_path ofdm_fix_path_sel;/*@ BB Reg for Adv-Ctrl (or debug mode)*/
+	enum phydm_path_ctrl tx_path_ctrl;
+	enum bb_path default_tx_path;
+	enum bb_path path_sel[ODM_ASSOCIATE_ENTRY_NUM];
 	u32	path_a_sum[ODM_ASSOCIATE_ENTRY_NUM];
 	u32	path_b_sum[ODM_ASSOCIATE_ENTRY_NUM];
 	u16	path_a_cnt[ODM_ASSOCIATE_ENTRY_NUM];
 	u16	path_b_cnt[ODM_ASSOCIATE_ENTRY_NUM];
 	u8	phydm_path_div_type;
+	boolean force_update;
 #if RTL8814A_SUPPORT
 
 	u32	path_a_sum_all;
@@ -110,130 +123,23 @@ struct _ODM_PATH_DIVERSITY_ {
 #endif
 };
 
-#endif /* #if(defined(CONFIG_PATH_DIVERSITY)) */
+void phydm_set_tx_path_by_bb_reg(void *dm_void, enum bb_path tx_path_sel_1ss);
+
+void phydm_get_tx_path_txdesc_jgr3(void *dm_void, u8 macid,
+				   struct path_txdesc_ctrl *desc);
 
 void phydm_c2h_dtp_handler(void *dm_void, u8 *cmd_buf, u8 cmd_len);
 
-void phydm_path_diversity_init(void *dm_void);
+void phydm_tx_path_diversity_init(void *dm_void);
 
-void odm_path_diversity(void *dm_void);
+void phydm_tx_path_diversity(void *dm_void);
 
-void odm_pathdiv_debug(
-	void *dm_void,
-	u32 *const dm_value,
-	u32 *_used,
-	char *output,
-	u32 *_out_len);
+void phydm_process_rssi_for_path_div(void *dm_void, void *phy_info_void,
+				     void *pkt_info_void);
 
-/* 1 [OLD IC]-------------------------------------------------------------------------------- */
-#if (DM_ODM_SUPPORT_TYPE & (ODM_WIN))
-/* #define   PATHDIV_ENABLE	 1 */
-#define dm_path_div_rssi_check odm_path_div_chk_per_pkt_rssi
-#define path_div_check_before_link8192c odm_path_diversity_before_link92c
+void phydm_pathdiv_debug(void *dm_void, char input[][16], u32 *_used,
+			 char *output, u32 *_out_len);
 
-struct _path_div_parameter_define_ {
-	u32 org_5g_rege30;
-	u32 org_5g_regc14;
-	u32 org_5g_regca0;
-	u32 swt_5g_rege30;
-	u32 swt_5g_regc14;
-	u32 swt_5g_regca0;
-	/* for 2G IQK information */
-	u32 org_2g_regc80;
-	u32 org_2g_regc4c;
-	u32 org_2g_regc94;
-	u32 org_2g_regc14;
-	u32 org_2g_regca0;
+#endif /* @#ifdef CONFIG_PATH_DIVERSITY */
+#endif /* @#ifndef  __PHYDMPATHDIV_H__ */
 
-	u32 swt_2g_regc80;
-	u32 swt_2g_regc4c;
-	u32 swt_2g_regc94;
-	u32 swt_2g_regc14;
-	u32 swt_2g_regca0;
-};
-
-void odm_path_diversity_init_92c(
-	void *adapter);
-
-void odm_2t_path_diversity_init_92c(
-	void *adapter);
-
-void odm_1t_path_diversity_init_92c(
-	void *adapter);
-
-boolean
-odm_is_connected_92c(
-	void *adapter);
-
-boolean
-odm_path_diversity_before_link92c(
-	/* struct void*	adapter */
-	struct dm_struct *dm);
-
-void odm_path_diversity_after_link_92c(
-	void *adapter);
-
-void odm_set_resp_path_92c(
-	void *adapter,
-	u8 default_resp_path);
-
-void odm_ofdm_tx_path_diversity_92c(
-	void *adapter);
-
-void odm_cck_tx_path_diversity_92c(
-	void *adapter);
-
-void odm_reset_path_diversity_92c(
-	void *adapter);
-
-void odm_cck_tx_path_diversity_callback(
-	struct phydm_timer_list *timer);
-
-void odm_cck_tx_path_diversity_work_item_callback(
-	void *context);
-
-void odm_path_div_chk_ant_switch_callback(
-	struct phydm_timer_list *timer);
-
-void odm_path_div_chk_ant_switch_workitem_callback(
-	void *context);
-
-void odm_path_div_chk_ant_switch(
-	struct dm_struct *dm);
-
-void odm_cck_path_diversity_chk_per_pkt_rssi(
-	void *adapter,
-	boolean is_def_port,
-	boolean is_match_bssid,
-	struct _WLAN_STA *entry,
-	PRT_RFD rfd,
-	u8 *desc);
-
-void odm_path_div_chk_per_pkt_rssi(
-	void *adapter,
-	boolean is_def_port,
-	boolean is_match_bssid,
-	struct _WLAN_STA *entry,
-	PRT_RFD rfd);
-
-void odm_path_div_rest_after_link(
-	struct dm_struct *dm);
-
-void odm_fill_tx_path_in_txdesc(
-	void *adapter,
-	PRT_TCB tcb,
-	u8 *desc);
-
-void odm_path_div_init_92d(
-	struct dm_struct *dm);
-
-u8 odm_sw_ant_div_select_scan_chnl(
-	void *adapter);
-
-void odm_sw_ant_div_construct_scan_chnl(
-	void *adapter,
-	u8 scan_chnl);
-
-#endif /* #if(DM_ODM_SUPPORT_TYPE & (ODM_WIN)) */
-
-#endif /* #ifndef  __ODMPATHDIV_H__ */

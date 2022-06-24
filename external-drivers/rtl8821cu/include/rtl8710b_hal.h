@@ -213,9 +213,9 @@ void rtl8710b_init_default_value(PADAPTER padapter);
 
 
 u32 indirect_read32_8710b(PADAPTER padapter, u32 regaddr);
-VOID indirect_write32_8710b(PADAPTER padapter, u32 regaddr, u32 data);
+void indirect_write32_8710b(PADAPTER padapter, u32 regaddr, u32 data);
 u32 hal_query_syson_reg_8710b(PADAPTER padapter, u32 regaddr, u32 bitmask);
-VOID hal_set_syson_reg_8710b(PADAPTER padapter, u32 regaddr, u32 bitmask, u32 data);
+void hal_set_syson_reg_8710b(PADAPTER padapter, u32 regaddr, u32 bitmask, u32 data);
 #define HAL_SetSYSOnReg hal_set_syson_reg_8710b
 
 
@@ -241,7 +241,7 @@ void Hal_EfuseParseXtal_8710B(PADAPTER pAdapter,
 			      u8 *hwinfo, u8 AutoLoadFail);
 void Hal_EfuseParseThermalMeter_8710B(PADAPTER padapter,
 				      u8 *hwinfo, u8 AutoLoadFail);
-VOID Hal_EfuseParseBoardType_8710B(PADAPTER Adapter,
+void Hal_EfuseParseBoardType_8710B(PADAPTER Adapter,
 				   u8	*PROMContent, BOOLEAN AutoloadFail);
 #endif
 

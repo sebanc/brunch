@@ -55,6 +55,7 @@ const char *android_wifi_cmd_str[ANDROID_WIFI_CMD_MAX] = {
 	"BTCOEXSCAN-START",
 	"BTCOEXSCAN-STOP",
 	"BTCOEXMODE",
+	"SETSUSPENDMODE",
 	"SETSUSPENDOPT",
 	"P2P_DEV_ADDR",
 	"SETFWPATH",
@@ -94,6 +95,7 @@ const char *android_wifi_cmd_str[ANDROID_WIFI_CMD_MAX] = {
 /*	Private command for	P2P disable*/
 	"P2P_DISABLE",
 	"SET_AEK",
+	"EXT_AUTH_STATUS",
 	"DRIVER_VERSION"
 };
 
@@ -369,7 +371,7 @@ int rtw_android_get_rssi(struct net_device *net, char *command, int total_len)
 	struct	wlan_network	*pcur_network = &pmlmepriv->cur_network;
 	int bytes_written = 0;
 
-	if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) {
+	if (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _TRUE) {
 		bytes_written += snprintf(&command[bytes_written], total_len, "%s rssi %d",
 			pcur_network->network.Ssid.Ssid, padapter->recvpriv.rssi);
 	}
@@ -596,6 +598,7 @@ exit:
 
 int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 {
+	#define PRIVATE_COMMAND_MAX_LEN        8192
 	int ret = 0;
 	char *command = NULL;
 	int cmd_num;
@@ -647,15 +650,24 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		goto exit;
 	}
 	/*RTW_INFO("%s priv_cmd.buf=%p priv_cmd.total_len=%d  priv_cmd.used_len=%d\n",__func__,priv_cmd.buf,priv_cmd.total_len,priv_cmd.used_len);*/
-	command = rtw_zmalloc(priv_cmd.total_len);
+	if (priv_cmd.total_len > PRIVATE_COMMAND_MAX_LEN || priv_cmd.total_len < 0) {
+		RTW_WARN("%s: invalid private command (%d)\n", __FUNCTION__,
+			priv_cmd.total_len);
+		ret = -EFAULT;
+		goto exit;
+	}
+	
+	command = rtw_zmalloc(priv_cmd.total_len+1);
 	if (!command) {
 		RTW_INFO("%s: failed to allocate memory\n", __FUNCTION__);
 		ret = -ENOMEM;
 		goto exit;
 	}
-		
-// Fix build error for Linux 5.0
-	if (VENDOR_READ, priv_cmd.buf, priv_cmd.total_len) {
+	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+	if (!access_ok(priv_cmd.buf, priv_cmd.total_len)) {
+	#else
+	if (!access_ok(VERIFY_READ, priv_cmd.buf, priv_cmd.total_len)) {
+	#endif
 		RTW_INFO("%s: failed to access memory\n", __FUNCTION__);
 		ret = -EFAULT;
 		goto exit;
@@ -664,7 +676,7 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		ret = -EFAULT;
 		goto exit;
 	}
-
+	command[priv_cmd.total_len] = '\0';
 	RTW_INFO("%s: Android private cmd \"%s\" on %s\n"
 		 , __FUNCTION__, command, ifr->ifr_name);
 
@@ -767,6 +779,9 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 #endif
 		break;
 
+	case ANDROID_WIFI_CMD_SETSUSPENDMODE:
+		break;
+
 	case ANDROID_WIFI_CMD_SETSUSPENDOPT:
 		/* bytes_written = wl_android_set_suspendopt(net, command, priv_cmd.total_len); */
 		break;
@@ -813,11 +828,13 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		break;
 
 #ifdef CONFIG_IOCTL_CFG80211
+	#ifdef CONFIG_AP_MODE
 	case ANDROID_WIFI_CMD_SET_AP_WPS_P2P_IE: {
 		int skip = strlen(android_wifi_cmd_str[ANDROID_WIFI_CMD_SET_AP_WPS_P2P_IE]) + 3;
 		bytes_written = rtw_cfg80211_set_mgnt_wpsp2pie(net, command + skip, priv_cmd.total_len - skip, *(command + skip - 2) - '0');
 		break;
 	}
+	#endif
 #endif /* CONFIG_IOCTL_CFG80211 */
 
 #ifdef CONFIG_WFD
@@ -851,7 +868,7 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		/*	wpa_cli driver wfd-set-tcpport = 554 */
 
 		if (padapter->wdinfo.driver_interface == DRIVER_CFG80211)
-			rtw_wfd_set_ctrl_port(padapter, (u16)get_int_from_command(priv_cmd.buf));
+			rtw_wfd_set_ctrl_port(padapter, (u16)get_int_from_command(command));
 		break;
 	}
 	case ANDROID_WIFI_CMD_WFD_SET_MAX_TPUT: {
@@ -863,7 +880,7 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 
 		pwfd_info = &padapter->wfd_info;
 		if (padapter->wdinfo.driver_interface == DRIVER_CFG80211) {
-			pwfd_info->wfd_device_type = (u8) get_int_from_command(priv_cmd.buf);
+			pwfd_info->wfd_device_type = (u8) get_int_from_command(command);
 			pwfd_info->wfd_device_type &= WFD_DEVINFO_DUAL;
 		}
 		break;
@@ -872,7 +889,7 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	case ANDROID_WIFI_CMD_CHANGE_DTIM: {
 #ifdef CONFIG_LPS
 		u8 dtim;
-		u8 *ptr = (u8 *) &priv_cmd.buf;
+		u8 *ptr = (u8 *) command;
 
 		ptr += 9;/* string command length of  "SET_DTIM"; */
 
@@ -921,6 +938,12 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		break;
 #endif
 	
+	case ANDROID_WIFI_CMD_EXT_AUTH_STATUS: {
+		rtw_set_external_auth_status(padapter,
+			command + strlen("EXT_AUTH_STATUS "),
+			priv_cmd.total_len - strlen("EXT_AUTH_STATUS "));
+		break;
+	}
 	case ANDROID_WIFI_CMD_DRIVERVERSION: {
 		bytes_written = strlen(DRIVERVERSION);
 		snprintf(command, bytes_written + 1, DRIVERVERSION);
@@ -952,7 +975,7 @@ response:
 exit:
 	rtw_unlock_suspend();
 	if (command)
-		rtw_mfree(command, priv_cmd.total_len);
+		rtw_mfree(command, priv_cmd.total_len + 1);
 
 	return ret;
 }
@@ -1053,13 +1076,21 @@ int wifi_get_mac_addr(unsigned char *buf)
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)) */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)) || defined(COMPAT_KERNEL_RELEASE)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+void *wifi_get_country_code(char *ccode, u32 flags)
+#else /* Linux kernel < 3.18 */
 void *wifi_get_country_code(char *ccode)
+#endif /* Linux kernel < 3.18 */
 {
 	RTW_INFO("%s\n", __FUNCTION__);
 	if (!ccode)
 		return NULL;
 	if (wifi_control_data && wifi_control_data->get_country_code)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+		return wifi_control_data->get_country_code(ccode, flags);
+#else /* Linux kernel < 3.18 */
 		return wifi_control_data->get_country_code(ccode);
+#endif /* Linux kernel < 3.18 */
 	return NULL;
 }
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)) */
@@ -1119,6 +1150,7 @@ extern PADAPTER g_test_adapter;
 
 static void shutdown_card(void)
 {
+	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(g_test_adapter);
 	u32 addr;
 	u8 tmp8, cnt = 0;
 
@@ -1135,7 +1167,7 @@ static void shutdown_card(void)
 #ifdef CONFIG_GPIO_WAKEUP
 	/*default wake up pin change to BT*/
 	RTW_INFO("%s:default wake up pin change to BT\n", __FUNCTION__);
-	rtw_hal_switch_gpio_wl_ctrl(g_test_adapter, WAKEUP_GPIO_IDX, _FALSE);
+	rtw_hal_switch_gpio_wl_ctrl(g_test_adapter, pwrpriv->wowlan_gpio_index, _FALSE);
 #endif /* CONFIG_GPIO_WAKEUP */
 #endif /* CONFIG_WOWLAN */
 

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -17026,17 +17026,19 @@
 	(BIT_CLEAR_R_WMAC_MASK_LA_MAC_8197F(x) |                               \
 	 BIT_R_WMAC_MASK_LA_MAC_8197F(v))
 
-#define BIT_SHIFT_DUMP_OK_ADDR_8197F 16
-#define BIT_MASK_DUMP_OK_ADDR_8197F 0xffff
-#define BIT_DUMP_OK_ADDR_8197F(x)                                              \
-	(((x) & BIT_MASK_DUMP_OK_ADDR_8197F) << BIT_SHIFT_DUMP_OK_ADDR_8197F)
-#define BITS_DUMP_OK_ADDR_8197F                                                \
-	(BIT_MASK_DUMP_OK_ADDR_8197F << BIT_SHIFT_DUMP_OK_ADDR_8197F)
-#define BIT_CLEAR_DUMP_OK_ADDR_8197F(x) ((x) & (~BITS_DUMP_OK_ADDR_8197F))
-#define BIT_GET_DUMP_OK_ADDR_8197F(x)                                          \
-	(((x) >> BIT_SHIFT_DUMP_OK_ADDR_8197F) & BIT_MASK_DUMP_OK_ADDR_8197F)
-#define BIT_SET_DUMP_OK_ADDR_8197F(x, v)                                       \
-	(BIT_CLEAR_DUMP_OK_ADDR_8197F(x) | BIT_DUMP_OK_ADDR_8197F(v))
+#define BIT_SHIFT_DUMP_OK_ADDR_V1_8197F 15
+#define BIT_MASK_DUMP_OK_ADDR_V1_8197F 0x1ffff
+#define BIT_DUMP_OK_ADDR_V1_8197F(x)                                           \
+	(((x) & BIT_MASK_DUMP_OK_ADDR_V1_8197F)                                \
+	 << BIT_SHIFT_DUMP_OK_ADDR_V1_8197F)
+#define BITS_DUMP_OK_ADDR_V1_8197F                                             \
+	(BIT_MASK_DUMP_OK_ADDR_V1_8197F << BIT_SHIFT_DUMP_OK_ADDR_V1_8197F)
+#define BIT_CLEAR_DUMP_OK_ADDR_V1_8197F(x) ((x) & (~BITS_DUMP_OK_ADDR_V1_8197F))
+#define BIT_GET_DUMP_OK_ADDR_V1_8197F(x)                                       \
+	(((x) >> BIT_SHIFT_DUMP_OK_ADDR_V1_8197F) &                            \
+	 BIT_MASK_DUMP_OK_ADDR_V1_8197F)
+#define BIT_SET_DUMP_OK_ADDR_V1_8197F(x, v)                                    \
+	(BIT_CLEAR_DUMP_OK_ADDR_V1_8197F(x) | BIT_DUMP_OK_ADDR_V1_8197F(v))
 
 #define BIT_SHIFT_R_TRIG_TIME_SEL_8197F 8
 #define BIT_MASK_R_TRIG_TIME_SEL_8197F 0x7f
@@ -17289,5 +17291,78 @@
 /* 2 REG_RTS_ADDRESS_0_8197F */
 
 /* 2 REG_RTS_ADDRESS_1_8197F */
+
+/* 2 REG_WL2LTECOEX_INDIRECT_ACCESS_CTRL_V1_8197F */
+#define BIT_LTECOEX_ACCESS_START_V1_8197F BIT(31)
+#define BIT_LTECOEX_WRITE_MODE_V1_8197F BIT(30)
+#define BIT_LTECOEX_READY_BIT_V1_8197F BIT(29)
+
+#define BIT_SHIFT_WRITE_BYTE_EN_V1_8197F 16
+#define BIT_MASK_WRITE_BYTE_EN_V1_8197F 0xf
+#define BIT_WRITE_BYTE_EN_V1_8197F(x)                                          \
+	(((x) & BIT_MASK_WRITE_BYTE_EN_V1_8197F)                               \
+	 << BIT_SHIFT_WRITE_BYTE_EN_V1_8197F)
+#define BITS_WRITE_BYTE_EN_V1_8197F                                            \
+	(BIT_MASK_WRITE_BYTE_EN_V1_8197F << BIT_SHIFT_WRITE_BYTE_EN_V1_8197F)
+#define BIT_CLEAR_WRITE_BYTE_EN_V1_8197F(x)                                    \
+	((x) & (~BITS_WRITE_BYTE_EN_V1_8197F))
+#define BIT_GET_WRITE_BYTE_EN_V1_8197F(x)                                      \
+	(((x) >> BIT_SHIFT_WRITE_BYTE_EN_V1_8197F) &                           \
+	 BIT_MASK_WRITE_BYTE_EN_V1_8197F)
+#define BIT_SET_WRITE_BYTE_EN_V1_8197F(x, v)                                   \
+	(BIT_CLEAR_WRITE_BYTE_EN_V1_8197F(x) | BIT_WRITE_BYTE_EN_V1_8197F(v))
+
+#define BIT_SHIFT_LTECOEX_REG_ADDR_V1_8197F 0
+#define BIT_MASK_LTECOEX_REG_ADDR_V1_8197F 0xffff
+#define BIT_LTECOEX_REG_ADDR_V1_8197F(x)                                       \
+	(((x) & BIT_MASK_LTECOEX_REG_ADDR_V1_8197F)                            \
+	 << BIT_SHIFT_LTECOEX_REG_ADDR_V1_8197F)
+#define BITS_LTECOEX_REG_ADDR_V1_8197F                                         \
+	(BIT_MASK_LTECOEX_REG_ADDR_V1_8197F                                    \
+	 << BIT_SHIFT_LTECOEX_REG_ADDR_V1_8197F)
+#define BIT_CLEAR_LTECOEX_REG_ADDR_V1_8197F(x)                                 \
+	((x) & (~BITS_LTECOEX_REG_ADDR_V1_8197F))
+#define BIT_GET_LTECOEX_REG_ADDR_V1_8197F(x)                                   \
+	(((x) >> BIT_SHIFT_LTECOEX_REG_ADDR_V1_8197F) &                        \
+	 BIT_MASK_LTECOEX_REG_ADDR_V1_8197F)
+#define BIT_SET_LTECOEX_REG_ADDR_V1_8197F(x, v)                                \
+	(BIT_CLEAR_LTECOEX_REG_ADDR_V1_8197F(x) |                              \
+	 BIT_LTECOEX_REG_ADDR_V1_8197F(v))
+
+/* 2 REG_WL2LTECOEX_INDIRECT_ACCESS_WRITE_DATA_V1_8197F */
+
+#define BIT_SHIFT_LTECOEX_W_DATA_V1_8197F 0
+#define BIT_MASK_LTECOEX_W_DATA_V1_8197F 0xffffffffL
+#define BIT_LTECOEX_W_DATA_V1_8197F(x)                                         \
+	(((x) & BIT_MASK_LTECOEX_W_DATA_V1_8197F)                              \
+	 << BIT_SHIFT_LTECOEX_W_DATA_V1_8197F)
+#define BITS_LTECOEX_W_DATA_V1_8197F                                           \
+	(BIT_MASK_LTECOEX_W_DATA_V1_8197F << BIT_SHIFT_LTECOEX_W_DATA_V1_8197F)
+#define BIT_CLEAR_LTECOEX_W_DATA_V1_8197F(x)                                   \
+	((x) & (~BITS_LTECOEX_W_DATA_V1_8197F))
+#define BIT_GET_LTECOEX_W_DATA_V1_8197F(x)                                     \
+	(((x) >> BIT_SHIFT_LTECOEX_W_DATA_V1_8197F) &                          \
+	 BIT_MASK_LTECOEX_W_DATA_V1_8197F)
+#define BIT_SET_LTECOEX_W_DATA_V1_8197F(x, v)                                  \
+	(BIT_CLEAR_LTECOEX_W_DATA_V1_8197F(x) | BIT_LTECOEX_W_DATA_V1_8197F(v))
+
+/* 2 REG_WL2LTECOEX_INDIRECT_ACCESS_READ_DATA_V1_8197F */
+
+#define BIT_SHIFT_LTECOEX_R_DATA_V1_8197F 0
+#define BIT_MASK_LTECOEX_R_DATA_V1_8197F 0xffffffffL
+#define BIT_LTECOEX_R_DATA_V1_8197F(x)                                         \
+	(((x) & BIT_MASK_LTECOEX_R_DATA_V1_8197F)                              \
+	 << BIT_SHIFT_LTECOEX_R_DATA_V1_8197F)
+#define BITS_LTECOEX_R_DATA_V1_8197F                                           \
+	(BIT_MASK_LTECOEX_R_DATA_V1_8197F << BIT_SHIFT_LTECOEX_R_DATA_V1_8197F)
+#define BIT_CLEAR_LTECOEX_R_DATA_V1_8197F(x)                                   \
+	((x) & (~BITS_LTECOEX_R_DATA_V1_8197F))
+#define BIT_GET_LTECOEX_R_DATA_V1_8197F(x)                                     \
+	(((x) >> BIT_SHIFT_LTECOEX_R_DATA_V1_8197F) &                          \
+	 BIT_MASK_LTECOEX_R_DATA_V1_8197F)
+#define BIT_SET_LTECOEX_R_DATA_V1_8197F(x, v)                                  \
+	(BIT_CLEAR_LTECOEX_R_DATA_V1_8197F(x) | BIT_LTECOEX_R_DATA_V1_8197F(v))
+
+/* 2 REG_NOT_VALID_8197F */
 
 #endif

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -43,6 +43,7 @@
 #define CMD_ID_IQK_OFFLOAD 0X05
 #define CMD_ID_MACID_CFG_3SS 0X06
 #define CMD_ID_RA_PARA_ADJUST 0X07
+#define CMD_ID_REQ_TXRPT_ACQ 0X12
 #define CMD_ID_WWLAN 0X00
 #define CMD_ID_REMOTE_WAKE_CTRL 0X01
 #define CMD_ID_AOAC_GLOBAL_INFO 0X02
@@ -80,6 +81,7 @@
 #define CLASS_IQK_OFFLOAD 0X2
 #define CLASS_MACID_CFG_3SS 0X2
 #define CLASS_RA_PARA_ADJUST 0X02
+#define CLASS_REQ_TXRPT_ACQ 0X02
 #define CLASS_WWLAN 0X4
 #define CLASS_REMOTE_WAKE_CTRL 0X4
 #define CLASS_AOAC_GLOBAL_INFO 0X04
@@ -675,66 +677,30 @@
 	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 8, 8, value)
 #define SET_PWR_MODE_SET_PWR_STATE_NO_CLR(h2c_pkt, value)                      \
 	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 8, 8, value)
-#define SET_PWR_MODE_GET_LOW_POWER_RX_BCN(h2c_pkt)                             \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 16, 1)
-#define SET_PWR_MODE_SET_LOW_POWER_RX_BCN(h2c_pkt, value)                      \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 16, 1, value)
-#define SET_PWR_MODE_SET_LOW_POWER_RX_BCN_NO_CLR(h2c_pkt, value)               \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 16, 1, value)
-#define SET_PWR_MODE_GET_ANT_AUTO_SWITCH(h2c_pkt)                              \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 17, 1)
-#define SET_PWR_MODE_SET_ANT_AUTO_SWITCH(h2c_pkt, value)                       \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 17, 1, value)
-#define SET_PWR_MODE_SET_ANT_AUTO_SWITCH_NO_CLR(h2c_pkt, value)                \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 17, 1, value)
-#define SET_PWR_MODE_GET_PS_ALLOW_BT_HIGH_PRIORITY(h2c_pkt)                    \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 18, 1)
-#define SET_PWR_MODE_SET_PS_ALLOW_BT_HIGH_PRIORITY(h2c_pkt, value)             \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 18, 1, value)
-#define SET_PWR_MODE_SET_PS_ALLOW_BT_HIGH_PRIORITY_NO_CLR(h2c_pkt, value)      \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 18, 1, value)
-#define SET_PWR_MODE_GET_PROTECT_BCN(h2c_pkt)                                  \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 19, 1)
-#define SET_PWR_MODE_SET_PROTECT_BCN(h2c_pkt, value)                           \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 19, 1, value)
-#define SET_PWR_MODE_SET_PROTECT_BCN_NO_CLR(h2c_pkt, value)                    \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 19, 1, value)
-#define SET_PWR_MODE_GET_SILENCE_PERIOD(h2c_pkt)                               \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 20, 1)
-#define SET_PWR_MODE_SET_SILENCE_PERIOD(h2c_pkt, value)                        \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 20, 1, value)
-#define SET_PWR_MODE_SET_SILENCE_PERIOD_NO_CLR(h2c_pkt, value)                 \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 20, 1, value)
-#define SET_PWR_MODE_GET_FAST_BT_CONNECT(h2c_pkt)                              \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 21, 1)
-#define SET_PWR_MODE_SET_FAST_BT_CONNECT(h2c_pkt, value)                       \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 21, 1, value)
-#define SET_PWR_MODE_SET_FAST_BT_CONNECT_NO_CLR(h2c_pkt, value)                \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 21, 1, value)
-#define SET_PWR_MODE_GET_TWO_ANTENNA_EN(h2c_pkt)                               \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 22, 1)
-#define SET_PWR_MODE_SET_TWO_ANTENNA_EN(h2c_pkt, value)                        \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 22, 1, value)
-#define SET_PWR_MODE_SET_TWO_ANTENNA_EN_NO_CLR(h2c_pkt, value)                 \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 22, 1, value)
-#define SET_PWR_MODE_GET_ADOPT_USER_SETTING(h2c_pkt)                           \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 24, 1)
-#define SET_PWR_MODE_SET_ADOPT_USER_SETTING(h2c_pkt, value)                    \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 24, 1, value)
-#define SET_PWR_MODE_SET_ADOPT_USER_SETTING_NO_CLR(h2c_pkt, value)             \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 24, 1, value)
-#define SET_PWR_MODE_GET_DRV_BCN_EARLY_SHIFT(h2c_pkt)                          \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 25, 3)
-#define SET_PWR_MODE_SET_DRV_BCN_EARLY_SHIFT(h2c_pkt, value)                   \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 25, 3, value)
-#define SET_PWR_MODE_SET_DRV_BCN_EARLY_SHIFT_NO_CLR(h2c_pkt, value)            \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 25, 3, value)
-#define SET_PWR_MODE_GET_DRV_BCN_EARLY_SHIFT2(h2c_pkt)                         \
-	GET_H2C_FIELD(h2c_pkt + 0X04, 28, 4)
-#define SET_PWR_MODE_SET_DRV_BCN_EARLY_SHIFT2(h2c_pkt, value)                  \
-	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 28, 4, value)
-#define SET_PWR_MODE_SET_DRV_BCN_EARLY_SHIFT2_NO_CLR(h2c_pkt, value)           \
-	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 28, 4, value)
+#define SET_PWR_MODE_GET_RSVD_NOUSED(h2c_pkt)                                  \
+	GET_H2C_FIELD(h2c_pkt + 0X04, 16, 8)
+#define SET_PWR_MODE_SET_RSVD_NOUSED(h2c_pkt, value)                           \
+	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 16, 8, value)
+#define SET_PWR_MODE_SET_RSVD_NOUSED_NO_CLR(h2c_pkt, value)                    \
+	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 16, 8, value)
+#define SET_PWR_MODE_GET_BCN_RECEIVING_TIME(h2c_pkt)                           \
+	GET_H2C_FIELD(h2c_pkt + 0X04, 24, 5)
+#define SET_PWR_MODE_SET_BCN_RECEIVING_TIME(h2c_pkt, value)                    \
+	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 24, 5, value)
+#define SET_PWR_MODE_SET_BCN_RECEIVING_TIME_NO_CLR(h2c_pkt, value)             \
+	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 24, 5, value)
+#define SET_PWR_MODE_GET_BCN_LISTEN_INTERVAL(h2c_pkt)                          \
+	GET_H2C_FIELD(h2c_pkt + 0X04, 29, 2)
+#define SET_PWR_MODE_SET_BCN_LISTEN_INTERVAL(h2c_pkt, value)                   \
+	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 29, 2, value)
+#define SET_PWR_MODE_SET_BCN_LISTEN_INTERVAL_NO_CLR(h2c_pkt, value)            \
+	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 29, 2, value)
+#define SET_PWR_MODE_GET_ADOPT_BCN_RECEIVING_TIME(h2c_pkt)                     \
+	GET_H2C_FIELD(h2c_pkt + 0X04, 31, 1)
+#define SET_PWR_MODE_SET_ADOPT_BCN_RECEIVING_TIME(h2c_pkt, value)              \
+	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 31, 1, value)
+#define SET_PWR_MODE_SET_ADOPT_BCN_RECEIVING_TIME_NO_CLR(h2c_pkt, value)       \
+	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 31, 1, value)
 #define PS_TUNING_PARA_GET_CMD_ID(h2c_pkt) GET_H2C_FIELD(h2c_pkt + 0X00, 0, 5)
 #define PS_TUNING_PARA_SET_CMD_ID(h2c_pkt, value)                              \
 	SET_H2C_FIELD_CLR(h2c_pkt + 0X00, 0, 5, value)
@@ -1257,6 +1223,28 @@
 	SET_H2C_FIELD_CLR(h2c_pkt + 0X04, 16, 8, value)
 #define RA_PARA_ADJUST_SET_ASK_FW_FOR_FW_PARA_NO_CLR(h2c_pkt, value)           \
 	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X04, 16, 8, value)
+#define REQ_TXRPT_ACQ_GET_CMD_ID(h2c_pkt) GET_H2C_FIELD(h2c_pkt + 0X00, 0, 5)
+#define REQ_TXRPT_ACQ_SET_CMD_ID(h2c_pkt, value)                               \
+	SET_H2C_FIELD_CLR(h2c_pkt + 0X00, 0, 5, value)
+#define REQ_TXRPT_ACQ_SET_CMD_ID_NO_CLR(h2c_pkt, value)                        \
+	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X00, 0, 5, value)
+#define REQ_TXRPT_ACQ_GET_CLASS(h2c_pkt) GET_H2C_FIELD(h2c_pkt + 0X00, 5, 3)
+#define REQ_TXRPT_ACQ_SET_CLASS(h2c_pkt, value)                                \
+	SET_H2C_FIELD_CLR(h2c_pkt + 0X00, 5, 3, value)
+#define REQ_TXRPT_ACQ_SET_CLASS_NO_CLR(h2c_pkt, value)                         \
+	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X00, 5, 3, value)
+#define REQ_TXRPT_ACQ_GET_STA1_MACID(h2c_pkt)                                  \
+	GET_H2C_FIELD(h2c_pkt + 0X00, 8, 8)
+#define REQ_TXRPT_ACQ_SET_STA1_MACID(h2c_pkt, value)                           \
+	SET_H2C_FIELD_CLR(h2c_pkt + 0X00, 8, 8, value)
+#define REQ_TXRPT_ACQ_SET_STA1_MACID_NO_CLR(h2c_pkt, value)                    \
+	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X00, 8, 8, value)
+#define REQ_TXRPT_ACQ_GET_PASS_DROP_SEL(h2c_pkt)                               \
+	GET_H2C_FIELD(h2c_pkt + 0X00, 16, 8)
+#define REQ_TXRPT_ACQ_SET_PASS_DROP_SEL(h2c_pkt, value)                        \
+	SET_H2C_FIELD_CLR(h2c_pkt + 0X00, 16, 8, value)
+#define REQ_TXRPT_ACQ_SET_PASS_DROP_SEL_NO_CLR(h2c_pkt, value)                 \
+	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X00, 16, 8, value)
 #define WWLAN_GET_CMD_ID(h2c_pkt) GET_H2C_FIELD(h2c_pkt + 0X00, 0, 5)
 #define WWLAN_SET_CMD_ID(h2c_pkt, value)                                       \
 	SET_H2C_FIELD_CLR(h2c_pkt + 0X00, 0, 5, value)
@@ -1430,6 +1418,12 @@
 	SET_H2C_FIELD_CLR(h2c_pkt + 0X00, 24, 1, value)
 #define REMOTE_WAKE_CTRL_SET_ARP_ACTION_NO_CLR(h2c_pkt, value)                 \
 	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X00, 24, 1, value)
+#define REMOTE_WAKE_CTRL_GET_TIM_PARSER_EN(h2c_pkt)                            \
+	GET_H2C_FIELD(h2c_pkt + 0X00, 26, 1)
+#define REMOTE_WAKE_CTRL_SET_TIM_PARSER_EN(h2c_pkt, value)                     \
+	SET_H2C_FIELD_CLR(h2c_pkt + 0X00, 26, 1, value)
+#define REMOTE_WAKE_CTRL_SET_TIM_PARSER_EN_NO_CLR(h2c_pkt, value)              \
+	SET_H2C_FIELD_NO_CLR(h2c_pkt + 0X00, 26, 1, value)
 #define REMOTE_WAKE_CTRL_GET_FW_PARSING_UNTIL_WAKEUP(h2c_pkt)                  \
 	GET_H2C_FIELD(h2c_pkt + 0X00, 28, 1)
 #define REMOTE_WAKE_CTRL_SET_FW_PARSING_UNTIL_WAKEUP(h2c_pkt, value)           \

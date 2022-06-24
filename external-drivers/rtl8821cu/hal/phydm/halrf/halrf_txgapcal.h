@@ -26,7 +26,6 @@
 #ifndef __HALRF_TXGAPCAL_H__
 #define __HALRF_TXGAPCAL_H__
 
-void odm_tx_gain_gap_calibration(
-	void *dm_void);
+void odm_tx_gain_gap_calibration(void *dm_void);
 
-#endif /*#ifndef __HALRF_TXGAPCAL_H__*/
+#endif /*__HALRF_TXGAPCAL_H__*/

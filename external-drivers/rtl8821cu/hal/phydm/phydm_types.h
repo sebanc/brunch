@@ -29,11 +29,14 @@
 #define	ODM_AP			0x01	/*BIT(0)*/
 #define	ODM_CE			0x04	/*BIT(2)*/
 #define	ODM_WIN		0x08	/*BIT(3)*/
-#define	ODM_ADSL		0x10	/*BIT(4)*/		/*already combine with ODM_AP, and is nouse now*/
+#define	ODM_ADSL		0x10
+/*BIT(4)*/		/*already combine with ODM_AP, and is nouse now*/
 #define	ODM_IOT		0x20	/*BIT(5)*/
 
 /*For FW API*/
 #define	__iram_odm_func__
+#define	__odm_func__
+#define	__odm_func_aon__
 
 /*Deifne HW endian support*/
 #define	ODM_ENDIAN_BIG	0
@@ -48,9 +51,17 @@
 #endif
 
 #if (DM_ODM_SUPPORT_TYPE != ODM_WIN)
-	#define	RT_PCI_INTERFACE				1
-	#define	RT_USB_INTERFACE				2
-	#define	RT_SDIO_INTERFACE				3
+	#if defined(CONFIG_RTL_TRIBAND_SUPPORT) && defined(CONFIG_USB_HCI)
+	/* enable PCI & USB HCI at the same time */
+  	#define RT_PCI_USB_INTERFACE			1
+  	#define	RT_PCI_INTERFACE			RT_PCI_USB_INTERFACE
+	#define RT_USB_INTERFACE			RT_PCI_USB_INTERFACE
+	#define	RT_SDIO_INTERFACE			3
+  	#else
+	#define	RT_PCI_INTERFACE			1
+	#define	RT_USB_INTERFACE			2
+	#define	RT_SDIO_INTERFACE			3
+	#endif
 #endif
 
 enum hal_status {
@@ -84,16 +95,19 @@ enum rt_spinlock_type {
 	RT_CHNLOP_SPINLOCK = 9,
 	RT_RF_OPERATE_SPINLOCK = 10,
 	RT_INITIAL_SPINLOCK = 11,
-	RT_RF_STATE_SPINLOCK = 12, /* For RF state. Added by Bruce, 2007-10-30. */
+	RT_RF_STATE_SPINLOCK = 12,
+	/* For RF state. Added by Bruce, 2007-10-30. */
 #if VISTA_USB_RX_REVISE
 	RT_USBRX_CONTEXT_SPINLOCK = 13,
-	RT_USBRX_POSTPROC_SPINLOCK = 14, /* protect data of adapter->IndicateW/ IndicateR */
+	RT_USBRX_POSTPROC_SPINLOCK = 14,
+	/* protect data of adapter->IndicateW/ IndicateR */
 #endif
 	/* Shall we define Ndis 6.2 SpinLock Here ? */
 	RT_PORT_SPINLOCK = 16,
 	RT_VNIC_SPINLOCK = 17,
 	RT_HVL_SPINLOCK = 18,
-	RT_H2C_SPINLOCK = 20, /* For H2C cmd. Added by tynli. 2009.11.09. */
+	RT_H2C_SPINLOCK = 20,
+	/* For H2C cmd. Added by tynli. 2009.11.09. */
 
 	rt_bt_data_spinlock = 25,
 
@@ -144,12 +158,56 @@ enum rt_spinlock_type {
 
 	#define	phydm_timer_list	_RT_TIMER
 
+	// for power limit table
+	enum odm_pw_lmt_regulation_type {
+		PW_LMT_REGU_FCC = 0,
+		PW_LMT_REGU_ETSI = 1,
+		PW_LMT_REGU_MKK = 2,
+		PW_LMT_REGU_WW13 = 3,
+		PW_LMT_REGU_IC = 4,
+		PW_LMT_REGU_KCC = 5,
+		PW_LMT_REGU_ACMA = 6,
+		PW_LMT_REGU_CHILE = 7,
+		PW_LMT_REGU_UKRAINE = 8,
+		PW_LMT_REGU_MEXICO = 9,
+		PW_LMT_REGU_CN = 10
+	};
+
+	enum odm_pw_lmt_band_type {
+		PW_LMT_BAND_2_4G = 0,
+		PW_LMT_BAND_5G = 1
+	};
+
+	enum odm_pw_lmt_bandwidth_type {
+		PW_LMT_BW_20M = 0,
+		PW_LMT_BW_40M = 1,
+		PW_LMT_BW_80M = 2,
+		PW_LMT_BW_160M = 3
+	};
+
+	enum odm_pw_lmt_ratesection_type {
+		PW_LMT_RS_CCK = 0,
+		PW_LMT_RS_OFDM = 1,
+		PW_LMT_RS_HT = 2,
+		PW_LMT_RS_VHT = 3
+	};
+
+	enum odm_pw_lmt_rfpath_type {
+		PW_LMT_PH_1T = 0,
+		PW_LMT_PH_2T = 1,
+		PW_LMT_PH_3T = 2,
+		PW_LMT_PH_4T = 3
+	};
 
 #elif (DM_ODM_SUPPORT_TYPE == ODM_AP)
 	#include "../typedef.h"
 
 	#ifdef CONFIG_PCI_HCI
+	#if defined(CONFIG_RTL_TRIBAND_SUPPORT) && defined(CONFIG_USB_HCI)
+		#define DEV_BUS_TYPE		RT_PCI_USB_INTERFACE
+	#else
 		#define DEV_BUS_TYPE		RT_PCI_INTERFACE
+	#endif
 	#endif
 
 	#if (defined(TESTCHIP_SUPPORT))
@@ -162,7 +220,9 @@ enum rt_spinlock_type {
 	#define	boolean	bool
 
 	#define	phydm_timer_list	timer_list
-
+	#if defined(__ECOS)
+	#define s64	s8Byte
+	#endif 
 #elif (DM_ODM_SUPPORT_TYPE == ODM_CE) && defined(DM_ODM_CE_MAC80211)
 
 	#include <asm/byteorder.h>
@@ -191,7 +251,7 @@ enum rt_spinlock_type {
 	#define sta_info	rtl_sta_info
 	#define	boolean		bool
 
-	#define	phydm_timer_list	rtw_timer_list
+	#define	phydm_timer_list	timer_list
 
 #elif (DM_ODM_SUPPORT_TYPE == ODM_CE)
 	#include <drv_types.h>
@@ -232,6 +292,47 @@ enum rt_spinlock_type {
 	#endif
 
 	#define	phydm_timer_list	rtw_timer_list
+
+	// for power limit table
+	enum odm_pw_lmt_regulation_type {
+		PW_LMT_REGU_FCC = 0,
+		PW_LMT_REGU_ETSI = 1,
+		PW_LMT_REGU_MKK = 2,
+		PW_LMT_REGU_WW13 = 3,
+		PW_LMT_REGU_IC = 4,
+		PW_LMT_REGU_KCC = 5,
+		PW_LMT_REGU_ACMA = 6,
+		PW_LMT_REGU_CHILE = 7,
+		PW_LMT_REGU_UKRAINE = 8,
+		PW_LMT_REGU_MEXICO = 9,
+		PW_LMT_REGU_CN = 10
+	};
+
+	enum odm_pw_lmt_band_type {
+		PW_LMT_BAND_2_4G = 0,
+		PW_LMT_BAND_5G = 1
+	};
+
+	enum odm_pw_lmt_bandwidth_type {
+		PW_LMT_BW_20M = 0,
+		PW_LMT_BW_40M = 1,
+		PW_LMT_BW_80M = 2,
+		PW_LMT_BW_160M = 3
+	};
+
+	enum odm_pw_lmt_ratesection_type {
+		PW_LMT_RS_CCK = 0,
+		PW_LMT_RS_OFDM = 1,
+		PW_LMT_RS_HT = 2,
+		PW_LMT_RS_VHT = 3
+	};
+
+	enum odm_pw_lmt_rfpath_type {
+		PW_LMT_PH_1T = 0,
+		PW_LMT_PH_2T = 1,
+		PW_LMT_PH_3T = 2,
+		PW_LMT_PH_4T = 3
+	};
 
 #elif (DM_ODM_SUPPORT_TYPE == ODM_IOT)
 	#define	boolean	bool
@@ -275,6 +376,9 @@ enum rt_spinlock_type {
 		PW_LMT_PH_3T = 3,
 		PW_LMT_PH_4T = 4
 	};
+
+	#define	phydm_timer_list	timer_list
+
 #endif
 
 #define READ_NEXT_PAIR(v1, v2, i) do { if (i + 2 >= array_len) break; i += 2; v1 = array[i]; v2 = array[i + 1]; } while (0)
@@ -288,20 +392,22 @@ enum rt_spinlock_type {
 #define	MASKHWORD		0xffff0000
 #define	MASKLWORD		0x0000ffff
 #define	MASKDWORD		0xffffffff
+
 #define	MASK7BITS		0x7f
 #define	MASK12BITS		0xfff
 #define	MASKH4BITS		0xf0000000
 #define	MASK20BITS		0xfffff
+#define	MASK24BITS		0xffffff
 #define	MASKOFDM_D		0xffc00000
 #define	MASKCCK			0x3f3f3f3f
-#define RFREGOFFSETMASK	0xfffff
+
+#define RFREGOFFSETMASK		0xfffff
 #define RFREG_MASK		0xfffff
 
 #define MASKH3BYTES		0xffffff00
 #define MASKL3BYTES		0x00ffffff
-#define MASKBYTE2HIGHNIBBLE		0x00f00000
-#define MASKBYTE3LOWNIBBLE		0x0f000000
-#define	MASKL3BYTES			0x00ffffff
-#define RFREGOFFSETMASK	0xfffff
+#define MASKBYTE2HIGHNIBBLE	0x00f00000
+#define MASKBYTE3LOWNIBBLE	0x0f000000
+#define	MASKL3BYTES		0x00ffffff
 
 #endif /* __ODM_TYPES_H__ */

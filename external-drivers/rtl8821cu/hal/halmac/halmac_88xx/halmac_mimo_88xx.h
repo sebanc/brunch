@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -64,7 +64,7 @@ mu_bfer_entry_del_88xx(struct halmac_adapter *adapter);
 
 enum halmac_ret_status
 cfg_csi_rate_88xx(struct halmac_adapter *adapter, u8 rssi, u8 cur_rate,
-		  u8 fixrate_en, u8 *new_rate);
+		  u8 fixrate_en, u8 *new_rate, u8 *bmp_ofdm54);
 
 enum halmac_ret_status
 fw_snding_88xx(struct halmac_adapter *adapter,

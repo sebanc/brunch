@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -71,6 +71,30 @@
 #define HALMAC_WLPHY_RFE_CTRL2GPIO	25
 #define HALMAC_EXT_XTAL			26
 #define HALMAC_SW_IO			27
+#define HALMAC_BT_SDIO_INT		28
+#define HALMAC_BT_JTAG			29
+#define HALMAC_WL_JTAG			30
+#define HALMAC_BT_RF			31
+#define HALMAC_WLPHY_RFE_CTRL2GPIO_2	32
+#define HALMAC_MAILBOX_3W		33
+#define HALMAC_MAILBOX_1W		34
+#define HALMAC_SW_DPDT_SEL		35
+#define HALMAC_BT_DPDT_SEL		36
+#define HALMAC_WL_DPDT_SEL		37
+#define HALMAC_BT_PAPE_SEL		38
+#define HALMAC_SW_PAPE_SEL		39
+#define HALMAC_WL_PAPE_SEL		40
+#define HALMAC_SW_LNAON_SET		41
+#define HALMAC_BT_LNAON_SEL		42
+#define HALMAC_WL_LNAON_SEL		43
+#define HALMAC_SWR_CTRL_EN		44
+#define HALMAC_UART_BRIDGE		45
+#define HALMAC_BT_I2C			46
+#define HALMAC_BTCOEX_CMD		47
+#define HALMAC_BT_UART_INTF		48
+#define HALMAC_DATA_CPU_JTAG		49
+#define HALMAC_DATA_CPU_SFLASH		50
+#define HALMAC_DATA_CPU_UART		51
 
 struct halmac_gpio_pimux_list {
 	u16 func;

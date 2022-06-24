@@ -34,27 +34,24 @@
 void phydm_reset_pt_para(void *dm_void)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	struct phydm_pow_train_stuc *pow_train_t = &dm->pow_train_table;
+	struct phydm_pow_train_stuc *pt_t = &dm->pow_train_table;
 
-	pow_train_t->pow_train_score = 0;
-	dm->phy_dbg_info.num_qry_phy_status_ofdm = 0;
-	dm->phy_dbg_info.num_qry_phy_status_cck = 0;
+	pt_t->pow_train_score = 0;
 }
 
 void phydm_update_power_training_state(void *dm_void)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	struct phydm_pow_train_stuc *pow_train_t = &dm->pow_train_table;
+	struct phydm_pow_train_stuc *pt_t = &dm->pow_train_table;
 	struct phydm_fa_struct *fa_cnt = &dm->false_alm_cnt;
-	struct phydm_dig_struct *dig_t = &dm->dm_dig_table;
 	struct ccx_info *ccx = &dm->dm_ccx_info;
-	u32 pt_score_tmp = 0;
-	u32 crc_ok_cnt;
-	u32 cca_all_cnt;
+	u32 pt_score_tmp = ENABLE_PT_SCORE;
+	u32 crc_ok_cnt = 0;
+	u32 cca_cnt = 0;
 
-	/*is_disable_power_training is the key to H2C to disable/enable power training*/
-	/*if is_disable_power_training == 1, it will use largest power*/
-	if (!(dm->support_ability & ODM_BB_PWR_TRAIN)) {
+	/*@is_disable_power_training is the key to H2C to disable/enable PT*/
+	/*@if is_disable_power_training == 1, it will use largest power*/
+	if (!(dm->support_ability & ODM_BB_PWR_TRAIN) || !dm->is_linked) {
 		dm->is_disable_power_training = true;
 		phydm_reset_pt_para(dm);
 		return;
@@ -62,114 +59,73 @@ void phydm_update_power_training_state(void *dm_void)
 
 	PHYDM_DBG(dm, DBG_PWR_TRAIN, "%s ======>\n", __func__);
 
-	if (pow_train_t->force_power_training_state == DISABLE_POW_TRAIN) {
+	if (pt_t->pt_state == DISABLE_POW_TRAIN) {
 		dm->is_disable_power_training = true;
 		phydm_reset_pt_para(dm);
 		PHYDM_DBG(dm, DBG_PWR_TRAIN, "Disable PT\n");
 		return;
 
-	} else if (pow_train_t->force_power_training_state == ENABLE_POW_TRAIN) {
+	} else if (pt_t->pt_state == ENABLE_POW_TRAIN) {
 		dm->is_disable_power_training = false;
 		phydm_reset_pt_para(dm);
 		PHYDM_DBG(dm, DBG_PWR_TRAIN, "Enable PT\n");
 		return;
 
-	} else if (pow_train_t->force_power_training_state == DYNAMIC_POW_TRAIN) {
+	} else if (pt_t->pt_state == DYNAMIC_POW_TRAIN) {
 		PHYDM_DBG(dm, DBG_PWR_TRAIN, "Dynamic PT\n");
 
-		if (!dm->is_linked) {
-			dm->is_disable_power_training = true;
-			pow_train_t->pow_train_score = 0;
-			dm->phy_dbg_info.num_qry_phy_status_ofdm = 0;
-			dm->phy_dbg_info.num_qry_phy_status_cck = 0;
-
-			PHYDM_DBG(dm, DBG_PWR_TRAIN,
-				  "PT is disabled due to no link.\n");
-			return;
-		}
-
-		/* First connect */
-		if (dm->is_linked && !dig_t->is_media_connect) {
-			pow_train_t->pow_train_score = 0;
-			dm->phy_dbg_info.num_qry_phy_status_ofdm = 0;
-			dm->phy_dbg_info.num_qry_phy_status_cck = 0;
-			PHYDM_DBG(dm, DBG_PWR_TRAIN, "(PT)First Connect\n");
-			return;
-		}
-
-		/* Compute score */
-		crc_ok_cnt = dm->phy_dbg_info.num_qry_phy_status_ofdm + dm->phy_dbg_info.num_qry_phy_status_cck;
-		cca_all_cnt = fa_cnt->cnt_cca_all;
+		/* @Compute score */
+		crc_ok_cnt = dm->phy_dbg_info.num_qry_phy_status_ofdm +
+			     dm->phy_dbg_info.num_qry_phy_status_cck;
+		cca_cnt = fa_cnt->cnt_cca_all;
 #if 0
-		if (crc_ok_cnt < cca_all_cnt) {
-			/* crc_ok <= (2/3)*cca */
-			if ((crc_ok_cnt + (crc_ok_cnt >> 1)) <= cca_all_cnt)
-				pt_score_tmp = DISABLE_PT_SCORE;
-
-			/* crc_ok <= (4/5)*cca */
-			else if ((crc_ok_cnt + (crc_ok_cnt >> 2)) <= cca_all_cnt)
-				pt_score_tmp = KEEP_PRE_PT_SCORE;
-
-			/* crc_ok > (4/5)*cca */
-			else
-				pt_score_tmp = ENABLE_PT_SCORE;
+		if (crc_ok_cnt > cca_cnt) { /*invalid situation*/
+			pt_score_tmp = KEEP_PRE_PT_SCORE;
+			return;
+		} else if ((crc_ok_cnt + (crc_ok_cnt >> 1)) <= cca_cnt) {
+		/* @???crc_ok <= (2/3)*cca */
+			pt_score_tmp = DISABLE_PT_SCORE;
+			dm->is_disable_power_training = true;
+		} else if ((crc_ok_cnt + (crc_ok_cnt >> 2)) <= cca_cnt) {
+		/* @???crc_ok <= (4/5)*cca */
+			pt_score_tmp = KEEP_PRE_PT_SCORE;
 		} else {
+		/* @???crc_ok > (4/5)*cca */
 			pt_score_tmp = ENABLE_PT_SCORE;
+			dm->is_disable_power_training = false;
 		}
 #endif
-		if (ccx->nhm_ratio > 10)
+		if (ccx->nhm_ratio > 10) {
 			pt_score_tmp = DISABLE_PT_SCORE;
-		else if (ccx->nhm_ratio < 5)
-			pt_score_tmp = ENABLE_PT_SCORE;
-		else
-			pt_score_tmp = KEEP_PRE_PT_SCORE;
-
-		PHYDM_DBG(dm, DBG_PWR_TRAIN,
-			  "crc_ok_cnt = %d, cnt_cca_all = %d\n", crc_ok_cnt,
-			  cca_all_cnt);
-
-		PHYDM_DBG(dm, DBG_PWR_TRAIN,
-			  "num_qry_phy_status_ofdm = %d, num_qry_phy_status_cck = %d\n",
-			  dm->phy_dbg_info.num_qry_phy_status_ofdm,
-			  dm->phy_dbg_info.num_qry_phy_status_cck);
-
-		PHYDM_DBG(dm, DBG_PWR_TRAIN, "pt_score_tmp = %d\n",
-			  pt_score_tmp);
-		PHYDM_DBG(dm, DBG_PWR_TRAIN,
-			  "pt_score_tmp = 0(DISABLE), 1(KEEP), 2(ENABLE)\n");
-
-		/* smoothing */
-		pow_train_t->pow_train_score = (pt_score_tmp << 4) + (pow_train_t->pow_train_score >> 1) + (pow_train_t->pow_train_score >> 2);
-		pt_score_tmp = (pow_train_t->pow_train_score + 32) >> 6;
-		PHYDM_DBG(dm, DBG_PWR_TRAIN,
-			  "pow_train_score = %d, score after smoothing = %d\n",
-			  pow_train_t->pow_train_score, pt_score_tmp);
-
-		/* mode decision */
-		if (pt_score_tmp == ENABLE_PT_SCORE) {
-			dm->is_disable_power_training = false;
-			PHYDM_DBG(dm, DBG_PWR_TRAIN,
-				  "Enable power training under dynamic.\n");
-
-		} else if (pt_score_tmp == DISABLE_PT_SCORE) {
 			dm->is_disable_power_training = true;
-			PHYDM_DBG(dm, DBG_PWR_TRAIN,
-				  "Disable PT due to noisy.\n");
+		} else if (ccx->nhm_ratio < 5) {
+			pt_score_tmp = ENABLE_PT_SCORE;
+			dm->is_disable_power_training = false;
+		} else {
+			pt_score_tmp = KEEP_PRE_PT_SCORE;
 		}
 
 		PHYDM_DBG(dm, DBG_PWR_TRAIN,
-			  "Final, score = %d, is_disable_power_training = %d\n",
-			  pt_score_tmp, dm->is_disable_power_training);
+			  "pkt_cnt{ofdm,cck,all} = {%d, %d, %d}, cnt_cca_all=%d\n",
+			  dm->phy_dbg_info.num_qry_phy_status_ofdm,
+			  dm->phy_dbg_info.num_qry_phy_status_cck,
+			  crc_ok_cnt, cca_cnt);
 
-		dm->phy_dbg_info.num_qry_phy_status_ofdm = 0;
-		dm->phy_dbg_info.num_qry_phy_status_cck = 0;
-	} else {
-		dm->is_disable_power_training = true;
-		phydm_reset_pt_para(dm);
+		PHYDM_DBG(dm, DBG_PWR_TRAIN, "pt_score_tmp=%d\n", pt_score_tmp);
+
+		/* smoothing */
+		pt_t->pow_train_score = (pt_score_tmp << 4) +
+					(pt_t->pow_train_score >> 1) +
+					(pt_t->pow_train_score >> 2);
+
+		pt_score_tmp = (pt_t->pow_train_score + 32) >> 6;
 
 		PHYDM_DBG(dm, DBG_PWR_TRAIN,
-			  "PT is disabled due to unknown pt state.\n");
-		return;
+			  "pow_train_score = %d, score after smoothing = %d, is_disable_PT = %d\n",
+			  pt_t->pow_train_score, pt_score_tmp,
+			  dm->is_disable_power_training);
+	} else {
+		PHYDM_DBG(dm, DBG_PWR_TRAIN, "[%s]warning\n", __func__);
 	}
 }
 
@@ -178,11 +134,10 @@ void phydm_pow_train_debug(
 	char input[][16],
 	u32 *_used,
 	char *output,
-	u32 *_out_len,
-	u32 input_num)
+	u32 *_out_len)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	struct phydm_pow_train_stuc *pow_train_t = &dm->pow_train_table;
+	struct phydm_pow_train_stuc *pt_t = &dm->pow_train_table;
 	char help[] = "-h";
 	u32 var1[10] = {0};
 	u32 used = *_used;
@@ -191,34 +146,22 @@ void phydm_pow_train_debug(
 
 	if ((strcmp(input[1], help) == 0)) {
 		PDM_SNPF(out_len, used, output + used, out_len - used,
-			 "0: Dynamic state\n");
-		PDM_SNPF(out_len, used, output + used, out_len - used,
-			 "1: Enable PT\n");
-		PDM_SNPF(out_len, used, output + used, out_len - used,
-			 "2: Disable PT\n");
-
+			 "{0: Auto PT, 1:enable, 2: disable}\n");
 	} else {
 		for (i = 0; i < 10; i++) {
 			if (input[i + 1])
 				PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
 		}
 
-		if (var1[0] == 0) {
-			pow_train_t->force_power_training_state = DYNAMIC_POW_TRAIN;
-			PDM_SNPF(out_len, used, output + used, out_len - used,
-				 "Dynamic state\n");
-		} else if (var1[0] == 1) {
-			pow_train_t->force_power_training_state = ENABLE_POW_TRAIN;
-			PDM_SNPF(out_len, used, output + used, out_len - used,
-				 "Enable PT\n");
-		} else if (var1[0] == 2) {
-			pow_train_t->force_power_training_state = DISABLE_POW_TRAIN;
-			PDM_SNPF(out_len, used, output + used, out_len - used,
-				 "Disable PT\n");
-		} else {
-			PDM_SNPF(out_len, used, output + used, out_len - used,
-				 "Set Error\n");
-		}
+		if (var1[0] == 0)
+			pt_t->pt_state = DYNAMIC_POW_TRAIN;
+		else if (var1[0] == 1)
+			pt_t->pt_state = ENABLE_POW_TRAIN;
+		else if (var1[0] == 2)
+			pt_t->pt_state = DISABLE_POW_TRAIN;
+
+		PDM_SNPF(out_len, used, output + used, out_len - used,
+			 "PT state = %d\n", pt_t->pt_state);
 	}
 
 	*_used = used;

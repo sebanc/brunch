@@ -21,7 +21,7 @@
 #include "mp_precomp.h"
 #include "../phydm_precomp.h"
 
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 #if ((RTL8812A_SUPPORT == 1) || (RTL8821A_SUPPORT == 1))
 void hal_txbf_8812a_set_ndpa_rate(
 	void *dm_void,
@@ -51,20 +51,20 @@ void hal_txbf_jaguar_rf_mode(
 		/* Paath_A */
 		odm_set_rf_reg(dm, RF_PATH_A, RF_0x30, 0x78000, 0x3); /*Select RX mode*/
 		odm_set_rf_reg(dm, RF_PATH_A, RF_0x31, 0xfffff, 0x3F7FF); /*Set Table data*/
-		odm_set_rf_reg(dm, RF_PATH_A, RF_0x32, 0xfffff, 0xE26BF); /*Enable TXIQGEN in RX mode*/
+		odm_set_rf_reg(dm, RF_PATH_A, RF_0x32, 0xfffff, 0xE26BF); /*@Enable TXIQGEN in RX mode*/
 		/* Path_B */
 		odm_set_rf_reg(dm, RF_PATH_B, RF_0x30, 0x78000, 0x3); /*Select RX mode*/
 		odm_set_rf_reg(dm, RF_PATH_B, RF_0x31, 0xfffff, 0x3F7FF); /*Set Table data*/
-		odm_set_rf_reg(dm, RF_PATH_B, RF_0x32, 0xfffff, 0xE26BF); /*Enable TXIQGEN in RX mode*/
+		odm_set_rf_reg(dm, RF_PATH_B, RF_0x32, 0xfffff, 0xE26BF); /*@Enable TXIQGEN in RX mode*/
 	} else {
 		/* Paath_A */
 		odm_set_rf_reg(dm, RF_PATH_A, RF_0x30, 0x78000, 0x3); /*Select RX mode*/
 		odm_set_rf_reg(dm, RF_PATH_A, RF_0x31, 0xfffff, 0x3F7FF); /*Set Table data*/
-		odm_set_rf_reg(dm, RF_PATH_A, RF_0x32, 0xfffff, 0xC26BF); /*Disable TXIQGEN in RX mode*/
+		odm_set_rf_reg(dm, RF_PATH_A, RF_0x32, 0xfffff, 0xC26BF); /*@Disable TXIQGEN in RX mode*/
 		/* Path_B */
 		odm_set_rf_reg(dm, RF_PATH_B, RF_0x30, 0x78000, 0x3); /*Select RX mode*/
 		odm_set_rf_reg(dm, RF_PATH_B, RF_0x31, 0xfffff, 0x3F7FF); /*Set Table data*/
-		odm_set_rf_reg(dm, RF_PATH_B, RF_0x32, 0xfffff, 0xC26BF); /*Disable TXIQGEN in RX mode*/
+		odm_set_rf_reg(dm, RF_PATH_B, RF_0x32, 0xfffff, 0xC26BF); /*@Disable TXIQGEN in RX mode*/
 	}
 
 	odm_set_rf_reg(dm, RF_PATH_A, RF_0xef, 0x80000, 0x0); /*RF mode table write disable*/
@@ -84,7 +84,7 @@ void hal_txbf_jaguar_download_ndpa(
 	u8 u1b_tmp = 0, tmp_reg422 = 0, head_page;
 	u8 bcn_valid_reg = 0, count = 0, dl_bcn_count = 0;
 	boolean is_send_beacon = false;
-	u8 tx_page_bndy = LAST_ENTRY_OF_TX_PKT_BUFFER_8812; /*default reseved 1 page for the IC type which is undefined.*/
+	u8 tx_page_bndy = LAST_ENTRY_OF_TX_PKT_BUFFER_8812; /*@default reseved 1 page for the IC type which is undefined.*/
 	struct _RT_BEAMFORMING_INFO *beam_info = &dm->beamforming_info;
 	struct _RT_BEAMFORMEE_ENTRY *p_beam_entry = beam_info->beamformee_entry + idx;
 	void *adapter = dm->adapter;
@@ -93,10 +93,9 @@ void hal_txbf_jaguar_download_ndpa(
 #endif
 	PHYDM_DBG(dm, DBG_TXBF, "[%s] Start!\n", __func__);
 
-	if (idx == 0)
-		head_page = 0xFE;
-	else
-		head_page = 0xFE;
+	/* if (idx == 0) head_page = 0xFE; */
+	/* else	head_page = 0xFE;*/
+	head_page = 0xFE;
 
 	phydm_get_hal_def_var_handler_interface(dm, HAL_DEF_TX_PAGE_BOUNDARY, (u8 *)&tx_page_bndy);
 
@@ -118,17 +117,17 @@ void hal_txbf_jaguar_download_ndpa(
 	odm_write_1byte(dm, REG_TDECTRL_8812A + 1, head_page);
 
 	do {
-		/*Clear beacon valid check bit.*/
+		/*@Clear beacon valid check bit.*/
 		bcn_valid_reg = odm_read_1byte(dm, REG_TDECTRL_8812A + 2);
 		odm_write_1byte(dm, REG_TDECTRL_8812A + 2, (bcn_valid_reg | BIT(0)));
 
-		/*download NDPA rsvd page.*/
+		/*@download NDPA rsvd page.*/
 		if (p_beam_entry->beamform_entry_cap & BEAMFORMER_CAP_VHT_SU)
 			beamforming_send_vht_ndpa_packet(dm, p_beam_entry->mac_addr, p_beam_entry->aid, p_beam_entry->sound_bw, BEACON_QUEUE);
 		else
 			beamforming_send_ht_ndpa_packet(dm, p_beam_entry->mac_addr, p_beam_entry->sound_bw, BEACON_QUEUE);
 
-		/*check rsvd page download OK.*/
+		/*@check rsvd page download OK.*/
 		bcn_valid_reg = odm_read_1byte(dm, REG_TDECTRL_8812A + 2);
 		count = 0;
 		while (!(bcn_valid_reg & BIT(0)) && count < 20) {
@@ -147,15 +146,15 @@ void hal_txbf_jaguar_download_ndpa(
 	odm_write_1byte(dm, REG_TDECTRL_8812A + 1, tx_page_bndy);
 
 	/*To make sure that if there exists an adapter which would like to send beacon.*/
-	/*If exists, the origianl value of 0x422[6] will be 1, we should check this to*/
+	/*@If exists, the origianl value of 0x422[6] will be 1, we should check this to*/
 	/*prevent from setting 0x422[6] to 0 after download reserved page, or it will cause*/
 	/*the beacon cannot be sent by HW.*/
-	/*2010.06.23. Added by tynli.*/
+	/*@2010.06.23. Added by tynli.*/
 	if (is_send_beacon)
 		odm_write_1byte(dm, REG_FWHW_TXQ_CTRL_8812A + 2, tmp_reg422);
 
-	/*Do not enable HW DMA BCN or it will cause Pcie interface hang by timing issue. 2011.11.24. by tynli.*/
-	/*Clear CR[8] or beacon packet will not be send to TxBuf anymore.*/
+	/*@Do not enable HW DMA BCN or it will cause Pcie interface hang by timing issue. 2011.11.24. by tynli.*/
+	/*@Clear CR[8] or beacon packet will not be send to TxBuf anymore.*/
 	u1b_tmp = odm_read_1byte(dm, REG_CR_8812A + 1);
 	odm_write_1byte(dm, REG_CR_8812A + 1, (u1b_tmp & (~BIT(0))));
 
@@ -175,7 +174,7 @@ void hal_txbf_jaguar_fw_txbf_cmd(
 	struct _RT_BEAMFORMING_INFO *beam_info = &dm->beamforming_info;
 
 	for (idx = 0; idx < BEAMFORMEE_ENTRY_NUM; idx++) {
-		/*Modified by David*/
+		/*@Modified by David*/
 		if (beam_info->beamformee_entry[idx].is_used && beam_info->beamformee_entry[idx].beamform_entry_state == BEAMFORMING_ENTRY_STATE_PROGRESSED) {
 			if (idx == 0) {
 				if (beam_info->beamformee_entry[idx].is_sound)
@@ -232,20 +231,20 @@ void hal_txbf_jaguar_enter(
 		/*Sounding protocol control*/
 		odm_write_1byte(dm, REG_SND_PTCL_CTRL_8812A, 0xCB);
 
-		/*MAC address/Partial AID of Beamformer*/
+		/*@MAC address/Partial AID of Beamformer*/
 		if (bfer_idx == 0) {
 			for (i = 0; i < 6; i++)
 				odm_write_1byte(dm, (REG_BFMER0_INFO_8812A + i), beamformer_entry.mac_addr[i]);
-			/*CSI report use legacy ofdm so don't need to fill P_AID. */
+			/*@CSI report use legacy ofdm so don't need to fill P_AID. */
 			/*platform_efio_write_2byte(adapter, REG_BFMER0_INFO_8812A+6, beamform_entry.P_AID); */
 		} else {
 			for (i = 0; i < 6; i++)
 				odm_write_1byte(dm, (REG_BFMER1_INFO_8812A + i), beamformer_entry.mac_addr[i]);
-			/*CSI report use legacy ofdm so don't need to fill P_AID.*/
+			/*@CSI report use legacy ofdm so don't need to fill P_AID.*/
 			/*platform_efio_write_2byte(adapter, REG_BFMER1_INFO_8812A+6, beamform_entry.P_AID);*/
 		}
 
-		/*CSI report parameters of Beamformee*/
+		/*@CSI report parameters of Beamformee*/
 		if (beamformer_entry.beamform_entry_cap & BEAMFORMEE_CAP_VHT_SU) {
 			if (dm->rf_type == RF_2T2R)
 				csi_param = 0x01090109;
@@ -281,9 +280,9 @@ void hal_txbf_jaguar_enter(
 		} else
 			odm_write_2byte(dm, REG_TXBF_CTRL_8812A + 2, sta_id | BIT(12) | BIT(14) | BIT(15));
 
-		/*CSI report parameters of Beamformee*/
+		/*@CSI report parameters of Beamformee*/
 		if (bfee_idx == 0) {
-			/*Get BIT24 & BIT25*/
+			/*@Get BIT24 & BIT25*/
 			u8 tmp = odm_read_1byte(dm, REG_BFMEE_SEL_8812A + 3) & 0x3;
 
 			odm_write_1byte(dm, REG_BFMEE_SEL_8812A + 3, tmp | 0x60);
@@ -313,9 +312,9 @@ void hal_txbf_jaguar_leave(
 
 	PHYDM_DBG(dm, DBG_TXBF, "[%s]Start!, IDx = %d\n", __func__, idx);
 
-	/*Clear P_AID of Beamformee*/
-	/*Clear MAC address of Beamformer*/
-	/*Clear Associated Bfmee Sel*/
+	/*@Clear P_AID of Beamformee*/
+	/*@Clear MAC address of Beamformer*/
+	/*@Clear Associated Bfmee Sel*/
 
 	if (beamformer_entry.beamform_entry_cap == BEAMFORMING_CAP_NONE) {
 		odm_write_1byte(dm, REG_SND_PTCL_CTRL_8812A, 0xC8);
@@ -435,7 +434,8 @@ void hal_txbf_jaguar_clk_8812a(
 	}
 #if DEV_BUS_TYPE == RT_PCI_INTERFACE
 	/*Stop PCIe TxDMA*/
-	odm_write_1byte(dm, REG_PCIE_CTRL_REG_8812A + 1, 0xFE);
+	if (dm->support_interface == ODM_ITRF_PCIE)
+		odm_write_1byte(dm, REG_PCIE_CTRL_REG_8812A + 1, 0xFE);
 #endif
 
 /*Stop Usb TxDMA*/
@@ -480,24 +480,25 @@ void hal_txbf_jaguar_clk_8812a(
 			ODM_delay_ms(10);
 	}
 
-	/*Disable clock*/
+	/*@Disable clock*/
 	odm_write_1byte(dm, REG_SYS_CLKR_8812A + 1, 0xf0);
-	/*Disable 320M*/
+	/*@Disable 320M*/
 	odm_write_1byte(dm, REG_AFE_PLL_CTRL_8812A + 3, 0x8);
-	/*Enable 320M*/
+	/*@Enable 320M*/
 	odm_write_1byte(dm, REG_AFE_PLL_CTRL_8812A + 3, 0xa);
-	/*Enable clock*/
+	/*@Enable clock*/
 	odm_write_1byte(dm, REG_SYS_CLKR_8812A + 1, 0xfc);
 
 	/*Release Tx pause*/
 	odm_write_1byte(dm, REG_TXPAUSE_8812A, 0);
 
-	/*Enable RX DMA path*/
+	/*@Enable RX DMA path*/
 	u1btmp = odm_read_1byte(dm, REG_RXDMA_CONTROL_8812A);
 	odm_write_1byte(dm, REG_RXDMA_CONTROL_8812A, u1btmp & (~BIT(2)));
 #if DEV_BUS_TYPE == RT_PCI_INTERFACE
-	/*Enable PCIe TxDMA*/
-	odm_write_1byte(dm, REG_PCIE_CTRL_REG_8812A + 1, 0);
+	/*@Enable PCIe TxDMA*/
+	if (dm->support_interface == ODM_ITRF_PCIE)
+		odm_write_1byte(dm, REG_PCIE_CTRL_REG_8812A + 1, 0);
 #endif
 	/*Start Usb TxDMA*/
 	RT_ENABLE_FUNC((PADAPTER)adapter, DF_TX_BIT);

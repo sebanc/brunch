@@ -26,7 +26,8 @@
 #ifndef __PHYDMRAINFO_H__
 #define __PHYDMRAINFO_H__
 
-#define RAINFO_VERSION "7.0"
+/* 2020.08.05 Fix ARFR bug due to rate_id error for 2.4G VHT mode*/
+#define RAINFO_VERSION "8.8"
 
 #define	FORCED_UPDATE_RAMASK_PERIOD	5
 
@@ -40,17 +41,16 @@
 #define	RA_RETRY_LIMIT_LOW	4
 #define	RA_RETRY_LIMIT_HIGH	32
 
+#define PHYDM_IS_LEGACY_RATE(rate) ((rate <= ODM_RATE54M) ? true : false)
+#define PHYDM_IS_CCK_RATE(rate) ((rate <= ODM_RATE11M) ? true : false)
+
 #if (DM_ODM_SUPPORT_TYPE == ODM_AP)
-	#define		RA_FIRST_MACID	1
-#elif (DM_ODM_SUPPORT_TYPE == ODM_WIN)
-	#define	RA_FIRST_MACID		0
-	#define	WIN_DEFAULT_PORT_MACID	0
-	#define	WIN_BT_PORT_MACID	2
-#else /*if (DM_ODM_SUPPORT_TYPE == ODM_CE)*/
-	#define		RA_FIRST_MACID	0
+	#define	FIRST_MACID	1
+#else
+	#define	FIRST_MACID	0
 #endif
 
-/* 1 ============================================================
+/* @1 ============================================================
  * 1 enumrate
  * 1 ============================================================
  */
@@ -106,11 +106,30 @@ enum phydm_rateid_idx {
 	PHYDM_ARFR3_AC_2G_2SS	= 12,
 	PHYDM_ARFR4_AC_3SS	= 13,
 	PHYDM_ARFR5_N_3SS	= 14,
-	PHYDM_ARFR6_AC_4SS	= 15,
-	PHYDM_ARFR7_N_4SS	= 16
+	PHYDM_ARFR7_N_4SS	= 15,
+	PHYDM_ARFR6_AC_4SS	= 16
 };
 
-#if (RATE_ADAPTIVE_SUPPORT == 1)/* 88E RA */
+/*ARFR4(0x49c/0x4a0) can not be used because FW BT would use.*/
+enum phydm_rateid_idx_type_2 {
+	PHYDM_TYPE2_AC_2SS		= 9,
+	PHYDM_TYPE2_AC_1SS		= 10,
+	PHYDM_TYPE2_MIX_1SS		= 11,
+	PHYDM_TYPE2_MIX_2SS		= 12,
+	PHYDM_TYPE2_ARFR3_AC_2G_2SS	= 16, /*0x494/0x498*/
+	PHYDM_TYPE2_ARFR5_AC_2G_1SS	= 18  /*0x4a4/0x4a8*/
+};
+
+enum phydm_qam_order {
+	PHYDM_QAM_CCK	= 0,
+	PHYDM_QAM_BPSK	= 1,
+	PHYDM_QAM_QPSK	= 2,
+	PHYDM_QAM_16QAM	= 3,
+	PHYDM_QAM_64QAM	= 4,
+	PHYDM_QAM_256QAM = 5
+};
+
+#if (RATE_ADAPTIVE_SUPPORT == 1)/* @88E RA */
 
 struct _phydm_txstatistic_ {
 	u32	hw_total_tx;
@@ -119,7 +138,7 @@ struct _phydm_txstatistic_ {
 	u32	hw_tx_drop;
 };
 
-/* 1 ============================================================
+/* @1 ============================================================
  * 1  structure
  * 1 ============================================================
  */
@@ -147,13 +166,13 @@ struct _odm_ra_info_ {
 	u8	ra_drop_after_down;
 #if 1 /* POWER_TRAINING_ACTIVE == 1 */ /* For compile  pass only~! */
 	u8	pt_active;	/* on or off */
-	u8	pt_try_state;	/* 0 trying state, 1 for decision state */
-	u8	pt_stage;	/* 0~6 */
+	u8	pt_try_state;	/* @0 trying state, 1 for decision state */
+	u8	pt_stage;	/* @0~6 */
 	u8	pt_stop_count;	/* Stop PT counter */
-	u8	pt_pre_rate;	/* if rate change do PT */
-	u8	pt_pre_rssi;	/* if RSSI change 5% do PT */
-	u8	pt_mode_ss;	/* decide whitch rate should do PT */
-	u8	ra_stage;	/* StageRA, decide how many times RA will be done between PT */
+	u8	pt_pre_rate;	/* @if rate change do PT */
+	u8	pt_pre_rssi;	/* @if RSSI change 5% do PT */
+	u8	pt_mode_ss;	/* @decide whitch rate should do PT */
+	u8	ra_stage;	/* @StageRA, decide how many times RA will be done between PT */
 	u8	pt_smooth_factor;
 #endif
 #if (DM_ODM_SUPPORT_TYPE == ODM_AP) &&	((DEV_BUS_TYPE == RT_USB_INTERFACE) || (DEV_BUS_TYPE == RT_SDIO_INTERFACE))
@@ -170,58 +189,91 @@ struct _odm_ra_info_ {
 
 
 struct ra_table {
-	u8	firstconnect;
-	/*u8	link_tx_rate[ODM_ASSOCIATE_ENTRY_NUM];*/
-	u8	mu1_rate[30];
+	#ifdef MU_EX_MACID
+	u8	mu1_rate[MU_EX_MACID];
+	#endif
 	u8	highest_client_tx_order;
 	u16	highest_client_tx_rate_order;
 	u8	power_tracking_flag;
 	u8	ra_th_ofst; /*RA_threshold_offset*/
 	u8	ra_ofst_direc; /*RA_offset_direction*/
-	u8	up_ramask_cnt; /*force update_ra_mask counter*/
-	u8	up_ramask_cnt_tmp; /*Just for debug, should be removed latter*/
-#if 0	/*CONFIG_RA_DYNAMIC_RTY_LIMIT*/
-	u8	per_rate_retrylimit_20M[ODM_NUM_RATE_IDX];
-	u8	per_rate_retrylimit_40M[ODM_NUM_RATE_IDX];
+	u8	up_ramask_cnt; /*@force update_ra_mask counter*/
+	u8	up_ramask_cnt_tmp; /*@Just for debug, should be removed latter*/
+	u32	rrsr_val_init; /*0x440*/
+	u32	rrsr_val_curr; /*0x440*/
+	boolean dynamic_rrsr_en;
+	u8	ra_trigger_mode; /*0: pkt RA, 1: TBTT RA*/
+	u8	ra_tx_cls_th;	 /*255: auto, xx: in dB*/
+#if 0	/*@CONFIG_RA_DYNAMIC_RTY_LIMIT*/
+	u8	per_rate_retrylimit_20M[PHY_NUM_RATE_IDX];
+	u8	per_rate_retrylimit_40M[PHY_NUM_RATE_IDX];
 	u8	retry_descend_num;
 	u8	retrylimit_low;
 	u8	retrylimit_high;
 #endif
-	u8	ldpc_thres; /* if RSSI > ldpc_thres => switch from LPDC to BCC */
-	void (*record_ra_info)(void *dm_void, u8 macid, struct cmn_sta_info *sta, u64 ra_mask);
+	u8	ldpc_thres; /* @if RSSI > ldpc_th => switch from LPDC to BCC */
+	void (*record_ra_info)(void *dm_void, u8 macid,
+			       struct cmn_sta_info *sta, u64 ra_mask);
+	u8	ra_mask_rpt_stamp;
+	u8 	ra_mask_buf[8];
 };
 
-/* 1 ============================================================
+struct ra_mask_rpt_trig {
+	u8			ra_mask_rpt_stamp;
+	u8			macid;
+};
+
+struct ra_mask_rpt {
+	u8			ra_mask_rpt_stamp;
+	u8 			ra_mask_buf[8];
+};
+
+/* @1 ============================================================
  * 1  Function Prototype
  * 1 ============================================================
  */
+boolean phydm_is_cck_rate(void *dm_void, u8 rate);
+
+boolean phydm_is_ofdm_rate(void *dm_void, u8 rate);
+
+boolean phydm_is_ht_rate(void *dm_void, u8 rate);
+
+boolean phydm_is_vht_rate(void *dm_void, u8 rate);
+
+u8 phydm_legacy_rate_2_spec_rate(void *dm_void, u8 rate);
+
+u8 phydm_rate_2_rate_digit(void *dm_void, u8 rate);
+
+u8 phydm_rate_type_2_num_ss(void *dm_void, enum PDM_RATE_TYPE type);
 
 u8 phydm_rate_to_num_ss(void *dm_void, u8 data_rate);
 
-void phydm_h2C_debug(void *dm_void, u32 *const dm_value, u32 *_used,
+void phydm_h2C_debug(void *dm_void, char input[][16], u32 *_used,
 		     char *output, u32 *_out_len);
 
 void phydm_ra_debug(void *dm_void, char input[][16], u32 *_used, char *output,
 		    u32 *_out_len);
 
+void phydm_ra_mask_report_h2c_trigger(void *dm_void,
+				      struct ra_mask_rpt_trig *trig_rpt);
+
+void phydm_ra_mask_report_c2h_result(void *dm_void, struct ra_mask_rpt *rpt);
+
 void odm_c2h_ra_para_report_handler(void *dm_void, u8 *cmd_buf, u8 cmd_len);
-
-void phydm_ra_dynamic_retry_count(void *dm_void);
-
 
 void phydm_print_rate(void *dm_void, u8 rate, u32 dbg_component);
 
-void phydm_print_rate_2_buff(
-	void *dm_void,
-	u8 rate,
-	char *buf,
-	u16 buf_size);
+void phydm_print_rate_2_buff(void *dm_void, u8 rate, char *buf, u16 buf_size);
 
 void phydm_c2h_ra_report_handler(void *dm_void, u8 *cmd_buf, u8 cmd_len);
 
 u8 phydm_rate_order_compute(void *dm_void, u8 rate_idx);
 
+void phydm_rrsr_set_register(void *dm_void, u32 rrsr_val);
+
 void phydm_ra_info_watchdog(void *dm_void);
+
+void phydm_rrsr_en(void *dm_void, boolean en_rrsr);
 
 void phydm_ra_info_init(void *dm_void);
 
@@ -250,6 +302,8 @@ u8 phydm_get_plcp(void *dm_void, u16 macid);
 
 void phydm_refresh_rate_adaptive_mask(void *dm_void);
 
+u8 phydm_get_rx_stream_num(void *dm_void, enum rf_type type);
+
 u8 phydm_rssi_lv_dec(void *dm_void, u32 rssi, u8 ratr_state);
 
 void odm_ra_post_action_on_assoc(void *dm);
@@ -257,9 +311,9 @@ void odm_ra_post_action_on_assoc(void *dm);
 u8 odm_find_rts_rate(void *dm_void, u8 tx_rate, boolean is_erp_protect);
 
 void phydm_show_sta_info(void *dm_void, char input[][16], u32 *_used,
-			 char *output, u32 *_out_len, u32 input_num);
+			 char *output, u32 *_out_len);
 
-#ifdef PHYDM_3RD_REFORM_RA_MASK
+u8 phydm_get_rate_from_rssi_lv(void *dm_void, u8 sta_idx);
 
 void phydm_ra_registed(void *dm_void, u8 macid, u8 rssi_from_assoc);
 
@@ -267,10 +321,13 @@ void phydm_ra_offline(void *dm_void, u8 macid);
 
 void phydm_ra_mask_watchdog(void *dm_void);
 
-#endif
-
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
 void odm_refresh_basic_rate_mask(
 	void *dm_void);
 #endif
-#endif /*#ifndef __PHYDMRAINFO_H__*/
+
+#ifdef PHYDM_IC_JGR3_SERIES_SUPPORT
+void phydm_ra_mode_selection(void *dm_void, u8 mode);
+#endif
+
+#endif /*@#ifndef __PHYDMRAINFO_H__*/

@@ -35,10 +35,11 @@
 
 #define HALMAC_INLINE	inline
 
-typedef u16		__le16;
-typedef u32		__le32;
-typedef u16		__be16;
-typedef u32		__be32;
+/*
+ * Ignore following typedef because Linux already have these
+ * u8, u16, u32, s8, s16, s32
+ * __le16, __le32, __be16, __be32
+ */
 
 #define HALMAC_PLATFORM_LITTLE_ENDIAN	1
 #define HALMAC_PLATFORM_BIG_ENDIAN	0
@@ -71,6 +72,12 @@ typedef u32		__be32;
  * Use HALMAC_MSG_LEVEL_XXXX
  */
 #define HALMAC_MSG_LEVEL HALMAC_MSG_LEVEL_TRACE
+
+#ifdef DBG_IO
+#define HALMAC_DBG_MONITOR_IO		1
+#else
+#define HALMAC_DBG_MONITOR_IO		0
+#endif /*DBG_IO*/
 
 /*[Driver] define the Rx FIFO expanding mode packet size unit for 8821C and 8822B */
 /*Should be 8 Byte alignment*/

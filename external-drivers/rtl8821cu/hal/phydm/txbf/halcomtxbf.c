@@ -12,7 +12,7 @@
  * more details.
  *
  *****************************************************************************/
-/*************************************************************
+/*@************************************************************
  * Description:
  *
  * This file is for TXBF mechanism
@@ -21,8 +21,8 @@
 #include "mp_precomp.h"
 #include "../phydm_precomp.h"
 
-#if (BEAMFORMING_SUPPORT == 1)
-/*Beamforming halcomtxbf API create by YuChen 2015/05*/
+#ifdef PHYDM_BEAMFORMING_SUPPORT
+/*@Beamforming halcomtxbf API create by YuChen 2015/05*/
 
 void hal_com_txbf_beamform_init(
 	void *dm_void)
@@ -129,9 +129,7 @@ void phydm_beamform_set_sounding_clk(
 	if (!odm_is_work_item_scheduled(&p_txbf_info->txbf_clk_work_item))
 		odm_schedule_work_item(&p_txbf_info->txbf_clk_work_item);
 #elif (DM_ODM_SUPPORT_TYPE == ODM_CE)
-	void *padpt = dm->adapter;
-
-	rtw_run_in_thread_cmd(padpt, hal_com_txbf_clk_work_item_callback, dm);
+	phydm_run_in_thread_cmd(dm, hal_com_txbf_clk_work_item_callback, dm);
 #else
 	hal_com_txbf_clk_work_item_callback(dm);
 #endif
@@ -466,43 +464,49 @@ hal_com_txbf_get(
 	if (get_type == TXBF_GET_EXPLICIT_BEAMFORMEE) {
 		if (IS_HARDWARE_TYPE_OLDER_THAN_8812A(adapter))
 			*p_boolean = false;
-		else if (/*IS_HARDWARE_TYPE_8822B(adapter)	||*/
+		else if (/*@IS_HARDWARE_TYPE_8822B(adapter)	||*/
 			 IS_HARDWARE_TYPE_8821B(adapter) ||
 			 IS_HARDWARE_TYPE_8192E(adapter) ||
 			 IS_HARDWARE_TYPE_8192F(adapter) ||
 			 IS_HARDWARE_TYPE_JAGUAR(adapter) ||
-			 IS_HARDWARE_TYPE_JAGUAR_AND_JAGUAR2(adapter))
+			 IS_HARDWARE_TYPE_JAGUAR_AND_JAGUAR2(adapter) ||
+			 IS_HARDWARE_TYPE_JAGUAR3(adapter))
 			*p_boolean = true;
 		else
 			*p_boolean = false;
 	} else if (get_type == TXBF_GET_EXPLICIT_BEAMFORMER) {
 		if (IS_HARDWARE_TYPE_OLDER_THAN_8812A(adapter))
 			*p_boolean = false;
-		else if (/*IS_HARDWARE_TYPE_8822B(adapter)	||*/
+		else if (/*@IS_HARDWARE_TYPE_8822B(adapter)	||*/
 			 IS_HARDWARE_TYPE_8821B(adapter) ||
 			 IS_HARDWARE_TYPE_8192E(adapter) ||
 			 IS_HARDWARE_TYPE_8192F(adapter) ||
 			 IS_HARDWARE_TYPE_JAGUAR(adapter) ||
-			 IS_HARDWARE_TYPE_JAGUAR_AND_JAGUAR2(adapter)) {
+			 IS_HARDWARE_TYPE_JAGUAR_AND_JAGUAR2(adapter) ||
+			 IS_HARDWARE_TYPE_JAGUAR3(adapter)) {
 			if (hal_data->RF_Type == RF_2T2R ||
-			    hal_data->RF_Type == RF_3T3R)
+			    hal_data->RF_Type == RF_3T3R ||
+			    hal_data->RF_Type == RF_4T4R)
 				*p_boolean = true;
 			else
 				*p_boolean = false;
 		} else
 			*p_boolean = false;
 	} else if (get_type == TXBF_GET_MU_MIMO_STA) {
-#if ((RTL8822B_SUPPORT == 1) || (RTL8821C_SUPPORT == 1))
+#if ((RTL8822B_SUPPORT == 1) || (RTL8821C_SUPPORT == 1) ||\
+	(RTL8822C_SUPPORT == 1))
 		if (IS_HARDWARE_TYPE_8822B(adapter) ||
-		    IS_HARDWARE_TYPE_8821C(adapter))
+		    IS_HARDWARE_TYPE_8821C(adapter) ||
+		    IS_HARDWARE_TYPE_JAGUAR3(adapter))
 			*p_boolean = true;
 		else
 #endif
 			*p_boolean = false;
 
 	} else if (get_type == TXBF_GET_MU_MIMO_AP) {
-#if (RTL8822B_SUPPORT == 1)
-		if (IS_HARDWARE_TYPE_8822B(adapter))
+#if ((RTL8822B_SUPPORT == 1) || (RTL8822C_SUPPORT == 1))
+		if (IS_HARDWARE_TYPE_8822B(adapter) ||
+		    IS_HARDWARE_TYPE_JAGUAR3(adapter))
 			*p_boolean = true;
 		else
 #endif

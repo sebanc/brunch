@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2017 Realtek Corporation.
+ * Copyright(c) 2007 - 2019 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -21,7 +21,11 @@
 #define NUM_STA MACID_NUM_SW_LIMIT
 
 #ifndef CONFIG_RTW_MACADDR_ACL
+	#ifdef CONFIG_AP_MODE
 	#define CONFIG_RTW_MACADDR_ACL 1
+	#else
+	#define CONFIG_RTW_MACADDR_ACL 0
+	#endif
 #endif
 
 #ifndef CONFIG_RTW_PRE_LINK_STA
@@ -99,27 +103,27 @@ struct	stainfo_stats	{
 	systime last_rx_time;
 
 	u64 rx_mgnt_pkts;
-		u64 rx_beacon_pkts;
-		u64 rx_probereq_pkts;
-		u64 rx_probersp_pkts; /* unicast to self */
-		u64 rx_probersp_bm_pkts;
-		u64 rx_probersp_uo_pkts; /* unicast to others */
+	u64 rx_beacon_pkts;
+	u64 rx_probereq_pkts;
+	u64 rx_probersp_pkts; /* unicast to self */
+	u64 rx_probersp_bm_pkts;
+	u64 rx_probersp_uo_pkts; /* unicast to others */
 	u64 rx_ctrl_pkts;
 	u64 rx_data_pkts;
-		u64 rx_data_bc_pkts;
-		u64 rx_data_mc_pkts;
+	u64 rx_data_bc_pkts;
+	u64 rx_data_mc_pkts;
 	u64 rx_data_qos_pkts[TID_NUM]; /* unicast only */
 
 	u64	last_rx_mgnt_pkts;
-		u64 last_rx_beacon_pkts;
-		u64 last_rx_probereq_pkts;
-		u64 last_rx_probersp_pkts; /* unicast to self */
-		u64 last_rx_probersp_bm_pkts;
-		u64 last_rx_probersp_uo_pkts; /* unicast to others */
+	u64 last_rx_beacon_pkts;
+	u64 last_rx_probereq_pkts;
+	u64 last_rx_probersp_pkts; /* unicast to self */
+	u64 last_rx_probersp_bm_pkts;
+	u64 last_rx_probersp_uo_pkts; /* unicast to others */
 	u64	last_rx_ctrl_pkts;
 	u64	last_rx_data_pkts;
-		u64 last_rx_data_bc_pkts;
-		u64 last_rx_data_mc_pkts;
+	u64 last_rx_data_bc_pkts;
+	u64 last_rx_data_mc_pkts;
 	u64 last_rx_data_qos_pkts[TID_NUM]; /* unicast only */
 
 #ifdef CONFIG_TDLS
@@ -128,13 +132,14 @@ struct	stainfo_stats	{
 #endif
 
 	u64	rx_bytes;
-		u64	rx_bc_bytes;
-		u64	rx_mc_bytes;
+	u64	rx_bc_bytes;
+	u64	rx_mc_bytes;
 	u64	last_rx_bytes;
-		u64 last_rx_bc_bytes;
-		u64 last_rx_mc_bytes;
+	u64 last_rx_bc_bytes;
+	u64 last_rx_mc_bytes;
 	u64	rx_drops; /* TBD */
-	u16 rx_tp_mbytes;
+	u32 rx_tp_kbits;
+	u32 smooth_rx_tp_kbits;
 
 	u64	tx_pkts;
 	u64	last_tx_pkts;
@@ -142,7 +147,13 @@ struct	stainfo_stats	{
 	u64	tx_bytes;
 	u64	last_tx_bytes;
 	u64 tx_drops; /* TBD */
-	u16 tx_tp_mbytes;
+	u32 tx_tp_kbits;
+	u32 smooth_tx_tp_kbits;
+
+#ifdef CONFIG_LPS_CHK_BY_TP
+	u64 acc_tx_bytes;
+	u64 acc_rx_bytes;
+#endif
 
 	/* unicast only */
 	u64 last_rx_data_uc_pkts; /* For Read & Clear requirement in proc_get_rx_stat() */
@@ -271,6 +282,10 @@ struct sta_info {
 #endif
 	_queue sleep_q;
 	unsigned int sleepq_len;
+#ifdef CONFIG_RTW_MGMT_QUEUE
+	_queue mgmt_sleep_q;
+	unsigned int mgmt_sleepq_len;
+#endif
 
 	uint state;
 	uint qos_option;
@@ -281,6 +296,7 @@ struct sta_info {
 	u8 rm_diag_token;
 #endif /* CONFIG_RTW_80211K */
 
+	systime	resp_nonenc_eapol_key_starttime;
 	uint	ieee8021x_blocked;	/* 0: allowed, 1:blocked */
 	uint	dot118021XPrivacy; /* aes, tkip... */
 	union Keytype	dot11tkiptxmickey;
@@ -296,6 +312,7 @@ struct sta_info {
 	union pn48 gtk_pn;
 	#ifdef CONFIG_IEEE80211W
 	/* peer's IGTK, RX only */
+	enum security_type dot11wCipher;
 	u8 igtk_bmp;
 	u8 igtk_id;
 	union Keytype igtk;
@@ -375,6 +392,10 @@ struct sta_info {
 
 	unsigned int expire_to;
 
+	int flags;
+
+	u8 bpairwise_key_installed;
+
 #ifdef CONFIG_AP_MODE
 
 	_list asoc_list;
@@ -385,7 +406,6 @@ struct sta_info {
 	unsigned char chg_txt[128];
 
 	u16 capability;
-	int flags;
 
 	int dot8021xalg;/* 0:disable, 1:psk, 2:802.1x */
 	int wpa_psk;/* 0:disable, bit(0): WPA, bit(1):WPA2 */
@@ -394,7 +414,8 @@ struct sta_info {
 	int wpa_pairwise_cipher;
 	int wpa2_pairwise_cipher;
 
-	u8 bpairwise_key_installed;
+	u32 akm_suite_type;
+
 #ifdef CONFIG_RTW_80211R
 	u8 ft_pairwise_key_installed;
 #endif
@@ -447,9 +468,9 @@ struct sta_info {
 	u8 op_wfd_mode;
 #endif
 
-#ifdef CONFIG_TX_MCAST2UNI
+#if !defined(CONFIG_ACTIVE_KEEP_ALIVE_CHECK) && defined(CONFIG_80211N_HT)
 	u8 under_exist_checking;
-#endif /* CONFIG_TX_MCAST2UNI */
+#endif
 
 	u8 keep_alive_trycnt;
 
@@ -468,9 +489,13 @@ struct sta_info {
 	u8 nonpeer_mps;
 
 	struct rtw_atlm_param metrics;
+	/* The reference for nexthop_lookup */
+	BOOLEAN alive;
 #endif
 
 #ifdef CONFIG_IOCTL_CFG80211
+	u8 *pauth_frame;
+	u32 auth_len;
 	u8 *passoc_req;
 	u32 assoc_req_len;
 #endif
@@ -487,6 +512,22 @@ struct sta_info {
 	u8 max_agg_num_minimal_record; /*keep minimal tx desc max_agg_num setting*/
 	u8 curr_rx_rate;
 	u8 curr_rx_rate_bmc;
+#ifdef CONFIG_RTS_FULL_BW
+	bool vendor_8812;
+#endif
+
+#ifdef CONFIG_RTW_TOKEN_BASED_XMIT
+	u8 tbtx_enable;			/* Does this sta_info support & enable TBTX function? */
+//	u8 tbtx_timeslot;		/* This sta_info belong to which time slot.	*/
+#endif
+
+	/*
+	 * Vaiables for queuing TX pkt a short period of time
+	 * to wait something ready.
+	 */
+	u8 tx_q_enable;
+	struct __queue tx_queue;
+	_workitem tx_q_work;
 };
 
 #ifdef CONFIG_RTW_MESH
@@ -634,6 +675,8 @@ struct	sta_priv {
 
 	u32 adhoc_expire_to;
 
+	int rx_chk_limit;
+
 #ifdef CONFIG_AP_MODE
 	_list asoc_list;
 	_list auth_list;
@@ -667,7 +710,12 @@ struct	sta_priv {
 	#if CONFIG_RTW_PRE_LINK_STA
 	struct pre_link_sta_ctl_t pre_link_sta_ctl;
 	#endif
-
+#ifdef CONFIG_RTW_TOKEN_BASED_XMIT
+	u8 tbtx_asoc_list_cnt;
+	struct sta_info *token_holder[NR_MAXSTA_INSLOT];
+	struct sta_info *last_token_holder;
+	ATOMIC_T nr_token_keeper;
+#endif
 #endif /* CONFIG_AP_MODE */
 
 #ifdef CONFIG_ATMEL_RC_PATCH

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -21,9 +21,15 @@
 #include "halmac_efuse_88xx.h"
 #include "halmac_mimo_88xx.h"
 #include "halmac_bb_rf_88xx.h"
+#if HALMAC_SDIO_SUPPORT
 #include "halmac_sdio_88xx.h"
+#endif
+#if HALMAC_USB_SUPPORT
 #include "halmac_usb_88xx.h"
+#endif
+#if HALMAC_PCIE_SUPPORT
 #include "halmac_pcie_88xx.h"
+#endif
 #include "halmac_gpio_88xx.h"
 #include "halmac_flash_88xx.h"
 
@@ -39,6 +45,10 @@
 #include "halmac_8822c/halmac_init_8822c.h"
 #endif
 
+#if HALMAC_8812F_SUPPORT
+#include "halmac_8812f/halmac_init_8812f.h"
+#endif
+
 #if HALMAC_PLATFORM_TESTPROGRAM
 #include "halmisc_api_88xx.h"
 #endif
@@ -48,48 +58,6 @@
 #define PLTFM_INFO_MALLOC_MAX_SIZE	16384
 #define PLTFM_INFO_RSVD_PG_SIZE		16384
 #define DLFW_PKT_MAX_SIZE		8192 /* need multiple of 2 */
-
-#define SYS_FUNC_EN		0xD8
-#define WLAN_SLOT_TIME		0x05
-#define WLAN_PIFS_TIME		0x19
-#define WLAN_SIFS_CCK_CONT_TX	0xA
-#define WLAN_SIFS_OFDM_CONT_TX	0xA
-#define WLAN_SIFS_CCK_TRX	0x10
-#define WLAN_SIFS_OFDM_TRX	0x10
-#define WLAN_VO_TXOP_LIMIT	0x186 /* unit : 32us */
-#define WLAN_VI_TXOP_LIMIT	0x3BC /* unit : 32us */
-#define WLAN_RDG_NAV		0x05
-#define WLAN_TXOP_NAV		0x1B
-#define WLAN_CCK_RX_TSF		0x30
-#define WLAN_OFDM_RX_TSF	0x30
-#define WLAN_TBTT_PROHIBIT	0x04 /* unit : 32us */
-#define WLAN_TBTT_HOLD_TIME	0x064 /* unit : 32us */
-#define WLAN_DRV_EARLY_INT	0x04
-#define WLAN_BCN_DMA_TIME	0x02
-#define WLAN_ACK_TO_CCK		0x40
-
-#define WLAN_RX_FILTER0		0x0FFFFFFF
-#define WLAN_RX_FILTER2		0xFFFF
-#define WLAN_RCR_CFG		0xE400220E
-#define WLAN_RXPKT_MAX_SZ	12288
-#define WLAN_RXPKT_MAX_SZ_512	(WLAN_RXPKT_MAX_SZ >> 9)
-
-#define WLAN_TX_FUNC_CFG1		0x30
-#define WLAN_TX_FUNC_CFG2		0x30
-#define WLAN_MAC_OPT_NORM_FUNC1		0x98
-#define WLAN_MAC_OPT_LB_FUNC1		0x80
-#define WLAN_MAC_OPT_FUNC2		0x30810041
-
-#define WLAN_SIFS_CFG	(WLAN_SIFS_CCK_CONT_TX | \
-			(WLAN_SIFS_OFDM_CONT_TX << BIT_SHIFT_SIFS_OFDM_CTX) | \
-			(WLAN_SIFS_CCK_TRX << BIT_SHIFT_SIFS_CCK_TRX) | \
-			(WLAN_SIFS_OFDM_TRX << BIT_SHIFT_SIFS_OFDM_TRX))
-
-#define WLAN_TBTT_TIME	(WLAN_TBTT_PROHIBIT |\
-			(WLAN_TBTT_HOLD_TIME << BIT_SHIFT_TBTT_HOLD_TIME_AP))
-
-#define WLAN_NAV_CFG		(WLAN_RDG_NAV | (WLAN_TXOP_NAV << 16))
-#define WLAN_RX_TSF_CFG		(WLAN_CCK_RX_TSF | (WLAN_OFDM_RX_TSF) << 8)
 
 static void
 init_state_machine_88xx(struct halmac_adapter *adapter);
@@ -164,12 +132,15 @@ init_adapter_param_88xx(struct halmac_adapter *adapter)
 
 	adapter->sdio_cmd53_4byte = HALMAC_SDIO_CMD53_4BYTE_MODE_DISABLE;
 	adapter->sdio_hw_info.io_hi_speed_flag = 0;
-	adapter->sdio_hw_info.io_indir_flag = 0;
+	adapter->sdio_hw_info.io_indir_flag = 1;
+	adapter->sdio_hw_info.io_warn_flag = 0;
 	adapter->sdio_hw_info.spec_ver = HALMAC_SDIO_SPEC_VER_2_00;
 	adapter->sdio_hw_info.clock_speed = 50;
 	adapter->sdio_hw_info.block_size = 512;
 	adapter->sdio_hw_info.tx_seq = 1;
 	adapter->sdio_fs.macid_map = (u8 *)NULL;
+
+	adapter->watcher.get_watcher.sdio_rn_not_align = 0;
 
 	adapter->pinmux_info.wl_led = 0;
 	adapter->pinmux_info.sdio_int = 0;
@@ -230,6 +201,7 @@ mount_api_88xx(struct halmac_adapter *adapter)
 	api->halmac_register_api = register_api_88xx;
 	api->halmac_download_firmware = download_firmware_88xx;
 	api->halmac_free_download_firmware = free_download_firmware_88xx;
+	api->halmac_reset_wifi_fw = reset_wifi_fw_88xx;
 	api->halmac_get_fw_version = get_fw_version_88xx;
 	api->halmac_cfg_mac_addr = cfg_mac_addr_88xx;
 	api->halmac_cfg_bssid = cfg_bssid_88xx;
@@ -239,13 +211,9 @@ mount_api_88xx(struct halmac_adapter *adapter)
 	api->halmac_cfg_bcn_space = cfg_bcn_space_88xx;
 	api->halmac_rw_bcn_ctrl = rw_bcn_ctrl_88xx;
 	api->halmac_cfg_multicast_addr = cfg_multicast_addr_88xx;
-	api->halmac_pre_init_system_cfg = pre_init_system_cfg_88xx;
-	api->halmac_init_system_cfg = init_system_cfg_88xx;
-	api->halmac_init_edca_cfg = init_edca_cfg_88xx;
 	api->halmac_cfg_operation_mode = cfg_operation_mode_88xx;
 	api->halmac_cfg_ch_bw = cfg_ch_bw_88xx;
 	api->halmac_cfg_bw = cfg_bw_88xx;
-	api->halmac_init_wmac_cfg = init_wmac_cfg_88xx;
 	api->halmac_init_mac_cfg = init_mac_cfg_88xx;
 	api->halmac_dump_efuse_map = dump_efuse_map_88xx;
 	api->halmac_dump_efuse_map_bt = dump_efuse_map_bt_88xx;
@@ -253,6 +221,7 @@ mount_api_88xx(struct halmac_adapter *adapter)
 	api->halmac_read_efuse_bt = read_efuse_bt_88xx;
 	api->halmac_cfg_efuse_auto_check = cfg_efuse_auto_check_88xx;
 	api->halmac_dump_logical_efuse_map = dump_log_efuse_map_88xx;
+	api->halmac_dump_logical_efuse_mask = dump_log_efuse_mask_88xx;
 	api->halmac_pg_efuse_by_map = pg_efuse_by_map_88xx;
 	api->halmac_mask_logical_efuse = mask_log_efuse_88xx;
 	api->halmac_get_efuse_size = get_efuse_size_88xx;
@@ -262,7 +231,11 @@ mount_api_88xx(struct halmac_adapter *adapter)
 	api->halmac_get_logical_efuse_size = get_log_efuse_size_88xx;
 
 	api->halmac_write_logical_efuse = write_log_efuse_88xx;
+	api->halmac_write_logical_efuse_word = write_log_efuse_word_88xx;
 	api->halmac_read_logical_efuse = read_logical_efuse_88xx;
+
+	api->halmac_write_wifi_phy_efuse = write_wifi_phy_efuse_88xx;
+	api->halmac_read_wifi_phy_efuse = read_wifi_phy_efuse_88xx;
 
 	api->halmac_ofld_func_cfg = ofld_func_cfg_88xx;
 	api->halmac_h2c_lb = h2c_lb_88xx;
@@ -293,8 +266,11 @@ mount_api_88xx(struct halmac_adapter *adapter)
 	api->halmac_p2pps = p2pps_88xx;
 	api->halmac_clear_ch_info = clear_ch_info_88xx;
 	api->halmac_send_general_info = send_general_info_88xx;
+	api->halmac_send_scan_packet = send_scan_packet_88xx;
+	api->halmac_drop_scan_packet = drop_scan_packet_88xx;
 
 	api->halmac_start_iqk = start_iqk_88xx;
+	api->halmac_start_dpk = start_dpk_88xx;
 	api->halmac_ctrl_pwr_tracking = ctrl_pwr_tracking_88xx;
 	api->halmac_psd = psd_88xx;
 	api->halmac_cfg_la_mode = cfg_la_mode_88xx;
@@ -322,15 +298,6 @@ mount_api_88xx(struct halmac_adapter *adapter)
 	api->halmac_dl_drv_rsvd_page = dl_drv_rsvd_page_88xx;
 	api->halmac_cfg_csi_rate = cfg_csi_rate_88xx;
 
-	api->halmac_sdio_cmd53_4byte = sdio_cmd53_4byte_88xx;
-	api->halmac_sdio_hw_info = sdio_hw_info_88xx;
-
-	api->halmac_init_sdio_cfg = init_sdio_cfg_88xx;
-	api->halmac_init_usb_cfg = init_usb_cfg_88xx;
-	api->halmac_init_pcie_cfg = init_pcie_cfg_88xx;
-	api->halmac_deinit_sdio_cfg = deinit_sdio_cfg_88xx;
-	api->halmac_deinit_usb_cfg = deinit_usb_cfg_88xx;
-	api->halmac_deinit_pcie_cfg = deinit_pcie_cfg_88xx;
 	api->halmac_txfifo_is_empty = txfifo_is_empty_88xx;
 	api->halmac_download_flash = download_flash_88xx;
 	api->halmac_read_flash = read_flash_88xx;
@@ -351,18 +318,27 @@ mount_api_88xx(struct halmac_adapter *adapter)
 	api->halmac_enter_cpu_sleep_mode = enter_cpu_sleep_mode_88xx;
 	api->halmac_get_cpu_mode = get_cpu_mode_88xx;
 	api->halmac_drv_fwctrl = drv_fwctrl_88xx;
-	api->halmac_en_ref_autok_pcie = en_ref_autok_88xx;
+	api->halmac_get_watcher = get_watcher_88xx;
 
 	if (adapter->intf == HALMAC_INTERFACE_SDIO) {
+#if HALMAC_SDIO_SUPPORT
+		api->halmac_deinit_sdio_cfg = deinit_sdio_cfg_88xx;
 		api->halmac_cfg_rx_aggregation = cfg_sdio_rx_agg_88xx;
-		api->halmac_init_interface_cfg = init_sdio_cfg_88xx;
 		api->halmac_deinit_interface_cfg = deinit_sdio_cfg_88xx;
 		api->halmac_cfg_tx_agg_align = cfg_txagg_sdio_align_88xx;
 		api->halmac_set_bulkout_num = set_sdio_bulkout_num_88xx;
 		api->halmac_get_usb_bulkout_id = get_sdio_bulkout_id_88xx;
 		api->halmac_reg_read_indirect_32 = sdio_indirect_reg_r32_88xx;
 		api->halmac_reg_sdio_cmd53_read_n = sdio_reg_rn_88xx;
+		api->halmac_sdio_cmd53_4byte = sdio_cmd53_4byte_88xx;
+		api->halmac_sdio_hw_info = sdio_hw_info_88xx;
+		api->halmac_en_ref_autok_pcie = en_ref_autok_sdio_88xx;
+
+#endif
 	} else if (adapter->intf == HALMAC_INTERFACE_USB) {
+#if HALMAC_USB_SUPPORT
+		api->halmac_init_usb_cfg = init_usb_cfg_88xx;
+		api->halmac_deinit_usb_cfg = deinit_usb_cfg_88xx;
 		api->halmac_cfg_rx_aggregation = cfg_usb_rx_agg_88xx;
 		api->halmac_init_interface_cfg = init_usb_cfg_88xx;
 		api->halmac_deinit_interface_cfg = deinit_usb_cfg_88xx;
@@ -379,7 +355,12 @@ mount_api_88xx(struct halmac_adapter *adapter)
 		api->halmac_reg_write_32 = reg_w32_usb_88xx;
 		api->halmac_reg_read_indirect_32 = usb_indirect_reg_r32_88xx;
 		api->halmac_reg_sdio_cmd53_read_n = usb_reg_rn_88xx;
+		api->halmac_en_ref_autok_pcie = en_ref_autok_usb_88xx;
+#endif
 	} else if (adapter->intf == HALMAC_INTERFACE_PCIE) {
+#if HALMAC_PCIE_SUPPORT
+		api->halmac_init_pcie_cfg = init_pcie_cfg_88xx;
+		api->halmac_deinit_pcie_cfg = deinit_pcie_cfg_88xx;
 		api->halmac_cfg_rx_aggregation = cfg_pcie_rx_agg_88xx;
 		api->halmac_init_interface_cfg = init_pcie_cfg_88xx;
 		api->halmac_deinit_interface_cfg = deinit_pcie_cfg_88xx;
@@ -396,6 +377,8 @@ mount_api_88xx(struct halmac_adapter *adapter)
 		api->halmac_reg_write_32 = reg_w32_pcie_88xx;
 		api->halmac_reg_read_indirect_32 = pcie_indirect_reg_r32_88xx;
 		api->halmac_reg_sdio_cmd53_read_n = pcie_reg_rn_88xx;
+		api->halmac_en_ref_autok_pcie = en_ref_autok_pcie_88xx;
+#endif
 	} else {
 		PLTFM_MSG_ERR("[ERR]Set halmac io function Error!!\n");
 	}
@@ -411,6 +394,10 @@ mount_api_88xx(struct halmac_adapter *adapter)
 	} else if (adapter->chip_id == HALMAC_CHIP_ID_8822C) {
 #if HALMAC_8822C_SUPPORT
 		mount_api_8822c(adapter);
+#endif
+	} else if (adapter->chip_id == HALMAC_CHIP_ID_8812F) {
+#if HALMAC_8812F_SUPPORT
+		mount_api_8812f(adapter);
 #endif
 	} else {
 		PLTFM_MSG_ERR("[ERR]Chip ID undefine!!\n");
@@ -506,213 +493,6 @@ register_api_88xx(struct halmac_adapter *adapter,
 }
 
 /**
- * pre_init_system_cfg_88xx() - pre-init system config
- * @adapter : the adapter of halmac
- * Author : KaiYuan Chang/Ivan Lin
- * Return : enum halmac_ret_status
- * More details of status code can be found in prototype document
- */
-enum halmac_ret_status
-pre_init_system_cfg_88xx(struct halmac_adapter *adapter)
-{
-	u32 value32;
-	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
-	u8 enable_bb;
-
-	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
-
-	HALMAC_REG_W8(REG_RSV_CTRL, 0);
-
-	if (adapter->intf == HALMAC_INTERFACE_SDIO) {
-		if (leave_sdio_suspend_88xx(adapter) != HALMAC_RET_SUCCESS)
-			return HALMAC_RET_SDIO_LEAVE_SUSPEND_FAIL;
-	} else if (adapter->intf == HALMAC_INTERFACE_USB) {
-		if (HALMAC_REG_R8(REG_SYS_CFG2 + 3) == 0x20)
-			HALMAC_REG_W8(0xFE5B, HALMAC_REG_R8(0xFE5B) | BIT(4));
-	} else if (adapter->intf == HALMAC_INTERFACE_PCIE) {
-		/* For PCIE power on fail issue */
-		HALMAC_REG_W8(REG_HCI_OPT_CTRL + 1,
-			      HALMAC_REG_R8(REG_HCI_OPT_CTRL + 1) | BIT(0));
-	}
-
-	/* Config PIN Mux */
-	value32 = HALMAC_REG_R32(REG_PAD_CTRL1);
-	value32 = value32 & (~(BIT(28) | BIT(29)));
-	value32 = value32 | BIT(28) | BIT(29);
-	HALMAC_REG_W32(REG_PAD_CTRL1, value32);
-
-	value32 = HALMAC_REG_R32(REG_LED_CFG);
-	value32 = value32 & (~(BIT(25) | BIT(26)));
-	HALMAC_REG_W32(REG_LED_CFG, value32);
-
-	value32 = HALMAC_REG_R32(REG_GPIO_MUXCFG);
-	value32 = value32 & (~(BIT(2)));
-	value32 = value32 | BIT(2);
-	HALMAC_REG_W32(REG_GPIO_MUXCFG, value32);
-
-	enable_bb = 0;
-	set_hw_value_88xx(adapter, HALMAC_HW_EN_BB_RF, &enable_bb);
-
-	if (HALMAC_REG_R8(REG_SYS_CFG1 + 2) & BIT(4)) {
-		PLTFM_MSG_ERR("[ERR]test mode!!\n");
-		return HALMAC_RET_WLAN_MODE_FAIL;
-	}
-
-	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
-
-	return HALMAC_RET_SUCCESS;
-}
-
-/**
- * init_system_cfg_88xx() -  init system config
- * @adapter : the adapter of halmac
- * Author : KaiYuan Chang/Ivan Lin
- * Return : enum halmac_ret_status
- * More details of status code can be found in prototype document
- */
-enum halmac_ret_status
-init_system_cfg_88xx(struct halmac_adapter *adapter)
-{
-	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
-	u32 tmp = 0;
-	u32 value32;
-	enum halmac_ret_status status;
-	u8 hwval;
-
-	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
-
-	if (adapter->intf == HALMAC_INTERFACE_PCIE) {
-		hwval = 1;
-		status = api->halmac_set_hw_value(adapter,
-						  HALMAC_HW_PCIE_REF_AUTOK,
-						  &hwval);
-		if (status != HALMAC_RET_SUCCESS)
-			return status;
-	}
-
-	value32 = HALMAC_REG_R32(REG_CPU_DMEM_CON) | BIT_WL_PLATFORM_RST;
-#if HALMAC_8822C_SUPPORT
-	if (adapter->chip_id != HALMAC_CHIP_ID_8822B &&
-	    adapter->chip_id != HALMAC_CHIP_ID_8821C)
-		value32 |= BIT_DDMA_EN;
-#endif
-	HALMAC_REG_W32(REG_CPU_DMEM_CON, value32);
-
-	HALMAC_REG_W8(REG_SYS_FUNC_EN + 1, SYS_FUNC_EN);
-#if HALMAC_8822B_SUPPORT
-	/* cpu_en is related to wlan tx in 8822B hw design */
-	/* 8822B should enable cpu_en in init flow */
-	if (adapter->chip_id == HALMAC_CHIP_ID_8822B)
-		HALMAC_REG_W8_SET(REG_SYS_FUNC_EN + 1, BIT(2));
-#endif
-	/*disable boot-from-flash for driver's DL FW*/
-	tmp = HALMAC_REG_R32(REG_MCUFW_CTRL);
-	if (tmp & BIT_BOOT_FSPI_EN) {
-		HALMAC_REG_W32(REG_MCUFW_CTRL, tmp & (~BIT_BOOT_FSPI_EN));
-		value32 = HALMAC_REG_R32(REG_GPIO_MUXCFG) & (~BIT_FSPI_EN);
-		HALMAC_REG_W32(REG_GPIO_MUXCFG, value32);
-	}
-
-	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
-
-	return HALMAC_RET_SUCCESS;
-}
-
-/**
- * init_edca_cfg_88xx() - init EDCA config
- * @adapter : the adapter of halmac
- * Author : KaiYuan Chang/Ivan Lin
- * Return : enum halmac_ret_status
- * More details of status code can be found in prototype document
- */
-enum halmac_ret_status
-init_edca_cfg_88xx(struct halmac_adapter *adapter)
-{
-	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
-
-	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
-
-	/* Init SYNC_CLI_SEL : reg 0x5B4[6:4] = 0 */
-	HALMAC_REG_W8_CLR(REG_TIMER0_SRC_SEL, BIT(4) | BIT(5) | BIT(6));
-
-	/* Clear TX pause */
-	HALMAC_REG_W16(REG_TXPAUSE, 0x0000);
-
-	HALMAC_REG_W8(REG_SLOT, WLAN_SLOT_TIME);
-	HALMAC_REG_W8(REG_PIFS, WLAN_PIFS_TIME);
-	HALMAC_REG_W32(REG_SIFS, WLAN_SIFS_CFG);
-
-	HALMAC_REG_W16(REG_EDCA_VO_PARAM + 2, WLAN_VO_TXOP_LIMIT);
-	HALMAC_REG_W16(REG_EDCA_VI_PARAM + 2, WLAN_VI_TXOP_LIMIT);
-
-	HALMAC_REG_W32(REG_RD_NAV_NXT, WLAN_NAV_CFG);
-	HALMAC_REG_W16(REG_RXTSF_OFFSET_CCK, WLAN_RX_TSF_CFG);
-
-	/* Set beacon cotnrol - enable TSF and other related functions */
-	HALMAC_REG_W8(REG_BCN_CTRL, (u8)(HALMAC_REG_R8(REG_BCN_CTRL) |
-					  BIT_EN_BCN_FUNCTION));
-
-	/* Set send beacon related registers */
-	HALMAC_REG_W32(REG_TBTT_PROHIBIT, WLAN_TBTT_TIME);
-	HALMAC_REG_W8(REG_DRVERLYINT, WLAN_DRV_EARLY_INT);
-	HALMAC_REG_W8(REG_BCNDMATIM, WLAN_BCN_DMA_TIME);
-
-	HALMAC_REG_W8_CLR(REG_TX_PTCL_CTRL + 1, BIT(4));
-
-	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
-
-	return HALMAC_RET_SUCCESS;
-}
-
-/**
- * init_wmac_cfg_88xx() - init wmac config
- * @adapter : the adapter of halmac
- * Author : KaiYuan Chang/Ivan Lin
- * Return : enum halmac_ret_status
- * More details of status code can be found in prototype document
- */
-enum halmac_ret_status
-init_wmac_cfg_88xx(struct halmac_adapter *adapter)
-{
-	u8 value8;
-	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
-	enum halmac_ret_status status = HALMAC_RET_SUCCESS;
-
-	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
-
-	HALMAC_REG_W32(REG_RXFLTMAP0, WLAN_RX_FILTER0);
-	HALMAC_REG_W16(REG_RXFLTMAP2, WLAN_RX_FILTER2);
-
-	HALMAC_REG_W32(REG_RCR, WLAN_RCR_CFG);
-
-	HALMAC_REG_W8(REG_RX_PKT_LIMIT, WLAN_RXPKT_MAX_SZ_512);
-
-	HALMAC_REG_W8(REG_TCR + 2, WLAN_TX_FUNC_CFG2);
-	HALMAC_REG_W8(REG_TCR + 1, WLAN_TX_FUNC_CFG1);
-
-#if HALMAC_8821C_SUPPORT
-	if (adapter->chip_id == HALMAC_CHIP_ID_8821C)
-		HALMAC_REG_W8(REG_ACKTO_CCK, WLAN_ACK_TO_CCK);
-#endif
-	HALMAC_REG_W32(REG_WMAC_OPTION_FUNCTION + 8, WLAN_MAC_OPT_FUNC2);
-
-	if (adapter->hw_cfg_info.trx_mode == HALMAC_TRNSFER_NORMAL)
-		value8 = WLAN_MAC_OPT_NORM_FUNC1;
-	else
-		value8 = WLAN_MAC_OPT_LB_FUNC1;
-
-	HALMAC_REG_W8(REG_WMAC_OPTION_FUNCTION + 4, value8);
-
-	status = api->halmac_init_low_pwr(adapter);
-	if (status != HALMAC_RET_SUCCESS)
-		return status;
-
-	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
-
-	return HALMAC_RET_SUCCESS;
-}
-
-/**
  * init_mac_cfg_88xx() - config page1~page7 register
  * @adapter : the adapter of halmac
  * @mode : trx mode
@@ -740,13 +520,13 @@ init_mac_cfg_88xx(struct halmac_adapter *adapter, enum halmac_trx_mode mode)
 		return status;
 	}
 
-	status = init_edca_cfg_88xx(adapter);
+	status = api->halmac_init_edca_cfg(adapter);
 	if (status != HALMAC_RET_SUCCESS) {
 		PLTFM_MSG_ERR("[ERR]init edca %x\n", status);
 		return status;
 	}
 
-	status = init_wmac_cfg_88xx(adapter);
+	status = api->halmac_init_wmac_cfg(adapter);
 	if (status != HALMAC_RET_SUCCESS) {
 		PLTFM_MSG_ERR("[ERR]init wmac %x\n", status);
 		return status;
@@ -780,6 +560,7 @@ reset_ofld_feature_88xx(struct halmac_adapter *adapter,
 		break;
 	case HALMAC_FEATURE_DUMP_PHYSICAL_EFUSE:
 	case HALMAC_FEATURE_DUMP_LOGICAL_EFUSE:
+	case HALMAC_FEATURE_DUMP_LOGICAL_EFUSE_MASK:
 		state->efuse_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
 		state->efuse_state.cmd_cnstr_state = HALMAC_CMD_CNSTR_IDLE;
 		break;
@@ -789,6 +570,12 @@ reset_ofld_feature_88xx(struct halmac_adapter *adapter,
 		break;
 	case HALMAC_FEATURE_UPDATE_PACKET:
 		state->update_pkt_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
+		break;
+	case HALMAC_FEATURE_SEND_SCAN_PACKET:
+		state->scan_pkt_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
+		break;
+	case HALMAC_FEATURE_DROP_SCAN_PACKET:
+		state->drop_pkt_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
 		break;
 	case HALMAC_FEATURE_IQK:
 		state->iqk_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
@@ -803,6 +590,9 @@ reset_ofld_feature_88xx(struct halmac_adapter *adapter,
 		state->fw_snding_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
 		state->fw_snding_state.cmd_cnstr_state = HALMAC_CMD_CNSTR_IDLE;
 		break;
+	case HALMAC_FEATURE_DPK:
+		state->dpk_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
+		break;
 	case HALMAC_FEATURE_ALL:
 		state->cfg_param_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
 		state->cfg_param_state.cmd_cnstr_state = HALMAC_CMD_CNSTR_IDLE;
@@ -811,6 +601,8 @@ reset_ofld_feature_88xx(struct halmac_adapter *adapter,
 		state->scan_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
 		state->scan_state.cmd_cnstr_state = HALMAC_CMD_CNSTR_IDLE;
 		state->update_pkt_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
+		state->scan_pkt_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
+		state->drop_pkt_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
 		state->iqk_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
 		state->pwr_trk_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
 		state->psd_state.proc_status = HALMAC_CMD_PROCESS_IDLE;
@@ -886,6 +678,7 @@ verify_io_88xx(struct halmac_adapter *adapter)
 	enum halmac_ret_status ret_status = HALMAC_RET_SUCCESS;
 
 	if (adapter->intf == HALMAC_INTERFACE_SDIO) {
+#if HALMAC_SDIO_SUPPORT
 		offset = REG_PAGE5_DUMMY;
 		if (0 == (offset & 0xFFFF0000))
 			offset |= WLAN_IOREG_OFFSET;
@@ -938,6 +731,9 @@ verify_io_88xx(struct halmac_adapter *adapter)
 			PLTFM_MSG_ERR("[ERR]cmd52 is used\n");
 			ret_status = HALMAC_RET_PLATFORM_API_INCORRECT;
 		}
+#else
+		return HALMAC_RET_WRONG_INTF;
+#endif
 	} else {
 		wvalue32 = 0x77665511;
 		PLTFM_REG_W32(REG_PAGE5_DUMMY, wvalue32);
@@ -1094,6 +890,25 @@ rqpn_parser_88xx(struct halmac_adapter *adapter, enum halmac_trx_mode mode,
 		return HALMAC_RET_TRX_MODE_NOT_SUPPORT;
 	}
 
+	return HALMAC_RET_SUCCESS;
+}
+
+enum halmac_ret_status
+fwff_is_empty_88xx(struct halmac_adapter *adapter)
+{
+	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
+	u32 cnt;
+
+	cnt = 5000;
+	while (HALMAC_REG_R16(REG_FWFF_CTRL) !=
+		HALMAC_REG_R16(REG_FWFF_PKT_INFO)) {
+		if (cnt == 0) {
+			PLTFM_MSG_ERR("[ERR]polling fwff empty fail\n");
+			return HALMAC_RET_FWFF_NO_EMPTY;
+		}
+		cnt--;
+		PLTFM_DELAY_US(50);
+	}
 	return HALMAC_RET_SUCCESS;
 }
 

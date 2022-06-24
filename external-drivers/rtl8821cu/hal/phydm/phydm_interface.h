@@ -26,11 +26,11 @@
 #ifndef __ODM_INTERFACE_H__
 #define __ODM_INTERFACE_H__
 
-#define INTERFACE_VERSION "1.2" /*2017.05.03  YuChen add phy param offload HAL MAC API*/
+#define INTERFACE_VERSION "1.2"
 
 #define pdm_set_reg odm_set_bb_reg
 
-/*=========== Constant/Structure/Enum/... Define*/
+/*@=========== Constant/Structure/Enum/... Define*/
 
 enum phydm_h2c_cmd {
 	PHYDM_H2C_RA_MASK		= 0x40,
@@ -45,6 +45,10 @@ enum phydm_h2c_cmd {
 	PHYDM_H2C_MU			= 0x4a,
 	PHYDM_H2C_FW_GENERAL_INIT	= 0x4c,
 	PHYDM_H2C_FW_CLM_MNTR		= 0x4d,
+	PHYDM_H2C_MCC			= 0x4f,
+	PHYDM_H2C_RESP_TX_PATH_CTRL	= 0x50,
+	PHYDM_H2C_RESP_TX_ANT_CTRL	= 0x51,
+	PHYDM_H2C_FW_DM_CTRL		= 0x55,
 	ODM_MAX_H2CCMD
 };
 
@@ -58,7 +62,7 @@ enum phydm_c2h_evt {
 	PHYDM_C2H_RA_RPT =	12,
 	PHYDM_C2H_RA_PARA_RPT = 14,
 	PHYDM_C2H_DYNAMIC_TX_PATH_RPT = 15,
-	PHYDM_C2H_IQK_FINISH =	17, /*0x11*/
+	PHYDM_C2H_IQK_FINISH =	17, /*@0x11*/
 	PHYDM_C2H_CLM_MONITOR =	0x2a,
 	PHYDM_C2H_DBG_CODE =	0xFE,
 	PHYDM_C2H_EXTEND =	0xFF,
@@ -82,28 +86,22 @@ enum phydm_halmac_param {
 	PHYDM_HALMAC_CMD_END = 0XFF,
 };
 
-/*=========== Macro Define*/
+/*@=========== Macro Define*/
 
 #define _reg_all(_name)			ODM_##_name
 #define _reg_ic(_name, _ic)		ODM_##_name##_ic
 #define _bit_all(_name)			BIT_##_name
 #define _bit_ic(_name, _ic)		BIT_##_name##_ic
 
-/* _cat: implemented by Token-Pasting Operator. */
-#if 0
-#define _cat(_name, _ic_type, _func) \
-	(                            \
-		_func##_all(_name))
-#endif
+#if defined(DM_ODM_CE_MAC80211)
+#define ODM_BIT(name, dm)				\
+	((dm->support_ic_type & ODM_IC_11N_SERIES) ?	\
+	 ODM_BIT_##name##_11N : ODM_BIT_##name##_11AC)
 
-#if 0
-
-#define ODM_REG_DIG_11N		0xC50
-#define ODM_REG_DIG_11AC	0xDDD
-
-ODM_REG(DIG,_pdm_odm)
-#endif
-
+#define ODM_REG(name, dm)				\
+	((dm->support_ic_type & ODM_IC_11N_SERIES) ?	\
+	 ODM_REG_##name##_11N : ODM_REG_##name##_11AC)
+#else
 #define _reg_11N(_name)			ODM_REG_##_name##_11N
 #define _reg_11AC(_name)		ODM_REG_##_name##_11AC
 #define _bit_11N(_name)			ODM_BIT_##_name##_11N
@@ -121,7 +119,7 @@ ODM_REG(DIG,_pdm_odm)
 		((_ic_type) & ODM_IC_11N_SERIES) ? _func##_11N(_name) : \
 						   _func##_11AC(_name))
 #endif
-/*
+/*@
  * only sample code
  *#define _cat(_name, _ic_type, _func)					\
  *	(								\
@@ -130,23 +128,29 @@ ODM_REG(DIG,_pdm_odm)
  *	)
  */
 
-/* _name: name of register or bit.
+/* @_name: name of register or bit.
  * Example: "ODM_REG(R_A_AGC_CORE1, dm)"
- * gets "ODM_R_A_AGC_CORE1" or "ODM_R_A_AGC_CORE1_8192C", depends on support_ic_type.
+ * gets "ODM_R_A_AGC_CORE1" or "ODM_R_A_AGC_CORE1_8192C",
+ * depends on support_ic_type.
  */
 #ifdef __ECOS
-	#define ODM_REG(_name, _pdm_odm)	_rtk_cat(_name, _pdm_odm->support_ic_type, _reg)
-	#define ODM_BIT(_name, _pdm_odm)	_rtk_cat(_name, _pdm_odm->support_ic_type, _bit)
+	#define ODM_REG(_name, _pdm_odm)	\
+		_rtk_cat(_name, _pdm_odm->support_ic_type, _reg)
+	#define ODM_BIT(_name, _pdm_odm)	\
+		_rtk_cat(_name, _pdm_odm->support_ic_type, _bit)
 #else
-	#define ODM_REG(_name, _pdm_odm)	_cat(_name, _pdm_odm->support_ic_type, _reg)
-	#define ODM_BIT(_name, _pdm_odm)	_cat(_name, _pdm_odm->support_ic_type, _bit)
+	#define ODM_REG(_name, _pdm_odm)	\
+		_cat(_name, _pdm_odm->support_ic_type, _reg)
+	#define ODM_BIT(_name, _pdm_odm)	\
+		_cat(_name, _pdm_odm->support_ic_type, _bit)
 #endif
 
-/*
+#endif
+/*@
  * =========== Extern Variable ??? It should be forbidden.
  */
 
-/*
+/*@
  * =========== EXtern Function Prototype
  */
 
@@ -177,7 +181,7 @@ void odm_set_rf_reg(struct dm_struct *dm, u8 e_rf_path, u32 reg_addr,
 u32 odm_get_rf_reg(struct dm_struct *dm, u8 e_rf_path, u32 reg_addr,
 		   u32 bit_mask);
 
-/*
+/*@
  * Memory Relative Function.
  */
 void odm_allocate_memory(struct dm_struct *dm, void **ptr, u32 length);
@@ -190,7 +194,7 @@ s32 odm_compare_memory(struct dm_struct *dm, void *buf1, void *buf2,
 
 void odm_memory_set(struct dm_struct *dm, void *pbuf, s8 value, u32 length);
 
-/*
+/*@
  * ODM MISC-spin lock relative API.
  */
 void odm_acquire_spin_lock(struct dm_struct *dm, enum rt_spinlock_type type);
@@ -198,7 +202,7 @@ void odm_acquire_spin_lock(struct dm_struct *dm, enum rt_spinlock_type type);
 void odm_release_spin_lock(struct dm_struct *dm, enum rt_spinlock_type type);
 
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
-/*
+/*@
  * ODM MISC-workitem relative API.
  */
 void odm_initialize_work_item(
@@ -225,7 +229,7 @@ odm_is_work_item_scheduled(
 	PRT_WORK_ITEM p_rt_work_item);
 #endif
 
-/*
+/*@
  * ODM Timer relative API.
  */
 void ODM_delay_ms(u32 ms);
@@ -263,7 +267,8 @@ u8 phydm_c2H_content_parsing(void *dm_void, u8 c2h_cmd_id, u8 c2h_cmd_len,
 u64 odm_get_current_time(struct dm_struct *dm);
 u64 odm_get_progressing_time(struct dm_struct *dm, u64 start_time);
 
-#if (DM_ODM_SUPPORT_TYPE & (ODM_WIN | ODM_CE)) && !defined(DM_ODM_CE_MAC80211)
+#if (DM_ODM_SUPPORT_TYPE & (ODM_WIN | ODM_CE)) && \
+	(!defined(DM_ODM_CE_MAC80211) && !defined(DM_ODM_CE_MAC80211_V2))
 
 void phydm_set_hw_reg_handler_interface(struct dm_struct *dm, u8 reg_Name,
 					u8 *val);
@@ -290,9 +295,8 @@ void odm_efuse_logical_map_read(struct dm_struct *dm, u8 type, u16 offset,
 enum hal_status
 odm_iq_calibrate_by_fw(struct dm_struct *dm, u8 clear, u8 segment);
 
-void odm_cmn_info_ptr_array_hook(struct dm_struct *dm,
-				 enum odm_cmninfo cmn_info, u16 index,
-				 void *value);
+enum hal_status
+odm_dpk_by_fw(struct dm_struct *dm);
 
 void phydm_cmn_sta_info_hook(struct dm_struct *dm, u8 index,
 			     struct cmn_sta_info *pcmn_sta_info);
@@ -304,22 +308,21 @@ void phydm_add_interrupt_mask_handler(struct dm_struct *dm, u8 interrupt_type);
 
 void phydm_enable_rx_related_interrupt_handler(struct dm_struct *dm);
 
-#if 0
-boolean
-phydm_get_txbf_en(
-	struct dm_struct		*dm,
-	u16		mac_id,
-	u8		i
-);
-#endif
-
 void phydm_iqk_wait(struct dm_struct *dm, u32 timeout);
+u8 phydm_get_hwrate_to_mrate(struct dm_struct *dm, u8 rate);
 
-u8 phydm_get_hwrate_to_mrate(
-	struct dm_struct *dm,
-	u8 rate);
+void phydm_set_crystalcap(struct dm_struct *dm, u8 crystal_cap);
+void phydm_run_in_thread_cmd(struct dm_struct *dm, void (*func)(void *),
+			     void *context);
+u8 phydm_get_tx_rate(struct dm_struct *dm);
+u8 phydm_get_tx_power_dbm(struct dm_struct *dm, u8 rf_path,
+					u8 rate, u8 bandwidth, u8 channel);
 
-void phydm_set_crystalcap(
-	struct dm_struct *dm,
-	u8 crystal_cap);
-#endif /* __ODM_INTERFACE_H__ */
+s16 phydm_get_tx_power_mdbm(struct dm_struct *dm, u8 rf_path,
+					u8 rate, u8 bandwidth, u8 channel);
+
+u32 phydm_rfe_ctrl_gpio(struct dm_struct *dm, u8 gpio_num);
+
+u64 phydm_division64(u64 x, u64 y);
+
+#endif /* @__ODM_INTERFACE_H__ */

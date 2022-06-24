@@ -23,19 +23,18 @@
  *
  *****************************************************************************/
 
-/*Image2HeaderVersion: R3 1.0*/
+/*Image2HeaderVersion: R3 1.5.10.1*/
 #if (RTL8821C_SUPPORT == 1)
 #ifndef __INC_MP_MAC_HW_IMG_8821C_H
 #define __INC_MP_MAC_HW_IMG_8821C_H
 
-
 /******************************************************************************
-*                           mac_reg.TXT
-******************************************************************************/
+ *                           mac_reg.TXT
+ ******************************************************************************/
 
+/* tc: Test Chip, mp: mp Chip*/
 void
-odm_read_and_config_mp_8821c_mac_reg( /* tc: Test Chip, mp: mp Chip*/
-				     struct dm_struct *dm);
+odm_read_and_config_mp_8821c_mac_reg(struct dm_struct *dm);
 u32 odm_get_version_mp_8821c_mac_reg(void);
 
 #endif

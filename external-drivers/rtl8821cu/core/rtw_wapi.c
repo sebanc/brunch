@@ -792,6 +792,14 @@ void rtw_wapi_return_all_sta_info(_adapter *padapter)
 	WAPI_TRACE(WAPI_API, "<========== %s\n", __FUNCTION__);
 }
 
+void CAM_empty_entry(
+	PADAPTER	Adapter,
+	u8			ucIndex
+)
+{
+	rtw_hal_set_hwreg(Adapter, HW_VAR_CAM_EMPTY_ENTRY, (u8 *)(&ucIndex));
+}
+
 void rtw_wapi_clear_cam_entry(_adapter *padapter, u8 *pMacAddr)
 {
 	u8 UcIndex = 0;

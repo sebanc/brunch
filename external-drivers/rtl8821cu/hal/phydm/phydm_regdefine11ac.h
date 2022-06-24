@@ -26,11 +26,11 @@
 #ifndef __ODM_REGDEFINE11AC_H__
 #define __ODM_REGDEFINE11AC_H__
 
-/* 2 RF REG LIST */
+/* @2 RF REG LIST */
 
 
 
-/* 2 BB REG LIST */
+/* @2 BB REG LIST */
 /* PAGE 8 */
 #define	ODM_REG_CCK_RPT_FORMAT_11AC		0x804
 #define	ODM_REG_BB_RX_PATH_11AC			0x808
@@ -41,7 +41,7 @@
 /* PAGE 9 */
 #define	ODM_REG_EDCCA_DOWN_OPT			0x900
 #define	ODM_REG_ACBB_EDCCA_ENHANCE		0x944
-#define	odm_adc_trigger_jaguar2			0x95C	/*ADC sample mode*/
+#define	odm_adc_trigger_jaguar2			0x95C	/*@ADC sample mode*/
 #define	ODM_REG_OFDM_FA_RST_11AC		0x9A4
 #define	ODM_REG_CCX_PERIOD_11AC			0x990
 #define	ODM_REG_NHM_TH9_TH10_11AC		0x994
@@ -62,7 +62,7 @@
 #define	ODM_REG_IGI_A_11AC			0xC50
 /* PAGE E */
 #define	ODM_REG_IGI_B_11AC			0xE50
-#define	ODM_REG_TRMUX_11AC_B			0xE08
+#define	ODM_REG_ANT_11AC_B			0xE08
 /* PAGE F */
 #define	ODM_REG_CCK_CRC32_CNT_11AC		0xF04
 #define	ODM_REG_CCK_CCA_CNT_11AC		0xF08
@@ -91,12 +91,12 @@
 /* PAGE 1D */
 #define	ODM_REG_IGI_11AC3			0x1D70
 
-/* 2 MAC REG LIST */
+/* @2 MAC REG LIST */
 #define	ODM_REG_RESP_TX_11AC			0x6D8
 
 
 
-/* DIG Related */
+/* @DIG Related */
 #define	ODM_BIT_IGI_11AC			0x0000007F
 #define	ODM_BIT_IGI_B_11AC3			0x00007F00
 #define	ODM_BIT_IGI_C_11AC3			0x007F0000

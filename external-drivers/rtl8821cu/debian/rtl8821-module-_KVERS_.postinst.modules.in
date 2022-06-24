@@ -1,7 +1,0 @@
-#!/bin/sh -e
-
-if [ "`uname -r`" = _KVERS_ ] ; then
-  depmod -a &
-fi
-
-#DEBHELPER#

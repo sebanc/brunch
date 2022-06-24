@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -167,7 +167,7 @@ static struct halmac_wlan_pwr_cfg TRANS_ACT_TO_CARDEMU_8821C[] = {
 	 HALMAC_PWR_CUT_ALL_MSK,
 	 HALMAC_PWR_INTF_ALL_MSK,
 	 HALMAC_PWR_ADDR_MAC,
-	 HALMAC_PWR_CMD_WRITE, BIT(3), 0},
+	 HALMAC_PWR_CMD_WRITE, 0xFF, 0xC4},
 	{0x001F,
 	 HALMAC_PWR_CUT_ALL_MSK,
 	 HALMAC_PWR_INTF_ALL_MSK,
@@ -234,11 +234,6 @@ static struct halmac_wlan_pwr_cfg TRANS_CARDEMU_TO_CARDDIS_8821C[] = {
 	 HALMAC_PWR_CMD_WRITE, BIT(5), 0},
 	{0x0005,
 	 HALMAC_PWR_CUT_ALL_MSK,
-	 HALMAC_PWR_INTF_USB_MSK | HALMAC_PWR_INTF_SDIO_MSK,
-	 HALMAC_PWR_ADDR_MAC,
-	 HALMAC_PWR_CMD_WRITE, BIT(3) | BIT(4), BIT(3)},
-	{0x0005,
-	 HALMAC_PWR_CUT_ALL_MSK,
 	 HALMAC_PWR_INTF_PCI_MSK,
 	 HALMAC_PWR_ADDR_MAC,
 	 HALMAC_PWR_CMD_WRITE, BIT(2), BIT(2)},
@@ -292,6 +287,11 @@ static struct halmac_wlan_pwr_cfg TRANS_CARDEMU_TO_CARDDIS_8821C[] = {
 	 HALMAC_PWR_INTF_ALL_MSK,
 	 HALMAC_PWR_ADDR_MAC,
 	 HALMAC_PWR_CMD_WRITE, BIT(7) | BIT(6), 0},
+	{0x0005,
+	 HALMAC_PWR_CUT_ALL_MSK,
+	 HALMAC_PWR_INTF_USB_MSK | HALMAC_PWR_INTF_SDIO_MSK,
+	 HALMAC_PWR_ADDR_MAC,
+	 HALMAC_PWR_CMD_WRITE, BIT(3) | BIT(4), BIT(3)},
 	{0x0086,
 	 HALMAC_PWR_CUT_ALL_MSK,
 	 HALMAC_PWR_INTF_SDIO_MSK,

@@ -25,6 +25,10 @@
 #define config_phydm_read_rf_check_8821c(data) (data != INVALID_RF_DATA)
 #define config_phydm_read_txagc_check_8821c(data) (data != INVALID_TXAGC_DATA)
 
+#define	PSD_VAL_NUM_8821C 5
+#define	PSD_SMP_NUM_8821C 3
+#define	FREQ_PT_5G_NUM_8821C 3
+
 enum rf_set_8821c {
 	SWITCH_TO_BTG = 0x0,
 	SWITCH_TO_WLG = 0x1,
@@ -43,6 +47,8 @@ enum ant_num_map_8821c {
 	ONLY_ANT2 = 0x3,
 	DONT_CARE = 0x4
 };
+
+s8 phydm_cck_rssi_8821c(struct dm_struct *dm, u8 lna_idx, u8 vga_idx);
 
 u32 config_phydm_read_rf_reg_8821c(struct dm_struct *dm, enum rf_path path,
 				   u32 reg_addr, u32 bit_mask);

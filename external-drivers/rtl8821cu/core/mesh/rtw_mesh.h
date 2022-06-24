@@ -106,6 +106,7 @@ extern const char *_rtw_mesh_ps_str[];
 #define RTW_PREQ_Q_F_REFRESH	0x2
 #define RTW_PREQ_Q_F_CHK	0x4
 #define RTW_PREQ_Q_F_PEER_AKA	0x8
+#define RTW_PREQ_Q_F_BCAST_PREQ	0x10 /* force path_dicover using broadcast */
 struct rtw_mesh_preq_queue {
 	_list list;
 	u8 dst[ETH_ALEN];
@@ -241,6 +242,10 @@ struct mesh_plink_pool {
 	u8 num; /* current ent being used */
 	struct mesh_plink_ent ent[RTW_MESH_MAX_PEER_CANDIDATES];
 
+#if CONFIG_RTW_MESH_ACNODE_PREVENT
+	u8 acnode_rsvd;
+#endif
+
 #if CONFIG_RTW_MESH_PEER_BLACKLIST
 	_queue peer_blacklist;
 #endif
@@ -251,6 +256,12 @@ struct mesh_plink_pool {
 
 struct mesh_peer_sel_policy {
 	u32 scanr_exp_ms;
+
+#if CONFIG_RTW_MESH_ACNODE_PREVENT
+	u8 acnode_prevent;
+	u32 acnode_conf_timeout_ms;
+	u32 acnode_notify_timeout_ms;
+#endif
 
 #if CONFIG_RTW_MESH_OFFCH_CAND
 	u8 offch_cand;
@@ -381,7 +392,7 @@ struct rtw_mesh_info {
 
 	_queue mpath_tx_queue;
 	u32 mpath_tx_queue_len;
-	struct tasklet_struct mpath_tx_tasklet;
+	_tasklet mpath_tx_tasklet;
 
 	struct rtw_mrc *mrc;
 
@@ -401,11 +412,19 @@ u8 *rtw_set_ie_mesh_config(u8 *buf, u32 *buf_len
 	, bool mbca_en, bool tbtt_adj, bool ps_level);
 
 int rtw_bss_is_same_mbss(WLAN_BSSID_EX *a, WLAN_BSSID_EX *b);
-int rtw_bss_is_candidate_mesh_peer(WLAN_BSSID_EX *self, WLAN_BSSID_EX *target, u8 ch, u8 add_peer);
+int rtw_bss_is_candidate_mesh_peer(_adapter *adapter, WLAN_BSSID_EX *target, u8 ch, u8 add_peer);
 
 void rtw_chk_candidate_peer_notify(_adapter *adapter, struct wlan_network *scanned);
 
 void rtw_mesh_peer_status_chk(_adapter *adapter);
+
+#if CONFIG_RTW_MESH_ACNODE_PREVENT
+void rtw_mesh_update_scanned_acnode_status(_adapter *adapter, struct wlan_network *scanned);
+bool rtw_mesh_scanned_is_acnode_confirmed(_adapter *adapter, struct wlan_network *scanned);
+bool rtw_mesh_acnode_prevent_allow_sacrifice(_adapter *adapter);
+struct sta_info *rtw_mesh_acnode_prevent_pick_sacrifice(_adapter *adapter);
+void dump_mesh_acnode_prevent_settings(void *sel, _adapter *adapter);
+#endif
 
 #if CONFIG_RTW_MESH_OFFCH_CAND
 u8 rtw_mesh_offch_candidate_accepted(_adapter *adapter);
@@ -436,10 +455,11 @@ void dump_mesh_networks(void *sel, _adapter *adapter);
 
 void rtw_mesh_adjust_chbw(u8 req_ch, u8 *req_bw, u8 *req_offset);
 
-int rtw_sae_check_frames(_adapter *adapter, const u8 *buf, u32 len, u8 tx);
+void rtw_mesh_sae_check_frames(_adapter *adapter, const u8 *buf, u32 len, u8 tx, u16 alg, u16 seq, u16 status);
 int rtw_mesh_check_frames_tx(_adapter *adapter, const u8 **buf, size_t *len);
 int rtw_mesh_check_frames_rx(_adapter *adapter, const u8 *buf, size_t len);
 
+int rtw_mesh_on_auth(_adapter *adapter, union recv_frame *rframe);
 unsigned int on_action_self_protected(_adapter *adapter, union recv_frame *rframe);
 
 bool rtw_mesh_update_bss_peering_status(_adapter *adapter, WLAN_BSSID_EX *bss);
@@ -464,7 +484,8 @@ void rtw_mesh_plink_ctl_init(_adapter *adapter);
 void rtw_mesh_plink_ctl_deinit(_adapter *adapter);
 void dump_mesh_plink_ctl(void *sel, _adapter *adapter);
 
-int rtw_mesh_peer_establish(_adapter *adapter, struct mesh_plink_ent *plink, struct sta_info *sta);
+u8 rtw_mesh_set_plink_state_cmd(_adapter *adapter, const u8 *mac, u8 plink_state);
+
 void _rtw_mesh_expire_peer_ent(_adapter *adapter, struct mesh_plink_ent *plink);
 void rtw_mesh_expire_peer(_adapter *adapter, const u8 *peer_addr);
 u8 rtw_mesh_ps_annc(_adapter *adapter, u8 ps);
@@ -481,7 +502,7 @@ void rtw_mesh_deinit_mesh_info(_adapter *adapter);
 void dump_mesh_b2u_flags(void *sel, _adapter *adapter);
 #endif
 
-int rtw_mesh_addr_resolve(_adapter *adapter, struct xmit_frame *xframe, _pkt *pkt, _list *b2u_list);
+int rtw_mesh_addr_resolve(_adapter *adapter, u16 os_qid, struct xmit_frame *xframe, _pkt *pkt, _list *b2u_list);
 
 s8 rtw_mesh_tx_set_whdr_mctrl_len(u8 mesh_frame_mode, struct pkt_attrib *attrib);
 void rtw_mesh_tx_build_mctrl(_adapter *adapter, struct pkt_attrib *attrib, u8 *buf);
@@ -498,6 +519,7 @@ int rtw_mesh_rx_msdu_act_check(union recv_frame *rframe
 	, const u8 *mda, const u8 *msa
 	, const u8 *da, const u8 *sa
 	, struct rtw_ieee80211s_hdr *mctrl
+	, u8 *msdu, enum rtw_rx_llc_hdl llc_hdl
 	, struct xmit_frame **fwd_frame, _list *b2u_list);
 
 void dump_mesh_stats(void *sel, _adapter *adapter);

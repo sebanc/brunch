@@ -15,14 +15,13 @@
 #ifndef __RTL8192F_DM_H__
 #define __RTL8192F_DM_H__
 
+void rtl8192f_init_dm_priv(PADAPTER Adapter);
+void rtl8192f_deinit_dm_priv(PADAPTER Adapter);
+void rtl8192f_InitHalDm(PADAPTER Adapter);
+void rtl8192f_HalDmWatchDog(PADAPTER Adapter);
 
-void rtl8192f_init_dm_priv(IN PADAPTER Adapter);
-void rtl8192f_deinit_dm_priv(IN PADAPTER Adapter);
-void rtl8192f_InitHalDm(IN PADAPTER Adapter);
-void rtl8192f_HalDmWatchDog(IN PADAPTER Adapter);
+/* void rtl8192c_dm_CheckTXPowerTracking(PADAPTER Adapter); */
 
-/* VOID rtl8192c_dm_CheckTXPowerTracking(IN PADAPTER Adapter); */
-
-/* void rtl8192c_dm_RF_Saving(IN PADAPTER pAdapter, IN u8 bForceInNormal); */
+/* void rtl8192c_dm_RF_Saving(PADAPTER pAdapter, u8 bForceInNormal); */
 
 #endif

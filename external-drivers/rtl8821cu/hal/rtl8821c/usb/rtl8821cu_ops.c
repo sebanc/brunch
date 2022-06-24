@@ -110,7 +110,6 @@ static u8 sethwreg(PADAPTER padapter, u8 variable, u8 *val)
 		rtw_mdelay_os(1);
 		rtw_write8(padapter, REG_PAD_CTRL2_8821C + 2, (tmp1Byte | BIT1));
 		break;
-
 	default:
 		ret = rtl8821c_sethwreg(padapter, variable, val);
 		break;
@@ -140,7 +139,7 @@ static void gethwreg(PADAPTER padapter, u8 variable, u8 *val)
 	Description:
 		Change default setting of specified variable.
 */
-static u8 sethaldefvar(PADAPTER padapter, HAL_DEF_VARIABLE eVariable, PVOID pValue)
+static u8 sethaldefvar(PADAPTER padapter, HAL_DEF_VARIABLE eVariable, void *pValue)
 {
 	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
 	u8 bResult = _SUCCESS;
@@ -158,7 +157,7 @@ static u8 sethaldefvar(PADAPTER padapter, HAL_DEF_VARIABLE eVariable, PVOID pVal
 	Description:
 		Query setting of specified variable.
 */
-static u8 gethaldefvar(PADAPTER	padapter, HAL_DEF_VARIABLE eVariable, PVOID pValue)
+static u8 gethaldefvar(PADAPTER	padapter, HAL_DEF_VARIABLE eVariable, void *pValue)
 {
 	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
 	u8 bResult = _SUCCESS;
@@ -185,11 +184,6 @@ static u8 rtl8821cu_ps_func(PADAPTER padapter, HAL_INTF_PS_FUNC efunc_id, u8 *va
 	u8 bResult = _TRUE;
 
 	switch (efunc_id) {
-
-#if defined(CONFIG_AUTOSUSPEND) && defined(SUPPORT_HW_RFOFF_DETECTED)
-	case HAL_USB_SELECT_SUSPEND:
-		break;
-#endif /* CONFIG_AUTOSUSPEND && SUPPORT_HW_RFOFF_DETECTED */
 
 	default:
 		break;
@@ -308,6 +302,9 @@ u8 rtl8821cu_set_hal_ops(PADAPTER padapter)
 
 	ops->hal_xmit = rtl8821cu_hal_xmit;
 	ops->mgnt_xmit = rtl8821cu_mgnt_xmit;
+#ifdef CONFIG_RTW_MGMT_QUEUE
+	ops->hal_mgmt_xmitframe_enqueue = rtl8821cu_hal_mgmt_xmitframe_enqueue;
+#endif
 	ops->hal_xmitframe_enqueue = rtl8821cu_hal_xmitframe_enqueue;
 
 #ifdef CONFIG_HOSTAPD_MLME

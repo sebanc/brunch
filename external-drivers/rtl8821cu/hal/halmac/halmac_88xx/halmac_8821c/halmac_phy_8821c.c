@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -14,8 +14,12 @@
  ******************************************************************************/
 
 #include "../../halmac_type.h"
+#if HALMAC_USB_SUPPORT
 #include "halmac_usb_8821c.h"
+#endif
+#if HALMAC_PCIE_SUPPORT
 #include "halmac_pcie_8821c.h"
+#endif
 
 /**
  * ============ip sel item list============
@@ -38,7 +42,7 @@ struct halmac_intf_phy_para usb2_phy_param_8821c[] = {
 	{0xFFFF, 0x00,
 	 HALMAC_IP_INTF_PHY,
 	 HALMAC_INTF_PHY_CUT_ALL,
-	 HALMAC_INTF_PHY_PLATFORM_ALL},
+	 HALMAC_INTF_PHY_PLATFORM_FOR_ALL},
 };
 
 struct halmac_intf_phy_para usb3_phy_param_8821c[] = {
@@ -46,7 +50,7 @@ struct halmac_intf_phy_para usb3_phy_param_8821c[] = {
 	{0xFFFF, 0x0000,
 	 HALMAC_IP_INTF_PHY,
 	 HALMAC_INTF_PHY_CUT_ALL,
-	 HALMAC_INTF_PHY_PLATFORM_ALL},
+	 HALMAC_INTF_PHY_PLATFORM_FOR_ALL},
 };
 
 struct halmac_intf_phy_para pcie_gen1_phy_param_8821c[] = {
@@ -54,11 +58,11 @@ struct halmac_intf_phy_para pcie_gen1_phy_param_8821c[] = {
 	{0x0009, 0x6380,
 	 HALMAC_IP_INTF_PHY,
 	 HALMAC_INTF_PHY_CUT_ALL,
-	 HALMAC_INTF_PHY_PLATFORM_ALL},
+	 HALMAC_INTF_PHY_PLATFORM_FOR_ALL},
 	{0xFFFF, 0x0000,
 	 HALMAC_IP_INTF_PHY,
 	 HALMAC_INTF_PHY_CUT_ALL,
-	 HALMAC_INTF_PHY_PLATFORM_ALL},
+	 HALMAC_INTF_PHY_PLATFORM_FOR_ALL},
 };
 
 struct halmac_intf_phy_para pcie_gen2_phy_param_8821c[] = {
@@ -66,7 +70,7 @@ struct halmac_intf_phy_para pcie_gen2_phy_param_8821c[] = {
 	{0xFFFF, 0x0000,
 	 HALMAC_IP_INTF_PHY,
 	 HALMAC_INTF_PHY_CUT_ALL,
-	 HALMAC_INTF_PHY_PLATFORM_ALL},
+	 HALMAC_INTF_PHY_PLATFORM_FOR_ALL},
 };
 
 #endif /* HALMAC_8821C_SUPPORT */

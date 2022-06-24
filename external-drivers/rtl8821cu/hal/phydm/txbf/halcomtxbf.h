@@ -59,7 +59,7 @@ enum txbf_get_type {
 	TXBF_GET_MU_MIMO_AP
 };
 
-/* 2 HAL TXBF related */
+/* @2 HAL TXBF related */
 struct _HAL_TXBF_INFO {
 	u8 txbf_idx;
 	u8 ndpa_idx;
@@ -79,7 +79,7 @@ struct _HAL_TXBF_INFO {
 #endif
 };
 
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 
 void hal_com_txbf_beamform_init(
 	void *dm_void);
@@ -180,4 +180,4 @@ hal_com_txbf_get(
 
 #endif
 
-#endif /*  #ifndef __HAL_COM_TXBF_H__ */
+#endif /*  @#ifndef __HAL_COM_TXBF_H__ */

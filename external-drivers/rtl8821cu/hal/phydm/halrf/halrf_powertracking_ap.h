@@ -79,6 +79,7 @@
 
 #define	ODM_OFDM_TABLE_SIZE	37
 #define	ODM_CCK_TABLE_SIZE		33
+#define TXPWR_TRACK_TABLE_SIZE 30
 /* <20140613, YuChen> In case fail to read TxPowerTrack.txt, we use the table of 88E as the default table. */
 extern u8 delta_swing_table_idx_2ga_p_default[DELTA_SWINGIDX_SIZE];
 extern u8 delta_swing_table_idx_2ga_n_default[DELTA_SWINGIDX_SIZE];
@@ -101,7 +102,9 @@ static u8 delta_swing_table_idx_2ga_n_8188e[] = {0, 0, 0, 2, 2, 3, 3, 4, 4, 4, 4
 #define	OFDM_TABLE_SIZE_8812	43
 #define	AVG_THERMAL_NUM_8812	4
 
-#if (RTL8814A_SUPPORT == 1 || RTL8822B_SUPPORT == 1 || RTL8821C_SUPPORT == 1)
+#if (RTL8814A_SUPPORT == 1 || RTL8822B_SUPPORT == 1 ||\
+	RTL8821C_SUPPORT == 1 || RTL8198F_SUPPORT == 1 ||\
+	RTL8814B_SUPPORT == 1)
 	extern u32 tx_scaling_table_jaguar[TXSCALE_TABLE_SIZE];
 	#elif(ODM_IC_11AC_SERIES_SUPPORT)
 	extern unsigned int ofdm_swing_table_8812[OFDM_TABLE_SIZE_8812];
@@ -137,12 +140,16 @@ struct dm_rf_calibration_struct {
 
 	u8  	thermal_meter[2];    /* thermal_meter, index 0 for RFIC0, and 1 for RFIC1 */
 	u8	thermal_value;
+	u8	thermal_value_path[MAX_RF_PATH];
 	u8	thermal_value_lck;
 	u8	thermal_value_iqk;
 	s8  	thermal_value_delta; /* delta of thermal_value and efuse thermal */
-
 	u8	thermal_value_avg[AVG_THERMAL_NUM];
+	u8	thermal_value_avg_path[MAX_RF_PATH][AVG_THERMAL_NUM];
 	u8	thermal_value_avg_index;
+	u8	thermal_value_avg_index_path[MAX_RF_PATH];
+	s8	power_index_offset_path[MAX_RF_PATH];
+
 	u8	thermal_value_rx_gain;
 	u8	thermal_value_crystal;
 	u8	thermal_value_dpk_store;
@@ -159,7 +166,9 @@ struct dm_rf_calibration_struct {
 	u8	OFDM_index[MAX_RF_PATH];
 	s8	power_index_offset;
 	s8	delta_power_index;
+	s8	delta_power_index_path[MAX_RF_PATH];
 	s8	delta_power_index_last;
+	s8	delta_power_index_last_path[MAX_RF_PATH];
 	boolean is_tx_power_changed;
 
 	struct iqk_matrix_regs_setting iqk_matrix_reg_setting[IQK_MATRIX_SETTINGS_NUM];
@@ -211,6 +220,7 @@ struct dm_rf_calibration_struct {
 	u8			bb_swing_idx_ofdm_base[MAX_RF_PATH];
 #else
 	u8			bb_swing_idx_ofdm_base;
+	u8			bb_swing_idx_ofdm_base_path[MAX_RF_PATH];
 #endif
 	boolean			bb_swing_flag_ofdm;
 	u8			bb_swing_idx_cck;
@@ -218,6 +228,7 @@ struct dm_rf_calibration_struct {
 	u8			bb_swing_idx_cck_base;
 	u8			default_ofdm_index;
 	u8			default_cck_index;
+	s8			default_txagc_index;
 	boolean			bb_swing_flag_cck;
 
 	s8			absolute_ofdm_swing_idx[MAX_RF_PATH];
@@ -277,7 +288,7 @@ struct dm_rf_calibration_struct {
 	u8	is_ap_kdone;
 	u8	is_apk_thermal_meter_ignore;
 	u8	is_dp_done;
-#if 0
+#if 0 /*move below members to halrf_dpk.h*/
 	u8	is_dp_path_aok;
 	u8	is_dp_path_bok;
 	u8	is_dp_path_cok;
@@ -320,7 +331,6 @@ struct dm_rf_calibration_struct {
 	u8	thermal_value_dpk_avg[AVG_THERMAL_NUM_DPK];
 	u8	thermal_value_dpk_avg_index;
 #endif
-
 	s8  modify_tx_agc_value_ofdm;
 	s8  modify_tx_agc_value_cck;
 

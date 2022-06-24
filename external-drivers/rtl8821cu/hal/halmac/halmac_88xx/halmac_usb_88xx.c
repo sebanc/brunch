@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -15,7 +15,7 @@
 
 #include "halmac_usb_88xx.h"
 
-#if HALMAC_88XX_SUPPORT
+#if (HALMAC_88XX_SUPPORT && HALMAC_USB_SUPPORT)
 
 enum usb_burst_size {
 	USB_BURST_SIZE_3_0 = 0x0,
@@ -24,6 +24,9 @@ enum usb_burst_size {
 	USB_BURST_SIZE_2_0_OTHERS = 0x3,
 	USB_BURST_SIZE_UNDEFINE = 0x7F,
 };
+
+#define USB_PHY_PAGE0			0x9B
+#define USB_PHY_PAGE1			0xBB
 
 /**
  * init_usb_cfg_88xx() - init USB
@@ -517,4 +520,21 @@ usbphy_read_88xx(struct halmac_adapter *adapter, u8 addr, u8 speed)
 	return value;
 }
 
+enum halmac_ret_status
+en_ref_autok_usb_88xx(struct halmac_adapter *adapter, u8 en)
+{
+	return HALMAC_RET_NOT_SUPPORT;
+}
+enum halmac_ret_status
+usb_page_switch_88xx(struct halmac_adapter *adapter, u8 speed, u8 page)
+{
+	if (speed == HAL_INTF_PHY_USB3)
+		return HALMAC_RET_SUCCESS;
+	if (page == 0)
+		usbphy_write_88xx(adapter, USB_REG_PAGE, USB_PHY_PAGE0, speed);
+	else
+		usbphy_write_88xx(adapter, USB_REG_PAGE, USB_PHY_PAGE1, speed);
+
+	return HALMAC_RET_SUCCESS;
+}
 #endif /* HALMAC_88XX_SUPPORT */

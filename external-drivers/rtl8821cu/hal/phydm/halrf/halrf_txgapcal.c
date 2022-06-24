@@ -25,7 +25,7 @@
 #include "mp_precomp.h"
 #include "phydm_precomp.h"
 
-void odm_bub_sort(pu4Byte data, u4Byte n)
+void odm_bub_sort(u32 *data, u32 n)
 {
 	int i, j, temp, sp;
 
@@ -256,7 +256,9 @@ void odm_tx_gain_gap_calibration_8197f(
 		ODM_delay_us(100);
 	}
 
+#if 0
 	/*odm_set_bb_reg(dm, R_0x88c, (BIT(23) | BIT(22) | BIT(21) | BIT(20)), 0x0);*/ /*enable 3-wire*/
+#endif
 
 	for (rf_path = RF_PATH_A; rf_path <= RF_PATH_B; rf_path++) {
 		odm_set_rf_reg(dm, rf_path, RF_0xef, bRFRegOffsetMask, 0x00100);
@@ -288,11 +290,9 @@ void odm_tx_gain_gap_calibration_8197f(
 }
 #endif
 
-void odm_tx_gain_gap_calibration(
-	void *dm_void)
+void odm_tx_gain_gap_calibration(void *dm_void)
 {
 	PDM_ODM_T dm = (PDM_ODM_T)dm_void;
-
 #if (RTL8197F_SUPPORT == 1)
 	if (dm->SupportICType & ODM_RTL8197F)
 		odm_tx_gain_gap_calibration_8197f(dm_void);

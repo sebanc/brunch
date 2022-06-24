@@ -234,13 +234,13 @@ extern char *rtw_fw_mp_bt_file_path;
 s32 FirmwareDownload8814A(PADAPTER	Adapter, BOOLEAN bUsedWoWLANFw);
 void	InitializeFirmwareVars8814(PADAPTER padapter);
 
-VOID
+void
 Hal_InitEfuseVars_8814A(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 );
 
 s32 InitLLTTable8814A(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 );
 
 
@@ -250,9 +250,9 @@ void InitRDGSetting8814A(PADAPTER padapter);
 
 /* EFuse */
 u8	GetEEPROMSize8814A(PADAPTER padapter);
-VOID hal_InitPGData_8814A(
- IN PADAPTER  padapter,
- IN OUT u8   *PROMContent
+void hal_InitPGData_8814A(
+		PADAPTER padapter,
+		u8 *PROMContent
 );
 
 void	hal_ReadPROMVersion8814A(PADAPTER padapter, u8 *hwinfo, BOOLEAN AutoLoadFail);
@@ -263,28 +263,26 @@ void	hal_ReadChannelPlan8814A(PADAPTER padapter, u8 *hwinfo, BOOLEAN AutoLoadFai
 void	hal_EfuseParseXtal_8814A(PADAPTER pAdapter, u8 *hwinfo, BOOLEAN AutoLoadFail);
 void	hal_ReadAntennaDiversity8814A(PADAPTER pAdapter, u8 *PROMContent, BOOLEAN AutoLoadFail);
 void	hal_Read_TRX_antenna_8814A(PADAPTER	Adapter, u8 *PROMContent, BOOLEAN AutoloadFail);
-VOID hal_ReadAmplifierType_8814A(
-	IN	PADAPTER		Adapter
+void hal_ReadAmplifierType_8814A(
+		PADAPTER		Adapter
 );
-VOID hal_ReadPAType_8814A(
-	IN	PADAPTER	Adapter,
-	IN	u8			*PROMContent,
-	IN	BOOLEAN		AutoloadFail,
-	OUT u8		*pPAType,
-	OUT u8		*pLNAType
+void hal_ReadPAType_8814A(
+		PADAPTER	Adapter,
+		u8			*PROMContent,
+		BOOLEAN		AutoloadFail,
+		u8		*pPAType,
+		u8		*pLNAType
 );
-
-void hal_ReadPowerTrackingType_8814A(PADAPTER Adapter, u8 *PROMContent, BOOLEAN AutoloadFail);
 
 void hal_GetRxGainOffset_8814A(
 	PADAPTER	Adapter,
-	pu1Byte		PROMContent,
+	u8 			*PROMContent,
 	BOOLEAN		AutoloadFail
 );
 void Hal_EfuseParseKFreeData_8814A(
-	IN		PADAPTER		Adapter,
-	IN		u8				*PROMContent,
-	IN		BOOLEAN			AutoloadFail);
+			PADAPTER		Adapter,
+			u8				*PROMContent,
+			BOOLEAN			AutoloadFail);
 void	hal_ReadRFEType_8814A(PADAPTER Adapter, u8 *PROMContent, BOOLEAN AutoloadFail);
 void	hal_EfuseParseBTCoexistInfo8814A(PADAPTER Adapter, u8 *hwinfo, BOOLEAN AutoLoadFail);
 
@@ -318,13 +316,14 @@ void rtl8814_stop_thread(PADAPTER padapter);
 
 #ifdef CONFIG_PCI_HCI
 	BOOLEAN	InterruptRecognized8814AE(PADAPTER Adapter);
-	VOID	UpdateInterruptMask8814AE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
-	VOID	InitMAC_TRXBD_8814AE(PADAPTER Adapter);
+	void	UpdateInterruptMask8814AE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
+	void	InitMAC_TRXBD_8814AE(PADAPTER Adapter);
+	void rtl8814ae_reset_desc_ring(_adapter *padapter);
 	u16	get_txbd_rw_reg(u16 ff_hwaddr);
 #endif
 
 #ifdef CONFIG_BT_COEXIST
-	void rtl8812a_combo_card_WifiOnlyHwInit(PADAPTER Adapter);
+	void rtl8814a_combo_card_WifiOnlyHwInit(PADAPTER Adapter);
 #endif
 
 #endif /* __RTL8188E_HAL_H__ */

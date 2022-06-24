@@ -164,7 +164,9 @@ enum bt_8821c_1ant_scoreboard {
 	BT_8821C_1ANT_SCBD_SCAN		= BIT(2),
 	BT_8821C_1ANT_SCBD_UNDERTEST	= BIT(3),
 	BT_8821C_1ANT_SCBD_WLBUSY	= BIT(6),
-	BT_8821C_1ANT_SCBD_BTCQDDR	= BIT(10)
+	BT_8821C_1ANT_SCBD_TDMA		= BIT(9),
+	BT_8821C_1ANT_SCBD_BTCQDDR	= BIT(10),
+	BT_8821C_1ANT_SCBD_ALL		= 0xffff
 };
 
 enum bt_8821c_1ant_RUNREASON {
@@ -185,6 +187,7 @@ enum bt_8821c_1ant_RUNREASON {
 	BT_8821C_1ANT_RSN_BTINFO	= 0xe,
 	BT_8821C_1ANT_RSN_PERIODICAL	= 0xf,
 	BT_8821C_1ANT_RSN_PNP		= 0x10,
+	BT_8821C_1ANT_RSN_LPS		= 0x11,
 	BT_8821C_1ANT_RSN_MAX
 };
 
@@ -233,138 +236,166 @@ struct coex_dm_8821c_1ant {
 };
 
 struct coex_sta_8821c_1ant {
-	boolean			bt_disabled;
-	boolean			bt_link_exist;
-	boolean			sco_exist;
-	boolean			a2dp_exist;
-	boolean			hid_exist;
-	boolean			pan_exist;
-	boolean			msft_mr_exist;
-	u8			num_of_profile;
+	boolean	bt_disabled;
+	boolean	bt_link_exist;
+	boolean	sco_exist;
+	boolean	a2dp_exist;
+	boolean	hid_exist;
+	boolean	pan_exist;
+	boolean	msft_mr_exist;
+	boolean bt_a2dp_active;
+	u8	num_of_profile;
 
-	boolean			under_lps;
-	boolean			under_ips;
-	u32			specific_pkt_period_cnt;
-	u32			high_priority_tx;
-	u32			high_priority_rx;
-	u32			low_priority_tx;
-	u32			low_priority_rx;
-	boolean			is_hi_pri_rx_overhead;
-	s8			bt_rssi;
-	u8			pre_bt_rssi_state;
-	u8			pre_wifi_rssi_state[4];
-	u8			bt_info_c2h[BT_8821C_1ANT_INFO_SRC_MAX][10];
-	u32			bt_info_c2h_cnt[BT_8821C_1ANT_INFO_SRC_MAX];
-	boolean			bt_whck_test;
-	boolean			c2h_bt_inquiry_page;
-	boolean			c2h_bt_remote_name_req;
-	boolean			c2h_bt_page;
+	boolean	under_lps;
+	boolean	under_ips;
+	u32	specific_pkt_period_cnt;
+	u32	high_priority_tx;
+	u32	high_priority_rx;
+	u32	low_priority_tx;
+	u32	low_priority_rx;
+	boolean bt_ctr_ok;
+	boolean	is_hi_pri_rx_overhead;
+	s8	bt_rssi;
+	u8	pre_bt_rssi_state;
+	u8	pre_wifi_rssi_state[4];
+	u8	bt_info_c2h[BT_8821C_1ANT_INFO_SRC_MAX][BTC_BTINFO_LENGTH_MAX];
+	u32	bt_info_c2h_cnt[BT_8821C_1ANT_INFO_SRC_MAX];
+	boolean	bt_whck_test;
+	boolean	c2h_bt_inquiry_page;
+	boolean bt_inq_page_pre;
+	boolean bt_inq_page_remain;
+	boolean	c2h_bt_remote_name_req;
+	boolean	c2h_bt_page;
+	boolean bt_a2dp_active_pre;
+	boolean bt_a2dp_active_remain;
 
-	boolean			wifi_high_pri_task1;
-	boolean			wifi_high_pri_task2;
+	boolean	wifi_high_pri_task1;
+	boolean	wifi_high_pri_task2;
 
-	u8			bt_info_ext;
-	u8			bt_info_ext2;
-	u32			pop_event_cnt;
-	u8			scan_ap_num;
-	u8			bt_retry_cnt;
+	u8	bt_info_lb2;
+	u8	bt_info_lb3;
+	u8	bt_info_hb0;
+	u8	bt_info_hb1;
+	u8	bt_info_hb2;
+	u8	bt_info_hb3;
 
-	u32			crc_ok_cck;
-	u32			crc_ok_11g;
-	u32			crc_ok_11n;
-	u32			crc_ok_11n_vht;
+	u32	pop_event_cnt;
+	u8	scan_ap_num;
+	u8	bt_retry_cnt;
 
-	u32			crc_err_cck;
-	u32			crc_err_11g;
-	u32			crc_err_11n;
-	u32			crc_err_11n_vht;
+	u32	crc_ok_cck;
+	u32	crc_ok_11g;
+	u32	crc_ok_11n;
+	u32	crc_ok_11n_vht;
 
-	boolean			cck_lock;
-	boolean			cck_lock_ever;
-	boolean			cck_lock_warn;
+	u32	crc_err_cck;
+	u32	crc_err_11g;
+	u32	crc_err_11n;
+	u32	crc_err_11n_vht;
 
-	u8			coex_table_type;
-	boolean			force_lps_ctrl;
-	boolean			concurrent_rx_mode_on;
-	u16			score_board;
-	u8			isolation_btween_wb;   /* 0~ 50 */
+	boolean	cck_lock;
+	boolean	cck_lock_ever;
+	boolean	cck_lock_warn;
 
-	u8			a2dp_bit_pool;
-	u8			cut_version;
-	boolean			acl_busy;
-	boolean			bt_create_connection;
+	u8	coex_table_type;
+	boolean	force_lps_ctrl;
+	boolean	concurrent_rx_mode_on;
+	u16	score_board;
+	u8	isolation_btween_wb;   /* 0~ 50 */
 
-	u32			bt_coex_supported_feature;
-	u32			bt_coex_supported_version;
+	u8	a2dp_bit_pool;
+	u8	kt_ver;
+	boolean	acl_busy;
+	boolean	bt_create_connection;
 
-	u8			bt_ble_scan_type;
-	u32			bt_ble_scan_para[3];
+	u32	bt_coex_supported_feature;
+	u32	bt_coex_supported_version;
 
-	boolean			run_time_state;
-	boolean			freeze_coexrun_by_btinfo;
+	u8	bt_ble_scan_type;
+	u32	bt_ble_scan_para[3];
 
-	boolean			is_A2DP_3M;
-	boolean			voice_over_HOGP;
-	u8			bt_info;
-	boolean			is_autoslot;
-	u8			forbidden_slot;
-	u8			hid_busy_num;
-	u8			hid_pair_cnt;
+	boolean	run_time_state;
+	boolean	freeze_coexrun_by_btinfo;
 
-	u32			cnt_remote_name_req;
-	u32			cnt_setup_link;
-	u32			cnt_reinit;
-	u32			cnt_ign_wlan_act;
-	u32			cnt_page;
-	u32			cnt_role_switch;
+	boolean	is_A2DP_3M;
+	boolean	voice_over_HOGP;
+	boolean	bt_418_hid_exist;
+	boolean bt_ble_hid_exist;
+	u8	forbidden_slot;
+	u8	hid_busy_num;
+	u8	hid_pair_cnt;
 
-	u16			bt_reg_vendor_ac;
-	u16			bt_reg_vendor_ae;
+	u32	cnt_remote_name_req;
+	u32	cnt_setup_link;
+	u32	cnt_reinit;
+	u32	cnt_ign_wlan_act;
+	u32	cnt_page;
+	u32	cnt_role_switch;
+	u32	cnt_wl_fw_notify;
 
-	boolean			is_setup_link;
-	u8			wl_noisy_level;
-	u32			gnt_error_cnt;
+	u16	bt_reg_vendor_ac;
+	u16	bt_reg_vendor_ae;
 
-	u8			bt_afh_map[10];
-	u8			bt_relink_downcount;
-	boolean			is_tdma_btautoslot;
-	boolean			is_tdma_btautoslot_hang;
+	boolean	is_setup_link;
+	u8	wl_noisy_level;
+	u32	gnt_error_cnt;
 
-	u8			switch_band_notify_to;
-	boolean			is_rf_state_off;
+	u8	bt_afh_map[10];
+	u8	bt_relink_downcount;
+	u8	bt_inq_page_downcount;
+	u8	bt_a2dp_active_downcount;
+	boolean	is_tdma_btautoslot;
 
-	boolean			is_hid_low_pri_tx_overhead;
-	boolean			is_bt_multi_link;
-	boolean			is_bt_a2dp_sink;
-	boolean			is_set_ps_state_fail;
-	u8			cnt_set_ps_state_fail;
+	u8	switch_band_notify_to;
 
-	u8			wl_fw_dbg_info[10];
-	u8			wl_rx_rate;
-	u8			wl_tx_rate;
-	u8			wl_rts_rx_rate;
-	u8			wl_center_channel;
-	u8			wl_tx_macid;
-	u8			wl_tx_retry_ratio;
+	boolean	is_hid_low_pri_tx_overhead;
+	boolean	is_bt_multi_link;
+	boolean	is_bt_a2dp_sink;
+	boolean	is_set_ps_state_fail;
+	u8	cnt_set_ps_state_fail;
 
-	u16			score_board_WB;
-	boolean			is_hid_rcu;
-	u16			legacy_forbidden_slot;
-	u16			le_forbidden_slot;
-	u8			bt_a2dp_vendor_id;
-	u32			bt_a2dp_device_name;
-	boolean			is_ble_scan_en;
+	u8	wl_fw_dbg_info[10];
+	u8	wl_rx_rate;
+	u8	wl_tx_rate;
+	u8	wl_rts_rx_rate;
+	u8	wl_center_channel;
+	u8	wl_tx_macid;
+	u8	wl_tx_retry_ratio;
 
-	boolean			is_bt_opp_exist;
-	boolean			gl_wifi_busy;
-	u8			connect_ap_period_cnt;
+	u16	score_board_WB;
+	boolean	is_hid_rcu;
+	u8	bt_a2dp_vendor_id;
+	u32	bt_a2dp_device_name;
+	u32	bt_a2dp_flush_time;
+	boolean	is_ble_scan_en;
 
-	boolean			is_bt_reenable;
-	u8			cnt_bt_reenable;
-	boolean			is_wifi_linkscan_process;
-	u8			wl_coex_mode;
-	u8			wl_pnp_wakeup_downcnt;
-	u32			coex_run_cnt;
+	boolean	is_bt_opp_exist;
+	boolean	gl_wifi_busy;
+	u8	connect_ap_period_cnt;
+
+	boolean	is_bt_reenable;
+	u8	cnt_bt_reenable;
+	boolean	is_wifi_linkscan_process;
+	u8	wl_coex_mode;
+	u8	wl_pnp_wakeup_downcnt;
+	u32	coex_run_cnt;
+	boolean	is_no_wl_5ms_extend;
+
+	u16	wl_0x42a_backup;
+	u32	wl_0x430_backup;
+	u32	wl_0x434_backup;
+	u8	wl_0x455_backup;
+
+	boolean	wl_tx_limit_en;
+	boolean	wl_ampdu_limit_en;
+	boolean	wl_rxagg_limit_en;
+	u8	wl_rxagg_size;
+	u8	coex_run_reason;
+
+	u8	tdma_timer_base;
+	boolean wl_slot_toggle;
+	boolean wl_slot_toggle_change; /* if toggle to no-toggle */
+	u8	wl_iot_peer;
 };
 
 
@@ -393,11 +424,12 @@ struct rfe_type_8821c_1ant {
 };
 
 struct wifi_link_info_8821c_1ant {
-	u8				num_of_active_port;
-	u32				port_connect_status;
-	boolean				is_all_under_5g;
-	boolean				is_mcc_25g;
-	boolean				is_p2p_connected;
+	u8	num_of_active_port;
+	u32	port_connect_status;
+	boolean	is_all_under_5g;
+	boolean	is_mcc_25g;
+	boolean	is_p2p_connected;
+	boolean is_connected;
 };
 
 /* *******************************************

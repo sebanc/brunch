@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -314,9 +314,6 @@ chk_h2c_ver_88xx(struct halmac_adapter *adapter, u8 *fw_bin)
 
 	PLTFM_MSG_TRACE("[TRACE]halmac h2c ver = %x, fw h2c ver = %x!!\n",
 			halmac_h2c_ver, fw_h2c_ver);
-
-	if (fw_h2c_ver != halmac_h2c_ver)
-		PLTFM_MSG_WARN("[WARN]H2C/C2H ver is compatible!!\n");
 }
 
 static enum halmac_ret_status
@@ -466,6 +463,39 @@ DL_FREE_FW_END:
 	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
 
 	return status;
+}
+
+/**
+ * reset_wifi_fw_88xx() - reset wifi fw
+ * @adapter : the adapter of halmac
+ * Author : LIN YONG-CHING
+ * Return : enum halmac_ret_status
+ * More details of status code can be found in prototype document
+ */
+enum halmac_ret_status
+reset_wifi_fw_88xx(struct halmac_adapter *adapter)
+{
+	enum halmac_ret_status status;
+	u32 lte_coex_backup = 0;
+
+	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
+
+	status = ltecoex_reg_read_88xx(adapter, 0x38, &lte_coex_backup);
+	if (status != HALMAC_RET_SUCCESS)
+		return status;
+
+	wlan_cpu_en_88xx(adapter, 0);
+	pltfm_reset_88xx(adapter);
+	init_ofld_feature_state_machine_88xx(adapter);
+	wlan_cpu_en_88xx(adapter, 1);
+
+	status = ltecoex_reg_write_88xx(adapter, 0x38, lte_coex_backup);
+	if (status != HALMAC_RET_SUCCESS)
+		return status;
+
+	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
+
+	return HALMAC_RET_SUCCESS;
 }
 
 /**
@@ -996,6 +1026,7 @@ get_cpu_mode_88xx(struct halmac_adapter *adapter,
 
 	if (HALMAC_REG_R8(REG_MCU_TST_CFG) == ID_CHECK_ENETR_CPU_SLEEP) {
 		*mode = HALMAC_WLCPU_SLEEP;
+		*cur_mode = HALMAC_WLCPU_SLEEP;
 		HALMAC_REG_W8(REG_MCU_TST_CFG, 0);
 	} else {
 		*mode = HALMAC_WLCPU_ENTER_SLEEP;
@@ -1019,12 +1050,16 @@ send_general_info_88xx(struct halmac_adapter *adapter,
 	u8 h2cq_ele[4] = {0};
 	u32 h2cq_addr;
 	enum halmac_ret_status status = HALMAC_RET_SUCCESS;
+	u8 cnt;
 
 	if (halmac_fw_validate(adapter) != HALMAC_RET_SUCCESS)
 		return HALMAC_RET_NO_DLFW;
 
 	if (adapter->fw_ver.h2c_version < 4)
 		return HALMAC_RET_FW_NO_SUPPORT;
+
+	if (adapter->fw_ver.h2c_version < 14)
+		PLTFM_MSG_WARN("[WARN]the H2C ver. does not match halmac\n");
 
 	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
 
@@ -1047,17 +1082,26 @@ send_general_info_88xx(struct halmac_adapter *adapter,
 
 	h2cq_addr = adapter->txff_alloc.rsvd_h2cq_addr;
 	h2cq_addr <<= TX_PAGE_SIZE_SHIFT_88XX;
-	status = dump_fifo_88xx(adapter, HAL_FIFO_SEL_TX,
-				h2cq_addr, 4, h2cq_ele);
-	if (status != HALMAC_RET_SUCCESS) {
-		PLTFM_MSG_ERR("[ERR]dump h2cq!!\n");
-		return status;
-	}
 
-	if ((h2cq_ele[0] & 0x7F) != 0x01 || h2cq_ele[1] != 0xFF) {
-		PLTFM_MSG_ERR("[ERR]h2cq compare!!\n");
-		return HALMAC_RET_SEND_H2C_FAIL;
-	}
+	cnt = 100;
+	do {
+		status = dump_fifo_88xx(adapter, HAL_FIFO_SEL_TX,
+					h2cq_addr, 4, h2cq_ele);
+		if (status != HALMAC_RET_SUCCESS) {
+			PLTFM_MSG_ERR("[ERR]dump h2cq!!\n");
+			return status;
+		}
+
+		if ((h2cq_ele[0] & 0x7F) == 0x01 && h2cq_ele[1] == 0xFF)
+			break;
+
+		cnt--;
+		if (cnt == 0) {
+			PLTFM_MSG_ERR("[ERR]h2cq compare!!\n");
+			return HALMAC_RET_SEND_H2C_FAIL;
+		}
+		PLTFM_DELAY_US(5);
+	} while (1);
 
 	if (adapter->halmac_state.dlfw_state == HALMAC_DLFW_DONE)
 		adapter->halmac_state.dlfw_state = HALMAC_GEN_INFO_SENT;
@@ -1111,6 +1155,9 @@ proc_send_phydm_info_88xx(struct halmac_adapter *adapter,
 	PHYDM_INFO_SET_CUT_VER(h2c_buf, adapter->chip_ver);
 	PHYDM_INFO_SET_RX_ANT_STATUS(h2c_buf, info->rx_ant_status);
 	PHYDM_INFO_SET_TX_ANT_STATUS(h2c_buf, info->tx_ant_status);
+	PHYDM_INFO_SET_EXT_PA(h2c_buf, info->ext_pa);
+	PHYDM_INFO_SET_PACKAGE_TYPE(h2c_buf, info->package_type);
+	PHYDM_INFO_SET_MP_MODE(h2c_buf, info->mp_mode);
 
 	hdr_info.sub_cmd_id = SUB_CMD_ID_PHYDM_INFO;
 	hdr_info.content_size = 8;

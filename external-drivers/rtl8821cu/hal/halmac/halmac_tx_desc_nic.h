@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -16,7 +16,8 @@
 #ifndef _HALMAC_TX_DESC_NIC_H_
 #define _HALMAC_TX_DESC_NIC_H_
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 /*TXDESC_WORD0*/
 
@@ -35,7 +36,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_GF(txdesc, value)                                          \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x00, 30, 1, value)
@@ -52,7 +54,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_NO_ACM(txdesc, value)                                      \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x00, 29, 1, value)
@@ -69,7 +72,8 @@
 #endif
 
 #if (HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT || HALMAC_8821C_SUPPORT ||   \
-     HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT ||   \
+     HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_BCNPKT_TSF_CTRL(txdesc, value)                             \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x00, 28, 1, value)
@@ -79,14 +83,29 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_AMSDU_PAD_EN(txdesc, value)                                \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x00, 27, 1, value)
 #define GET_TX_DESC_AMSDU_PAD_EN(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x00, 27, 1)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_LS(txdesc, value)                                          \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x00, 26, 1, value)
 #define GET_TX_DESC_LS(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x00, 26, 1)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_HTC(txdesc, value)                                         \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x00, 25, 1, value)
 #define GET_TX_DESC_HTC(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x00, 25, 1)
@@ -106,7 +125,8 @@
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
      HALMAC_8821C_SUPPORT || HALMAC_8814B_SUPPORT || HALMAC_8198F_SUPPORT ||   \
-     HALMAC_8822C_SUPPORT)
+     HALMAC_8822C_SUPPORT || HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT ||   \
+     HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_OFFSET(txdesc, value)                                      \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x00, 16, 8, value)
@@ -117,7 +137,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 /*WORD1*/
 
@@ -135,7 +155,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_FTM_EN_V1(txdesc, value)                                   \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x04, 30, 1, value)
@@ -143,8 +163,17 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_KEYID_SEL(txdesc, value)                                   \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x04, 30, 1, value)
+#define GET_TX_DESC_KEYID_SEL(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x04, 30, 1)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_MOREDATA(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x04, 29, 1, value)
@@ -164,7 +193,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_PKT_OFFSET(txdesc, value)                                  \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x04, 24, 5, value)
@@ -181,7 +211,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_SEC_TYPE(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x04, 22, 2, value)
@@ -204,7 +235,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_PIFS(txdesc, value)                                        \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x04, 15, 1, value)
@@ -228,7 +260,8 @@
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
      HALMAC_8821C_SUPPORT || HALMAC_8814B_SUPPORT || HALMAC_8198F_SUPPORT ||   \
-     HALMAC_8822C_SUPPORT)
+     HALMAC_8822C_SUPPORT || HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT ||   \
+     HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_QSEL(txdesc, value)                                        \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x04, 8, 5, value)
@@ -236,7 +269,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_SPECIAL_CW(txdesc, value)                                  \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x04, 7, 1, value)
@@ -245,7 +278,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_MACID(txdesc, value)                                       \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x04, 0, 7, value)
@@ -262,7 +296,7 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 /*TXDESC_WORD2*/
 
@@ -281,7 +315,7 @@
 #endif
 
 #if (HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT || HALMAC_8821C_SUPPORT ||   \
-     HALMAC_8822C_SUPPORT)
+     HALMAC_8822C_SUPPORT || HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_FTM_EN(txdesc, value)                                      \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x08, 30, 1, value)
@@ -289,7 +323,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_ANTCEL_D_V1(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x08, 28, 4, value)
@@ -306,7 +340,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8192F_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_G_ID(txdesc, value)                                        \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x08, 24, 6, value)
@@ -323,7 +358,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_ANTSEL_C_V1(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x08, 24, 4, value)
@@ -332,7 +367,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_BT_NULL(txdesc, value)                                     \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x08, 23, 1, value)
@@ -365,7 +401,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_NULL_1(txdesc, value)                                      \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x08, 15, 1, value)
@@ -386,7 +423,8 @@
 #endif
 
 #if (HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT || HALMAC_8821C_SUPPORT ||   \
-     HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8192F_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_TRI_FRAME(txdesc, value)                                   \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x08, 9, 1, value)
@@ -395,7 +433,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_P_AID(txdesc, value)                                       \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x08, 0, 9, value)
@@ -413,7 +452,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 /*TXDESC_WORD3*/
 
@@ -443,7 +483,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_NAVUSEHDR(txdesc, value)                                   \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x0C, 15, 1, value)
@@ -472,7 +513,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_DISDATAFB(txdesc, value)                                   \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x0C, 10, 1, value)
@@ -501,7 +543,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_WHEADER_LEN(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x0C, 0, 5, value)
@@ -518,7 +561,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 /*TXDESC_WORD4*/
 
@@ -561,7 +605,7 @@
 
 #endif
 
-#if (HALMAC_8822C_SUPPORT)
+#if (HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_ANTSEL_EN_V1(txdesc, value)                                \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 30, 1, value)
@@ -570,7 +614,7 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_TXPWR_OFSET(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 28, 3, value)
@@ -578,7 +622,7 @@
 
 #endif
 
-#if (HALMAC_8822C_SUPPORT)
+#if (HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_TXPWR_OFSET_TYPE(txdesc, value)                            \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 28, 2, value)
@@ -587,8 +631,18 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_TXPWR_OFSET_TYPE_V1(txdesc, value)                         \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 28, 3, value)
+#define GET_TX_DESC_TXPWR_OFSET_TYPE_V1(txdesc)                                \
+	LE_BITS_TO_4BYTE(txdesc + 0x14, 28, 3)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8192F_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_TX_ANT(txdesc, value)                                      \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 24, 4, value)
@@ -596,7 +650,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_DROP_ID(txdesc, value)                                     \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 24, 2, value)
@@ -604,8 +658,17 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_DROP_ID_V1(txdesc, value)                                  \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 22, 2, value)
+#define GET_TX_DESC_DROP_ID_V1(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x14, 22, 2)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_PORT_ID(txdesc, value)                                     \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 21, 3, value)
@@ -613,8 +676,17 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_PORT_ID_V1(txdesc, value)                                  \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 21, 1, value)
+#define GET_TX_DESC_PORT_ID_V1(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x14, 21, 1)
+
+#endif
+
 #if (HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT || HALMAC_8821C_SUPPORT ||   \
-     HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT ||   \
+     HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_MULTIPLE_PORT(txdesc, value)                               \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 18, 3, value)
@@ -623,7 +695,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_SIGNALING_TAPKT_EN(txdesc, value)                          \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 17, 1, value)
@@ -632,7 +705,8 @@
 
 #endif
 
-#if (HALMAC_8814A_SUPPORT || HALMAC_8197F_SUPPORT || HALMAC_8198F_SUPPORT)
+#if (HALMAC_8814A_SUPPORT || HALMAC_8197F_SUPPORT || HALMAC_8198F_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_RTS_SC(txdesc, value)                                      \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 13, 4, value)
@@ -640,7 +714,8 @@
 
 #endif
 
-#if (HALMAC_8822B_SUPPORT || HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+#if (HALMAC_8822B_SUPPORT || HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_SIGNALING_TA_PKT_SC(txdesc, value)                         \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 13, 4, value)
@@ -650,7 +725,8 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_RTS_SHORT(txdesc, value)                                   \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x14, 12, 1, value)
@@ -677,7 +753,7 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 /*TXDESC_WORD6*/
 
@@ -687,7 +763,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_ANT_MAPD_V1(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 30, 2, value)
@@ -695,8 +771,16 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_ANT_MAPC_V2(txdesc, value)                                 \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 30, 2, value)
+#define GET_TX_DESC_ANT_MAPC_V2(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x18, 30, 2)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_ANT_MAPD(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 28, 2, value)
@@ -704,7 +788,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_ANT_MAPC_V1(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 28, 2, value)
@@ -712,8 +796,16 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_ANT_MAPB_V2(txdesc, value)                                 \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 28, 2, value)
+#define GET_TX_DESC_ANT_MAPB_V2(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x18, 28, 2)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_ANT_MAPC(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 26, 2, value)
@@ -721,7 +813,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_ANT_MAPB_V1(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 26, 2, value)
@@ -729,8 +821,16 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_ANT_MAPA_V2(txdesc, value)                                 \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 26, 2, value)
+#define GET_TX_DESC_ANT_MAPA_V2(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x18, 26, 2)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_ANT_MAPB(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 24, 2, value)
@@ -738,7 +838,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_ANT_MAPA_V1(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 24, 2, value)
@@ -746,19 +846,41 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_ANTSEL_D_V1(txdesc, value)                                 \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 24, 2, value)
+#define GET_TX_DESC_ANTSEL_D_V1(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x18, 24, 2)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_ANT_MAPA(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 22, 2, value)
 #define GET_TX_DESC_ANT_MAPA(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x18, 22, 2)
+
+#endif
+
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_ANTSEL_C_V2(txdesc, value)                                 \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 22, 2, value)
+#define GET_TX_DESC_ANTSEL_C_V2(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x18, 22, 2)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
+
 #define SET_TX_DESC_ANTSEL_C(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 20, 2, value)
 #define GET_TX_DESC_ANTSEL_C(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x18, 20, 2)
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_ANTSEL_B_V1(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 20, 4, value)
@@ -766,8 +888,16 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_ANTSEL_B_V2(txdesc, value)                                 \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 19, 3, value)
+#define GET_TX_DESC_ANTSEL_B_V2(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x18, 19, 3)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_ANTSEL_B(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 18, 2, value)
@@ -778,7 +908,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_ANTSEL_A_V1(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 16, 4, value)
@@ -786,8 +916,17 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_ANTSEL_A_V2(txdesc, value)                                 \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 16, 3, value)
+#define GET_TX_DESC_ANTSEL_A_V2(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x18, 16, 3)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_MBSSID(txdesc, value)                                      \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 12, 4, value)
@@ -796,7 +935,7 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_SW_DEFINE(txdesc, value)                                   \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 0, 12, value)
@@ -804,7 +943,7 @@
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8192F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_SWPS_SEQ(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x18, 0, 12, value)
@@ -813,24 +952,50 @@
 #endif
 
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 /*TXDESC_WORD7*/
 
 #define SET_TX_DESC_DMA_TXAGG_NUM(txdesc, value)                               \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x1C, 24, 8, value)
 #define GET_TX_DESC_DMA_TXAGG_NUM(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x1C, 24, 8)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_FINAL_DATA_RATE(txdesc, value)                             \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x1C, 24, 8, value)
 #define GET_TX_DESC_FINAL_DATA_RATE(txdesc)                                    \
 	LE_BITS_TO_4BYTE(txdesc + 0x1C, 24, 8)
+
+#endif
+
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_ANT_MAPD_V2(txdesc, value)                                 \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x1C, 22, 2, value)
+#define GET_TX_DESC_ANT_MAPD_V2(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x1C, 22, 2)
+#define SET_TX_DESC_ANTSEL_EN_V2(txdesc, value)                                \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x1C, 21, 1, value)
+#define GET_TX_DESC_ANTSEL_EN_V2(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x1C, 21, 1)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_NTX_MAP(txdesc, value)                                     \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x1C, 20, 4, value)
 #define GET_TX_DESC_NTX_MAP(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x1C, 20, 4)
 
 #endif
 
-#if (HALMAC_8198F_SUPPORT)
+#if (HALMAC_8198F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_ANTSEL_EN(txdesc, value)                                   \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x1C, 19, 1, value)
@@ -841,8 +1006,17 @@
 
 #endif
 
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_MBSSID_EX_V1(txdesc, value)                                \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x1C, 16, 1, value)
+#define GET_TX_DESC_MBSSID_EX_V1(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x1C, 16, 1)
+
+#endif
+
 #if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
-     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 #define SET_TX_DESC_TX_BUFF_SIZE(txdesc, value)                                \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x1C, 0, 16, value)
@@ -854,6 +1028,12 @@
 #define SET_TX_DESC_TIMESTAMP(txdesc, value)                                   \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x1C, 0, 16, value)
 #define GET_TX_DESC_TIMESTAMP(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x1C, 0, 16)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
 
 /*TXDESC_WORD8*/
 
@@ -881,6 +1061,13 @@
 #define SET_TX_DESC_SMH_EN(txdesc, value)                                      \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x20, 24, 1, value)
 #define GET_TX_DESC_SMH_EN(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x20, 24, 1)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_TAILPAGE_L(txdesc, value)                                  \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x20, 24, 8, value)
 #define GET_TX_DESC_TAILPAGE_L(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x20, 24, 8)
@@ -891,12 +1078,40 @@
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x20, 16, 8, value)
 #define GET_TX_DESC_NEXTHEADPAGE_L(txdesc)                                     \
 	LE_BITS_TO_4BYTE(txdesc + 0x20, 16, 8)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT)
+
 #define SET_TX_DESC_EN_HWSEQ(txdesc, value)                                    \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x20, 15, 1, value)
 #define GET_TX_DESC_EN_HWSEQ(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x20, 15, 1)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT)
+
 #define SET_TX_DESC_EN_HWEXSEQ(txdesc, value)                                  \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x20, 14, 1, value)
 #define GET_TX_DESC_EN_HWEXSEQ(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x20, 14, 1)
+
+#endif
+
+#if (HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
+#define SET_TX_DESC_EN_HWSEQ_MODE(txdesc, value)                               \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x20, 14, 2, value)
+#define GET_TX_DESC_EN_HWSEQ_MODE(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x20, 14, 2)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_DATA_RC(txdesc, value)                                     \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x20, 8, 6, value)
 #define GET_TX_DESC_DATA_RC(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x20, 8, 6)
@@ -907,6 +1122,12 @@
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x20, 0, 6, value)
 #define GET_TX_DESC_RTS_RC(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x20, 0, 6)
 
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 /*TXDESC_WORD9*/
 
 #define SET_TX_DESC_TAILPAGE_H(txdesc, value)                                  \
@@ -916,12 +1137,42 @@
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x24, 24, 4, value)
 #define GET_TX_DESC_NEXTHEADPAGE_H(txdesc)                                     \
 	LE_BITS_TO_4BYTE(txdesc + 0x24, 24, 4)
+
+#endif
+
+#if (HALMAC_8192F_SUPPORT)
+
+#define SET_TX_DESC_FINAL_DATA_RATE_V1(txdesc, value)                          \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x24, 24, 8, value)
+#define GET_TX_DESC_FINAL_DATA_RATE_V1(txdesc)                                 \
+	LE_BITS_TO_4BYTE(txdesc + 0x24, 24, 8)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_SW_SEQ(txdesc, value)                                      \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x24, 12, 12, value)
 #define GET_TX_DESC_SW_SEQ(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x24, 12, 12)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_TXBF_PATH(txdesc, value)                                   \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x24, 11, 1, value)
 #define GET_TX_DESC_TXBF_PATH(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x24, 11, 1)
+
+#endif
+
+#if (HALMAC_8814A_SUPPORT || HALMAC_8822B_SUPPORT || HALMAC_8197F_SUPPORT ||   \
+     HALMAC_8821C_SUPPORT || HALMAC_8198F_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8192F_SUPPORT || HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_PADDING_LEN(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x24, 0, 11, value)
 #define GET_TX_DESC_PADDING_LEN(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x24, 0, 11)
@@ -932,9 +1183,26 @@
 
 #endif
 
-#if (HALMAC_8822B_SUPPORT || HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT)
+#if (HALMAC_8812F_SUPPORT)
 
 /*WORD10*/
+
+#define SET_TX_DESC_HT_DATA_SND(txdesc, value)                                 \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x28, 31, 1, value)
+#define GET_TX_DESC_HT_DATA_SND(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x28, 31, 1)
+
+#endif
+
+#if (HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
+#define SET_TX_DESC_SHCUT_CAM(txdesc, value)                                   \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x28, 16, 6, value)
+#define GET_TX_DESC_SHCUT_CAM(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x28, 16, 6)
+
+#endif
+
+#if (HALMAC_8822B_SUPPORT || HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT)
 
 #define SET_TX_DESC_MU_DATARATE(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x28, 8, 8, value)
@@ -942,6 +1210,23 @@
 #define SET_TX_DESC_MU_RC(txdesc, value)                                       \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x28, 4, 4, value)
 #define GET_TX_DESC_MU_RC(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x28, 4, 4)
+
+#endif
+
+#if (HALMAC_8812F_SUPPORT)
+
+#define SET_TX_DESC_NDPA_RATE_SEL(txdesc, value)                               \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x28, 3, 1, value)
+#define GET_TX_DESC_NDPA_RATE_SEL(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x28, 3, 1)
+#define SET_TX_DESC_HW_NDPA_EN(txdesc, value)                                  \
+	SET_BITS_TO_LE_4BYTE(txdesc + 0x28, 2, 1, value)
+#define GET_TX_DESC_HW_NDPA_EN(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x28, 2, 1)
+
+#endif
+
+#if (HALMAC_8822B_SUPPORT || HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT ||   \
+     HALMAC_8812F_SUPPORT || HALMAC_8197G_SUPPORT)
+
 #define SET_TX_DESC_SND_PKT_SEL(txdesc, value)                                 \
 	SET_BITS_TO_LE_4BYTE(txdesc + 0x28, 0, 2, value)
 #define GET_TX_DESC_SND_PKT_SEL(txdesc) LE_BITS_TO_4BYTE(txdesc + 0x28, 0, 2)

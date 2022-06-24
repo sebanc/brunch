@@ -104,6 +104,7 @@
 	typedef void timer_hdl_return;
 	typedef void* timer_hdl_context;
 	typedef struct work_struct _workitem;
+	typedef struct task _tasklet;
 
 #define   KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
 /* emulate a modern version */

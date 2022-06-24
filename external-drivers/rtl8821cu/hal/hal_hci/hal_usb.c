@@ -19,13 +19,14 @@
 
 int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 {
+	struct registry_priv *regsty = adapter_to_regsty(padapter);
 	struct recv_priv	*precvpriv = &padapter->recvpriv;
 	int	i, res = _SUCCESS;
 	struct recv_buf *precvbuf;
 
 #ifdef PLATFORM_LINUX
 	tasklet_init(&precvpriv->recv_tasklet,
-		     (void(*)(unsigned long))usb_recv_tasklet,
+		     (void(*))usb_recv_tasklet,
 		     (unsigned long)padapter);
 #endif /* PLATFORM_LINUX */
 
@@ -60,9 +61,9 @@ int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 	skb_queue_head_init(&precvpriv->free_recv_skb_queue);
 #endif
 
-	RTW_INFO("NR_RECVBUFF: %d\n", NR_RECVBUFF);
+	RTW_INFO("NR_RECVBUFF: %d, recvbuf_nr: %d\n", NR_RECVBUFF, regsty->recvbuf_nr);
 	RTW_INFO("MAX_RECVBUF_SZ: %d\n", MAX_RECVBUF_SZ);
-	precvpriv->pallocated_recv_buf = rtw_zmalloc(NR_RECVBUFF * sizeof(struct recv_buf) + 4);
+	precvpriv->pallocated_recv_buf = rtw_zmalloc(regsty->recvbuf_nr * sizeof(struct recv_buf) + 4);
 	if (precvpriv->pallocated_recv_buf == NULL) {
 		res = _FAIL;
 		goto exit;
@@ -72,14 +73,16 @@ int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 
 	precvbuf = (struct recv_buf *)precvpriv->precv_buf;
 
-	for (i = 0; i < NR_RECVBUFF ; i++) {
+	for (i = 0; i < regsty->recvbuf_nr ; i++) {
 		_rtw_init_listhead(&precvbuf->list);
 
+#ifdef PLATFORM_WINDOWS
 		_rtw_spinlock_init(&precvbuf->recvbuf_lock);
+#endif
 
 		precvbuf->alloc_sz = MAX_RECVBUF_SZ;
 
-		res = rtw_os_recvbuf_resource_alloc(padapter, precvbuf);
+		res = rtw_os_recvbuf_resource_alloc(padapter, precvbuf, precvbuf->alloc_sz);
 		if (res == _FAIL)
 			break;
 
@@ -91,7 +94,7 @@ int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 		precvbuf++;
 	}
 
-	precvpriv->free_recv_buf_queue_cnt = NR_RECVBUFF;
+	precvpriv->free_recv_buf_queue_cnt = regsty->recvbuf_nr;
 
 #if defined(PLATFORM_LINUX) || defined(PLATFORM_FREEBSD)
 
@@ -149,18 +152,19 @@ exit:
 void usb_free_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 {
 	int i;
+	struct registry_priv *regsty = &padapter->registrypriv;
 	struct recv_buf *precvbuf;
 	struct recv_priv	*precvpriv = &padapter->recvpriv;
 
 	precvbuf = (struct recv_buf *)precvpriv->precv_buf;
 
-	for (i = 0; i < NR_RECVBUFF ; i++) {
+	for (i = 0; i < regsty->recvbuf_nr ; i++) {
 		rtw_os_recvbuf_resource_free(padapter, precvbuf);
 		precvbuf++;
 	}
 
 	if (precvpriv->pallocated_recv_buf)
-		rtw_mfree(precvpriv->pallocated_recv_buf, NR_RECVBUFF * sizeof(struct recv_buf) + 4);
+		rtw_mfree(precvpriv->pallocated_recv_buf, regsty->recvbuf_nr * sizeof(struct recv_buf) + 4);
 
 #ifdef CONFIG_USB_INTERRUPT_IN_PIPE
 #ifdef PLATFORM_LINUX

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -43,6 +43,10 @@ set_hw_value_88xx(struct halmac_adapter *adapter, enum halmac_hw_id hw_id,
 		  void *value);
 
 enum halmac_ret_status
+get_watcher_88xx(struct halmac_adapter *adapter, enum halmac_watcher_sel sel,
+		 void *value);
+
+enum halmac_ret_status
 set_h2c_pkt_hdr_88xx(struct halmac_adapter *adapter, u8 *hdr,
 		     struct halmac_h2c_header_info *info, u16 *seq_num);
 
@@ -65,6 +69,14 @@ cfg_parameter_88xx(struct halmac_adapter *adapter,
 enum halmac_ret_status
 update_packet_88xx(struct halmac_adapter *adapter, enum halmac_packet_id pkt_id,
 		   u8 *pkt, u32 size);
+
+enum halmac_ret_status
+send_scan_packet_88xx(struct halmac_adapter *adapter, u8 index,
+		      u8 *pkt, u32 size);
+
+enum halmac_ret_status
+drop_scan_packet_88xx(struct halmac_adapter *adapter,
+		      struct halmac_drop_pkt_option *option);
 
 enum halmac_ret_status
 bcn_ie_filter_88xx(struct halmac_adapter *adapter,

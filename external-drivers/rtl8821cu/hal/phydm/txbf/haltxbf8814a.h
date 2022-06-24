@@ -26,7 +26,7 @@
 #define __HAL_TXBF_8814A_H__
 
 #if (RTL8814A_SUPPORT == 1)
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 
 boolean
 phydm_beamforming_set_iqgen_8814A(void *dm_void);

@@ -49,6 +49,9 @@ s32 rtl8821cu_init_xmit_priv(PADAPTER);
 void rtl8821cu_free_xmit_priv(PADAPTER);
 s32 rtl8821cu_mgnt_xmit(PADAPTER, struct xmit_frame *);
 s32 rtl8821cu_hal_xmit(PADAPTER, struct xmit_frame *);
+#ifdef CONFIG_RTW_MGMT_QUEUE
+s32 rtl8821cu_hal_mgmt_xmitframe_enqueue(PADAPTER, struct xmit_frame *);
+#endif
 s32 rtl8821cu_hal_xmitframe_enqueue(PADAPTER, struct xmit_frame *);
 s32 rtl8821cu_hostap_mgnt_xmit_entry(PADAPTER, _pkt *);
 #ifdef CONFIG_XMIT_THREAD_MODE

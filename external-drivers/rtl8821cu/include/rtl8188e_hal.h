@@ -131,15 +131,20 @@ typedef struct _RT_8188E_FIRMWARE_HDR {
 #define PAGE_SIZE_TX_88E PAGE_SIZE_128
 /* Note: We will divide number of page equally for each queue other than public queue!
  * 22k = 22528 bytes = 176 pages (@page =  128 bytes)
- * must reserved about 7 pages for LPS =>  176-7 = 169 (0xA9)
  * BCN rsvd_page_num = MAX_BEACON_LEN / PAGE_SIZE_TX_88E
- * 1*ps-poll / 1*null-data /1*prob_rsp /1*QOS null-data /1*BT QOS null-data / CTS-2-SELF / LTE QoS Null = 7 pages*/
+ * 1 ps-poll / 1 null-data /1 prob_rsp /1 QOS null-data = 4 pages */
 
-#define BCNQ_PAGE_NUM_88E		(MAX_BEACON_LEN / PAGE_SIZE_TX_88E + 7) /*0x09*/
+#define BCNQ_PAGE_NUM_88E		(MAX_BEACON_LEN / PAGE_SIZE_TX_88E + 4) /*0x09*/
 
 /* For WoWLan , more reserved page */
 #ifdef CONFIG_WOWLAN
-	#define WOWLAN_PAGE_NUM_88E	0x00
+	#ifdef CONFIG_WOW_KEEP_ALIVE_PATTERN
+	#define WOWLAN_KEEP_ALIVE_PAGE 0x02 /*for keep alive packet*/
+	#else
+	#define WOWLAN_KEEP_ALIVE_PAGE	0x00
+	#endif /*CONFIG_WOW_KEEP_ALIVE_PATTERN*/
+	/* 1 ArpRsp + 2 NbrAdv + 2 NDPInfo + 1 RCI + 1 AOAC = 7 pages */
+	#define WOWLAN_PAGE_NUM_88E	(0x07+ WOWLAN_KEEP_ALIVE_PAGE)
 #else
 	#define WOWLAN_PAGE_NUM_88E	0x00
 #endif
@@ -306,9 +311,9 @@ void GetHwReg8188E(PADAPTER padapter, u8 variable, u8 *val);
 
 u8
 GetHalDefVar8188E(
-	IN	PADAPTER				Adapter,
-	IN	HAL_DEF_VARIABLE		eVariable,
-	IN	PVOID					pValue
+		PADAPTER				Adapter,
+		HAL_DEF_VARIABLE		eVariable,
+		void						*pValue
 );
 #ifdef CONFIG_GPIO_API
 int rtl8188e_GpioFuncCheck(PADAPTER adapter, u8 gpio_num);

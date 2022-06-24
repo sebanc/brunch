@@ -23,68 +23,67 @@
  *
  *****************************************************************************/
 
-/*Image2HeaderVersion: R3 1.0*/
+/*Image2HeaderVersion: R3 1.5.10.1*/
 #if (RTL8821C_SUPPORT == 1)
 #ifndef __INC_MP_BB_HW_IMG_8821C_H
 #define __INC_MP_BB_HW_IMG_8821C_H
 
-
 /******************************************************************************
-*                           agc_tab.TXT
-******************************************************************************/
+ *                           agc_tab.TXT
+ ******************************************************************************/
 
+/* tc: Test Chip, mp: mp Chip*/
 void
-odm_read_and_config_mp_8821c_agc_tab( /* tc: Test Chip, mp: mp Chip*/
-				     struct dm_struct *dm);
+odm_read_and_config_mp_8821c_agc_tab(struct dm_struct *dm);
 u32 odm_get_version_mp_8821c_agc_tab(void);
 
 /******************************************************************************
-*                           agc_tab_diff.TXT
-******************************************************************************/
+ *                           agc_tab_diff.TXT
+ ******************************************************************************/
 
-extern u32	array_mp_8821c_agc_tab_diff_wlg[780];
-extern u32	array_mp_8821c_agc_tab_diff_btg[780];
+extern const u32	array_mp_8821c_agc_tab_diff_wlg[780];
+extern const u32	array_mp_8821c_agc_tab_diff_btg[780];
 void
-odm_read_and_config_mp_8821c_agc_tab_diff(struct dm_struct *dm, u32 array[],
+odm_read_and_config_mp_8821c_agc_tab_diff(struct dm_struct *dm,
+					  const u32 array[],
 					  u32 array_len);
 u32 odm_get_version_mp_8821c_agc_tab_diff(void);
 
 /******************************************************************************
-*                           phy_reg.TXT
-******************************************************************************/
+ *                           phy_reg.TXT
+ ******************************************************************************/
 
+/* tc: Test Chip, mp: mp Chip*/
 void
-odm_read_and_config_mp_8821c_phy_reg( /* tc: Test Chip, mp: mp Chip*/
-				     struct dm_struct *dm);
+odm_read_and_config_mp_8821c_phy_reg(struct dm_struct *dm);
 u32 odm_get_version_mp_8821c_phy_reg(void);
 
 /******************************************************************************
-*                           phy_reg_mp.TXT
-******************************************************************************/
+ *                           phy_reg_mp.TXT
+ ******************************************************************************/
 
+/* tc: Test Chip, mp: mp Chip*/
 void
-odm_read_and_config_mp_8821c_phy_reg_mp( /* tc: Test Chip, mp: mp Chip*/
-					struct dm_struct *dm);
+odm_read_and_config_mp_8821c_phy_reg_mp(struct dm_struct *dm);
 u32 odm_get_version_mp_8821c_phy_reg_mp(void);
 
 /******************************************************************************
-*                           phy_reg_pg.TXT
-******************************************************************************/
+ *                           phy_reg_pg.TXT
+ ******************************************************************************/
 
+/* tc: Test Chip, mp: mp Chip*/
 void
-odm_read_and_config_mp_8821c_phy_reg_pg( /* tc: Test Chip, mp: mp Chip*/
-					struct dm_struct *dm);
-u32	odm_get_version_mp_8821c_phy_reg_pg(void);
+odm_read_and_config_mp_8821c_phy_reg_pg(struct dm_struct *dm);
+u32 odm_get_version_mp_8821c_phy_reg_pg(void);
 
 /******************************************************************************
-*                           phy_reg_pg_type0x28.TXT
-******************************************************************************/
+ *                           phy_reg_pg_type0x28.TXT
+ ******************************************************************************/
 
+/* tc: Test Chip, mp: mp Chip*/
 void
-odm_read_and_config_mp_8821c_phy_reg_pg_type0x28(
-						 /* tc: Test Chip, mp: mp Chip*/
-						 struct dm_struct *dm);
-u32	odm_get_version_mp_8821c_phy_reg_pg_type0x28(void);
+odm_read_and_config_mp_8821c_phy_reg_pg_type0x28(struct dm_struct *dm);
+u32 odm_get_version_mp_8821c_phy_reg_pg_type0x28(void);
 
 #endif
 #endif /* end of HWIMG_SUPPORT*/

@@ -106,7 +106,6 @@ enum h2c_cmd_8192F {
 #define SET_8192F_H2CCMD_PWRMODE_PARM_ALL_QUEUE_UAPSD(__pH2CCmd, __Value)	SET_BITS_TO_LE_1BYTE((__pH2CCmd)+3, 0, 8, __Value)
 #define SET_8192F_H2CCMD_PWRMODE_PARM_BCN_EARLY_C2H_RPT(__pH2CCmd, __Value)	SET_BITS_TO_LE_1BYTE((__pH2CCmd)+3, 2, 1, __Value)
 #define SET_8192F_H2CCMD_PWRMODE_PARM_PWR_STATE(__pH2CCmd, __Value)			SET_BITS_TO_LE_1BYTE((__pH2CCmd)+4, 0, 8, __Value)
-#define SET_8192F_H2CCMD_PWRMODE_PARM_BYTE5(__pH2CCmd, __Value)				SET_BITS_TO_LE_1BYTE((__pH2CCmd)+5, 0, 8, __Value)
 
 #define GET_8192F_H2CCMD_PWRMODE_PARM_MODE(__pH2CCmd)					LE_BITS_TO_1BYTE(__pH2CCmd, 0, 8)
 
@@ -152,7 +151,7 @@ enum h2c_cmd_8192F {
 #define SET_8192F_H2CCMD_BT_MPOPER_PARAM3(__pH2CCmd, __Value)							SET_BITS_TO_LE_1BYTE(__pH2CCmd+4, 0, 8, __Value)
 
 /* _BT_FW_PATCH_0x6A */
-#define SET_8192F_H2CCMD_BT_FW_PATCH_SIZE(__pH2CCmd, __Value)					SET_BITS_TO_LE_2BYTE((pu1Byte)(__pH2CCmd), 0, 16, __Value)
+#define SET_8192F_H2CCMD_BT_FW_PATCH_SIZE(__pH2CCmd, __Value)					SET_BITS_TO_LE_2BYTE((u8 *)(__pH2CCmd), 0, 16, __Value)
 #define SET_8192F_H2CCMD_BT_FW_PATCH_ADDR0(__pH2CCmd, __Value)					SET_BITS_TO_LE_1BYTE((__pH2CCmd)+2, 0, 8, __Value)
 #define SET_8192F_H2CCMD_BT_FW_PATCH_ADDR1(__pH2CCmd, __Value)					SET_BITS_TO_LE_1BYTE((__pH2CCmd)+3, 0, 8, __Value)
 #define SET_8192F_H2CCMD_BT_FW_PATCH_ADDR2(__pH2CCmd, __Value)					SET_BITS_TO_LE_1BYTE((__pH2CCmd)+4, 0, 8, __Value)
@@ -174,22 +173,41 @@ void rtl8192f_set_FwJoinBssRpt_cmd(PADAPTER padapter, u8 mstatus);
 void rtl8192f_set_FwPsTuneParam_cmd(PADAPTER padapter);
 void rtl8192f_download_rsvd_page(PADAPTER padapter, u8 mstatus);
 #ifdef CONFIG_BT_COEXIST
-	void rtl8192f__download_BTCoex_AP_mode_rsvd_page(PADAPTER padapter);
+void rtl8192f_download_BTCoex_AP_mode_rsvd_page(PADAPTER padapter);
 #endif /* CONFIG_BT_COEXIST */
 #ifdef CONFIG_P2P
-	void rtl8192f_set_p2p_ps_offload_cmd(PADAPTER padapter, u8 p2p_ps_state);
+void rtl8192f_set_p2p_ps_offload_cmd(PADAPTER padapter, u8 p2p_ps_state);
 #endif /* CONFIG_P2P */
 
-#ifdef CONFIG_TDLS
-#ifdef CONFIG_TDLS_CH_SW
-void rtl8192f_set_BcnEarly_C2H_Rpt_cmd(PADAPTER padapter, u8 enable);
-#endif
-#endif
-
 #ifdef CONFIG_P2P_WOWLAN
-	void rtl8192f_set_p2p_wowlan_offload_cmd(PADAPTER padapter);
+void rtl8192f_set_p2p_wowlan_offload_cmd(PADAPTER padapter);
 #endif
 
+/*	AP_REQ_TXREP_CMD 0x43	*/
+#define SET_8192F_H2CCMD_TXREP_PARM_STA1(__pH2CCmd, __Value)			SET_BITS_TO_LE_1BYTE(__pH2CCmd, 0, 8, __Value)
+#define SET_8192F_H2CCMD_TXREP_PARM_STA2(__pH2CCmd, __Value)			SET_BITS_TO_LE_1BYTE((__pH2CCmd)+1, 0, 8, __Value)
+#define SET_8192F_H2CCMD_TXREP_PARM_RTY(__pH2CCmd, __Value)			SET_BITS_TO_LE_1BYTE((__pH2CCmd)+2, 0, 2, __Value)
+
+/*		C2H_AP_REQ_TXRPT		*/
+#define	GET_8192F_C2H_TC2H_APREQ_TXRPT_MACID1(_Header)				LE_BITS_TO_1BYTE((_Header + 0), 0, 8)
+#define	GET_8192F_C2H_TC2H_APREQ_TXRPT_TXOK1(_Header)				LE_BITS_TO_2BYTE((_Header + 1), 0, 16)
+#define	GET_8192F_C2H_TC2H_APREQ_TXRPT_TXFAIL1(_Header)				LE_BITS_TO_2BYTE((_Header + 3), 0, 16)
+#define	GET_8192F_C2H_TC2H_APREQ_TXRPT_INIRATE1(_Header)			LE_BITS_TO_1BYTE((_Header + 5), 0, 8)
+#define	GET_8192F_C2H_TC2H_APREQ_TXRPT_MACID2(_Header)				LE_BITS_TO_1BYTE((_Header + 6), 0, 8)
+#define	GET_8192F_C2H_TC2H_APREQ_TXRPT_TXOK2(_Header)				LE_BITS_TO_2BYTE((_Header + 7), 0, 16)
+#define	GET_8192F_C2H_TC2H_APREQ_TXRPT_TXFAIL2(_Header)				LE_BITS_TO_2BYTE((_Header + 9), 0, 16)
+#define	GET_8192F_C2H_TC2H_APREQ_TXRPT_INIRATE2(_Header)			LE_BITS_TO_1BYTE((_Header + 11), 0, 8)
+
+/*		C2H_SPC_STAT			*/
+#define	GET_8192F_C2H_SPC_STAT_IDX(_Header)					LE_BITS_TO_1BYTE((_Header + 0), 0, 8)
+	/*	Tip :TYPE_A data3 is msb and data0 is lsb	*/
+#define	GET_8192F_C2H_SPC_STAT_TYPEA_RETRY(_Header)				LE_BITS_TO_4BYTE((_Header + 1), 0, 32)
+#define	GET_8192F_C2H_SPC_STAT_TYPEB_PKT1(_Header)				LE_BITS_TO_2BYTE((_Header + 1), 0, 16)
+#define	GET_8192F_C2H_SPC_STAT_TYPEB_RETRY1(_Header)				LE_BITS_TO_2BYTE((_Header + 3), 0, 16)
+#define	GET_8192F_C2H_SPC_STAT_TYPEB_PKT2(_Header)				LE_BITS_TO_2BYTE((_Header + 5), 0, 16)
+#define	GET_8192F_C2H_SPC_STAT_TYPEB_RETRY2(_Header)				LE_BITS_TO_2BYTE((_Header + 7), 0, 16)
+
+void rtl8192f_req_txrpt_cmd(PADAPTER, u8 macid);
 s32 FillH2CCmd8192F(PADAPTER padapter, u8 ElementID, u32 CmdLen, u8 *pCmdBuffer);
 u8 GetTxBufferRsvdPageNum8192F(_adapter *padapter, bool wowlan);
 #endif

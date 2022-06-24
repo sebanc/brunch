@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -18,7 +18,7 @@
 
 #include "../halmac_api.h"
 
-#if HALMAC_88XX_SUPPORT
+#if (HALMAC_88XX_SUPPORT && HALMAC_USB_SUPPORT)
 
 enum halmac_ret_status
 init_usb_cfg_88xx(struct halmac_adapter *adapter);
@@ -81,6 +81,12 @@ usbphy_write_88xx(struct halmac_adapter *adapter, u8 addr, u16 data, u8 speed);
 
 u16
 usbphy_read_88xx(struct halmac_adapter *adapter, u8 addr, u8 speed);
+
+enum halmac_ret_status
+en_ref_autok_usb_88xx(struct halmac_adapter *adapter, u8 en);
+
+enum halmac_ret_status
+usb_page_switch_88xx(struct halmac_adapter *adapter, u8 speed, u8 page);
 
 #endif /* HALMAC_88XX_SUPPORT */
 

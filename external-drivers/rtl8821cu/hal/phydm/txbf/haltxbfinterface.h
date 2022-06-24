@@ -25,7 +25,7 @@
 #ifndef __HAL_TXBF_INTERFACE_H__
 #define __HAL_TXBF_INTERFACE_H__
 
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
 
 #define a_SifsTime ((IS_WIRELESS_MODE_5G(adapter) || IS_WIRELESS_MODE_N_24G(adapter)) ? 16 : 10)

@@ -26,7 +26,7 @@
 #define __HAL_TXBF_8192E_H__
 
 #if (RTL8192E_SUPPORT == 1)
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 
 void hal_txbf_8192e_set_ndpa_rate(
 	void *dm_void,

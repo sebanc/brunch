@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2017 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2017 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -177,11 +177,11 @@
 /* 2 REG_NOT_VALID_8822C */
 
 /* 2 REG_NOT_VALID_8822C */
+#define BIT_R_SYM_CTRL_SPS_PWMFREQ_8822C BIT(10)
 #define BIT_HW_AUTO_CTRL_EXT_SWR_8822C BIT(9)
 #define BIT_USE_INTERNAL_SWR_AND_LDO_8822C BIT(8)
 #define BIT_MAC_ID_EN_8822C BIT(7)
-
-/* 2 REG_NOT_VALID_8822C */
+#define BIT_OPTION_DIS_XTAL_BG_8822C BIT(2)
 
 /* 2 REG_SYS_SWR_CTRL2_8822C */
 
@@ -255,11 +255,23 @@
 #define BIT_WLOCK_ALL_8822C BIT(0)
 
 /* 2 REG_RF_CTRL_8822C */
-#define BIT_RF_SDMRSTB_8822C BIT(2)
-#define BIT_RF_RSTB_8822C BIT(1)
-#define BIT_RF_EN_8822C BIT(0)
+#define BIT_S0_RFC_WO_0_8822C BIT(7)
+#define BIT_S0_RFC_WT_0_8822C BIT(6)
+#define BIT_S0_RFC_RSTB_8822C BIT(1)
 
 /* 2 REG_AFE_LDO_CTRL_8822C */
+#define BIT_R_SYM_WLPON_EMEM1_EN_8822C BIT(31)
+#define BIT_R_SYM_WLPON_EMEM0_EN_8822C BIT(30)
+#define BIT_R_SYM_WLPOFF_P4EN_8822C BIT(28)
+#define BIT_R_SYM_WLPOFF_P3EN_8822C BIT(27)
+#define BIT_R_SYM_WLPOFF_P2EN_8822C BIT(26)
+#define BIT_R_SYM_WLPOFF_P1EN_8822C BIT(25)
+#define BIT_R_SYM_WLPOFF_EN_8822C BIT(24)
+#define BIT_R_SYM_WLPON_P3EN_8822C BIT(21)
+#define BIT_R_SYM_WLPON_P2EN_8822C BIT(20)
+#define BIT_R_SYM_WLPON_P1EN_8822C BIT(19)
+#define BIT_R_SYM_WLPON_EN_8822C BIT(18)
+#define BIT_R_SYM_LDOV12D_STBY_8822C BIT(16)
 #define BIT_R_SYM_WLBBOFF1_P4_EN_8822C BIT(9)
 #define BIT_R_SYM_WLBBOFF1_P3_EN_8822C BIT(8)
 #define BIT_R_SYM_WLBBOFF1_P2_EN_8822C BIT(7)
@@ -2035,18 +2047,9 @@
 	(BIT_CLEAR_PCIE_MIO_DATA_8822C(x) | BIT_PCIE_MIO_DATA_8822C(v))
 
 /* 2 REG_WLRF1_8822C */
-
-#define BIT_SHIFT_WLRF1_CTRL_8822C 24
-#define BIT_MASK_WLRF1_CTRL_8822C 0xff
-#define BIT_WLRF1_CTRL_8822C(x)                                                \
-	(((x) & BIT_MASK_WLRF1_CTRL_8822C) << BIT_SHIFT_WLRF1_CTRL_8822C)
-#define BITS_WLRF1_CTRL_8822C                                                  \
-	(BIT_MASK_WLRF1_CTRL_8822C << BIT_SHIFT_WLRF1_CTRL_8822C)
-#define BIT_CLEAR_WLRF1_CTRL_8822C(x) ((x) & (~BITS_WLRF1_CTRL_8822C))
-#define BIT_GET_WLRF1_CTRL_8822C(x)                                            \
-	(((x) >> BIT_SHIFT_WLRF1_CTRL_8822C) & BIT_MASK_WLRF1_CTRL_8822C)
-#define BIT_SET_WLRF1_CTRL_8822C(x, v)                                         \
-	(BIT_CLEAR_WLRF1_CTRL_8822C(x) | BIT_WLRF1_CTRL_8822C(v))
+#define BIT_S1_RFC_WO_0_8822C BIT(31)
+#define BIT_S1_RFC_WT_0_8822C BIT(30)
+#define BIT_S1_RFC_RSTB_8822C BIT(25)
 
 /* 2 REG_SYS_CFG1_8822C */
 
@@ -3240,7 +3243,36 @@
 
 /* 2 REG_NOT_VALID_8822C */
 
+/* 2 REG_XTAL_AAC_OUTPUT_8822C */
+
 /* 2 REG_NOT_VALID_8822C */
+#define BIT_XTAL_PEAKDET_OUT_8822C BIT(9)
+#define BIT_XAAC_BUSY_8822C BIT(8)
+#define BIT_XAAC_READY_V1_8822C BIT(7)
+
+#define BIT_SHIFT_XAAC_PK_SEL_8822C 5
+#define BIT_MASK_XAAC_PK_SEL_8822C 0x3
+#define BIT_XAAC_PK_SEL_8822C(x)                                               \
+	(((x) & BIT_MASK_XAAC_PK_SEL_8822C) << BIT_SHIFT_XAAC_PK_SEL_8822C)
+#define BITS_XAAC_PK_SEL_8822C                                                 \
+	(BIT_MASK_XAAC_PK_SEL_8822C << BIT_SHIFT_XAAC_PK_SEL_8822C)
+#define BIT_CLEAR_XAAC_PK_SEL_8822C(x) ((x) & (~BITS_XAAC_PK_SEL_8822C))
+#define BIT_GET_XAAC_PK_SEL_8822C(x)                                           \
+	(((x) >> BIT_SHIFT_XAAC_PK_SEL_8822C) & BIT_MASK_XAAC_PK_SEL_8822C)
+#define BIT_SET_XAAC_PK_SEL_8822C(x, v)                                        \
+	(BIT_CLEAR_XAAC_PK_SEL_8822C(x) | BIT_XAAC_PK_SEL_8822C(v))
+
+#define BIT_SHIFT_XTAL_GM_OUT_8822C 0
+#define BIT_MASK_XTAL_GM_OUT_8822C 0x1f
+#define BIT_XTAL_GM_OUT_8822C(x)                                               \
+	(((x) & BIT_MASK_XTAL_GM_OUT_8822C) << BIT_SHIFT_XTAL_GM_OUT_8822C)
+#define BITS_XTAL_GM_OUT_8822C                                                 \
+	(BIT_MASK_XTAL_GM_OUT_8822C << BIT_SHIFT_XTAL_GM_OUT_8822C)
+#define BIT_CLEAR_XTAL_GM_OUT_8822C(x) ((x) & (~BITS_XTAL_GM_OUT_8822C))
+#define BIT_GET_XTAL_GM_OUT_8822C(x)                                           \
+	(((x) >> BIT_SHIFT_XTAL_GM_OUT_8822C) & BIT_MASK_XTAL_GM_OUT_8822C)
+#define BIT_SET_XTAL_GM_OUT_8822C(x, v)                                        \
+	(BIT_CLEAR_XTAL_GM_OUT_8822C(x) | BIT_XTAL_GM_OUT_8822C(v))
 
 /* 2 REG_ANAPAR_XTAL_MODE_DECODER_8822C */
 
@@ -10122,6 +10154,7 @@
 /* 2 REG_LIFETIME_EN_8822C */
 #define BIT_BT_INT_CPU_8822C BIT(7)
 #define BIT_BT_INT_PTA_8822C BIT(6)
+#define BIT_BA_PARSER_EN_8822C BIT(5)
 #define BIT_EN_CTRL_RTYBIT_8822C BIT(4)
 #define BIT_LIFETIME_BK_EN_8822C BIT(3)
 #define BIT_LIFETIME_BE_EN_8822C BIT(2)
@@ -10591,7 +10624,7 @@
 	(BIT_CLEAR_R_NDPA_RATE_V1_8822C(x) | BIT_R_NDPA_RATE_V1_8822C(v))
 
 /* 2 REG_TX_HANG_CTRL_8822C */
-#define BIT_R_EN_GNT_BT_AWAKE_8822C BIT(3)
+#define BIT_EN_GNT_BT_AWAKE_8822C BIT(3)
 #define BIT_EN_EOF_V1_8822C BIT(2)
 #define BIT_DIS_OQT_BLOCK_8822C BIT(1)
 #define BIT_SEARCH_QUEUE_EN_8822C BIT(0)
@@ -21407,6 +21440,7 @@
 #define BIT_SDIO_CPWM1_MSK_8822C BIT(18)
 #define BIT_SDIO_C2HCMD_INT_MSK_8822C BIT(17)
 #define BIT_SDIO_BCNERLY_INT_MSK_8822C BIT(16)
+#define BIT_BT_INT_MASK_8822C BIT(8)
 #define BIT_SDIO_TXBCNERR_MSK_8822C BIT(7)
 #define BIT_SDIO_TXBCNOK_MSK_8822C BIT(6)
 #define BIT_SDIO_RXFOVW_MSK_8822C BIT(5)
@@ -21433,6 +21467,7 @@
 #define BIT_SDIO_CPWM1_8822C BIT(18)
 #define BIT_SDIO_C2HCMD_INT_8822C BIT(17)
 #define BIT_SDIO_BCNERLY_INT_8822C BIT(16)
+#define BIT_BT_INT_8822C BIT(8)
 #define BIT_SDIO_TXBCNERR_8822C BIT(7)
 #define BIT_SDIO_TXBCNOK_8822C BIT(6)
 #define BIT_SDIO_RXFOVW_8822C BIT(5)

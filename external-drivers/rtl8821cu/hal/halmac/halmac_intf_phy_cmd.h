@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -39,7 +39,11 @@ enum halmac_ip_sel {
 
 /* Platform mask */
 enum halmac_intf_phy_platform {
-	HALMAC_INTF_PHY_PLATFORM_ALL = 0x7FFF,
+	HALMAC_INTF_PHY_PLATFORM_ALL = BIT(0),
+	HALMAC_INTF_PHY_PLATFORM_ASUS = BIT(1),
+	HALMAC_INTF_PHY_PLATFORM_LENOVO_V540 = BIT(2),
+	HALMAC_INTF_PHY_PLATFORM_DHC = BIT(3),
+	HALMAC_INTF_PHY_PLATFORM_FOR_ALL = 0x7FFF,
 };
 
 #endif

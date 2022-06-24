@@ -324,6 +324,63 @@ rtw_mesh_path_lookup_by_idx(_adapter *adapter, int idx)
 	return __rtw_mesh_path_lookup_by_idx(adapter->mesh_info.mesh_paths, idx);
 }
 
+void dump_mpath(void *sel, _adapter *adapter)
+{
+	struct rtw_mesh_path *mpath;
+	int idx = 0;
+	char dst[ETH_ALEN];
+	char next_hop[ETH_ALEN];
+	u32 sn, metric, qlen;
+	u32 exp_ms = 0, dto_ms;
+	u8 drty;
+	enum rtw_mesh_path_flags flags;
+
+	RTW_PRINT_SEL(sel, "%-17s %-17s %-10s %-10s %-4s %-6s %-6s %-4s flags\n"
+		, "dst", "next_hop", "sn", "metric", "qlen", "exp_ms", "dto_ms", "drty"
+	);
+
+	do {
+		rtw_rcu_read_lock();
+
+		mpath = rtw_mesh_path_lookup_by_idx(adapter, idx);
+		if (mpath) {
+			_rtw_memcpy(dst, mpath->dst, ETH_ALEN);
+			_rtw_memcpy(next_hop, mpath->next_hop->cmn.mac_addr, ETH_ALEN);
+			sn = mpath->sn;
+			metric = mpath->metric;
+			qlen = mpath->frame_queue_len;
+			if (rtw_time_after(mpath->exp_time, rtw_get_current_time()))
+				exp_ms = rtw_get_remaining_time_ms(mpath->exp_time);
+			dto_ms = rtw_systime_to_ms(mpath->discovery_timeout);
+			drty = mpath->discovery_retries;
+			flags = mpath->flags;
+		}
+
+		rtw_rcu_read_unlock();
+
+		if (mpath) {
+			RTW_PRINT_SEL(sel, MAC_FMT" "MAC_FMT" %10u %10u %4u %6u %6u %4u%s%s%s%s%s%s%s%s%s%s\n"
+				, MAC_ARG(dst), MAC_ARG(next_hop), sn, metric, qlen
+				, exp_ms < 999999 ? exp_ms : 999999
+				, dto_ms < 999999 ? dto_ms : 999999
+				, drty
+				, (flags & RTW_MESH_PATH_ACTIVE) ? " ACT" : ""
+				, (flags & RTW_MESH_PATH_RESOLVING) ? " RSVING" : ""
+				, (flags & RTW_MESH_PATH_SN_VALID) ? " SN_VALID" : ""
+				, (flags & RTW_MESH_PATH_FIXED) ?  " FIXED" : ""
+				, (flags & RTW_MESH_PATH_RESOLVED) ? " RSVED" : ""
+				, (flags & RTW_MESH_PATH_REQ_QUEUED) ? " REQ_IN_Q" : ""
+				, (flags & RTW_MESH_PATH_DELETED) ? " DELETED" : ""
+				, (flags & RTW_MESH_PATH_ROOT_ADD_CHK) ? " R_ADD_CHK" : ""
+				, (flags & RTW_MESH_PATH_PEER_AKA) ? " PEER_AKA" : ""
+				, (flags & RTW_MESH_PATH_BCAST_PREQ) ? " BC_PREQ" : ""
+			);
+		}
+
+		idx++;
+	} while (mpath);
+}
+
 /**
  * rtw_mpp_path_lookup_by_idx - look up a path in the proxy path table by its index
  * @idx: index
@@ -387,8 +444,13 @@ int rtw_mesh_path_add_gate(struct rtw_mesh_path *mpath)
 
 	exit_critical_bh(&mpath->state_lock);
 
-	if (ori_num_gates == 0)
-		update_beacon(mpath->adapter, WLAN_EID_MESH_CONFIG, NULL, _TRUE);
+	if (ori_num_gates == 0) {
+		update_beacon(mpath->adapter, WLAN_EID_MESH_CONFIG, NULL, _TRUE, 0);
+		#if CONFIG_RTW_MESH_CTO_MGATE_CARRIER
+		if (!rtw_mesh_cto_mgate_required(mpath->adapter))
+			rtw_netif_carrier_on(mpath->adapter->pnetdev);
+		#endif
+	}
 
 	RTW_MPATH_DBG(
 		  FUNC_ADPT_FMT" Mesh path: Recorded new gate: %pM. %d known gates\n",
@@ -442,8 +504,13 @@ void rtw_mesh_gate_del(struct rtw_mesh_table *tbl, struct rtw_mesh_path *mpath)
 
 	exit_critical_bh(&tbl->gates_lock);
 
-	if (ori_num_gates == 1)
-		update_beacon(mpath->adapter, WLAN_EID_MESH_CONFIG, NULL, _TRUE);
+	if (ori_num_gates == 1) {
+		update_beacon(mpath->adapter, WLAN_EID_MESH_CONFIG, NULL, _TRUE, 0);
+		#if CONFIG_RTW_MESH_CTO_MGATE_CARRIER
+		if (rtw_mesh_cto_mgate_required(mpath->adapter))
+			rtw_netif_carrier_off(mpath->adapter->pnetdev);
+		#endif
+	}
 
 	RTW_MPATH_DBG(
 		  FUNC_ADPT_FMT" Mesh path: Deleted gate: %pM. %d known gates\n",
@@ -639,6 +706,34 @@ int rtw_mpp_path_add(_adapter *adapter,
 	return ret;
 }
 
+void dump_mpp(void *sel, _adapter *adapter)
+{
+	struct rtw_mesh_path *mpath;
+	int idx = 0;
+	char dst[ETH_ALEN];
+	char mpp[ETH_ALEN];
+
+	RTW_PRINT_SEL(sel, "%-17s %-17s\n", "dst", "mpp");
+
+	do {
+		rtw_rcu_read_lock();
+
+		mpath = rtw_mpp_path_lookup_by_idx(adapter, idx);
+		if (mpath) {
+			_rtw_memcpy(dst, mpath->dst, ETH_ALEN);
+			_rtw_memcpy(mpp, mpath->mpp, ETH_ALEN);
+		}
+
+		rtw_rcu_read_unlock();
+
+		if (mpath) {
+			RTW_PRINT_SEL(sel, MAC_FMT" "MAC_FMT"\n"
+				, MAC_ARG(dst), MAC_ARG(mpp));
+		}
+
+		idx++;
+	} while (mpath);
+}
 
 /**
  * rtw_mesh_plink_broken - deactivates paths and sends perr when a link breaks

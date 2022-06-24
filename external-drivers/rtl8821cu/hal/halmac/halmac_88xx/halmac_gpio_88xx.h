@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -44,15 +44,6 @@ enum halmac_ret_status
 pinmux_parser_88xx(struct halmac_adapter *adapter,
 		   const struct halmac_gpio_pimux_list *list, u32 size,
 		   u32 gpio_id, u32 *cur_func);
-
-enum halmac_ret_status
-pinmux_switch_88xx(struct halmac_adapter *adapter,
-		   const struct halmac_gpio_pimux_list *list, u32 size,
-		   u32 gpio_id, enum halmac_gpio_func gpio_func);
-
-enum halmac_ret_status
-pinmux_record_88xx(struct halmac_adapter *adapter,
-		   enum halmac_gpio_func gpio_func, u8 val);
 
 #endif /* HALMAC_88XX_SUPPORT */
 

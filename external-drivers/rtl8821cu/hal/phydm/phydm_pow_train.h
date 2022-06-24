@@ -26,7 +26,7 @@
 #ifndef __PHYDM_POW_TRAIN_H__
 #define __PHYDM_POW_TRAIN_H__
 
-#define POW_TRAIN_VERSION "1.0" /* 2017.07.0141  Dino, Add phydm_pow_train.h*/
+#define POW_TRAIN_VERSION "1.0" /* @2017.07.0141  Dino, Add phydm_pow_train.h*/
 
 /****************************************************************
  * 1 ============================================================
@@ -42,7 +42,7 @@
  ***************************************************************/
 
 struct phydm_pow_train_stuc {
-	u8 force_power_training_state;
+	u8 pt_state;
 	u32 pow_train_score;
 };
 
@@ -78,8 +78,7 @@ void phydm_pow_train_debug(
 	char input[][16],
 	u32 *_used,
 	char *output,
-	u32 *_out_len,
-	u32 input_num);
+	u32 *_out_len);
 
 #endif
 #endif

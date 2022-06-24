@@ -26,7 +26,7 @@
 #ifndef __ODM_REGDEFINE11N_H__
 #define __ODM_REGDEFINE11N_H__
 
-/* 2 RF REG LIST */
+/* @2 RF REG LIST */
 #define	ODM_REG_RF_MODE_11N			0x00
 #define	ODM_REG_RF_0B_11N			0x0B
 #define	ODM_REG_CHNBW_11N			0x18
@@ -39,10 +39,11 @@
 #define	ODM_REG_RXRF_A3_11N			0x3C
 #define	ODM_REG_T_METER_92D_11N			0x42
 #define	ODM_REG_T_METER_88E_11N			0x42
+#define	ODM_REF_RF_DF_11N			0xDF
 
 
 
-/* 2 BB REG LIST
+/* @2 BB REG LIST
  * PAGE 8
  */
 #define	ODM_REG_BB_CTRL_11N			0x800
@@ -73,7 +74,7 @@
 #define	ODM_REG_CLM_RESULT_11N			0x8d0
 #define	ODM_REG_NHM_CNT_11N			0x8d8
 
-/* For struct acs_info, Jeffery, 2014-12-26 */
+/* @For struct acs_info, Jeffery, 2014-12-26 */
 #define	ODM_REG_NHM_CNT7_TO_CNT4_11N		0x8dc
 #define	ODM_REG_NHM_CNT9_TO_CNT8_11N		0x8d0
 #define	ODM_REG_NHM_CNT10_TO_CNT11_11N		0x8d4
@@ -194,7 +195,7 @@
 #define	ODM_REG_OFDM_CRC32_CNT_11N		0xF94
 #define	ODM_REG_HT_CRC32_CNT_11N_AGG		0xFB8
 
-/* 2 MAC REG LIST */
+/* @2 MAC REG LIST */
 #define	ODM_REG_BB_RST_11N			0x02
 #define	ODM_REG_ANTSEL_PIN_11N			0x4C
 #define	ODM_REG_EARLY_MODE_11N			0x4D0
@@ -209,11 +210,11 @@
 #define	ODM_REG_ANT_TRAIN_PARA2_11N		0x7b4
 
 
-/* DIG Related */
+/* @DIG Related */
 #define	ODM_BIT_IGI_11N				0x0000007F
 #define	ODM_BIT_CCK_RPT_FORMAT_11N		BIT(9)
 #define	ODM_BIT_BB_RX_PATH_11N			0xF
 #define	ODM_BIT_BB_TX_PATH_11N			0xF
 #define	ODM_BIT_BB_ATC_11N			BIT(11)
-
 #endif
+

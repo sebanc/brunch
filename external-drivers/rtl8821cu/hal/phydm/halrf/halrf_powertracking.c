@@ -23,7 +23,7 @@
  *
  *****************************************************************************/
 
-/* ************************************************************
+/*@************************************************************
  * include files
  * ************************************************************
  */
@@ -129,10 +129,9 @@ void halrf_update_init_rate_work_item_callback(
 #endif
 	} else if (dm->support_ic_type == ODM_RTL8812) {
 #if (RTL8812A_SUPPORT == 1)
-		for (p = RF_PATH_A; p < MAX_PATH_NUM_8812A; p++) { /*DOn't know how to include &c*/
-
+		/*Don't know how to include &c*/
+		for (p = RF_PATH_A; p < MAX_PATH_NUM_8812A; p++)
 			odm_tx_pwr_track_set_pwr8812a(dm, MIX_MODE, p, 0);
-		}
 #endif
 	} else if (dm->support_ic_type == ODM_RTL8723B) {
 #if (RTL8723B_SUPPORT == 1)
@@ -140,9 +139,9 @@ void halrf_update_init_rate_work_item_callback(
 #endif
 	} else if (dm->support_ic_type == ODM_RTL8192E) {
 #if (RTL8192E_SUPPORT == 1)
-		for (p = RF_PATH_A; p < MAX_PATH_NUM_8192E; p++) { /*DOn't know how to include &c*/
+		/*Don't know how to include &c*/
+		for (p = RF_PATH_A; p < MAX_PATH_NUM_8192E; p++)
 			odm_tx_pwr_track_set_pwr92_e(dm, MIX_MODE, p, 0);
-		}
 #endif
 	} else if (dm->support_ic_type == ODM_RTL8188E) {
 #if (RTL8188E_SUPPORT == 1)
@@ -151,3 +150,37 @@ void halrf_update_init_rate_work_item_callback(
 	}
 }
 #endif
+
+void halrf_set_pwr_track(void *dm_void, u8 enable)
+{
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
+	struct dm_rf_calibration_struct *cali_info = &dm->rf_calibrate_info;
+	struct _hal_rf_ *rf = &(dm->rf_table);
+	struct txpwrtrack_cfg c;
+	u8 i;
+
+	configure_txpower_track(dm, &c);
+	if (enable) {
+		rf->rf_supportability = rf->rf_supportability | HAL_RF_TX_PWR_TRACK;
+		if (cali_info->txpowertrack_control == 1 || cali_info->txpowertrack_control == 3)
+			halrf_do_tssi(dm);
+	} else {
+		rf->rf_supportability = rf->rf_supportability & ~HAL_RF_TX_PWR_TRACK;
+		odm_clear_txpowertracking_state(dm);
+		halrf_do_tssi(dm);
+		halrf_calculate_tssi_codeword(dm);
+		halrf_set_tssi_codeword(dm);
+		
+#if !(RTL8723F_SUPPORT == 1)
+		for (i = 0; i < c.rf_path_count; i++)
+			(*c.odm_tx_pwr_track_set_pwr)(dm, CLEAN_MODE, i, 0);
+#endif
+	}
+
+	if (cali_info->txpowertrack_control == 2 ||
+		cali_info->txpowertrack_control == 3 ||
+		cali_info->txpowertrack_control == 4 ||
+		cali_info->txpowertrack_control == 5)
+		halrf_txgapk_reload_tx_gain(dm);
+}
+

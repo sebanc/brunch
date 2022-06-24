@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -34,6 +34,10 @@
 #include "halmac_88xx/halmac_init_win8822c.h"
 #endif
 
+#if HALMAC_8812F_SUPPORT
+#include "halmac_88xx/halmac_init_win8812f.h"
+#endif
+
 #else
 
 #if HALMAC_88XX_SUPPORT
@@ -41,6 +45,9 @@
 #endif
 #if HALMAC_88XX_V1_SUPPORT
 #include "halmac_88xx_v1/halmac_init_88xx_v1.h"
+#if defined(HALMAC_DATA_CPU_EN)
+#include "halmac_88xxd_v1/halmac_init_88xxd_v1.h"
+#endif
 #endif
 
 #endif
@@ -63,6 +70,7 @@ enum chip_id_hw_def {
 	CHIP_ID_HW_DEF_8723D = 0x0F,
 	CHIP_ID_HW_DEF_8814B = 0x11,
 	CHIP_ID_HW_DEF_8822C = 0x13,
+	CHIP_ID_HW_DEF_8812F = 0x14,
 	CHIP_ID_HW_DEF_UNDEFINE = 0x7F,
 	CHIP_ID_HW_DEF_PS = 0xEA,
 };
@@ -122,10 +130,10 @@ halmac_init_adapter(void *drv_adapter, struct halmac_platform_api *pltfm_api,
 
 	pltfm_api->MSG_PRINT(drv_adapter, HALMAC_MSG_INIT, HALMAC_DBG_ALWAYS,
 			     HALMAC_SVN_VER "\n"
-			     "HALMAC_MAJOR_VER = %x\n"
-			     "HALMAC_PROTOTYPE_VER = %x\n"
-			     "HALMAC_MINOR_VER = %x\n"
-			     "HALMAC_PATCH_VER = %x\n",
+			     "HALMAC_MAJOR_VER = %d\n"
+			     "HALMAC_PROTOTYPE_VER = %d\n"
+			     "HALMAC_MINOR_VER = %d\n"
+			     "HALMAC_PATCH_VER = %d\n",
 			     HALMAC_MAJOR_VER, HALMAC_PROTOTYPE_VER,
 			     HALMAC_MINOR_VER, HALMAC_PATCH_VER);
 
@@ -170,7 +178,8 @@ halmac_init_adapter(void *drv_adapter, struct halmac_platform_api *pltfm_api,
 #if HALMAC_88XX_SUPPORT
 	if (adapter->chip_id == HALMAC_CHIP_ID_8822B ||
 	    adapter->chip_id == HALMAC_CHIP_ID_8821C ||
-	    adapter->chip_id == HALMAC_CHIP_ID_8822C) {
+	    adapter->chip_id == HALMAC_CHIP_ID_8822C ||
+	    adapter->chip_id == HALMAC_CHIP_ID_8812F) {
 		init_adapter_param_88xx(adapter);
 		status = mount_api_88xx(adapter);
 	}
@@ -181,6 +190,12 @@ halmac_init_adapter(void *drv_adapter, struct halmac_platform_api *pltfm_api,
 		init_adapter_param_88xx_v1(adapter);
 		status = mount_api_88xx_v1(adapter);
 	}
+#if defined(HALMAC_DATA_CPU_EN)
+	if (adapter->chip_id == HALMAC_CHIP_ID_8814B) {
+		init_adapter_param_88xxd_v1(adapter);
+		status = mount_api_88xxd_v1(adapter);
+	}
+#endif
 #endif
 
 #else
@@ -213,9 +228,19 @@ halmac_init_adapter(void *drv_adapter, struct halmac_platform_api *pltfm_api,
 	}
 #endif
 
+#if HALMAC_8812F_SUPPORT
+	if (adapter->chip_id == HALMAC_CHIP_ID_8812F) {
+		init_adapter_param_win8812f(adapter);
+		status = mount_api_win8812f(adapter);
+	}
+#endif
+
 #endif
 	*halmac_api = (struct halmac_api *)adapter->halmac_api;
 
+#if HALMAC_DBG_MONITOR_IO
+	mount_api_dbg(adapter);
+#endif
 	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
 
 	return status;
@@ -431,7 +456,18 @@ chk_pltfm_api(void *drv_adapter, enum halmac_interface intf,
 				     HALMAC_DBG_ERR, "[ERR]event-indication\n");
 		return HALMAC_RET_PLATFORM_API_NULL;
 	}
-
+#if HALMAC_DBG_MONITOR_IO
+	if (!pltfm_api->READ_MONITOR) {
+		pltfm_api->MSG_PRINT(drv_adapter, HALMAC_MSG_INIT,
+				     HALMAC_DBG_ERR, "[ERR]read-monitor\n");
+		return HALMAC_RET_PLATFORM_API_NULL;
+	}
+	if (!pltfm_api->WRITE_MONITOR) {
+		pltfm_api->MSG_PRINT(drv_adapter, HALMAC_MSG_INIT,
+				     HALMAC_DBG_ERR, "[ERR]write-monitor\n");
+		return HALMAC_RET_PLATFORM_API_NULL;
+	}
+#endif
 	return HALMAC_RET_SUCCESS;
 }
 
@@ -496,6 +532,8 @@ get_chip_info(void *drv_adapter, struct halmac_platform_api *pltfm_api,
 		adapter->chip_id = HALMAC_CHIP_ID_8197F;
 	} else if (chip_id == CHIP_ID_HW_DEF_8822C) {
 		adapter->chip_id = HALMAC_CHIP_ID_8822C;
+	} else if (chip_id == CHIP_ID_HW_DEF_8812F) {
+		adapter->chip_id = HALMAC_CHIP_ID_8812F;
 	} else {
 		adapter->chip_id = HALMAC_CHIP_ID_UNDEFINE;
 		PLTFM_MSG_ERR("[ERR]Chip id is undefined\n");

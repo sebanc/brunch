@@ -26,7 +26,7 @@
 #define __HAL_TXBF_8822B_H__
 
 #if (RTL8822B_SUPPORT == 1)
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 
 void hal_txbf_8822b_enter(
 	void *dm_void,

@@ -25,21 +25,7 @@
 
 #endif
 
-
-static void _dbg_dump_macreg(PADAPTER padapter)
-{
-	u32 offset = 0;
-	u32 val32 = 0;
-	u32 index = 0;
-
-	for (index = 0; index < 64; index++) {
-		offset = index * 4;
-		val32 = rtw_read32(padapter, offset);
-		/* RTW_INFO("offset : 0x%02x ,val:0x%08x\n", offset, val32); */
-		RTW_INFO("offset : 0x%02x ,val:0x%08x\n", offset, val32);
-	}
-}
-
+#ifdef CONFIG_RTW_LED
 static void init_hwled(PADAPTER adapter, u8 enable)
 {
 	u8 mode = 0;
@@ -50,11 +36,18 @@ static void init_hwled(PADAPTER adapter, u8 enable)
 
 	rtw_halmac_led_cfg(adapter_to_dvobj(adapter), enable, mode);
 }
+#endif /* CONFIG_RTW_LED */
 
 static void hal_init_misc(PADAPTER adapter)
 {
 #ifdef CONFIG_RTW_LED
+	struct led_priv *ledpriv = adapter_to_led(adapter);
+
 	init_hwled(adapter, 1);
+#ifdef CONFIG_RTW_SW_LED
+	if (ledpriv->bRegUseLed == _TRUE)
+		rtw_halmac_led_cfg(adapter_to_dvobj(adapter), _TRUE, 3);
+#endif
 #endif /* CONFIG_RTW_LED */
 
 }
@@ -77,7 +70,13 @@ u32 rtl8821cu_hal_init(PADAPTER padapter)
 static void hal_deinit_misc(PADAPTER adapter)
 {
 #ifdef CONFIG_RTW_LED
+	struct led_priv *ledpriv = adapter_to_led(adapter);
+
 	init_hwled(adapter, 0);
+#ifdef CONFIG_RTW_SW_LED
+	if (ledpriv->bRegUseLed == _TRUE)
+		rtw_halmac_led_cfg(adapter_to_dvobj(adapter), _FALSE, 3);
+#endif
 #endif /* CONFIG_RTW_LED */
 }
 
@@ -105,6 +104,7 @@ u32 rtl8821cu_hal_deinit(PADAPTER padapter)
 
 u32 rtl8821cu_inirp_init(PADAPTER padapter)
 {
+	struct registry_priv *regsty = adapter_to_regsty(padapter);
 	u8 i, status;
 	struct recv_buf *precvbuf;
 	struct dvobj_priv *pdev = adapter_to_dvobj(padapter);
@@ -126,7 +126,7 @@ u32 rtl8821cu_inirp_init(PADAPTER padapter)
 
 	/* issue Rx irp to receive data */
 	precvbuf = (struct recv_buf *)precvpriv->precv_buf;
-	for (i = 0; i < NR_RECVBUFF; i++) {
+	for (i = 0; i < regsty->recvbuf_nr; i++) {
 		if (_read_port(pintfhdl, precvpriv->ff_hwaddr, 0, (u8 *)precvbuf) == _FALSE) {
 			status = _FAIL;
 			goto exit;
@@ -255,8 +255,6 @@ void rtl8821cu_interface_configure(PADAPTER padapter)
 		pHalData->UsbBulkOutSize = USB_HIGH_SPEED_BULK_SIZE;
 	else
 		pHalData->UsbBulkOutSize = USB_FULL_SPEED_BULK_SIZE;
-
-	pHalData->interfaceIndex = pdvobjpriv->InterfaceNumber;
 
 #ifdef CONFIG_USB_TX_AGGREGATION
 	/* according to value defined by halmac */

@@ -194,9 +194,13 @@ static u8 init_bb_reg(PADAPTER adapter)
 	 */
 	ret = _init_phy_parameter_bb(adapter);
 
-	hal_set_crystal_cap(adapter, hal->crystal_cap);
+	if (rtw_phydm_set_crystal_cap(adapter, hal->crystal_cap) == _FALSE) {
+		RTW_ERR("Init crystal_cap failed\n");
+		rtw_warn_on(1);
+		ret = _FALSE;
+	}
 
-	phy_set_bb_reg(adapter, rCCK0_FalseAlarmReport + 2, BIT2 | BIT6, 0);
+	phy_set_bb_reg(adapter, rCCK0_FalseAlarmReport, BIT18 | BIT22, 0);
 	return ret;
 }
 
@@ -206,6 +210,7 @@ static u8 _init_phy_parameter_rf(PADAPTER adapter)
 	enum rf_path eRFPath;
 	PBB_REGISTER_DEFINITION_T pPhyReg;
 	PHAL_DATA_TYPE hal = GET_HAL_DATA(adapter);
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(adapter);
 	enum hal_status status;
 	int res;
 	u8 ret = _TRUE;
@@ -214,7 +219,7 @@ static u8 _init_phy_parameter_rf(PADAPTER adapter)
 	/*
 	 * Initialize RF
 	 */
-	for (eRFPath = RF_PATH_A; eRFPath < hal->NumTotalRFPath; eRFPath++) {
+	for (eRFPath = RF_PATH_A; eRFPath < hal_spec->rf_reg_path_num; eRFPath++) {
 		pPhyReg = &hal->PHYRegDef[eRFPath];
 
 		/* Initialize RF from configuration file */
@@ -298,11 +303,6 @@ u8 rtl8821c_phy_init(PADAPTER adapter)
 
 	if (_FALSE == init_rf_reg(adapter))
 		return _FALSE;
-
-#if 0
-	if (_FALSE = config_phydm_trx_mode_8821c(phydm, ODM_RF_A, ODM_RF_A, FALSE))
-		return _FALSE;
-#endif
 
 	if (_FALSE ==  config_phydm_parameter_init_8821c(phydm, ODM_POST_SETTING))
 		return _FALSE;
@@ -391,21 +391,23 @@ void rtl8821c_set_tx_power_level(PADAPTER adapter, u8 channel)
 {
 	u8 path = RF_PATH_A;
 	struct dm_struct *phydm = adapter_to_phydm(adapter);
+	PHAL_DATA_TYPE hal = GET_HAL_DATA(adapter);
+	u8 under_survey_ch = phy_check_under_survey_ch(adapter);
+	u8 under_24g = (hal->current_band_type == BAND_ON_2_4G);
 
 	/*((hal->RFEType == 2) || (hal->RFEType == 4) || (hal->RFEType == 7))*/
 	if ((channel <= 14) && (SWITCH_TO_BTG == query_phydm_default_rf_set_8821c(phydm)))
 		path = RF_PATH_B;
 
 	/*if (adapter->registrypriv.mp_mode == 1)*/
+	if (under_24g)
+		phy_set_tx_power_index_by_rate_section(adapter, path, channel, CCK);
 
-	phy_set_tx_power_index_by_rate_section(adapter, path, channel, CCK);
 	phy_set_tx_power_index_by_rate_section(adapter, path, channel, OFDM);
-	phy_set_tx_power_index_by_rate_section(adapter, path, channel, HT_MCS0_MCS7);
-	phy_set_tx_power_index_by_rate_section(adapter, path, channel, VHT_1SSMCS0_1SSMCS9);
-}
-
-void rtl8821c_get_tx_power_level(PADAPTER adapter, s32 *power)
-{
+	if (!under_survey_ch) {
+		phy_set_tx_power_index_by_rate_section(adapter, path, channel, HT_MCS0_MCS7);
+		phy_set_tx_power_index_by_rate_section(adapter, path, channel, VHT_1SSMCS0_1SSMCS9);
+	}
 }
 
 /*
@@ -415,115 +417,52 @@ void rtl8821c_get_tx_power_level(PADAPTER adapter, s32 *power)
  *	rfpath		Antenna(RF) path, type "enum rf_path"
  *	rate		data rate, type "enum MGN_RATE"
  */
- /*#define DBG_SET_TX_POWER_IDX*/
 void rtl8821c_set_tx_power_index(PADAPTER adapter, u32 powerindex, enum rf_path rfpath, u8 rate)
 {
+	HAL_DATA_TYPE *hal = GET_HAL_DATA(adapter);
 	struct dm_struct *phydm = adapter_to_phydm(adapter);
+	u8 reg_path;
 	u8 shift = 0;
-	u8 hw_rate_idx;
-	static u32 index = 0;
+	boolean write_ret;
 
-	/*hw_rate_idx = PHY_GetRateIndexOfTxPowerByRate(rate);*/
-	hw_rate_idx = MRateToHwRate(rate);
-
-	if (hw_rate_idx > DESC_RATEVHTSS1MCS9) {
-		RTW_ERR(FUNC_ADPT_FMT"warn rate(%s)\n", FUNC_ADPT_ARG(adapter), HDATA_RATE(hw_rate_idx));
+	if (!IS_1T_RATE(rate)) {
+		RTW_ERR(FUNC_ADPT_FMT" invalid rate(%s)\n", FUNC_ADPT_ARG(adapter), MGN_RATE_STR(rate));
 		rtw_warn_on(1);
+		goto exit;
 	}
 
-	if (rfpath > RF_PATH_A) {
-		#ifdef DBG_SET_TX_POWER_IDX
-		RTW_INFO(FUNC_ADPT_FMT" rfpath(%d) power index to RF_PATH_A\n", FUNC_ADPT_ARG(adapter), rfpath);
-		#endif
-		rfpath =  RF_PATH_A;
-	}
+	reg_path = RF_PATH_A;
+	rate = MRateToHwRate(rate);
+
 	/*
 	* For 8821C, phydm api use 4 bytes txagc value
 	* driver must combine every four 1 byte to one 4 byte and send to phydm api
 	*/
-	shift = hw_rate_idx % 4;
-	index |= ((powerindex & 0xff) << (shift * 8));
+	shift = rate % 4;
+	hal->txagc_set_buf |= ((powerindex & 0xff) << (shift * 8));
 
-	if (shift == 3) {
-		hw_rate_idx = hw_rate_idx - 3;
+	if (shift != 3 && rate != DESC_RATEVHTSS1MCS9)
+		goto exit;
 
-		if (!config_phydm_write_txagc_8821c(phydm, index, rfpath, hw_rate_idx)) {
-			RTW_ERR(FUNC_ADPT_FMT" (power index:0x%02x, rfpath:%d, rate:0x%02x, disable api:%d) wite TX-AGC failed\n",
-				FUNC_ADPT_ARG(adapter), index, rfpath, hw_rate_idx, phydm->is_disable_phy_api);
+	rate = rate & 0xFC;
+	write_ret = config_phydm_write_txagc_8821c(phydm, hal->txagc_set_buf, reg_path, rate);
 
-			rtw_warn_on(1);
-		}
-		#ifdef DBG_SET_TX_POWER_IDX
-		RTW_INFO(FUNC_ADPT_FMT"Rate:%s ,tx_power_idx: 0x%08x\n", FUNC_ADPT_ARG(adapter), HDATA_RATE(hw_rate_idx), index);
-		#endif
-		index = 0;
-	}
-	if (MGN_VHT1SS_MCS9 == rate) {
-		if (!config_phydm_write_txagc_8821c(phydm, index, rfpath, MRateToHwRate(MGN_VHT1SS_MCS8))) {
-			RTW_ERR(FUNC_ADPT_FMT" (power index:0x%02x, rfpath:%d, rate:0x%02x, disable api:%d) wite TX-AGC failed\n",
-				FUNC_ADPT_ARG(adapter), index, rfpath, hw_rate_idx, phydm->is_disable_phy_api);
+	if (write_ret == true && !DBG_TX_POWER_IDX)
+		goto clear_buf;
 
-			rtw_warn_on(1);
-		}
-		#ifdef DBG_SET_TX_POWER_IDX
-		RTW_INFO(FUNC_ADPT_FMT"-Rate:%s ,tx_power_idx: 0x%08x\n", FUNC_ADPT_ARG(adapter), HDATA_RATE(MRateToHwRate(MGN_VHT1SS_MCS8)), index);
-		#endif
-		index = 0;
-	}
+	RTW_INFO(FUNC_ADPT_FMT" (index:0x%08x, %c, rate:%s(0x%02x), disable api:%d) from %c %s\n"
+		, FUNC_ADPT_ARG(adapter), hal->txagc_set_buf, rf_path_char(reg_path)
+		, HDATA_RATE(rate), rate, phydm->is_disable_phy_api
+		, rf_path_char(rfpath)
+		, write_ret == true ? "OK" : "FAIL");
 
-}
+	rtw_warn_on(write_ret != true);
 
-/*
- * Parameters:
- *	padatper
- *	rfpath		Antenna(RF) path, type "enum rf_path"
- *	rate		data rate, type "enum MGN_RATE"
- *	bandwidth	Bandwidth, type "enum _CHANNEL_WIDTH"
- *	channel		Channel number
- *
- * Rteurn:
- *	tx_power	power index for rate
- */
-u8 rtl8821c_get_tx_power_index(PADAPTER adapter, enum rf_path rfpath, u8 rate, u8 bandwidth, u8 channel, struct txpwr_idx_comp *tic)
-{
-	PHAL_DATA_TYPE hal = GET_HAL_DATA(adapter);
-	s16 power_idx;
-	u8 base_idx = 0;
-	s8 by_rate_diff = 0, limit = 0, tpt_offset = 0, extra_bias = 0;
-	u8 bIn24G = _FALSE;
+clear_buf:
+	hal->txagc_set_buf = 0;
 
-	base_idx = PHY_GetTxPowerIndexBase(adapter, rfpath, rate, RF_1TX, bandwidth, channel, &bIn24G);
-
-	by_rate_diff = PHY_GetTxPowerByRate(adapter, (u8)(!bIn24G), rfpath, rate);
-	limit = PHY_GetTxPowerLimit(adapter, NULL, (BAND_TYPE)(!bIn24G),
-		    hal->current_channel_bw, rfpath, rate, RF_1TX, hal->current_channel);
-
-	/* tpt_offset += PHY_GetTxPowerTrackingOffset(adapter, rfpath, rate); */
-
-	if (tic) {
-		tic->ntx_idx = RF_1TX;
-		tic->base = base_idx;
-		tic->by_rate = by_rate_diff;
-		tic->limit = limit;
-		tic->tpt = tpt_offset;
-		tic->ebias = extra_bias;
-	}
-
-	by_rate_diff = by_rate_diff > limit ? limit : by_rate_diff;
-	power_idx = base_idx + by_rate_diff + tpt_offset + extra_bias;
-
-#if 0
-#if CCX_SUPPORT
-	CCX_CellPowerLimit(adapter, channel, rate, (pu1Byte)&power_idx);
-#endif
-#endif
-
-	if (power_idx < 0)
-		power_idx = 0;
-	else if (power_idx > MAX_POWER_INDEX)
-		power_idx = MAX_POWER_INDEX;
-
-	return power_idx;
+exit:
+	return;
 }
 
 /*
@@ -614,7 +553,7 @@ static void mac_switch_bandwidth(PADAPTER adapter, u8 pri_ch_idx)
 			 FUNC_ADPT_ARG(adapter), channel, pri_ch_idx, bw);
 	}
 }
-u32 phy_get_tx_bbswing_8812c(_adapter *adapter, BAND_TYPE band, u8 rf_path)
+u32 phy_get_tx_bbswing_8821c(_adapter *adapter, BAND_TYPE band, u8 rf_path)
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(adapter);
 	struct dm_struct		*pDM_Odm = &pHalData->odmpriv;
@@ -734,14 +673,14 @@ u32 phy_get_tx_bbswing_8812c(_adapter *adapter, BAND_TYPE band, u8 rf_path)
 	return out;
 }
 
-void phy_set_bb_swing_by_band_8812c(_adapter *adapter, u8 band, u8 previous_band)
+void phy_set_bb_swing_by_band_8821c(_adapter *adapter, u8 band, u8 previous_band)
 {
 	s8 BBDiffBetweenBand = 0;
 	struct dm_struct *pDM_Odm = adapter_to_phydm(adapter);
 	struct dm_rf_calibration_struct *pRFCalibrateInfo = &(pDM_Odm->rf_calibrate_info);
 
 	phy_set_bb_reg(adapter, rA_TxScale_Jaguar, 0xFFE00000,
-			phy_get_tx_bbswing_8812c(adapter, (BAND_TYPE)band, RF_PATH_A)); /* 0xC1C[31:21] */
+			phy_get_tx_bbswing_8821c(adapter, (BAND_TYPE)band, RF_PATH_A)); /* 0xC1C[31:21] */
 
 	/* When TxPowerTrack is ON, we should take care of the change of BB swing. */
 	/* That is, reset all info to trigger Tx power tracking. */
@@ -790,7 +729,7 @@ void phy_switch_wireless_band_8821c(_adapter *adapter)
 			rtw_warn_on(1);
 			return;
 		}
-		phy_set_bb_swing_by_band_8812c(adapter, hal_data->current_band_type, current_band);
+		phy_set_bb_swing_by_band_8821c(adapter, hal_data->current_band_type, current_band);
 	}
 }
 
@@ -1051,23 +990,10 @@ void rtl8821c_notch_filter_switch(PADAPTER adapter, bool enable)
 
 static u8 _bf_get_nrx(PADAPTER adapter)
 {
-	u8 rf;
 	u8 nrx = 0;
 
-
-	rtw_hal_get_hwreg(adapter, HW_VAR_RF_TYPE, &rf);
-	switch (rf) {
-	case RF_1T1R:
-		nrx = 0;
-		break;
-	default:
-	case RF_1T2R:
-	case RF_2T2R:
-		nrx = 1;
-		break;
-	}
-
-	return nrx;
+	nrx = GET_HAL_RX_NSS(adapter);
+	return (nrx - 1);
 }
 
 

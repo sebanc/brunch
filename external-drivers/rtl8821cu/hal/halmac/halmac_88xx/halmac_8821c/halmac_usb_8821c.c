@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -18,7 +18,7 @@
 #include "../halmac_init_88xx.h"
 #include "../halmac_common_88xx.h"
 
-#if HALMAC_8821C_SUPPORT
+#if (HALMAC_8821C_SUPPORT && HALMAC_USB_SUPPORT)
 
 /**
  * mac_pwr_switch_usb_8821c() - switch mac power

@@ -51,6 +51,21 @@ struct ht_priv {
 
 };
 
+#ifdef ROKU_PRIVATE
+struct ht_priv_infra_ap {
+
+	/*Infra mode, only store AP's info , not intersection of STA and AP*/
+	u8	channel_width_infra_ap;
+	u8	sgi_20m_infra_ap;
+	u8	sgi_40m_infra_ap;
+	u8	ldpc_cap_infra_ap;
+	u8	stbc_cap_infra_ap;
+	u8	MCS_set_infra_ap[16];
+	u8	Rx_ss_infra_ap;
+	u16	rx_highest_data_rate_infra_ap;
+};
+#endif /* ROKU_PRIVATE */
+
 typedef enum AGGRE_SIZE {
 	HT_AGG_SIZE_8K = 0,
 	HT_AGG_SIZE_16K = 1,

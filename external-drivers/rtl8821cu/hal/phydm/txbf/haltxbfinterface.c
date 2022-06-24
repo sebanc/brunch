@@ -21,7 +21,7 @@
 #include "mp_precomp.h"
 #include "../phydm_precomp.h"
 
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
 void beamforming_gid_paid(
 	void *adapter,
@@ -39,11 +39,11 @@ void beamforming_gid_paid(
 		return;
 
 #if (SUPPORT_MU_BF == 1)
-	if (tcb->tx_bf_pkt_type == RT_BF_PKT_TYPE_BROADCAST_NDPA) { /* MU NDPA */
+	if (tcb->tx_bf_pkt_type == RT_BF_PKT_TYPE_BROADCAST_NDPA) { /* @MU NDPA */
 #else
 	if (0) {
 #endif
-		/* Fill G_ID and P_AID */
+		/* @Fill G_ID and P_AID */
 		tcb->G_ID = 63;
 		if (beam_info->first_mu_bfee_index < BEAMFORMEE_ENTRY_NUM) {
 			tcb->P_AID = beam_info->beamformee_entry[beam_info->first_mu_bfee_index].p_aid;
@@ -58,24 +58,24 @@ void beamforming_gid_paid(
 			tcb->G_ID = 63;
 			tcb->P_AID = 0;
 		} else if (ACTING_AS_AP(adapter)) {
-			u16 AID = (u16)(MacIdGetOwnerAssociatedClientAID(adapter, tcb->macId) & 0x1ff); /*AID[0:8]*/
+			u16 AID = (u16)(MacIdGetOwnerAssociatedClientAID(adapter, tcb->macId) & 0x1ff); /*@AID[0:8]*/
 
 			/*RT_DISP(FBEAM, FBEAM_FUN, ("@%s  tcb->mac_id=0x%X, AID=0x%X\n", __func__, tcb->mac_id, AID));*/
 			tcb->G_ID = 63;
 
-			if (AID == 0) /*A PPDU sent by an AP to a non associated STA*/
+			if (AID == 0) /*@A PPDU sent by an AP to a non associated STA*/
 				tcb->P_AID = 0;
 			else { /*Sent by an AP and addressed to a STA associated with that AP*/
 				u16 BSSID = 0;
 				GET_80211_HDR_ADDRESS2(p_header, &RA);
-				BSSID = ((RA[5] & 0xf0) >> 4) ^ (RA[5] & 0xf); /*BSSID[44:47] xor BSSID[40:43]*/
-				tcb->P_AID = (AID + BSSID * 32) & 0x1ff; /*(dec(A) + dec(B)*32) mod 512*/
+				BSSID = ((RA[5] & 0xf0) >> 4) ^ (RA[5] & 0xf); /*@BSSID[44:47] xor BSSID[40:43]*/
+				tcb->P_AID = (AID + BSSID * 32) & 0x1ff; /*@(dec(A) + dec(B)*32) mod 512*/
 			}
 		} else if (ACTING_AS_IBSS(((PADAPTER)adapter))) {
 			tcb->G_ID = 63;
 			/*P_AID for infrasturcture mode; MACID for ad-hoc mode. */
 			tcb->P_AID = tcb->macId;
-		} else if (MgntLinkStatusQuery(adapter)) { /*Addressed to AP*/
+		} else if (MgntLinkStatusQuery(adapter)) { /*@Addressed to AP*/
 			tcb->G_ID = 0;
 			GET_80211_HDR_ADDRESS1(p_header, &RA);
 			tcb->P_AID = RA[5]; /*RA[39:47]*/
@@ -103,7 +103,7 @@ beamforming_get_report_frame(
 
 	ACT_PKT_TYPE pkt_type = ACT_PKT_TYPE_UNKNOWN;
 
-	/* Memory comparison to see if CSI report is the same with previous one */
+	/* @Memory comparison to see if CSI report is the same with previous one */
 	beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(dm, Frame_Addr2(*p_pdu_os), &idx);
 
 	if (beamform_entry == NULL) {
@@ -114,7 +114,7 @@ beamforming_get_report_frame(
 
 	pkt_type = PacketGetActionFrameType(p_pdu_os);
 
-	/* -@ Modified by David */
+	/* @-@ Modified by David */
 	if (pkt_type == ACT_PKT_VHT_COMPRESSED_BEAMFORMING) {
 		p_mimo_ctrl_field = p_pdu_os->Octet + 26;
 		nc = ((*p_mimo_ctrl_field) & 0x7) + 1;
@@ -176,7 +176,7 @@ void construct_ht_ndpa_packet(
 
 	SET_80211_HDR_DURATION(buffer, duration);
 
-	/* HT control field */
+	/* @HT control field */
 	SET_HT_CTRL_CSI_STEERING(buffer + sMacHdrLng, 3);
 	SET_HT_CTRL_NDP_ANNOUNCEMENT(buffer + sMacHdrLng, 1);
 
@@ -317,7 +317,7 @@ void construct_vht_ndpa_packet(
 	ADAPTER * adapter = (PADAPTER)(dm->adapter);
 	u8 idx = 0;
 	struct _RT_BEAMFORMEE_ENTRY *beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(dm, RA, &idx);
-	/* Frame control. */
+	/* @Frame control. */
 	SET_80211_HDR_FRAME_CONTROL(p_ndpa_frame, 0);
 	SET_80211_HDR_TYPE_AND_SUBTYPE(p_ndpa_frame, Type_NDPA);
 
@@ -406,7 +406,7 @@ send_fw_vht_ndpa_packet(
 			tcb->G_ID = 63;
 
 		tcb->P_AID = beamform_entry->p_aid;
-		tcb->DataRate = ndp_tx_rate; /*decide by nr*/
+		tcb->DataRate = ndp_tx_rate; /*@decide by nr*/
 
 		((PADAPTER)adapter)->HalFunc.CmdSendPacketHandler(adapter, tcb, p_buf, tcb->PacketLength, DESC_PACKET_TYPE_NORMAL, false);
 	} else
@@ -470,7 +470,7 @@ send_sw_vht_ndpa_packet(
 
 #ifdef SUPPORT_MU_BF
 #if (SUPPORT_MU_BF == 1)
-/*
+/*@
  * Description: On VHT GID management frame by an MU beamformee.
  *
  * 2015.05.20. Created by tynli.
@@ -493,14 +493,14 @@ beamforming_get_vht_gid_mgnt_frame(
 
 	PHYDM_DBG(dm, DBG_TXBF, "[%s] On VHT GID mgnt frame!\n", __func__);
 
-	/* Check length*/
+	/* @Check length*/
 	if (p_pdu_os->length < (FRAME_OFFSET_VHT_GID_MGNT_USER_POSITION_ARRAY + 16)) {
 		PHYDM_DBG(dm, DBG_TXBF, "%s: Invalid length (%d)\n", __func__,
 			  p_pdu_os->length);
 		return RT_STATUS_INVALID_LENGTH;
 	}
 
-	/* Check RA*/
+	/* @Check RA*/
 	p_raddr = (u8 *)(p_pdu_os->Octet) + 4;
 	if (!eq_mac_addr(p_raddr, adapter->CurrentAddress)) {
 		PHYDM_DBG(dm, DBG_TXBF, "%s: Drop because of RA error.\n",
@@ -528,7 +528,7 @@ beamforming_get_vht_gid_mgnt_frame(
 
 	RT_DISP_DATA(FBEAM, FBEAM_DATA, "user_pos: ", user_pos, 16);
 
-	/* Group ID detail printed*/
+	/* @Group ID detail printed*/
 	{
 		u8 i, j;
 		u8 tmp_val;
@@ -546,7 +546,7 @@ beamforming_get_vht_gid_mgnt_frame(
 		}
 	}
 
-	/* Indicate GID frame to IHV service. */
+	/* @Indicate GID frame to IHV service. */
 	{
 		u8 indibuffer[24] = {0};
 		u8 indioffset = 0;
@@ -564,13 +564,13 @@ beamforming_get_vht_gid_mgnt_frame(
 			indioffset);
 	}
 
-	/* Config HW GID table */
+	/* @Config HW GID table */
 	hal_com_txbf_config_gtab(dm);
 
 	return rt_status;
 }
 
-/*
+/*@
  * Description: Construct VHT Group ID (GID) management frame.
  *
  * 2015.05.20. Created by tynli.
@@ -598,7 +598,7 @@ void construct_vht_gid_mgnt_frame(
 		ACT_VHT_GROUPID_MANAGEMENT,
 		&os_ftm_frame);
 
-	/* Membership status array*/
+	/* @Membership status array*/
 	FillOctetString(tmp, beamform_entry->gid_valid, 8);
 	PacketAppendData(&os_ftm_frame, tmp);
 
@@ -652,7 +652,7 @@ send_sw_vht_gid_mgnt_frame(
 	return ret;
 }
 
-/*
+/*@
  * Description: Construct VHT beamforming report poll.
  *
  * 2015.05.20. Created by tynli.
@@ -667,11 +667,11 @@ void construct_vht_bf_report_poll(
 	void *adapter = beam_info->source_adapter;
 	u8 *p_bf_rpt_poll = buffer;
 
-	/* Frame control*/
+	/* @Frame control*/
 	SET_80211_HDR_FRAME_CONTROL(p_bf_rpt_poll, 0);
 	SET_80211_HDR_TYPE_AND_SUBTYPE(p_bf_rpt_poll, Type_Beamforming_Report_Poll);
 
-	/* duration*/
+	/* @duration*/
 	SET_80211_HDR_DURATION(p_bf_rpt_poll, 100);
 
 	/* RA*/
@@ -680,7 +680,7 @@ void construct_vht_bf_report_poll(
 	/* TA*/
 	SET_VHT_BF_REPORT_POLL_TA(p_bf_rpt_poll, adapter->CurrentAddress);
 
-	/* Feedback Segment Retransmission Bitmap*/
+	/* @Feedback Segment Retransmission Bitmap*/
 	SET_VHT_BF_REPORT_POLL_FEEDBACK_SEG_RETRAN_BITMAP(p_bf_rpt_poll, 0xFF);
 
 	*p_length = 17;
@@ -714,7 +714,7 @@ send_sw_vht_bf_report_poll(
 			p_buf->Buffer.VirtualAddress,
 			&tcb->PacketLength);
 
-		tcb->bTxEnableSwCalcDur = true; /* <tynli_note> need?*/
+		tcb->bTxEnableSwCalcDur = true; /* @<tynli_note> need?*/
 		tcb->BWOfPacket = CHANNEL_WIDTH_20;
 
 		if (is_final_poll)
@@ -722,7 +722,7 @@ send_sw_vht_bf_report_poll(
 		else
 			tcb->TxBFPktType = RT_BF_PKT_TYPE_BF_REPORT_POLL;
 
-		data_rate = MGN_6M; /* Legacy OFDM rate*/
+		data_rate = MGN_6M; /* @Legacy OFDM rate*/
 		MgntSendPacket(adapter, tcb, p_buf, tcb->PacketLength, NORMAL_QUEUE, data_rate);
 	} else
 		ret = false;
@@ -736,7 +736,7 @@ send_sw_vht_bf_report_poll(
 	return ret;
 }
 
-/*
+/*@
  * Description: Construct VHT MU NDPA packet.
  *	<Note> We should combine this function with construct_vht_ndpa_packet() in the future.
  *
@@ -758,7 +758,7 @@ void construct_vht_mu_ndpa_packet(
 	u8 dest_addr[6] = {0};
 	struct _RT_BEAMFORMEE_ENTRY *entry = NULL;
 
-	/* Fill the first MU BFee entry (STA1) MAC addr to destination address then
+	/* @Fill the first MU BFee entry (STA1) MAC addr to destination address then
 	     HW will change A1 to broadcast addr. 2015.05.28. Suggested by SD1 Chunchu. */
 	for (idx = 0; idx < BEAMFORMEE_ENTRY_NUM; idx++) {
 		entry = &(beam_info->beamformee_entry[idx]);
@@ -770,15 +770,15 @@ void construct_vht_mu_ndpa_packet(
 	if (entry == NULL)
 		return;
 
-	/* Frame control.*/
+	/* @Frame control.*/
 	SET_80211_HDR_FRAME_CONTROL(p_ndpa_frame, 0);
 	SET_80211_HDR_TYPE_AND_SUBTYPE(p_ndpa_frame, Type_NDPA);
 
 	SET_80211_HDR_ADDRESS1(p_ndpa_frame, dest_addr);
 	SET_80211_HDR_ADDRESS2(p_ndpa_frame, entry->my_mac_addr);
 
-	/*--------------------------------------------*/
-	/* <Note> Need to modify "duration" to MU consideration. */
+	/*@--------------------------------------------*/
+	/* @<Note> Need to modify "duration" to MU consideration. */
 	duration = 2 * a_SifsTime + 44;
 
 	if (BW == CHANNEL_WIDTH_80)
@@ -787,7 +787,7 @@ void construct_vht_mu_ndpa_packet(
 		duration += 87;
 	else
 		duration += 180;
-	/*--------------------------------------------*/
+	/*@--------------------------------------------*/
 
 	SET_80211_HDR_DURATION(p_ndpa_frame, duration);
 
@@ -796,12 +796,12 @@ void construct_vht_mu_ndpa_packet(
 
 	*p_length = 17;
 
-	/* Construct STA info. for multiple STAs*/
+	/* @Construct STA info. for multiple STAs*/
 	for (idx = 0; idx < BEAMFORMEE_ENTRY_NUM; idx++) {
 		entry = &(beam_info->beamformee_entry[idx]);
 		if (entry->is_mu_sta) {
 			sta_info.aid = entry->AID;
-			sta_info.feedback_type = 1; /* 1'b1: MU*/
+			sta_info.feedback_type = 1; /* @1'b1: MU*/
 			sta_info.nc_index = 0;
 
 			PHYDM_DBG(dm, DBG_TXBF,
@@ -875,7 +875,7 @@ void dbg_construct_vht_mundpa_packet(
 
 	boolean is_STA1 = false;
 
-	/* Fill the first MU BFee entry (STA1) MAC addr to destination address then
+	/* @Fill the first MU BFee entry (STA1) MAC addr to destination address then
 	     HW will change A1 to broadcast addr. 2015.05.28. Suggested by SD1 Chunchu. */
 	for (idx = 0; idx < BEAMFORMEE_ENTRY_NUM; idx++) {
 		entry = &(beam_info->beamformee_entry[idx]);
@@ -890,15 +890,15 @@ void dbg_construct_vht_mundpa_packet(
 		}
 	}
 
-	/* Frame control.*/
+	/* @Frame control.*/
 	SET_80211_HDR_FRAME_CONTROL(p_ndpa_frame, 0);
 	SET_80211_HDR_TYPE_AND_SUBTYPE(p_ndpa_frame, Type_NDPA);
 
 	SET_80211_HDR_ADDRESS1(p_ndpa_frame, dest_addr);
 	SET_80211_HDR_ADDRESS2(p_ndpa_frame, dm->CurrentAddress);
 
-	/*--------------------------------------------*/
-	/* <Note> Need to modify "duration" to MU consideration. */
+	/*@--------------------------------------------*/
+	/* @<Note> Need to modify "duration" to MU consideration. */
 	duration = 2 * a_SifsTime + 44;
 
 	if (BW == CHANNEL_WIDTH_80)
@@ -907,7 +907,7 @@ void dbg_construct_vht_mundpa_packet(
 		duration += 87;
 	else
 		duration += 180;
-	/*--------------------------------------------*/
+	/*@--------------------------------------------*/
 
 	SET_80211_HDR_DURATION(p_ndpa_frame, duration);
 
@@ -918,7 +918,7 @@ void dbg_construct_vht_mundpa_packet(
 
 	/*STA2's STA Info*/
 	sta_info.aid = entry->aid;
-	sta_info.feedback_type = 1; /* 1'b1: MU */
+	sta_info.feedback_type = 1; /* @1'b1: MU */
 	sta_info.nc_index = 0;
 
 	PHYDM_DBG(dm, DBG_TXBF, "[%s] Get beamformee_entry idx(%d), AID =%d\n",
@@ -971,8 +971,8 @@ dbg_send_sw_vht_mundpa_packet(
 	return ret;
 }
 
-#endif /*#if (SUPPORT_MU_BF == 1)*/
-#endif /*#ifdef SUPPORT_MU_BF*/
+#endif /*@#if (SUPPORT_MU_BF == 1)*/
+#endif /*@#ifdef SUPPORT_MU_BF*/
 
 #elif (DM_ODM_SUPPORT_TYPE == ODM_CE)
 
@@ -988,13 +988,13 @@ u32 beamforming_get_report_frame(
 	u8 *TA;
 	u8 idx, offset;
 
-	/*Memory comparison to see if CSI report is the same with previous one*/
+	/*@Memory comparison to see if CSI report is the same with previous one*/
 	TA = get_addr2_ptr(pframe);
 	beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(dm, TA, &idx);
 	if (beamform_entry->beamform_entry_cap & BEAMFORMER_CAP_VHT_SU)
-		offset = 31; /*24+(1+1+3)+2  MAC header+(Category+ActionCode+MIMOControlField)+SNR(nc=2)*/
+		offset = 31; /*@24+(1+1+3)+2  MAC header+(Category+ActionCode+MIMOControlField)+SNR(nc=2)*/
 	else if (beamform_entry->beamform_entry_cap & BEAMFORMER_CAP_HT_EXPLICIT)
-		offset = 34; /*24+(1+1+6)+2  MAC header+(Category+ActionCode+MIMOControlField)+SNR(nc=2)*/
+		offset = 34; /*@24+(1+1+6)+2  MAC header+(Category+ActionCode+MIMOControlField)+SNR(nc=2)*/
 	else
 		return ret;
 
@@ -1074,7 +1074,7 @@ send_fw_ht_ndpa_packet(
 
 	set_duration(pframe, duration);
 
-	/* HT control field */
+	/* @HT control field */
 	SET_HT_CTRL_CSI_STEERING(pframe + 24, 3);
 	SET_HT_CTRL_NDP_ANNOUNCEMENT(pframe + 24, 1);
 
@@ -1160,7 +1160,7 @@ send_sw_ht_ndpa_packet(
 
 	set_duration(pframe, duration);
 
-	/*HT control field*/
+	/*@HT control field*/
 	SET_HT_CTRL_CSI_STEERING(pframe + 24, 3);
 	SET_HT_CTRL_NDP_ANNOUNCEMENT(pframe + 24, 1);
 
@@ -1396,7 +1396,7 @@ void beamforming_get_ndpa_frame(
 #elif (DM_ODM_SUPPORT_TYPE == ODM_CE)
 	u8 *p_ndpa_frame = precv_frame->u.hdr.rx_data;
 #endif
-	struct _RT_BEAMFORMER_ENTRY *beamformer_entry = NULL; /*Modified By Jeffery @2014-10-29*/
+	struct _RT_BEAMFORMER_ENTRY *beamformer_entry = NULL; /*@Modified By Jeffery @2014-10-29*/
 
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
 	RT_DISP_DATA(FBEAM, FBEAM_DATA, "beamforming_get_ndpa_frame\n",
@@ -1419,15 +1419,15 @@ void beamforming_get_ndpa_frame(
 	/*Remove signaling TA. */
 	TA[0] = TA[0] & 0xFE;
 
-	beamformer_entry = phydm_beamforming_get_bfer_entry_by_addr(dm, TA, &idx); /* Modified By Jeffery @2014-10-29 */
+	beamformer_entry = phydm_beamforming_get_bfer_entry_by_addr(dm, TA, &idx); /* @Modified By Jeffery @2014-10-29 */
 
-	/*Break options for Clock Reset*/
+	/*@Break options for Clock Reset*/
 	if (beamformer_entry == NULL)
 		return;
 	else if (!(beamformer_entry->beamform_entry_cap & BEAMFORMEE_CAP_VHT_SU))
 		return;
-	/*log_success: As long as 8812A receive NDPA and feedback CSI succeed once, clock reset is NO LONGER needed !2015-04-10, Jeffery*/
-	/*clock_reset_times: While BFer entry always doesn't receive our CSI, clock will reset again and again.So clock_reset_times is limited to 5 times.2015-04-13, Jeffery*/
+	/*@log_success: As long as 8812A receive NDPA and feedback CSI succeed once, clock reset is NO LONGER needed !2015-04-10, Jeffery*/
+	/*@clock_reset_times: While BFer entry always doesn't receive our CSI, clock will reset again and again.So clock_reset_times is limited to 5 times.2015-04-13, Jeffery*/
 	else if ((beamformer_entry->log_success == 1) || (beamformer_entry->clock_reset_times == 5)) {
 		PHYDM_DBG(dm, DBG_TXBF,
 			  "[%s] log_seq=%d, pre_log_seq=%d, log_retry_cnt=%d, log_success=%d, clock_reset_times=%d, clock reset is no longer needed.\n",
@@ -1453,13 +1453,13 @@ void beamforming_get_ndpa_frame(
 	if (beamformer_entry->log_seq != 0 && beamformer_entry->pre_log_seq != 0) {
 		/*Success condition*/
 		if (beamformer_entry->log_seq != sequence && beamformer_entry->pre_log_seq != beamformer_entry->log_seq) {
-			/* break option for clcok reset, 2015-03-30, Jeffery */
+			/* @break option for clcok reset, 2015-03-30, Jeffery */
 			beamformer_entry->log_retry_cnt = 0;
-			/*As long as 8812A receive NDPA and feedback CSI succeed once, clock reset is no longer needed.*/
+			/*@As long as 8812A receive NDPA and feedback CSI succeed once, clock reset is no longer needed.*/
 			/*That is, log_success is NOT needed to be reset to zero, 2015-04-13, Jeffery*/
 			beamformer_entry->log_success = 1;
 
-		} else { /*Fail condition*/
+		} else { /*@Fail condition*/
 
 			if (beamformer_entry->log_retry_cnt == 5) {
 				beamformer_entry->clock_reset_times++;

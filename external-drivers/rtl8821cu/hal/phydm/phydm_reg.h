@@ -34,12 +34,12 @@
 #ifndef __HAL_ODM_REG_H__
 #define __HAL_ODM_REG_H__
 
-/*
+/*@
  * Register Definition
  *
  */
 
-/* MAC REG */
+/* @MAC REG */
 #define	ODM_BB_RESET				0x002
 #define	ODM_DUMMY				0x4fe
 #define	RF_T_METER_OLD				0x24
@@ -51,13 +51,13 @@
 #define	ODM_EDCA_BK_PARAM			0x50C
 #define	ODM_TXPAUSE				0x522
 
-/* LTE_COEX */
+/* @LTE_COEX */
 #define REG_LTECOEX_CTRL			0x07C0
 #define REG_LTECOEX_WRITE_DATA			0x07C4
 #define REG_LTECOEX_READ_DATA			0x07C8
 #define REG_LTECOEX_PATH_CONTROL		0x70
 
-/* BB REG */
+/* @BB REG */
 #define	ODM_FPGA_PHY0_PAGE8			0x800
 #define	ODM_PSD_SETTING				0x808
 #define	ODM_AFE_SETTING				0x818
@@ -118,18 +118,18 @@
 #define	ODM_RF_T_METER_8812			0x42
 #define	REG_RF_TX_GAIN_OFFSET			0x55
 
-/* ant Detect Reg */
+/* @ant Detect Reg */
 #define	ODM_DPDT				0x300
 
 /* PSD Init */
 #define	ODM_PSDREG				0x808
 
-/* 92D path Div */
+/* @92D path Div */
 #define	PATHDIV_REG				0xB30
 #define	PATHDIV_TRI				0xBA0
 
 
-/*
+/*@
  * Bitmap Definition
  */
 #if (DM_ODM_SUPPORT_TYPE & (ODM_AP))
@@ -211,7 +211,9 @@
 	#define		is_tx_agc_byte1_jaguar	0xff00
 	#define		is_tx_agc_byte2_jaguar	0xff0000
 	#define		is_tx_agc_byte3_jaguar	0xff000000
-	#if defined(CONFIG_WLAN_HAL_8198F)
+#if defined(CONFIG_WLAN_HAL_8198F) || defined(CONFIG_WLAN_HAL_8822CE) ||\
+defined(CONFIG_WLAN_HAL_8814BE) || defined(CONFIG_WLAN_HAL_8812FE) ||\
+defined(CONFIG_WLAN_HAL_8197G)
 		#define REG_TX_AGC_CCK_11_CCK_1_JAGUAR3		0x3a00
 		#define REG_TX_AGC_OFDM_18_CCK_6_JAGUAR3	0x3a04
 		#define	REG_TX_AGC_OFDM_54_CCK_24_JAGUAR3	0x3a08
@@ -233,7 +235,7 @@
 		#define	REG_TX_AGC_VHT_Nss4_MCS1_Nss3_MCS8_JAGUAR3	0x3a48
 		#define	REG_TX_AGC_VHT_Nss4_MCS5_2_JAGUAR3	0x3a4c
 		#define	REG_TX_AGC_VHT_Nss4_MCS9_6_JAGUAR3	0x3a50
-	#endif
+#endif
 #endif
 
 #define	BIT_FA_RESET					BIT(0)

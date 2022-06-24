@@ -25,7 +25,7 @@
 #ifndef __HAL_TXBF_JAGUAR_H__
 #define __HAL_TXBF_JAGUAR_H__
 #if ((RTL8812A_SUPPORT == 1) || (RTL8821A_SUPPORT == 1))
-#if (BEAMFORMING_SUPPORT == 1)
+#ifdef PHYDM_BEAMFORMING_SUPPORT
 
 void hal_txbf_8812a_set_ndpa_rate(
 	void *dm_void,
@@ -75,4 +75,4 @@ void hal_txbf_jaguar_clk_8812a(
 #define hal_txbf_jaguar_clk_8812a(dm_void)
 #endif
 
-#endif /*  #ifndef __HAL_TXBF_JAGUAR_H__ */
+#endif /*  @#ifndef __HAL_TXBF_JAGUAR_H__ */

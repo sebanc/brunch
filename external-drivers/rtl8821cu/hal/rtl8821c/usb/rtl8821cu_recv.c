@@ -38,8 +38,7 @@ static u8 recvbuf2recvframe_proccess_normal_rx
 
 #ifdef CONFIG_RX_PACKET_APPEND_FCS
 	if (check_fwstate(&padapter->mlmepriv, WIFI_MONITOR_STATE) == _FALSE) {
-		//if (rtl8821c_rx_fcs_appended(padapter))
-		if ((pattrib->pkt_rpt_type == NORMAL_RX) && (pHalData->ReceiveConfig & RCR_APPFCS))
+		if (rtl8821c_rx_fcs_appended(padapter))
 			pattrib->pkt_len -= IEEE80211_FCS_LEN;
 	}
 #endif

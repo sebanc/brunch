@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -15,6 +15,22 @@
 
 #ifndef _HAL_H2CEXTRAINFO_H2C_C2H_AP_H_
 #define _HAL_H2CEXTRAINFO_H2C_C2H_AP_H_
+
+/* H2C extra info (rsvd page) usage, unit : page (128byte)*/
+/* dlfw : not include txdesc size*/
+/* update pkt : not include txdesc size*/
+/* cfg param : not include txdesc size*/
+/* scan info : not include txdesc size*/
+/* dl flash : not include txdesc size*/
+#define DLFW_RSVDPG_SIZE 2048
+#define UPDATE_PKT_RSVDPG_SIZE 2048
+#define CFG_PARAM_RSVDPG_SIZE 2048
+#define SCAN_INFO_RSVDPG_SIZE 256
+#define DL_FLASH_RSVDPG_SIZE 2048
+/* su0 snding pkt : include txdesc size */
+#define SU0_SNDING_PKT_OFFSET 0
+#define SU0_SNDING_PKT_RSVDPG_SIZE 128
+
 #define PARAM_INFO_GET_LEN(extra_info) GET_C2H_FIELD(extra_info + 0X00, 0, 8)
 #define PARAM_INFO_SET_LEN(extra_info, value)                                  \
 	SET_C2H_FIELD_CLR(extra_info + 0X00, 0, 8, value)

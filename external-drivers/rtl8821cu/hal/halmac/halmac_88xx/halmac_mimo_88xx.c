@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -22,6 +22,7 @@
 
 #define TXBF_CTRL_CFG	(BIT_R_ENABLE_NDPA | BIT_USE_NDPA_PARAMETER | \
 			 BIT_R_EN_NDPA_INT | BIT_DIS_NDP_BFEN)
+#define CSI_RATE_MAP	0x55
 
 static void
 cfg_mu_bfee_88xx(struct halmac_adapter *adapter,
@@ -62,8 +63,10 @@ cfg_txbf_88xx(struct halmac_adapter *adapter, u8 userid, enum halmac_bw bw,
 		switch (bw) {
 		case HALMAC_BW_80:
 			tmp42c |= BIT_R_TXBF0_80M;
+			/* fall through */
 		case HALMAC_BW_40:
 			tmp42c |= BIT_R_TXBF0_40M;
+			/* fall through */
 		case HALMAC_BW_20:
 			tmp42c |= BIT_R_TXBF0_20M;
 			break;
@@ -233,7 +236,7 @@ cfg_sounding_88xx(struct halmac_adapter *adapter, enum halmac_snd_role role,
 {
 	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
 	u32 tmp6dc = 0;
-	u8 csi_rsc = 0x1;
+	u8 csi_rsc = 0x0;
 
 	/*use ndpa rx rate to decide csi rate*/
 	tmp6dc = HALMAC_REG_R32(REG_BBPSF_CTRL) | BIT_WMAC_USE_NDPARATE
@@ -243,15 +246,24 @@ cfg_sounding_88xx(struct halmac_adapter *adapter, enum halmac_snd_role role,
 	case HAL_BFER:
 		HALMAC_REG_W32_SET(REG_TXBF_CTRL, TXBF_CTRL_CFG);
 		HALMAC_REG_W8(REG_NDPA_RATE, rate);
-		HALMAC_REG_W8_CLR(REG_NDPA_OPT_CTRL, BIT(0) | BIT(1));
 		HALMAC_REG_W8(REG_SND_PTCL_CTRL + 1, 0x2 | BIT(7));
 		HALMAC_REG_W8(REG_SND_PTCL_CTRL + 2, 0x2);
 		break;
 	case HAL_BFEE:
 		HALMAC_REG_W8(REG_SND_PTCL_CTRL, 0xDB);
-		HALMAC_REG_W8(REG_SND_PTCL_CTRL + 3, 0x26);
+		HALMAC_REG_W8(REG_SND_PTCL_CTRL + 3, 0x3A);
 		HALMAC_REG_W8_CLR(REG_RXFLTMAP1, BIT(4));
 		HALMAC_REG_W8_CLR(REG_RXFLTMAP4, BIT(4));
+		#if (HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
+		if (adapter->chip_id == HALMAC_CHIP_ID_8822C)
+			HALMAC_REG_W32(REG_CSI_RRSR,
+				       BIT_CSI_RRSC_BITMAP(CSI_RATE_MAP) |
+				       BIT_OFDM_LEN_TH(0));
+		else if (adapter->chip_id == HALMAC_CHIP_ID_8812F)
+			HALMAC_REG_W32(REG_CSI_RRSR,
+				       BIT_CSI_RRSC_BITMAP(CSI_RATE_MAP) |
+				       BIT_OFDM_LEN_TH(3));
+		#endif
 		break;
 	default:
 		return HALMAC_RET_INVALID_SOUNDING_SETTING;
@@ -608,13 +620,14 @@ mu_bfer_entry_del_88xx(struct halmac_adapter *adapter)
  */
 enum halmac_ret_status
 cfg_csi_rate_88xx(struct halmac_adapter *adapter, u8 rssi, u8 cur_rate,
-		  u8 fixrate_en, u8 *new_rate)
+		  u8 fixrate_en, u8 *new_rate, u8 *bmp_ofdm54)
 {
 	u32 csi_cfg;
-	u16 cur_rrsr;
 	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
 
 	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
+
+	*bmp_ofdm54 = 0xFF;
 
 #if HALMAC_8821C_SUPPORT
 	if (adapter->chip_id == HALMAC_CHIP_ID_8821C && fixrate_en) {
@@ -632,22 +645,24 @@ cfg_csi_rate_88xx(struct halmac_adapter *adapter, u8 rssi, u8 cur_rate,
 	csi_cfg = HALMAC_REG_R32(REG_BBPSF_CTRL) & ~BITS_WMAC_CSI_RATE;
 #endif
 
-	cur_rrsr = HALMAC_REG_R16(REG_RRSR);
+#if (HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
+	if (adapter->chip_id == HALMAC_CHIP_ID_8822C ||
+	    adapter->chip_id == HALMAC_CHIP_ID_8812F)
+		HALMAC_REG_W32_SET(REG_BBPSF_CTRL, BIT(15));
+#endif
 
 	if (rssi >= 40) {
 		if (cur_rate != HALMAC_OFDM54) {
-			cur_rrsr |= BIT(HALMAC_OFDM54);
 			csi_cfg |= BIT_WMAC_CSI_RATE(HALMAC_OFDM54);
-			HALMAC_REG_W16(REG_RRSR, cur_rrsr);
 			HALMAC_REG_W32(REG_BBPSF_CTRL, csi_cfg);
+			*bmp_ofdm54 = 1;
 		}
 		*new_rate = HALMAC_OFDM54;
 	} else {
 		if (cur_rate != HALMAC_OFDM24) {
-			cur_rrsr &= ~(BIT(HALMAC_OFDM54));
 			csi_cfg |= BIT_WMAC_CSI_RATE(HALMAC_OFDM24);
-			HALMAC_REG_W16(REG_RRSR, cur_rrsr);
 			HALMAC_REG_W32(REG_BBPSF_CTRL, csi_cfg);
+			*bmp_ofdm54 = 0;
 		}
 		*new_rate = HALMAC_OFDM24;
 	}

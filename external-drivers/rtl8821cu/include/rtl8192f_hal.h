@@ -117,7 +117,13 @@ typedef struct _RT_8192F_FIRMWARE_HDR {
  * NS offload: 2 NDP info: 1
  */
 #ifdef CONFIG_WOWLAN
-	#define WOWLAN_PAGE_NUM_8192F	0x07
+	#ifdef CONFIG_WOW_KEEP_ALIVE_PATTERN
+	#define WOWLAN_KEEP_ALIVE_PAGE 0x02 /*for keep alive packet*/
+	#else
+	#define WOWLAN_KEEP_ALIVE_PAGE	0x00
+	#endif /*CONFIG_WOW_KEEP_ALIVE_PATTERN*/
+	/* 7 pages for wow rsvd page + 2 pages for pattern */
+	#define WOWLAN_PAGE_NUM_8192F	(0x09 + WOWLAN_KEEP_ALIVE_PAGE)
 #else
 	#define WOWLAN_PAGE_NUM_8192F	0x00
 #endif
@@ -131,8 +137,18 @@ typedef struct _RT_8192F_FIRMWARE_HDR {
 	#define AP_WOWLAN_PAGE_NUM_8192F	0x02
 #endif
 
+#ifdef DBG_LA_MODE
+	#define LA_MODE_PAGE_NUM 0xE0
+#endif
+
 #define MAX_RX_DMA_BUFFER_SIZE_8192F	(RX_DMA_SIZE_8192F - RX_DMA_RESERVED_SIZE_8192F)
-#define TX_TOTAL_PAGE_NUMBER_8192F	(0xFF - BCNQ_PAGE_NUM_8192F - WOWLAN_PAGE_NUM_8192F)
+
+#ifdef DBG_LA_MODE
+	#define TX_TOTAL_PAGE_NUMBER_8192F	(0xFF - LA_MODE_PAGE_NUM)
+#else
+	#define TX_TOTAL_PAGE_NUMBER_8192F	(0xFF - BCNQ_PAGE_NUM_8192F - WOWLAN_PAGE_NUM_8192F)
+#endif
+
 #define TX_PAGE_BOUNDARY_8192F		(TX_TOTAL_PAGE_NUMBER_8192F + 1)
 
 #define WMM_NORMAL_TX_TOTAL_PAGE_NUMBER_8192F \
@@ -142,9 +158,9 @@ typedef struct _RT_8192F_FIRMWARE_HDR {
 
 /* For Normal Chip Setting
  * (HPQ + LPQ + NPQ + PUBQ) shall be TX_TOTAL_PAGE_NUMBER_8192F */
-#define NORMAL_PAGE_NUM_HPQ_8192F		0x10
-#define NORMAL_PAGE_NUM_LPQ_8192F		0x10
-#define NORMAL_PAGE_NUM_NPQ_8192F		0x10
+#define NORMAL_PAGE_NUM_HPQ_8192F		0x8
+#define NORMAL_PAGE_NUM_LPQ_8192F		0x8
+#define NORMAL_PAGE_NUM_NPQ_8192F		0x8
 #define NORMAL_PAGE_NUM_EPQ_8192F		0x00
 
 /* Note: For Normal Chip Setting, modify later */
@@ -224,10 +240,10 @@ void Hal_InitPGData(PADAPTER padapter, u8 *PROMContent);
 void Hal_EfuseParseIDCode(PADAPTER padapter, u8 *hwinfo);
 void Hal_EfuseParseTxPowerInfo_8192F(PADAPTER padapter,
 					u8 *PROMContent, BOOLEAN AutoLoadFail);
-/*
+#ifdef CONFIG_BT_COEXIST
 void Hal_EfuseParseBTCoexistInfo_8192F(PADAPTER padapter,
 				       u8 *hwinfo, BOOLEAN AutoLoadFail);
-*/
+#endif /* CONFIG_BT_COEXIST */
 void Hal_EfuseParseEEPROMVer_8192F(PADAPTER padapter,
 				   u8 *hwinfo, BOOLEAN AutoLoadFail);
 void Hal_EfuseParseChnlPlan_8192F(PADAPTER padapter,
@@ -240,9 +256,9 @@ void Hal_EfuseParseXtal_8192F(PADAPTER pAdapter,
 			      u8 *hwinfo, u8 AutoLoadFail);
 void Hal_EfuseParseThermalMeter_8192F(PADAPTER padapter,
 				      u8 *hwinfo, u8 AutoLoadFail);
-VOID Hal_EfuseParseVoltage_8192F(PADAPTER pAdapter,
+void Hal_EfuseParseVoltage_8192F(PADAPTER pAdapter,
 				 u8 *hwinfo, BOOLEAN	AutoLoadFail);
-VOID Hal_EfuseParseBoardType_8192F(PADAPTER Adapter,
+void Hal_EfuseParseBoardType_8192F(PADAPTER Adapter,
 				   u8	*PROMContent, BOOLEAN AutoloadFail);
 u8	Hal_ReadRFEType_8192F(PADAPTER Adapter, u8 *PROMContent, BOOLEAN AutoloadFail);
 void rtl8192f_set_hal_ops(struct hal_ops *pHalFunc);
@@ -255,8 +271,7 @@ u8 GetHalDefVar8192F(PADAPTER padapter, HAL_DEF_VARIABLE variable, void *pval);
 /* register */
 void rtl8192f_InitBeaconParameters(PADAPTER padapter);
 void rtl8192f_InitBeaconMaxError(PADAPTER padapter, u8 InfraMode);
-void _InitBurstPktLen_8192FS(PADAPTER Adapter);
-void _InitLTECoex_8192FS(PADAPTER Adapter);
+
 void _InitMacAPLLSetting_8192F(PADAPTER Adapter);
 void _8051Reset8192F(PADAPTER padapter);
 #ifdef CONFIG_WOWLAN
@@ -277,7 +292,7 @@ void rtl8192f_stop_thread(_adapter *padapter);
 	void HalSetOutPutGPIO(PADAPTER padapter, u8 index, u8 OutPutValue);
 #endif
 #ifdef CONFIG_MP_INCLUDED
-int FirmwareDownloadBT(IN PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
+int FirmwareDownloadBT(PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
 #endif
 void CCX_FwC2HTxRpt_8192f(PADAPTER padapter, u8 *pdata, u8 len);
 
@@ -297,7 +312,9 @@ void rtl8192f_pretx_cd_config(_adapter *adapter);
 
 #ifdef CONFIG_PCI_HCI
 	BOOLEAN	InterruptRecognized8192FE(PADAPTER Adapter);
-	VOID	UpdateInterruptMask8192FE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
+	void	UpdateInterruptMask8192FE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
+	void InitMAC_TRXBD_8192FE(PADAPTER Adapter);
+
 	u16 get_txbd_rw_reg(u16 ff_hwaddr);
 #endif
 

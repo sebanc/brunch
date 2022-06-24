@@ -32,11 +32,6 @@
 /* ************************************************************
  * Global var
  * ************************************************************ */
-static void dm_CheckProtection(PADAPTER adapter)
-{
-}
-	
-	
 #ifdef CONFIG_SUPPORT_HW_WPS_PBC
 static void dm_CheckPbcGPIO(PADAPTER adapter)
 {
@@ -112,7 +107,7 @@ void dm_InterruptMigration(PADAPTER adapter)
 	 * when interrupt migration is set before. 2010.03.05.
 	 */
 	if (!adapter->registrypriv.wifi_spec
-		&& (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
+		&& (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _TRUE)
 		&& pmlmepriv->LinkDetectInfo.bHigherBusyTraffic) {
 		IntMtToSet = _TRUE;
 
@@ -150,47 +145,14 @@ static void init_phydm_cominfo(PADAPTER adapter)
 {
 	PHAL_DATA_TYPE hal = GET_HAL_DATA(adapter);
 	struct dm_struct *pDM_Odm = &hal->odmpriv;
-	u8 cut_ver = ODM_CUT_A, fab_ver = ODM_TSMC;
 
 	Init_ODM_ComInfo(adapter);
 
 	odm_cmn_info_init(pDM_Odm, ODM_CMNINFO_PACKAGE_TYPE, hal->PackageType);
 
-	if (IS_CHIP_VENDOR_TSMC(hal->version_id))
-		fab_ver = ODM_TSMC;
-	else if (IS_CHIP_VENDOR_UMC(hal->version_id))
-		fab_ver = ODM_UMC;
-	else if (IS_CHIP_VENDOR_SMIC(hal->version_id))
-		fab_ver = ODM_UMC + 1;
-	else
-		RTW_INFO("%s: unknown fab_ver=%d !!\n",
-			 __FUNCTION__, GET_CVID_MANUFACTUER(hal->version_id));
-
-	if (IS_A_CUT(hal->version_id))
-		cut_ver = ODM_CUT_A;
-	else if (IS_B_CUT(hal->version_id))
-		cut_ver = ODM_CUT_B;
-	else if (IS_C_CUT(hal->version_id))
-		cut_ver = ODM_CUT_C;
-	else if (IS_D_CUT(hal->version_id))
-		cut_ver = ODM_CUT_D;
-	else if (IS_E_CUT(hal->version_id))
-		cut_ver = ODM_CUT_E;
-	else if (IS_F_CUT(hal->version_id))
-		cut_ver = ODM_CUT_F;
-	else if (IS_I_CUT(hal->version_id))
-		cut_ver = ODM_CUT_I;
-	else if (IS_J_CUT(hal->version_id))
-		cut_ver = ODM_CUT_J;
-	else if (IS_K_CUT(hal->version_id))
-		cut_ver = ODM_CUT_K;
-	else
-		RTW_INFO("%s: unknown cut_ver=%d !!\n",
-			 __FUNCTION__, GET_CVID_CUT_VERSION(hal->version_id));
-
-	RTW_INFO("%s: fab_ver=%d cut_ver=%d\n", __FUNCTION__, fab_ver, cut_ver);
-	odm_cmn_info_init(pDM_Odm, ODM_CMNINFO_FAB_VER, fab_ver);
-	odm_cmn_info_init(pDM_Odm, ODM_CMNINFO_CUT_VER, cut_ver);
+	RTW_INFO("%s: Fv=%d Cv=%d\n", __FUNCTION__, hal->version_id.VendorType, hal->version_id.CUTVersion);
+	odm_cmn_info_init(pDM_Odm, ODM_CMNINFO_FAB_VER, hal->version_id.VendorType);
+	odm_cmn_info_init(pDM_Odm, ODM_CMNINFO_CUT_VER, hal->version_id.CUTVersion);
 
 }
 	
@@ -214,46 +176,105 @@ void rtl8821c_phy_init_haldm(PADAPTER adapter)
 	rtw_phydm_init(adapter);
 }
 
+static void check_rxfifo_full(PADAPTER adapter)
+{
+	struct dvobj_priv *psdpriv = adapter->dvobj;
+	struct debug_priv *pdbgpriv = &psdpriv->drv_dbg;
+	struct registry_priv *regsty = &adapter->registrypriv;
+	u8 val8 = 0;
+
+	if (regsty->check_hw_status == 1) {
+		/* switch counter to RX fifo */
+		val8 = rtw_read8(adapter, REG_RXERR_RPT_8821C + 3);
+		rtw_write8(adapter, REG_RXERR_RPT_8821C + 3, (val8 | 0xa0));
+
+		pdbgpriv->dbg_rx_fifo_last_overflow = pdbgpriv->dbg_rx_fifo_curr_overflow;
+		pdbgpriv->dbg_rx_fifo_curr_overflow = rtw_read16(adapter, REG_RXERR_RPT_8821C);
+		if (pdbgpriv->dbg_rx_fifo_curr_overflow >= pdbgpriv->dbg_rx_fifo_last_overflow)
+			pdbgpriv->dbg_rx_fifo_diff_overflow =
+				pdbgpriv->dbg_rx_fifo_curr_overflow - pdbgpriv->dbg_rx_fifo_last_overflow;
+		else
+			pdbgpriv->dbg_rx_fifo_diff_overflow =
+				(0xFFFF - pdbgpriv->dbg_rx_fifo_last_overflow)
+				+ pdbgpriv->dbg_rx_fifo_curr_overflow;
+
+	}
+}
+
+
 void rtl8821c_phy_haldm_watchdog(PADAPTER Adapter)
 {
 	BOOLEAN bFwCurrentInPSMode = _FALSE;
 	u8 bFwPSAwake = _TRUE;
+	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(Adapter);
+	u8 in_lps = _FALSE;
+	PADAPTER current_lps_iface = NULL, iface = NULL;
+	struct dvobj_priv *dvobj = adapter_to_dvobj(Adapter);
+	u8 i = 0;
 
 	if (!rtw_is_hw_init_completed(Adapter))
 		goto skip_dm;
 
 #ifdef CONFIG_LPS
-	bFwCurrentInPSMode = adapter_to_pwrctl(Adapter)->bFwCurrentInPSMode;
+	bFwCurrentInPSMode = pwrpriv->bFwCurrentInPSMode;
 	rtw_hal_get_hwreg(Adapter, HW_VAR_FWLPS_RF_ON, &bFwPSAwake);
 #endif
 
 #ifdef CONFIG_P2P_PS
 	/* Fw is under p2p powersaving mode, driver should stop dynamic mechanism.
-	 modified by thomas. 2011.06.11.*/
+	 modifed by thomas. 2011.06.11.*/
 	if (Adapter->wdinfo.p2p_ps_mode)
 		bFwPSAwake = _FALSE;
 #endif /*CONFIG_P2P_PS*/
 
 	if ((rtw_is_hw_init_completed(Adapter))
 		&& ((!bFwCurrentInPSMode) && bFwPSAwake)) {
+		
+		/* check rx fifo */
+		check_rxfifo_full(Adapter);
 
 		/* Dynamically switch RTS/CTS protection.*/
-		/*dm_CheckProtection(Adapter);*/
 	}
 
-#ifdef CONFIG_DISABLE_ODM
-	goto skip_dm;
-#endif
-	rtw_phydm_watchdog(Adapter);
+#ifdef CONFIG_LPS
+	if (pwrpriv->bLeisurePs && bFwCurrentInPSMode && pwrpriv->pwr_mode != PS_MODE_ACTIVE) {
+		in_lps = _TRUE;
 
-skip_dm:
+		for (i = 0; i < dvobj->iface_nums; i++) {
+			iface = dvobj->padapters[i];
+			if (pwrpriv->current_lps_hw_port_id == rtw_hal_get_port(iface)) {
+				current_lps_iface = iface;
+				rtw_lps_rfon_ctrl(current_lps_iface, rf_on);
+				break;
+			}
+		}
+
+		if (!current_lps_iface) {
+			RTW_WARN("Can't find a adapter with LPS to enable RFON function !\n");
+			goto skip_dm;
+		}
+	}
+#endif
 
 #ifdef CONFIG_BEAMFORMING
 #ifdef RTW_BEAMFORMING_VERSION_2
 	if (check_fwstate(&Adapter->mlmepriv, WIFI_STATION_STATE) &&
-			check_fwstate(&Adapter->mlmepriv, _FW_LINKED))
+			check_fwstate(&Adapter->mlmepriv, WIFI_ASOC_STATE))
 		rtw_hal_beamforming_config_csirate(Adapter);
 #endif
+#endif
+
+#ifdef CONFIG_DISABLE_ODM
+	goto skip_dm;
+#endif
+
+	rtw_phydm_watchdog(Adapter, in_lps);
+
+skip_dm:
+
+#ifdef CONFIG_LPS
+	if (current_lps_iface)
+		rtw_lps_rfon_ctrl(current_lps_iface, rf_off);
 #endif
 #ifdef CONFIG_SUPPORT_HW_WPS_PBC
 	/* Check GPIO to determine current Pbc status.*/

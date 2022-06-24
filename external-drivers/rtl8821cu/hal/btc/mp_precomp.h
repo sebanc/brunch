@@ -17,6 +17,7 @@
 
 #include <drv_types.h>
 #include <hal_data.h>
+#include "btc_basic_types.h"
 
 #define BT_TMP_BUF_SIZE	100
 
@@ -64,6 +65,7 @@ extern u4Byte GLBtcDbgType[];
 #include "hal_btcoex_wifionly.h"
 
 #ifdef CONFIG_BT_COEXIST
+#define BTC_BTINFO_LENGTH_MAX 10
 
 struct wifi_only_cfg;
 struct btc_coexist;
@@ -110,6 +112,29 @@ struct btc_coexist;
 #include "halbtc8821c2ant.h"
 #endif
 
+#ifdef CONFIG_RTL8814A
+#include "halbtc8814a2ant.h"
+#endif
+
+#if (CONFIG_BTCOEX_SUPPORT_BTC_CMN == 1)
+#include "halbtccommon.h"
+
+#ifdef CONFIG_RTL8822C
+#include "halbtc8822cwifionly.h"
+#include "halbtc8822c.h"
+#endif
+
+#ifdef CONFIG_RTL8723F
+#include "halbtc8723fwifionly.h"
+#include "halbtc8723f.h"
+#endif
+
+#ifdef CONFIG_RTL8192F
+#include "halbtc8192f.h"
+#endif
+
+#endif
+
 #include "halbtcoutsrc.h"
 
 #else /* CONFIG_BT_COEXIST */
@@ -124,6 +149,18 @@ struct btc_coexist;
 
 #ifdef CONFIG_RTL8821C
 #include "halbtc8821cwifionly.h"
+#endif
+
+#ifdef CONFIG_RTL8822C
+#include "halbtc8822cwifionly.h"
+#endif
+
+#ifdef CONFIG_RTL8723F
+#include "halbtc8723fwifionly.h"
+#endif
+
+#ifdef CONFIG_RTL8814B
+#include "halbtc8814bwifionly.h"
 #endif
 
 #endif /* CONFIG_BT_COEXIST */

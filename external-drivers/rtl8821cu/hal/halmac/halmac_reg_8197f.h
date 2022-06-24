@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -696,5 +696,8 @@
 #define REG_SEC_OPT_V2_8197F 0x07EC
 #define REG_RTS_ADDRESS_0_8197F 0x07F0
 #define REG_RTS_ADDRESS_1_8197F 0x07F8
+#define REG_WL2LTECOEX_INDIRECT_ACCESS_CTRL_V1_8197F 0x1700
+#define REG_WL2LTECOEX_INDIRECT_ACCESS_WRITE_DATA_V1_8197F 0x1704
+#define REG_WL2LTECOEX_INDIRECT_ACCESS_READ_DATA_V1_8197F 0x1708
 
 #endif

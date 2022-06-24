@@ -23,24 +23,27 @@
  *
  *****************************************************************************/
 
-/*Image2HeaderVersion: R3 1.0*/
+/*Image2HeaderVersion: R3 1.5.10.1*/
 #include "mp_precomp.h"
 #include "../phydm_precomp.h"
 
 #if (RTL8821C_SUPPORT == 1)
 static boolean
-check_positive(
-	struct dm_struct *dm,
-	const u32	condition1,
-	const u32	condition2,
-	const u32	condition3,
-	const u32	condition4
+check_positive(struct dm_struct *dm,
+	       const u32	condition1,
+	       const u32	condition2,
+	       const u32	condition3,
+	       const u32	condition4
 )
 {
-	u32	cond1 = condition1, cond2 = condition2, cond3 = condition3, cond4 = condition4;
+	u32	cond1 = condition1, cond2 = condition2,
+		cond3 = condition3, cond4 = condition4;
 
-	u8	cut_version_for_para = (dm->cut_version ==  ODM_CUT_A) ? 15 : dm->cut_version;
-	u8	pkg_type_for_para = (dm->package_type == 0) ? 15 : dm->package_type;
+	u8	cut_version_for_para =
+		(dm->cut_version ==  ODM_CUT_A) ? 15 : dm->cut_version;
+
+	u8	pkg_type_for_para =
+		(dm->package_type == 0) ? 15 : dm->package_type;
 
 	u32	driver1 = cut_version_for_para << 24 |
 			(dm->support_interface & 0xF0) << 16 |
@@ -74,18 +77,20 @@ check_positive(
 	PHYDM_DBG(dm, ODM_COMP_INIT, "	(RFE, Package) = (0x%X, 0x%X)\n",
 		  dm->rfe_type, dm->package_type);
 
-
 	/*============== value Defined Check ===============*/
 	/*cut version [27:24] need to do value check*/
-	if (((cond1 & 0x0F000000) != 0) && ((cond1 & 0x0F000000) != (driver1 & 0x0F000000)))
+	if (((cond1 & 0x0F000000) != 0) &&
+	    ((cond1 & 0x0F000000) != (driver1 & 0x0F000000)))
 		return false;
 
 	/*pkg type [15:12] need to do value check*/
-	if (((cond1 & 0x0000F000) != 0) && ((cond1 & 0x0000F000) != (driver1 & 0x0000F000)))
+	if (((cond1 & 0x0000F000) != 0) &&
+	    ((cond1 & 0x0000F000) != (driver1 & 0x0000F000)))
 		return false;
 
 	/*interface [11:8] need to do value check*/
-	if (((cond1 & 0x00000F00) != 0) && ((cond1 & 0x00000F00) != (driver1 & 0x00000F00)))
+	if (((cond1 & 0x00000F00) != 0) &&
+	    ((cond1 & 0x00000F00) != (driver1 & 0x00000F00)))
 		return false;
 	/*=============== Bit Defined Check ================*/
 	/* We don't care [31:28] */
@@ -98,21 +103,13 @@ check_positive(
 	else
 		return false;
 }
-static boolean
-check_negative(
-	struct dm_struct *dm,
-	const u32	condition1,
-	const u32	condition2
-)
-{
-	return true;
-}
+
 
 /******************************************************************************
-*                           mac_reg.TXT
-******************************************************************************/
+ *                           mac_reg.TXT
+ ******************************************************************************/
 
-u32 array_mp_8821c_mac_reg[] = {
+const u32 array_mp_8821c_mac_reg[] = {
 		0x010, 0x00000043,
 		0x025, 0x0000001D,
 		0x026, 0x000000CE,
@@ -260,10 +257,12 @@ odm_read_and_config_mp_8821c_mac_reg(struct dm_struct *dm)
 	u32	i = 0;
 	u8	c_cond;
 	boolean	is_matched = true, is_skipped = false;
-	u32	array_len = sizeof(array_mp_8821c_mac_reg) / sizeof(u32);
-	u32	*array = array_mp_8821c_mac_reg;
+	u32	array_len =
+			sizeof(array_mp_8821c_mac_reg) / sizeof(u32);
+	u32	*array = (u32 *)array_mp_8821c_mac_reg;
 
 	u32	v1 = 0, v2 = 0, pre_v1 = 0, pre_v2 = 0;
+	u32	a1 = 0, a2 = 0, a3 = 0, a4 = 0;
 
 	PHYDM_DBG(dm, ODM_COMP_INIT, "===> %s\n", __func__);
 
@@ -273,7 +272,8 @@ odm_read_and_config_mp_8821c_mac_reg(struct dm_struct *dm)
 
 		if (v1 & (BIT(31) | BIT(30))) {/*positive & negative condition*/
 			if (v1 & BIT(31)) {/* positive condition*/
-				c_cond  = (u8)((v1 & (BIT(29) | BIT(28))) >> 28);
+				c_cond  =
+					(u8)((v1 & (BIT(29) | BIT(28))) >> 28);
 				if (c_cond == COND_ENDIF) {/*end*/
 					is_matched = true;
 					is_skipped = false;
@@ -284,19 +284,24 @@ odm_read_and_config_mp_8821c_mac_reg(struct dm_struct *dm)
 				} else {/*if , else if*/
 					pre_v1 = v1;
 					pre_v2 = v2;
-					PHYDM_DBG(dm, ODM_COMP_INIT, "IF or ELSE IF\n");
+					PHYDM_DBG(dm, ODM_COMP_INIT,
+						  "IF or ELSE IF\n");
 				}
 			} else if (v1 & BIT(30)) { /*negative condition*/
-				if (is_skipped == false) {
-					if (check_positive(dm, pre_v1, pre_v2, v1, v2)) {
+				if (!is_skipped) {
+					a1 = pre_v1; a2 = pre_v2;
+					a3 = v1; a4 = v2;
+					if (check_positive(dm,
+							   a1, a2, a3, a4)) {
 						is_matched = true;
 						is_skipped = true;
 					} else {
 						is_matched = false;
 						is_skipped = false;
 					}
-				} else
+				} else {
 					is_matched = false;
+				}
 			}
 		} else {
 			if (is_matched)
@@ -309,7 +314,7 @@ odm_read_and_config_mp_8821c_mac_reg(struct dm_struct *dm)
 u32
 odm_get_version_mp_8821c_mac_reg(void)
 {
-		return 49;
+		return 62;
 }
 
 #endif /* end of HWIMG_SUPPORT*/

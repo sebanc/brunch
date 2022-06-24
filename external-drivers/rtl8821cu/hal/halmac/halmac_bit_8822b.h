@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -15379,6 +15379,22 @@
 #define BIT_CLI1_PWR_ST_8822B BIT(2)
 #define BIT_CLI0_PWRBIT_OW_EN_8822B BIT(1)
 #define BIT_CLI0_PWR_ST_8822B BIT(0)
+
+/* 2 REG_MACRX_HANG_TIMER_CONTROL_8822B */
+#define BIT_TIMEOUT_COUNTER_EN_8822B BIT(7)
+#define BIT_RESET_FIFO_CONTROL_8822B BIT(5)
+
+#define BIT_SHIFT_COUNT_TIMEOUT_8822B 0
+#define BIT_MASK_COUNT_TIMEOUT_8822B 0x1f
+#define BIT_COUNT_TIMEOUT_8822B(x)                                             \
+	(((x) & BIT_MASK_COUNT_TIMEOUT_8822B) << BIT_SHIFT_COUNT_TIMEOUT_8822B)
+#define BITS_COUNT_TIMEOUT_8822B                                               \
+	(BIT_MASK_COUNT_TIMEOUT_8822B << BIT_SHIFT_COUNT_TIMEOUT_8822B)
+#define BIT_CLEAR_COUNT_TIMEOUT_8822B(x) ((x) & (~BITS_COUNT_TIMEOUT_8822B))
+#define BIT_GET_COUNT_TIMEOUT_8822B(x)                                         \
+	(((x) >> BIT_SHIFT_COUNT_TIMEOUT_8822B) & BIT_MASK_COUNT_TIMEOUT_8822B)
+#define BIT_SET_COUNT_TIMEOUT_8822B(x, v)                                      \
+	(BIT_CLEAR_COUNT_TIMEOUT_8822B(x) | BIT_COUNT_TIMEOUT_8822B(v))
 
 /* 2 REG_WMAC_MU_BF_OPTION_8822B */
 #define BIT_WMAC_RESP_NONSTA1_DIS_8822B BIT(7)

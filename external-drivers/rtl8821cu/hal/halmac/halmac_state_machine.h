@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2017 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2017 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -107,10 +107,32 @@ struct halmac_update_pkt_state {
 	enum halmac_cmd_process_status proc_status;
 	u8 fw_rc;
 	u16 seq_num;
+	u8 used_page;
+};
+
+struct halmac_scan_pkt_state {
+	enum halmac_cmd_process_status proc_status;
+	u8 fw_rc;
+	u16 seq_num;
+};
+
+struct halmac_drop_pkt_state {
+	enum halmac_cmd_process_status proc_status;
+	u8 fw_rc;
+	u16 seq_num;
 };
 
 struct halmac_iqk_state {
 	enum halmac_cmd_process_status proc_status;
+	u8 fw_rc;
+	u16 seq_num;
+};
+
+struct halmac_dpk_state {
+	enum halmac_cmd_process_status proc_status;
+	u16 data_size;
+	u16 seg_size;
+	u8 *data;
 	u8 fw_rc;
 	u16 seq_num;
 };
@@ -142,7 +164,10 @@ struct halmac_state {
 	struct halmac_cfg_param_state cfg_param_state;
 	struct halmac_scan_state scan_state;
 	struct halmac_update_pkt_state update_pkt_state;
+	struct halmac_scan_pkt_state scan_pkt_state;
+	struct halmac_drop_pkt_state drop_pkt_state;
 	struct halmac_iqk_state iqk_state;
+	struct halmac_dpk_state dpk_state;
 	struct halmac_pwr_tracking_state pwr_trk_state;
 	struct halmac_psd_state psd_state;
 	struct halmac_fw_snding_state fw_snding_state;

@@ -81,4 +81,10 @@ ex_hal8821c_wifi_only_switchbandnotify(
 	IN struct wifi_only_cfg *pwifionlycfg,
 	IN u1Byte  is_5g
 	);
+VOID
+ex_hal8821c_wifi_only_connectnotify(
+	IN struct wifi_only_cfg *pwifionlycfg,
+	IN u1Byte  is_5g
+	);
+
 #endif

@@ -25,7 +25,8 @@
 #ifndef __ODMNOISEMONITOR_H__
 #define __ODMNOISEMONITOR_H__
 
-#define ODM_MAX_CHANNEL_NUM 38 /* 14+24 */
+#define VALID_CNT 5
+
 struct noise_level {
 	u8 value[PHYDM_MAX_RF_PATH];
 	s8 sval[PHYDM_MAX_RF_PATH];

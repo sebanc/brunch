@@ -30,6 +30,7 @@ enum ANDROID_WIFI_CMD {
 	ANDROID_WIFI_CMD_BTCOEXSCAN_START,
 	ANDROID_WIFI_CMD_BTCOEXSCAN_STOP,
 	ANDROID_WIFI_CMD_BTCOEXMODE,
+	ANDROID_WIFI_CMD_SETSUSPENDMODE,
 	ANDROID_WIFI_CMD_SETSUSPENDOPT,
 	ANDROID_WIFI_CMD_P2P_DEV_ADDR,
 	ANDROID_WIFI_CMD_SETFWPATH,
@@ -70,6 +71,7 @@ enum ANDROID_WIFI_CMD {
 #endif /* CONFIG_GTK_OL */
 	ANDROID_WIFI_CMD_P2P_DISABLE,
 	ANDROID_WIFI_CMD_SET_AEK,
+	ANDROID_WIFI_CMD_EXT_AUTH_STATUS,
 	ANDROID_WIFI_CMD_DRIVERVERSION,
 	ANDROID_WIFI_CMD_MAX
 };
@@ -91,7 +93,11 @@ void *wl_android_prealloc(int section, unsigned long size);
 int wifi_get_irq_number(unsigned long *irq_flags_ptr);
 int wifi_set_power(int on, unsigned long msec);
 int wifi_get_mac_addr(unsigned char *buf);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+void *wifi_get_country_code(char *ccode, u32 flags);
+#else /* Linux kernel < 3.18 */
 void *wifi_get_country_code(char *ccode);
+#endif /* Linux kernel < 3.18 */
 #else
 static inline int rtw_android_wifictrl_func_add(void)
 {

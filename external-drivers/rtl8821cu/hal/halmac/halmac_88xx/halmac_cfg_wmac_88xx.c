@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -15,16 +15,21 @@
 
 #include "halmac_cfg_wmac_88xx.h"
 #include "halmac_88xx_cfg.h"
+#include "halmac_efuse_88xx.h"
 
 #if HALMAC_88XX_SUPPORT
 
 #define MAC_CLK_SPEED	80 /* 80M */
+#define EFUSE_PCB_INFO_OFFSET	0xCA
 
 enum mac_clock_hw_def {
 	MAC_CLK_HW_DEF_80M = 0,
 	MAC_CLK_HW_DEF_40M = 1,
 	MAC_CLK_HW_DEF_20M = 2,
 };
+
+static enum halmac_ret_status
+board_rf_fine_tune_88xx(struct halmac_adapter *adapter);
 
 /**
  * cfg_mac_addr_88xx() - config mac address
@@ -583,10 +588,10 @@ cfg_bw_88xx(struct halmac_adapter *adapter, enum halmac_bw bw)
 
 	switch (bw) {
 	case HALMAC_BW_80:
-		value32 = value32 | BIT(7);
+		value32 = value32 | BIT(8);
 		break;
 	case HALMAC_BW_40:
-		value32 = value32 | BIT(8);
+		value32 = value32 | BIT(7);
 		break;
 	case HALMAC_BW_20:
 	case HALMAC_BW_10:
@@ -598,13 +603,7 @@ cfg_bw_88xx(struct halmac_adapter *adapter, enum halmac_bw bw)
 
 	HALMAC_REG_W32(REG_WMAC_TRXPTCL_CTL, value32);
 
-	/* TODO:Move to change mac clk api later... */
-	value32 = HALMAC_REG_R32(REG_AFE_CTRL1) & ~(BIT(20) | BIT(21));
-	value32 |= (MAC_CLK_HW_DEF_80M << BIT_SHIFT_MAC_CLK_SEL);
-	HALMAC_REG_W32(REG_AFE_CTRL1, value32);
-
-	HALMAC_REG_W8(REG_USTIME_TSF, MAC_CLK_SPEED);
-	HALMAC_REG_W8(REG_USTIME_EDCA, MAC_CLK_SPEED);
+	cfg_mac_clk_88xx(adapter);
 
 	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
 
@@ -612,13 +611,38 @@ cfg_bw_88xx(struct halmac_adapter *adapter, enum halmac_bw bw)
 }
 
 void
-enable_bb_rf_88xx(struct halmac_adapter *adapter, u8 enable)
+cfg_txfifo_lt_88xx(struct halmac_adapter *adapter,
+		   struct halmac_txfifo_lifetime_cfg *cfg)
 {
 	u8 value8;
 	u32 value32;
 	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
 
+	if (cfg->enable == 1) {
+		value8 = HALMAC_REG_R8(REG_LIFETIME_EN);
+		value8 = value8 | BIT(0) | BIT(1) | BIT(2) | BIT(3);
+		HALMAC_REG_W8(REG_LIFETIME_EN, value8);
+
+		value32 = (cfg->lifetime) >> 8;
+		value32 = value32 + (value32 << 16);
+		HALMAC_REG_W32(REG_PKT_LIFE_TIME, value32);
+	} else {
+		value8 = HALMAC_REG_R8(REG_LIFETIME_EN);
+		value8 = value8 & (~(BIT(0) | BIT(1) | BIT(2) | BIT(3)));
+		HALMAC_REG_W8(REG_LIFETIME_EN, value8);
+	}
+}
+
+enum halmac_ret_status
+enable_bb_rf_88xx(struct halmac_adapter *adapter, u8 enable)
+{
+	u8 value8;
+	u32 value32;
+	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
+	enum halmac_ret_status status = HALMAC_RET_SUCCESS;
+
 	if (enable == 1) {
+		status = board_rf_fine_tune_88xx(adapter);
 		value8 = HALMAC_REG_R8(REG_SYS_FUNC_EN);
 		value8 = value8 | BIT(0) | BIT(1);
 		HALMAC_REG_W8(REG_SYS_FUNC_EN, value8);
@@ -643,6 +667,59 @@ enable_bb_rf_88xx(struct halmac_adapter *adapter, u8 enable)
 		value32 = value32 & (~(BIT(24) | BIT(25) | BIT(26)));
 		HALMAC_REG_W32(REG_WLRF1, value32);
 	}
+
+	return status;
+}
+
+static enum halmac_ret_status
+board_rf_fine_tune_88xx(struct halmac_adapter *adapter)
+{
+	u8 *map = NULL;
+	u32 size = adapter->hw_cfg_info.eeprom_size;
+	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
+
+	if (adapter->chip_id == HALMAC_CHIP_ID_8822B) {
+		if (!adapter->efuse_map_valid || !adapter->efuse_map) {
+			PLTFM_MSG_ERR("[ERR]efuse map invalid!!\n");
+			return HALMAC_RET_EFUSE_R_FAIL;
+		}
+
+		map = (u8 *)PLTFM_MALLOC(size);
+		if (!map) {
+			PLTFM_MSG_ERR("[ERR]malloc map\n");
+			return HALMAC_RET_MALLOC_FAIL;
+		}
+
+		PLTFM_MEMSET(map, 0xFF, size);
+
+		if (eeprom_parser_88xx(adapter, adapter->efuse_map, map) !=
+		    HALMAC_RET_SUCCESS) {
+			PLTFM_FREE(map, size);
+			return HALMAC_RET_EEPROM_PARSING_FAIL;
+		}
+
+		/* Fine-tune XTAL voltage for 2L PCB board */
+		if (*(map + EFUSE_PCB_INFO_OFFSET) == 0x0C)
+			HALMAC_REG_W8_SET(REG_AFE_CTRL1 + 1, BIT(1));
+
+		PLTFM_FREE(map, size);
+	}
+
+	return HALMAC_RET_SUCCESS;
+}
+
+void
+cfg_mac_clk_88xx(struct halmac_adapter *adapter)
+{
+	u32 value32;
+	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
+
+	value32 = HALMAC_REG_R32(REG_AFE_CTRL1) & ~(BIT(20) | BIT(21));
+	value32 |= (MAC_CLK_HW_DEF_80M << BIT_SHIFT_MAC_CLK_SEL);
+	HALMAC_REG_W32(REG_AFE_CTRL1, value32);
+
+	HALMAC_REG_W8(REG_USTIME_TSF, MAC_CLK_SPEED);
+	HALMAC_REG_W8(REG_USTIME_EDCA, MAC_CLK_SPEED);
 }
 
 /**
@@ -738,7 +815,7 @@ config_security_88xx(struct halmac_adapter *adapter,
 	if (setting->bip_enable == 1) {
 		if (adapter->chip_id == HALMAC_CHIP_ID_8822B)
 			return HALMAC_RET_BIP_NO_SUPPORT;
-#if HALMAC_8821C_SUPPORT
+#if (HALMAC_8821C_SUPPORT || HALMAC_8822C_SUPPORT || HALMAC_8812F_SUPPORT)
 		sec_cfg = HALMAC_REG_R8(REG_WSEC_OPTION + 2);
 
 		if (setting->tx_encryption == 1)

@@ -174,61 +174,61 @@ typedef struct RF_Shadow_Compare_Map {
 
 u32
 PHY_RFShadowRead(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				Offset);
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				Offset);
 
-VOID
+void
 PHY_RFShadowWrite(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				Offset,
-	IN	u32				Data);
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				Offset,
+		u32				Data);
 
 BOOLEAN
 PHY_RFShadowCompare(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				Offset);
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				Offset);
 
-VOID
+void
 PHY_RFShadowRecorver(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				Offset);
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				Offset);
 
-VOID
+void
 PHY_RFShadowCompareAll(
-	IN	PADAPTER		Adapter);
+		PADAPTER		Adapter);
 
-VOID
+void
 PHY_RFShadowRecorverAll(
-	IN	PADAPTER		Adapter);
+		PADAPTER		Adapter);
 
-VOID
+void
 PHY_RFShadowCompareFlagSet(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				Offset,
-	IN	u8				Type);
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				Offset,
+		u8				Type);
 
-VOID
+void
 PHY_RFShadowRecorverFlagSet(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				Offset,
-	IN	u8				Type);
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				Offset,
+		u8				Type);
 
-VOID
+void
 PHY_RFShadowCompareFlagSetAll(
-	IN	PADAPTER		Adapter);
+		PADAPTER		Adapter);
 
-VOID
+void
 PHY_RFShadowRecorverFlagSetAll(
-	IN	PADAPTER		Adapter);
+		PADAPTER		Adapter);
 
-VOID
+void
 PHY_RFShadowRefresh(
-	IN	PADAPTER		Adapter);
+		PADAPTER		Adapter);
 #endif /*#CONFIG_RF_SHADOW_RW*/
 #endif /* __HAL_COMMON_H__ */

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2017 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2017 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -17,7 +17,9 @@
 #include "halmac_common_8821c.h"
 #include "../halmac_common_88xx.h"
 #include "halmac_cfg_wmac_8821c.h"
+#if HALMAC_PCIE_SUPPORT
 #include "halmac_pcie_8821c.h"
+#endif
 
 #if HALMAC_8821C_SUPPORT
 
@@ -103,6 +105,7 @@ set_hw_value_8821c(struct halmac_adapter *adapter, enum halmac_hw_id hw_id,
 	case HALMAC_HW_LDO25_EN:
 		cfg_ldo25_8821c(adapter, *(u8 *)value);
 		break;
+#if HALMAC_PCIE_SUPPORT
 	case HALMAC_HW_PCIE_REF_AUTOK:
 		if (adapter->intf != HALMAC_INTERFACE_PCIE)
 			return HALMAC_RET_WRONG_INTF;
@@ -110,6 +113,7 @@ set_hw_value_8821c(struct halmac_adapter *adapter, enum halmac_hw_id hw_id,
 		if (status != HALMAC_RET_SUCCESS)
 			return status;
 		break;
+#endif
 	case HALMAC_HW_SDIO_WT_EN:
 		break;
 	case HALMAC_HW_SDIO_CLK_MONITOR:

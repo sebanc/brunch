@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2017 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2017 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -96,6 +96,7 @@
 #define REG_ANAPAR_XTAL_3_8822C 0x104C
 #define REG_ANAPAR_XTAL_AACK_0_8822C 0x1054
 #define REG_ANAPAR_XTAL_AACK_1_8822C 0x1058
+#define REG_XTAL_AAC_OUTPUT_8822C 0x1060
 #define REG_ANAPAR_XTAL_MODE_DECODER_8822C 0x1064
 #define REG_SYS_CFG5_8822C 0x1070
 #define REG_CPU_DMEM_CON_8822C 0x1080

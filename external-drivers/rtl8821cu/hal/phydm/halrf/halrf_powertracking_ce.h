@@ -33,7 +33,7 @@
 #define CCK_TABLE_SIZE_88F 21
 #define TXSCALE_TABLE_SIZE 37
 #define CCK_TABLE_SIZE_8723D 41
-/* JJ ADD 20161014 */
+/*@JJ ADD 20161014 */
 #define CCK_TABLE_SIZE_8710B 41
 #define CCK_TABLE_SIZE_8192F 41
 
@@ -52,7 +52,8 @@
 #define iqk_matrix_reg_num 8
 #if (DM_ODM_SUPPORT_TYPE == ODM_CE) && defined(DM_ODM_CE_MAC80211)
 #else
-#define IQK_MATRIX_SETTINGS_NUM (14 + 24 + 21) /* Channels_2_4G_NUM + Channels_5G_20M_NUM + Channels_5G */
+/* Channels_2_4G_NUM + Channels_5G_20M_NUM + Channels_5G */
+#define IQK_MATRIX_SETTINGS_NUM (14 + 24 + 21)
 #endif
 
 extern u32 ofdm_swing_table[OFDM_TABLE_SIZE];
@@ -66,17 +67,18 @@ extern u8 cck_swing_table_ch1_ch14_88f[CCK_TABLE_SIZE_88F][16];
 extern u8 cck_swing_table_ch1_ch13_88f[CCK_TABLE_SIZE_88F][16];
 extern u8 cck_swing_table_ch14_88f[CCK_TABLE_SIZE_88F][16];
 extern u32 cck_swing_table_ch1_ch14_8723d[CCK_TABLE_SIZE_8723D];
-/* JJ ADD 20161014 */
+/*@JJ ADD 20161014 */
 extern u32 cck_swing_table_ch1_ch14_8710b[CCK_TABLE_SIZE_8710B];
 extern u32 cck_swing_table_ch1_ch14_8192f[CCK_TABLE_SIZE_8192F];
 
 extern u32 tx_scaling_table_jaguar[TXSCALE_TABLE_SIZE];
 
-/* <20121018, Kordan> In case fail to read TxPowerTrack.txt, we use the table of 88E as the default table. */
+/*@<20121018, Kordan> In case fail to read TxPowerTrack.txt */
+/* we use the table of 88E as the default table. */
 #if (DM_ODM_SUPPORT_TYPE == ODM_CE) && defined(DM_ODM_CE_MAC80211)
 #else
-static u8 delta_swing_table_idx_2ga_p_8188e[] = {0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 7, 7, 8, 8, 8, 9, 9, 9, 9, 9};
-static u8 delta_swing_table_idx_2ga_n_8188e[] = {0, 0, 0, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 7, 7, 7, 7, 8, 8, 9, 9, 10, 10, 10, 11, 11, 11, 11};
+extern u8 delta_swing_table_idx_2ga_p_8188e[];
+extern u8 delta_swing_table_idx_2ga_n_8188e[];
 #endif
 
 #define dm_check_txpowertracking odm_txpowertracking_check
@@ -99,18 +101,23 @@ struct dm_rf_calibration_struct {
 	u8 tx_powercount;
 	boolean is_txpowertracking_init;
 	boolean is_txpowertracking;
-	u8 txpowertrack_control; /* for mp mode, turn off txpwrtracking as default */
+	/* for mp mode, turn off txpwrtracking as default */
+	u8 txpowertrack_control;
 	u8 tm_trigger;
 	u8 internal_pa_5g[2]; /* pathA / pathB */
 
-	u8 thermal_meter[2]; /* thermal_meter, index 0 for RFIC0, and 1 for RFIC1 */
+	/* thermal_meter, index 0 for RFIC0, and 1 for RFIC1 */
+	u8 thermal_meter[2];
 	u8 thermal_value;
+	u8 thermal_value_path[MAX_RF_PATH];
 	u8 thermal_value_lck;
 	u8 thermal_value_iqk;
 	s8 thermal_value_delta; /* delta of thermal_value and efuse thermal */
 	u8 thermal_value_dpk;
 	u8 thermal_value_avg[AVG_THERMAL_NUM];
+	u8 thermal_value_avg_path[MAX_RF_PATH][AVG_THERMAL_NUM];
 	u8 thermal_value_avg_index;
+	u8 thermal_value_avg_index_path[MAX_RF_PATH];
 	u8 thermal_value_rx_gain;
 	u8 thermal_value_crystal;
 	u8 thermal_value_dpk_store;
@@ -121,7 +128,7 @@ struct dm_rf_calibration_struct {
 	u8 is_rf_pi_enable;
 	u32 txpowertracking_callback_cnt; /* cosa add for debug */
 
-	/* ------------------------- Tx power Tracking ------------------------- */
+	/*@---------------------- Tx power Tracking ---------------------- */
 	u8 is_cck_in_ch14;
 	u8 CCK_index;
 	u8 OFDM_index[MAX_RF_PATH];
@@ -131,8 +138,10 @@ struct dm_rf_calibration_struct {
 	boolean is_tx_power_changed;
 	s8 xtal_offset;
 	s8 xtal_offset_last;
+	u8 xtal_offset_eanble;
 
-	struct iqk_matrix_regs_setting iqk_matrix_reg_setting[IQK_MATRIX_SETTINGS_NUM];
+	struct iqk_matrix_regs_setting
+				iqk_matrix_reg_setting[IQK_MATRIX_SETTINGS_NUM];
 	u8 delta_lck;
 	s8 bb_swing_diff_2g, bb_swing_diff_5g; /* Unit: dB */
 	u8 delta_swing_table_idx_2g_cck_a_p[DELTA_SWINGIDX_SIZE];
@@ -190,6 +199,7 @@ struct dm_rf_calibration_struct {
 	u8 bb_swing_idx_cck_base;
 	u8 default_ofdm_index;
 	u8 default_cck_index;
+	s8 default_txagc_index;
 	boolean bb_swing_flag_cck;
 
 	s8 absolute_ofdm_swing_idx[MAX_RF_PATH];
@@ -206,7 +216,7 @@ struct dm_rf_calibration_struct {
 
 	s8 kfree_offset[MAX_RF_PATH];
 
-	/* -------------------------------------------------------------------- */
+	/*@----------------------------------------------------------------- */
 
 	/* for IQK */
 	u32 regc04;
@@ -229,22 +239,30 @@ struct dm_rf_calibration_struct {
 	u32 IQK_MAC_backup[IQK_MAC_REG_NUM];
 	u32 IQK_BB_backup_recover[9];
 	u32 IQK_BB_backup[IQK_BB_REG_NUM];
-	u32 tx_iqc_8723b[2][3][2]; /* { {S1: 0xc94, 0xc80, 0xc4c} , {S0: 0xc9c, 0xc88, 0xc4c}} */
-	u32 rx_iqc_8723b[2][2][2]; /* { {S1: 0xc14, 0xca0} ,           {S0: 0xc14, 0xca0}} */
-	u32 tx_iqc_8703b[3][2]; /* { {S1: 0xc94, 0xc80, 0xc4c} , {S0: 0xc9c, 0xc88, 0xc4c}}*/
-	u32 rx_iqc_8703b[2][2]; /* { {S1: 0xc14, 0xca0} ,           {S0: 0xc14, 0xca0}}*/
-	u32 tx_iqc_8723d[2][3][2]; /* { {S1: 0xc94, 0xc80, 0xc4c} , {S0: 0xc9c, 0xc88, 0xc4c}}*/
-	u32 rx_iqc_8723d[2][2][2]; /* { {S1: 0xc14, 0xca0} ,           {S0: 0xc14, 0xca0}}*/
+	/* { {S1: 0xc94, 0xc80, 0xc4c} , {S0: 0xc9c, 0xc88, 0xc4c}} */
+	u32 tx_iqc_8723b[2][3][2];
+	/* { {S1: 0xc14, 0xca0} , {S0: 0xc14, 0xca0}} */
+	u32 rx_iqc_8723b[2][2][2];
+	/* { {S1: 0xc94, 0xc80, 0xc4c} , {S0: 0xc9c, 0xc88, 0xc4c}} */
+	u32 tx_iqc_8703b[3][2];
+	/* { {S1: 0xc14, 0xca0} , {S0: 0xc14, 0xca0}} */
+	u32 rx_iqc_8703b[2][2];
+	/* { {S1: 0xc94, 0xc80, 0xc4c} , {S0: 0xc9c, 0xc88, 0xc4c}} */
+	u32 tx_iqc_8723d[2][3][2];
+	/* { {S1: 0xc14, 0xca0} , {S0: 0xc14, 0xca0}} */
+	u32 rx_iqc_8723d[2][2][2];
 	/* JJ ADD 20161014 */
-	u32 tx_iqc_8710b[2][3][2]; /* { {S1: 0xc94, 0xc80, 0xc4c} , {S0: 0xc9c, 0xc88, 0xc4c}}*/
-	u32 rx_iqc_8710b[2][2][2]; /* { {S1: 0xc14, 0xca0} ,           {S0: 0xc14, 0xca0}}*/
+	/* { {S1: 0xc94, 0xc80, 0xc4c} , {S0: 0xc9c, 0xc88, 0xc4c}} */
+	u32 tx_iqc_8710b[2][3][2];
+	/* { {S1: 0xc14, 0xca0} , {S0: 0xc14, 0xca0}} */
+	u32 rx_iqc_8710b[2][2][2];
 
 	u8 iqk_step;
 	u8 kcount;
 	u8 retry_count[4][2]; /* [4]: path ABCD, [2] TXK, RXK */
 	boolean is_mp_mode;
 
-	/* <James> IQK time measurement */
+	/*@<James> IQK time measurement */
 	u64 iqk_start_time;
 	u64 iqk_progressing_time;
 	u64 iqk_total_progressing_time;
@@ -270,7 +288,7 @@ struct dm_rf_calibration_struct {
 	s8 modify_tx_agc_value_ofdm;
 	s8 modify_tx_agc_value_cck;
 
-	/*Add by Yuchen for Kfree Phydm*/
+	/*@Add by Yuchen for Kfree Phydm*/
 	u8 reg_rf_kfree_enable; /*for registry*/
 	u8 rf_kfree_enable; /*for efuse enable check*/
 };
@@ -288,6 +306,8 @@ void odm_txpowertracking_init(void *dm_void);
 void odm_txpowertracking_check_mp(void *dm_void);
 
 void odm_txpowertracking_check_ce(void *dm_void);
+
+void odm_txpowertracking_direct_ce(void *dm_void);
 
 #if (DM_ODM_SUPPORT_TYPE & (ODM_WIN))
 
@@ -308,4 +328,4 @@ void odm_txpowertracking_thermal_meter_check(
 
 #endif
 
-#endif /*#ifndef __HALRF_POWER_TRACKING_H__*/
+#endif /*__HALRF_POWER_TRACKING_H__*/

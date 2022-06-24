@@ -352,18 +352,18 @@ void rtl8812_stop_thread(PADAPTER padapter);
 
 #ifdef CONFIG_PCI_HCI
 BOOLEAN	InterruptRecognized8812AE(PADAPTER Adapter);
-VOID	UpdateInterruptMask8812AE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
-VOID	InitTRXDescHwAddress8812AE(PADAPTER Adapter);
+void	UpdateInterruptMask8812AE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
+void	InitTRXDescHwAddress8812AE(PADAPTER Adapter);
 #endif
 
 #ifdef CONFIG_BT_COEXIST
 void rtl8812a_combo_card_WifiOnlyHwInit(PADAPTER Adapter);
 #endif
 
-VOID
+void
 Hal_PatchwithJaguar_8812(
-	IN PADAPTER				Adapter,
-	IN RT_MEDIA_STATUS		MediaStatus
+		PADAPTER				Adapter,
+		RT_MEDIA_STATUS		MediaStatus
 );
 
 #endif /* __RTL8188E_HAL_H__ */

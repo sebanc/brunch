@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -241,178 +241,27 @@ pinmux_parser_88xx(struct halmac_adapter *adapter,
 		cur_list++;
 	}
 
+	switch (*cur_func) {
+	case HALMAC_BT_DPDT_SEL:
+		*cur_func = (HALMAC_REG_R8(REG_LED_CFG + 3) & BIT(0)) ?
+				HALMAC_WL_DPDT_SEL : HALMAC_BT_DPDT_SEL;
+		break;
+	case HALMAC_BT_PAPE_SEL:
+		*cur_func = (HALMAC_REG_R8(REG_PAD_CTRL1 + 3) & BIT(5)) ?
+				HALMAC_WL_PAPE_SEL : HALMAC_BT_PAPE_SEL;
+		break;
+	case HALMAC_BT_LNAON_SEL:
+		*cur_func = (HALMAC_REG_R8(REG_PAD_CTRL1 + 3) & BIT(4)) ?
+				HALMAC_WL_LNAON_SEL : HALMAC_BT_LNAON_SEL;
+		break;
+	default:
+		break;
+	}
+
 	*state = HALMAC_GPIO_CFG_STATE_IDLE;
 
 	if (i == size)
 		return HALMAC_RET_GET_PINMUX_ERR;
-
-	return HALMAC_RET_SUCCESS;
-}
-
-enum halmac_ret_status
-pinmux_switch_88xx(struct halmac_adapter *adapter,
-		   const struct halmac_gpio_pimux_list *list, u32 size,
-		   u32 gpio_id, enum halmac_gpio_func gpio_func)
-{
-	u32 i;
-	u8 value8;
-	u16 switch_func;
-	const struct halmac_gpio_pimux_list *cur_list = list;
-	enum halmac_gpio_cfg_state *state;
-	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
-
-	state = &adapter->halmac_state.gpio_cfg_state;
-
-	if (*state == HALMAC_GPIO_CFG_STATE_BUSY)
-		return HALMAC_RET_BUSY_STATE;
-
-	switch (gpio_func) {
-	case HALMAC_GPIO_FUNC_WL_LED:
-		switch_func = HALMAC_WL_LED;
-		break;
-	case HALMAC_GPIO_FUNC_SDIO_INT:
-		switch_func = HALMAC_SDIO_INT;
-		break;
-	case HALMAC_GPIO_FUNC_BT_HOST_WAKE1:
-	case HALMAC_GPIO_FUNC_BT_DEV_WAKE1:
-		switch_func = HALMAC_GPIO13_14_WL_CTRL_EN;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_0:
-	case HALMAC_GPIO_FUNC_SW_IO_1:
-	case HALMAC_GPIO_FUNC_SW_IO_2:
-	case HALMAC_GPIO_FUNC_SW_IO_3:
-	case HALMAC_GPIO_FUNC_SW_IO_4:
-	case HALMAC_GPIO_FUNC_SW_IO_5:
-	case HALMAC_GPIO_FUNC_SW_IO_6:
-	case HALMAC_GPIO_FUNC_SW_IO_7:
-	case HALMAC_GPIO_FUNC_SW_IO_8:
-	case HALMAC_GPIO_FUNC_SW_IO_9:
-	case HALMAC_GPIO_FUNC_SW_IO_10:
-	case HALMAC_GPIO_FUNC_SW_IO_11:
-	case HALMAC_GPIO_FUNC_SW_IO_12:
-	case HALMAC_GPIO_FUNC_SW_IO_13:
-	case HALMAC_GPIO_FUNC_SW_IO_14:
-	case HALMAC_GPIO_FUNC_SW_IO_15:
-		switch_func = HALMAC_SW_IO;
-		break;
-	default:
-		return HALMAC_RET_SWITCH_CASE_ERROR;
-	}
-
-	for (i = 0; i < size; i++) {
-		if (gpio_id != cur_list->id) {
-			PLTFM_MSG_ERR("[ERR]offset:%X, value:%X, func:%X\n",
-				      cur_list->offset, cur_list->value,
-				      cur_list->func);
-			PLTFM_MSG_ERR("[ERR]id1 : %X, id2 : %X\n",
-				      gpio_id, cur_list->id);
-			return HALMAC_RET_GET_PINMUX_ERR;
-		}
-
-		if (switch_func == cur_list->func)
-			break;
-
-		cur_list++;
-	}
-
-	if (i == size) {
-		PLTFM_MSG_ERR("[ERR]gpio func error:%X %X\n",
-			      gpio_id, cur_list->id);
-		return HALMAC_RET_GET_PINMUX_ERR;
-	}
-
-	*state = HALMAC_GPIO_CFG_STATE_BUSY;
-
-	cur_list = list;
-	for (i = 0; i < size; i++) {
-		value8 = HALMAC_REG_R8(cur_list->offset);
-		value8 &= ~(cur_list->msk);
-
-		if (switch_func == cur_list->func) {
-			value8 |= (cur_list->value & cur_list->msk);
-			HALMAC_REG_W8(cur_list->offset, value8);
-			break;
-		}
-
-		value8 |= (~cur_list->value & cur_list->msk);
-		HALMAC_REG_W8(cur_list->offset, value8);
-
-		cur_list++;
-	}
-
-	*state = HALMAC_GPIO_CFG_STATE_IDLE;
-
-	return HALMAC_RET_SUCCESS;
-}
-
-enum halmac_ret_status
-pinmux_record_88xx(struct halmac_adapter *adapter,
-		   enum halmac_gpio_func gpio_func, u8 val)
-{
-	switch (gpio_func) {
-	case HALMAC_GPIO_FUNC_WL_LED:
-		adapter->pinmux_info.wl_led = val;
-		break;
-	case HALMAC_GPIO_FUNC_SDIO_INT:
-		adapter->pinmux_info.sdio_int = val;
-		break;
-	case HALMAC_GPIO_FUNC_BT_HOST_WAKE1:
-		adapter->pinmux_info.bt_host_wake = val;
-		break;
-	case HALMAC_GPIO_FUNC_BT_DEV_WAKE1:
-		adapter->pinmux_info.bt_dev_wake = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_0:
-		adapter->pinmux_info.sw_io_0 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_1:
-		adapter->pinmux_info.sw_io_1 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_2:
-		adapter->pinmux_info.sw_io_2 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_3:
-		adapter->pinmux_info.sw_io_3 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_4:
-		adapter->pinmux_info.sw_io_4 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_5:
-		adapter->pinmux_info.sw_io_5 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_6:
-		adapter->pinmux_info.sw_io_6 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_7:
-		adapter->pinmux_info.sw_io_7 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_8:
-		adapter->pinmux_info.sw_io_8 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_9:
-		adapter->pinmux_info.sw_io_9 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_10:
-		adapter->pinmux_info.sw_io_10 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_11:
-		adapter->pinmux_info.sw_io_11 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_12:
-		adapter->pinmux_info.sw_io_12 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_13:
-		adapter->pinmux_info.sw_io_13 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_14:
-		adapter->pinmux_info.sw_io_14 = val;
-		break;
-	case HALMAC_GPIO_FUNC_SW_IO_15:
-		adapter->pinmux_info.sw_io_15 = val;
-		break;
-	default:
-		return HALMAC_RET_GET_PINMUX_ERR;
-	}
 
 	return HALMAC_RET_SUCCESS;
 }

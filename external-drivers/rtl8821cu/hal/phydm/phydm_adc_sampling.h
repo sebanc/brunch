@@ -26,16 +26,34 @@
 #ifndef __INC_ADCSMP_H
 #define __INC_ADCSMP_H
 
-#define DYNAMIC_LA_MODE "2.0" /*2017.02.06  Dino */
+#if (PHYDM_LA_MODE_SUPPORT)
 
-#if (PHYDM_LA_MODE_SUPPORT == 1)
+/* 2020.07.03 [8723F] Fix SD4 compile error*/
+#define DYNAMIC_LA_MODE "4.2"
 
-struct rt_adcsmp_string {
-	u32		*octet;
-	u32		length;
-	u32		buffer_size;
-	u32		start_pos;
-	u32		end_pos;	/*buf addr*/
+/* @1 ============================================================
+ * 1  Definition
+ * 1 ============================================================
+ */
+
+#if (DM_ODM_SUPPORT_TYPE & ODM_AP)
+#if (RTL8197F_SUPPORT || RTL8198F_SUPPORT || RTL8197G_SUPPORT)
+	#define PHYDM_COMPILE_LA_STORE_IN_IMEM
+#endif
+#endif
+
+#define PHYDM_LA_STORE_IN_IMEM_IC (ODM_RTL8197F | ODM_RTL8198F | ODM_RTL8197G)
+
+#define FULL_BUFF_MODE_SUPPORT (ODM_RTL8821C | ODM_RTL8195B | ODM_RTL8822C |\
+				ODM_RTL8812F | ODM_RTL8814B)
+
+/* @ ============================================================
+ *  enumrate
+ *  ============================================================
+ */
+enum la_dump_mode {
+	LA_BB_ADC_DUMP		= 0,
+	LA_MAC_DBG_DUMP		= 1
 };
 
 enum rt_adcsmp_trig_sel {
@@ -54,76 +72,101 @@ enum rt_adcsmp_trig_sig_sel {
 };
 
 enum rt_adcsmp_state {
-	ADCSMP_STATE_IDLE		= 0,
-	ADCSMP_STATE_SET		= 1,
-	ADCSMP_STATE_QUERY	=	2
+	ADCSMP_STATE_IDLE	= 0,
+	ADCSMP_STATE_SET	= 1,
+	ADCSMP_STATE_QUERY	= 2
 };
+
+enum la_buff_mode {
+	ADCSMP_BUFF_HALF	= 0,
+	ADCSMP_BUFF_ALL		= 1	/*Only use in MP Driver*/
+};
+
+/* @ ============================================================
+ *   structure
+ *  ============================================================
+ */
+
+struct rt_adcsmp_string {
+	u32			*octet;
+	u32			length;
+	u32			buffer_size;
+	u32			start_pos;
+	u32			end_pos;	/*@buf addr*/
+};
+
+#ifdef PHYDM_IC_JGR3_SERIES_SUPPORT
+struct la_adv_trig {
+	boolean			la_adv_bbtrigger_en;
+	boolean			la_ori_bb_dis;
+	u8			la_and1_sel;
+	u8			la_and1_val;
+	boolean			la_and1_inv;
+	u8			la_and2_sel;
+	u8			la_and2_val;
+	boolean			la_and2_inv;
+	u8			la_and3_sel;
+	u8			la_and3_val;
+	boolean			la_and3_inv;
+	u32			la_and4_mask;
+	u32			la_and4_bitmap;
+	boolean			la_and4_inv;
+};
+#endif
 
 struct rt_adcsmp {
-	struct rt_adcsmp_string		adc_smp_buf;
-	enum rt_adcsmp_state		adc_smp_state;
-	u8					la_trig_mode;
-	u32					la_trig_sig_sel;
-	u8					la_dma_type;
-	u32					la_trigger_time;
-	u32					la_mac_mask_or_hdr_sel; /*1.BB mode: for debug port header sel; 2.MAC mode: for reference mask*/
-	u32					la_dbg_port;
-	u8					la_trigger_edge;
-	u8					la_smp_rate;
-	u32					la_count;
-	u8					is_bb_trigger;
-	u8					la_work_item_index;
-	boolean					la_en_new_bbtrigger;
-	boolean					la_ori_bb_dis;
-	u8					la_and1_sel;
-	u8					la_and1_val;
-	u8					la_and2_sel;
-	u8					la_and2_val;
-	u8					la_and3_sel;
-	u8					la_and3_val;
-	u32					la_and4_en;
-	u32					la_and4_val;
+	struct rt_adcsmp_string	adc_smp_buf;
+	enum rt_adcsmp_state	adc_smp_state;
+	enum la_buff_mode	la_buff_mode;
+	enum la_dump_mode	la_dump_mode;
+	u8			la_trig_mode;
+	u32			la_trig_sig_sel;
+	u8			la_dma_type;
+	u32			la_trigger_time;
+	/*@1.BB mode: Dbg port header sel, 2.MAC mode: for reference mask*/
+	u32			la_mac_mask_or_hdr_sel;
+	u32			la_dbg_port;
+	u8			la_trigger_edge;
+	u8			la_smp_rate;
+	u32			la_count;
+	u32			smp_number;
+	u32			smp_number_max;
+	u32			txff_page;
+	boolean			is_la_print;
+	boolean			en_fake_trig;
+#if (RTL8197F_SUPPORT)
+	u32			backup_dma;
+#endif
 
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
-	RT_WORK_ITEM	adc_smp_work_item;
-	RT_WORK_ITEM	adc_smp_work_item_1;
+	u8			la_work_item_index;
+	RT_WORK_ITEM		adc_smp_work_item;
+	RT_WORK_ITEM		adc_smp_work_item_1;
+#endif
+
+#ifdef PHYDM_IC_JGR3_SERIES_SUPPORT
+	struct la_adv_trig	adv_trig_table;
 #endif
 };
 
-#if (DM_ODM_SUPPORT_TYPE & ODM_WIN)
-void adc_smp_work_item_callback(
-	void *context);
-#endif
+/* @ ============================================================
+ *  Function Prototype
+ *  ============================================================
+ */
 
-void adc_smp_set(void *dm_void, u8 trig_mode, u32 trig_sig_sel,
-		 u8 dma_data_sig_sel, u32 trigger_time, u16 polling_time);
+void phydm_la_set(void *dm_void);
 
-#if (DM_ODM_SUPPORT_TYPE & ODM_WIN)
-enum rt_status
-adc_smp_query(void *dm_void, ULONG information_buffer_length,
-	      void *information_buffer, PULONG bytes_written);
-#elif (DM_ODM_SUPPORT_TYPE & ODM_CE)
-void adc_smp_query(void *dm_void, void *output, u32 out_len, u32 *pused);
+void phydm_la_cmd(void *dm_void, char input[][16], u32 *_used, char *output,
+		  u32 *_out_len);
 
-s32 adc_smp_get_sample_counts(void *dm_void);
+void phydm_la_stop(void *dm_void);
 
-s32 adc_smp_query_single_data(void *dm_void, void *output, u32 out_len,
-			      u32 index);
+void phydm_la_init(void *dm_void);
 
-#endif
-void adc_smp_stop(void *dm_void);
-
-void adc_smp_init(void *dm_void);
-
-#if (DM_ODM_SUPPORT_TYPE & (ODM_WIN | ODM_CE))
 void adc_smp_de_init(void *dm_void);
+
+#if (DM_ODM_SUPPORT_TYPE & ODM_WIN)
+void adc_smp_work_item_callback(void *context);
 #endif
-
-void phydm_la_mode_bb_setting(void *dm_void);
-
-void phydm_la_mode_set_trigger_time(void *dm_void, u32 trigger_time_mu_sec);
-
-void phydm_lamode_trigger_setting(void *dm_void, char input[][16], u32 *_used,
-				  char *output, u32 *_out_len, u32 input_num);
 #endif
 #endif

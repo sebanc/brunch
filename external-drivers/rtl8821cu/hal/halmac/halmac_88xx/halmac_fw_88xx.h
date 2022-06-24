@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -28,6 +28,9 @@ download_firmware_88xx(struct halmac_adapter *adapter, u8 *fw_bin, u32 size);
 enum halmac_ret_status
 free_download_firmware_88xx(struct halmac_adapter *adapter,
 			    enum halmac_dlfw_mem mem_sel, u8 *fw_bin, u32 size);
+
+enum halmac_ret_status
+reset_wifi_fw_88xx(struct halmac_adapter *adapter);
 
 enum halmac_ret_status
 get_fw_version_88xx(struct halmac_adapter *adapter,

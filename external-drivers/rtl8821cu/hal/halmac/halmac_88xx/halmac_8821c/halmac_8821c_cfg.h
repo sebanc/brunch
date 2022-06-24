@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2018 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2019 Realtek Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -47,6 +47,7 @@
 #define EFUSE_SIZE_8821C		512
 #define EEPROM_SIZE_8821C		512
 #define BT_EFUSE_SIZE_8821C		128
+#define PRTCT_EFUSE_SIZE_8821C	96
 
 #define SEC_CAM_NUM_8821C		64
 

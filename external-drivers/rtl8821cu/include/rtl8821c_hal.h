@@ -46,11 +46,8 @@
 			/* 8821C - RX FIFO :16K ,for RX agg DMA mode = 16K, Rx agg USB mode could large than 16k*/
 			/* #define MAX_RECVBUF_SZ		(16384 + RX_FIFO_EXPANDING)*/
 			/* For Max throughput issue , need to use USB AGG mode to replace DMA AGG mode*/
-			#ifdef CONFIG_PLATFORM_NOVATEK_NT9852X
-				#define MAX_RECVBUF_SZ (16384)
-			#else
-				#define MAX_RECVBUF_SZ (32768)
-			#endif
+			#define MAX_RECVBUF_SZ (32768)
+
 			/*#define MAX_RECVBUF_SZ_8821C (24576)*/ /* 24k*/
 			/*#define MAX_RECVBUF_SZ_8821C (20480)*/ /*20K*/
 			/*#define MAX_RECVBUF_SZ_8821C (10240) */ /*10K*/

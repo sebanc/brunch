@@ -74,7 +74,7 @@ Before continuing, you will need a linux distro installed from the Microsoft Sto
 6. Extract the Brunch archive using `tar`
   * Replace `brunch_filename.tar.gz` with the file's actual filename.
 
-```tar zxvf brunch_filename.tar.gz```
+```sudo tar zxvf brunch_filename.tar.gz```
   
 7. Extract the ChromeOS recovery using `unzip`
   * Replace `chromeos_filename.bin.zip` with the file's actual filename.
@@ -88,7 +88,7 @@ This step is only needed for legacy boot devices that do not support UEFI. If yo
 * If you need it, this is when you should download the [MBR patch][mbr-patch] from the main branch and extract it with `tar`.
   * This file will overwrite some of the files you've already extracted, this is supposed to happen.
 
-```tar zxvf mbr_support.tar.gz```
+```sudo tar zxvf mbr_support.tar.gz```
 
 ### Install Brunch
 
@@ -245,7 +245,7 @@ Before continuing, you will need a linux distro installed from the Microsoft Sto
 6. Extract the Brunch archive using `tar`
   * Replace `brunch_filename.tar.gz` with the file's actual filename.
 
-```tar zxvf brunch_filename.tar.gz```
+```sudo tar zxvf brunch_filename.tar.gz```
   
 7. Extract the ChromeOS recovery using `unzip`
   * Replace `chromeos_filename.bin.zip` with the file's actual filename.

@@ -3,7 +3,7 @@
 ipts=0
 for i in $(echo "$1" | sed 's#,# #g')
 do
-	if [ "$i" == "ipts" ]; then ipts=1; fi
+	if [ "$i" == "ipts_touchscreen" ]; then ipts=1; fi
 done
 
 ret=0

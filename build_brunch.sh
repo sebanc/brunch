@@ -32,7 +32,7 @@ losetup -d "$recovery_image" || { echo "Failed to detach loop device"; exit 1; }
 else
 git clone -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
 cd rootfs
-curl -L https://dl.google.com/chromeos/rammus/14695.85.0/stable-channel/chromeos_14695.85.0_rammus_stable-channel_full_mp-v2.bin-gyzdqzrugy3tof32bmsye2k4oz6hvv4f.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
+curl -L https://dl.google.com/chromeos/rammus/14816.99.0/stable-channel/chromeos_14816.99.0_rammus_stable-channel_full_mp-v2.bin-gyzgeztgha3dgxt3ruo3mrutaldaek65.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
 python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
 cd ..
 [ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }
@@ -302,6 +302,17 @@ make -j"$NTHREADS" || { echo "Failed to build external ipts module for kernel $k
 cp ./ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ipts.ko || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 cd ../../.. || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 rm -r ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+
+fi
+
+if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ]; then
+
+cp -r ./external-drivers/ithc ./chroot/tmp/ || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }
+cd ./chroot/tmp/ithc || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }
+make -j"$NTHREADS" || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }
+cp ./build/ithc.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ithc.ko || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }
+cd ../../.. || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }
+rm -r ./chroot/tmp/ithc || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }
 
 fi
 

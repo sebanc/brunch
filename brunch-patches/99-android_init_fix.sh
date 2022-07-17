@@ -1,13 +1,21 @@
 # This patch attempts to fix the android apps spinning issue on some devices.
 
 android_init_fix=0
+android_init_fix2=0
 for i in $(echo "$1" | sed 's#,# #g')
 do
 	if [ "$i" == "android_init_fix" ]; then android_init_fix=1; fi
+	if [ "$i" == "android_init_fix2" ]; then android_init_fix2=1; fi
 done
 
 ret=0
+
 if [ "$android_init_fix" -eq 1 ]; then
+	sed -i 's@post-start script@post-start script\n  sleep 10@g' /roota/etc/init/ui.conf
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
+fi
+
+if [ "$android_init_fix2" -eq 1 ]; then
 	if [ -f /roota/etc/init/arc-ureadahead.conf ]; then rm /roota/etc/init/arc-ureadahead.conf; fi
 	if [ -f /roota/etc/init/arc-lifetime.conf ]; then rm /roota/etc/init/arc-lifetime.conf; fi
 	if [ -f /roota/etc/init/arc-keymasterd.conf ]; then rm /roota/etc/init/arc-keymasterd.conf; fi

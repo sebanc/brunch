@@ -6,8 +6,8 @@ cat >/roota/etc/init/bootscripts.conf <<BOOTSCRIPTS
 start on stopped udev-trigger
 
 script
-	if [ \$(ls -1q /mnt/stateful_partition/brunch_data/bootscripts/*.sh 2>/dev/null | wc -l) -gt 0 ]; then
-		for patch in /mnt/stateful_partition/brunch_data/bootscripts/*.sh
+	if [ \$(ls -1q /mnt/stateful_partition/brunch/bootscripts/*.sh 2>/dev/null | wc -l) -gt 0 ]; then
+		for patch in /mnt/stateful_partition/brunch/bootscripts/*.sh
 		do
 			/bin/bash "\$patch"
 		done

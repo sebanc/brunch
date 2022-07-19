@@ -192,10 +192,10 @@ stop on stopping boot-services
 
 pre-start script
    modprobe tpm_vtpm_proxy
-   mkdir -p /mnt/stateful_partition/brunch_data/swtpm
+   mkdir -p /mnt/stateful_partition/brunch/swtpm
 end script
 
-exec swtpm chardev --vtpm-proxy --tpm2 --tpmstate dir=/mnt/stateful_partition/brunch_data/swtpm --ctrl type=unixio,path=/mnt/stateful_partition/brunch_data/swtpm/swtpm.sock --flags not-need-init
+exec swtpm chardev --vtpm-proxy --tpm2 --tpmstate dir=/mnt/stateful_partition/brunch/swtpm --ctrl type=unixio,path=/mnt/stateful_partition/brunch/swtpm/swtpm.sock --flags not-need-init
 SWTPM
 [ -f ./etc/init/tpm2-simulator.conf ] || { echo "Failed to make swtpm package"; exit 1; }
 tar zcvf ../rootc/packages/swtpm.tar.gz * --owner=0 --group=0 || { echo "Failed to make swtpm package"; exit 1; }

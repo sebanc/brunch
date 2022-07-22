@@ -70,7 +70,9 @@ struct cntry_locales_custom {
 #define	WL_IW_RSSI_EXCELLENT	-57	
 #define	WL_IW_RSSI_INVALID	 0	
 #define MAX_WX_STRING 80
+#ifndef isprint
 #define isprint(c) bcm_isprint(c)
+#endif
 #define WL_IW_SET_ACTIVE_SCAN	(SIOCIWFIRSTPRIV+1)
 #define WL_IW_GET_RSSI			(SIOCIWFIRSTPRIV+3)
 #define WL_IW_SET_PASSIVE_SCAN	(SIOCIWFIRSTPRIV+5)

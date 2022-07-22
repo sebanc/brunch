@@ -2,7 +2,7 @@
 # Makefile fragment for Linux 2.6
 # Broadcom 802.11abg Networking Device Driver
 #
-# Copyright (C) 2014, Broadcom Corporation. All Rights Reserved.
+# Copyright (C) 2015, Broadcom Corporation. All Rights Reserved.
 # 
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
 # OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 # CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
-# $Id: Makefile_kbuild_portsrc 458427 2014-02-26 23:12:38Z $
+# $Id: Makefile_kbuild_portsrc 580354 2015-08-18 23:42:37Z $
 
 ifneq ($(KERNELRELEASE),)
 
@@ -101,6 +101,22 @@ ifneq ($(KERNELRELEASE),)
 
 endif
 
+#Check GCC version so we can apply -Wno-date-time if supported.  GCC >= 4.9
+empty:=
+space:= $(empty) $(empty)
+GCCVERSIONSTRING := $(shell expr `$(CC) -dumpversion`)
+#Create version number without "."
+GCCVERSION := $(shell expr `echo $(GCCVERSIONSTRING)` | cut -f1 -d.)
+GCCVERSION += $(shell expr `echo $(GCCVERSIONSTRING)` | cut -f2 -d.)
+GCCVERSION += $(shell expr `echo $(GCCVERSIONSTRING)` | cut -f3 -d.)
+# Make sure the version number has at least 3 decimals
+GCCVERSION += 00
+# Remove spaces from the version number
+GCCVERSION := $(subst $(space),$(empty),$(GCCVERSION))
+# Crop the version number to 3 decimals.
+GCCVERSION := $(shell expr `echo $(GCCVERSION)` | cut -b1-3)
+GE_49 := $(shell expr `echo $(GCCVERSION)` \>= 490)
+
 EXTRA_CFLAGS :=
 
 ifeq ($(APIFINAL),CFG80211)
@@ -112,12 +128,6 @@ ifeq ($(APIFINAL),WEXT)
   EXTRA_CFLAGS += -DUSE_IW
   $(info Using Wireless Extension API)
 endif
-
-#ifeq ($(shell dpkg --print-architecture),amd64)
-BINARCH = x86_64
-#else
-#BINARCH = i386
-#endif
 
 obj-m              += wl.o
 
@@ -131,13 +141,14 @@ EXTRA_CFLAGS       += -I$(src)/src/include -I$(src)/src/common/include
 EXTRA_CFLAGS       += -I$(src)/src/wl/sys -I$(src)/src/wl/phy -I$(src)/src/wl/ppr/include
 EXTRA_CFLAGS       += -I$(src)/src/shared/bcmwifi/include
 #EXTRA_CFLAGS       += -DBCMDBG_ASSERT -DBCMDBG_ERR
-
+ifeq "$(GE_49)" "1"
 EXTRA_CFLAGS       += -Wno-date-time
+endif
 
-EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped_$(BINARCH)
+EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped
 
 KBASE              ?= ../kernel
-KBUILD_DIR         ?= $(KBASE)
+KBUILD_DIR         ?= $(KBASE)/build
 MDEST_DIR          ?= $(KBASE)/kernel/drivers/net/wireless
 
 # Cross compile setup.  Tool chain and kernel tree, replace with your own.

@@ -21,9 +21,10 @@
 #ifndef _wl_linux_h_
 #define _wl_linux_h_
 
-#include <siutils.h>
-#include <wlc_pub.h>
 #include <wlc_types.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+#include <wlc_pub.h>
+#endif
 
 typedef struct wl_timer {
 	struct timer_list 	timer;
@@ -189,7 +190,9 @@ extern irqreturn_t wl_isr(int irq, void *dev_id, struct pt_regs *ptregs);
 extern int __devinit wl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 extern void wl_free(wl_info_t *wl);
 extern int  wl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
-extern int wlc_ioctl_kernel(struct net_device *dev, uint cmd, void *buf, uint len);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+extern int  wlc_ioctl_internal(struct net_device *dev, int cmd, void *buf, int len);
+#endif
 extern struct net_device * wl_netdev_get(wl_info_t *wl);
 
 #endif 

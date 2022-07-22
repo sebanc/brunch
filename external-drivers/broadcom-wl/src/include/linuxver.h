@@ -144,11 +144,7 @@ typedef irqreturn_t(*FN_ISR) (int irq, void *dev_id, struct pt_regs *ptregs);
 #endif 
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 #include <linux/sched.h>
-#else
-#include <linux/sched/signal.h>
-#endif
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 29)
@@ -594,10 +590,5 @@ do {									\
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 0))
 #define netdev_priv(dev) dev->priv
 #endif 
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
-#include <linux/uaccess.h>
-#define get_ds() (KERNEL_DS)
-#endif
 
 #endif 

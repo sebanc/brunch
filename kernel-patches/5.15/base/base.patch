@@ -1085,29 +1085,6 @@ diff -ruN a/drivers/base/syscore.c b/drivers/base/syscore.c
  
  	list_for_each_entry_continue(ops, &syscore_ops_list, node)
  		if (ops->resume)
-diff -ruN a/drivers/block/virtio_blk.c b/drivers/block/virtio_blk.c
---- a/drivers/block/virtio_blk.c	2021-12-08 09:04:57.000000000 +0100
-+++ b/drivers/block/virtio_blk.c	2021-12-23 08:35:16.000000000 +0100
-@@ -228,8 +228,6 @@
- 	bool unmap = false;
- 	u32 type;
- 
--	BUG_ON(req->nr_phys_segments + 2 > vblk->sg_elems);
--
- 	switch (req_op(req)) {
- 	case REQ_OP_READ:
- 	case REQ_OP_WRITE:
-@@ -253,6 +251,10 @@
- 		return BLK_STS_IOERR;
- 	}
- 
-+	BUG_ON(type != VIRTIO_BLK_T_DISCARD &&
-+	       type != VIRTIO_BLK_T_WRITE_ZEROES &&
-+	       (req->nr_phys_segments + 2 > vblk->sg_elems));
-+
- 	vbr->out_hdr.type = cpu_to_virtio32(vblk->vdev, type);
- 	vbr->out_hdr.sector = type ?
- 		0 : cpu_to_virtio64(vblk->vdev, blk_rq_pos(req));
 diff -ruN a/drivers/block/zram/zram_drv.c b/drivers/block/zram/zram_drv.c
 --- a/drivers/block/zram/zram_drv.c	2021-12-08 09:04:57.000000000 +0100
 +++ b/drivers/block/zram/zram_drv.c	2021-12-23 08:35:16.000000000 +0100
@@ -86995,26 +86972,6 @@ diff -ruN a/sound/soc/codecs/rt5682.c b/sound/soc/codecs/rt5682.c
  				freq_in);
  			return ret;
  		}
-@@ -2917,7 +2917,10 @@
- 	} else {
- #ifdef CONFIG_COMMON_CLK
- 		/* Check if MCLK provided */
--		rt5682->mclk = devm_clk_get(component->dev, "mclk");
-+		if (rt5682->pdata.mclk_name)
-+			rt5682->mclk = clk_get(NULL, rt5682->pdata.mclk_name);
-+		if (!rt5682->mclk)
-+			rt5682->mclk = devm_clk_get(component->dev, "mclk");
- 		if (IS_ERR(rt5682->mclk)) {
- 			if (PTR_ERR(rt5682->mclk) != -ENOENT) {
- 				ret = PTR_ERR(rt5682->mclk);
-@@ -3091,6 +3094,7 @@
- 
- 	rt5682->pdata.dmic_clk_driving_high = device_property_read_bool(dev,
- 		"realtek,dmic-clk-driving-high");
-+	device_property_read_string(dev, "realtek,mclk-name", &rt5682->pdata.mclk_name);
- 
- 	return 0;
- }
 diff -ruN a/sound/soc/codecs/rt5682s.c b/sound/soc/codecs/rt5682s.c
 --- a/sound/soc/codecs/rt5682s.c	1970-01-01 01:00:00.000000000 +0100
 +++ b/sound/soc/codecs/rt5682s.c	2021-12-23 08:36:02.000000000 +0100

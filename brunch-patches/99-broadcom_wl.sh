@@ -7,6 +7,7 @@ do
 done
 
 ret=0
+
 if [ "$broadcom_wl" -eq 1 ]; then
 	echo "brunch: $0 broadcom_wl enabled" > /dev/kmsg
 	cat >/roota/etc/modprobe.d/broadcom_wl.conf <<MODPROBE
@@ -30,7 +31,6 @@ script
 end script
 INSMOD
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
-	tar zxf /rootc/packages/broadcom-wl.tar.gz -C /roota
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 fi
+
 exit $ret

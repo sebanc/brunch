@@ -24,6 +24,9 @@
 
 #include <wlc_types.h>
 #include <wlc_utils.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+#include <siutils.h>
+#endif
 #include "proto/802.11.h"
 #include "proto/bcmevent.h"
 

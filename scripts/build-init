@@ -266,6 +266,8 @@ for i in $(ldd /sbin/modprobe | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "F
 cp /sbin/modprobe ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
 for i in $(ldd /usr/bin/ntfs-3g | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
 cp /usr/bin/ntfs-3g ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
+for i in $(ldd /usr/bin/ntfsfix | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
+cp /usr/bin/ntfsfix ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
 for i in $(ldd /sbin/resize2fs | cut -d' ' -f3); do cp "$i" ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }; done
 cp /sbin/resize2fs ./sbin/ || { echo "Failed to finalise initramfs"; exit 1; }
 cp /lib64/ld-linux-x86-64.so.2 ./lib64/ || { echo "Failed to finalise initramfs"; exit 1; }

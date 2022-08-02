@@ -41,6 +41,8 @@ if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 	mkdir /mainroot
 	fstype=$(blkid -s TYPE -o value "$img_part")
 	if [ "$fstype" == "ntfs" ]; then
+		ntfsfix "$img_part"
+		ntfsfix -d "$img_part"
 		if [ "$(cat /proc/version | cut -d' ' -f3 | cut -c1-4 | sed 's@\.@@g')" -eq 515 ]; then
 			mount -n -t ntfs3 "$img_part" /mainroot
 		else

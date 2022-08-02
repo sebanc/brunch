@@ -1,8 +1,8 @@
-diff --git a/drivers/gpu/drm/i915/display/intel_display.c b/drivers/gpu/drm/i915/display/intel_display.c
+diff --git a/drivers/gpu/drm/i915/display/intel_fb.c b/drivers/gpu/drm/i915/display/intel_fb.c
 index 8af7819db..022a576ab 100644
---- a/drivers/gpu/drm/i915/display/intel_display.c
-+++ b/drivers/gpu/drm/i915/display/intel_display.c
-@@ -15635,7 +15635,7 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
+--- a/drivers/gpu/drm/i915/display/intel_fb.c
++++ b/drivers/gpu/drm/i915/display/intel_fb.c
+@@ -1848,7 +1848,7 @@ static int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
  
  	if (!drm_any_plane_has_format(&dev_priv->drm,
  				      mode_cmd->pixel_format,

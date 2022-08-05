@@ -1,9 +1,0 @@
---- a/kernel/Kconfig.preempt	2021-01-16 07:36:51.000000000 +0100
-+++ b/kernel/Kconfig.preempt	2021-02-12 07:24:48.988142532 +0100
-@@ -83,5 +83,5 @@
- 
- config SCHED_CORE
- 	bool
--	default y
-+	default n
- 	depends on SCHED_SMT && FAIR_GROUP_SCHED && CGROUP_SCHED

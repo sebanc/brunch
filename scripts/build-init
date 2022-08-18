@@ -93,10 +93,10 @@ for i in $(ldd ./fbv | cut -d' ' -f3); do cp "$i" ../initramfs/lib64/ || { echo 
 cd .. || { echo "Failed to make fbv"; exit 1; }
 rm -rf ./fbv || { echo "Failed to make fbv"; exit 1; }
 
-git clone https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
+git clone -b master https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
 cd iptsd || { echo "Failed to make iptsd"; exit 1; }
-git checkout 33adc285c28c02147b78ea1e77cd0e85d2a3c2e0 || { echo "Failed to make iptsd"; exit 1; }
-meson --prefix="/usr" -Dservice_manager="" -Dsample_config=false build/ || { echo "Failed to make iptsd"; exit 1; }
+sed -i "/'-ffast-math',/d" ./src/meson.build
+meson --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" -Dsample_config=false build/ || { echo "Failed to make iptsd"; exit 1; }
 DESTDIR=/home/chronos/ipts-pkg ninja -j"$NTHREADS" -C build/ install || { echo "Failed to make iptsd"; exit 1; }
 cd .. || { echo "Failed to make iptsd"; exit 1; }
 rm -rf ./iptsd || { echo "Failed to make iptsd"; exit 1; }
@@ -165,16 +165,18 @@ tar zcvf ../rootc/packages/efibootmgr.tar.gz * --owner=0 --group=0 || { echo "Fa
 cd .. || { echo "Failed to make efibootmgr package"; exit 1; }
 rm -rf ./efibootmgr-pkg || { echo "Failed to make efibootmgr package"; exit 1; }
 
-git clone --depth=1 -b master https://github.com/stefanberger/libtpms.git || { echo "Failed to make libtpms"; exit 1; }
+git clone https://github.com/stefanberger/libtpms.git libtpms || { echo "Failed to make libtpms"; exit 1; }
 cd ./libtpms || { echo "Failed to make libtpms"; exit 1; }
+git checkout 0c2bc32a21e2c7218faa8cd6d5cf31b13835e6d5 || { echo "Failed to make libtpms"; exit 1; }
 ./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib64 --with-openssl --with-tpm2 --enable-debug || { echo "Failed to make libtpms"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make libtpms"; exit 1; }
 make install || { echo "Failed to make libtpms"; exit 1; }
 cd .. || { echo "Failed to make libtpms"; exit 1; }
 rm -rf ./libtpms || { echo "Failed to make libtpms"; exit 1; }
 
-git clone --depth=1 -b master https://github.com/stefanberger/swtpm.git || { echo "Failed to make swtpm"; exit 1; }
+git clone https://github.com/stefanberger/swtpm.git swtpm || { echo "Failed to make swtpm"; exit 1; }
 cd ./swtpm || { echo "Failed to make swtpm"; exit 1; }
+git checkout eaa9f92201bff08f7a1f386d3d74012fa7b6a812 || { echo "Failed to make swtpm"; exit 1; }
 sed -i '/AC_CONFIG_SRCDIR/ a AC_CONFIG_AUX_DIR([.])' ./configure.ac || { echo "Failed to make swtpm"; exit 1; }
 ./autogen.sh --prefix=/usr --libdir=/usr/lib64 --enable-debug --disable-python-installation with_seccomp=no with_gnutls=no with_cuse=no || { echo "Failed to make swtpm"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make swtpm"; exit 1; }

@@ -20,7 +20,7 @@ jobs:
       - name: Download kernels and apply patches
         env:
           CC: clang
-          CC: clang++
+          CXX: clang++
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
@@ -66,7 +66,7 @@ jobs:
       - name: Build kernels
         env:
           CC: clang
-          CC: clang++
+          CXX: clang++
         run: ./build_kernels.sh ${{ matrix.kernel }}
       - name: Clear keys
         run: rm -r /persist/keys
@@ -100,7 +100,7 @@ jobs:
       - name: Build brunch
         env:
           CC: clang
-          CC: clang++
+          CXX: clang++
         run: sudo bash build_brunch.sh
       - name: Upload artifacts
         uses: actions/upload-artifact@v2

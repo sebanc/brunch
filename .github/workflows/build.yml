@@ -23,9 +23,7 @@ jobs:
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
-        run: |
-          export LLVM=1
-          ./prepare_kernels.sh
+        run:  ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
         run: echo "::set-output name=matrix::$(echo [\"$(ls -d ./kernels/*  | cut -f3 -d'/' | sed -Ez '$ s/\n+$//' | sed -z 's#\n#","#g')\"])"
@@ -71,9 +69,7 @@ jobs:
           echo "$BRUNCH_PRIV" | base64 -d > /persist/keys/brunch.priv
           echo "$BRUNCH_PEM" | base64 -d > /persist/keys/brunch.pem
       - name: Build kernels
-        run: |
-          export LLVM=1
-          ./build_kernels.sh ${{ matrix.kernel }}
+        run: ./build_kernels.sh ${{ matrix.kernel }}
       - name: Clear keys
         run: rm -r /persist/keys
       - name: Compress built kernel

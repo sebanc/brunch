@@ -18,10 +18,7 @@ jobs:
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
-        env:
-          CC: gcc-11
-          CXX: g++-11
-        run: ./prepare_kernels.sh
+        run: CC=gcc-11 CXX=g++-11 ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
         run: echo "::set-output name=matrix::$(echo [\"$(ls -d ./kernels/*  | cut -f3 -d'/' | sed -Ez '$ s/\n+$//' | sed -z 's#\n#","#g')\"])"
@@ -64,10 +61,7 @@ jobs:
           echo "$BRUNCH_PRIV" | base64 -d > /persist/keys/brunch.priv
           echo "$BRUNCH_PEM" | base64 -d > /persist/keys/brunch.pem
       - name: Build kernels
-        env:
-          CC: gcc-11
-          CXX: g++-11
-        run: ./build_kernels.sh ${{ matrix.kernel }}
+        run: CC=gcc-11 CXX=g++-11 ./build_kernels.sh ${{ matrix.kernel }}
       - name: Clear keys
         run: rm -r /persist/keys
       - name: Compress built kernel
@@ -98,10 +92,7 @@ jobs:
           done
           rm -r /tmp/kernels-source/kernels-source.tar.gz
       - name: Build brunch
-        env:
-          CC: gcc-11
-          CXX: g++-11
-        run: sudo bash build_brunch.sh
+        run: sudo CC=gcc-11 CXX=g++-11 bash build_brunch.sh
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:

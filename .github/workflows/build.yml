@@ -11,12 +11,15 @@ concurrency:
 jobs:
   prepare-kernels:
     name: Prepare Kernels
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container: archlinux
     outputs:
       matrix: ${{ steps.kernels.outputs.matrix }}
     steps:
       - name: Install dependencies
-        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang llvm lld lldb
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm binutils grep base-devel git sbsigntools libffi python
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
@@ -37,13 +40,16 @@ jobs:
   build-kernels:
     name: Build Kernels
     needs: prepare-kernels
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container: archlinux
     strategy:
         matrix:
             kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
     steps:
       - name: Install dependencies
-        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang llvm lld lldb libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm binutils grep base-devel git sbsigntools libffi python
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels source
@@ -60,7 +66,7 @@ jobs:
           BRUNCH_PRIV: ${{ secrets.BRUNCH_PRIV }}
           BRUNCH_PEM: ${{ secrets.BRUNCH_PEM }}
         run: |
-          sudo ln -s $RUNNER_TEMP /persist
+          ln -s $RUNNER_TEMP /persist
           mkdir /persist/keys
           echo "$BRUNCH_PRIV" | base64 -d > /persist/keys/brunch.priv
           echo "$BRUNCH_PEM" | base64 -d > /persist/keys/brunch.pem
@@ -81,10 +87,13 @@ jobs:
   build-brunch:
     name: Build Brunch
     needs: build-kernels
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container: archlinux
     steps:
       - name: Install dependencies
-        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang llvm lld lldb
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm binutils grep base-devel git sbsigntools libffi python
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download built kernels
@@ -100,9 +109,7 @@ jobs:
           done
           rm -r /tmp/kernels-source/kernels-source.tar.gz
       - name: Build brunch
-        run: |
-          export LLVM=1
-          sudo bash build_brunch.sh
+        run: ./build_brunch.sh
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -115,6 +122,7 @@ jobs:
       contents: write
     needs: build-brunch
     runs-on: ubuntu-latest
+    container: archlinux
     steps:
       - name: Download built artifacts
         uses: actions/download-artifact@v2

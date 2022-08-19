@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel xmlto kmod inetutils bc libelf git cpio perl tar xz zstd git sbsigntools
+          pacman -S --noconfirm base-devel xmlto kmod inetutils bc libelf git cpio perl tar xz zstd git sbsigntools python python-protobuf
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
@@ -47,7 +47,7 @@ jobs:
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel xmlto kmod inetutils bc libelf git cpio perl tar xz zstd git sbsigntools
+          pacman -S --noconfirm base-devel xmlto kmod inetutils bc libelf git cpio perl tar xz zstd git sbsigntools python python-protobuf
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels source
@@ -89,7 +89,7 @@ jobs:
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel xmlto kmod inetutils bc libelf git cpio perl tar xz zstd git sbsigntools
+          pacman -S --noconfirm base-devel xmlto kmod inetutils bc libelf git cpio perl tar xz zstd git sbsigntools python python-protobuf
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download built kernels

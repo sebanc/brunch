@@ -12,7 +12,6 @@ jobs:
   prepare-kernels:
     name: Prepare Kernels
     runs-on: ubuntu-latest
-    container: archlinux
     outputs:
       matrix: ${{ steps.kernels.outputs.matrix }}
     steps:
@@ -38,7 +37,6 @@ jobs:
     name: Build Kernels
     needs: prepare-kernels
     runs-on: ubuntu-latest
-    container: archlinux
     strategy:
         matrix:
             kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
@@ -84,7 +82,6 @@ jobs:
     name: Build Brunch
     needs: build-kernels
     runs-on: ubuntu-latest
-    container: archlinux
     steps:
       - name: Checkout Brunch source code
         uses: actions/checkout@v2

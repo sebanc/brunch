@@ -17,12 +17,10 @@ jobs:
     steps:
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
-      - name: Install gcc-11
-        run:  |
-          sudo apt update
-          sudo apt install gcc-11 g++-11
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Download kernels and apply patches
+        env:
+          CC: clang
+          CC: clang++
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
@@ -45,11 +43,6 @@ jobs:
     steps:
       - name: Install dependencies
         run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
-      - name: Install gcc-11
-        run:  |
-          sudo apt update
-          sudo apt install gcc-11 g++-11
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels source
@@ -71,6 +64,9 @@ jobs:
           echo "$BRUNCH_PRIV" | base64 -d > /persist/keys/brunch.priv
           echo "$BRUNCH_PEM" | base64 -d > /persist/keys/brunch.pem
       - name: Build kernels
+        env:
+          CC: clang
+          CC: clang++
         run: ./build_kernels.sh ${{ matrix.kernel }}
       - name: Clear keys
         run: rm -r /persist/keys
@@ -102,6 +98,9 @@ jobs:
           done
           rm -r /tmp/kernels-source/kernels-source.tar.gz
       - name: Build brunch
+        env:
+          CC: clang
+          CC: clang++
         run: sudo bash build_brunch.sh
       - name: Upload artifacts
         uses: actions/upload-artifact@v2

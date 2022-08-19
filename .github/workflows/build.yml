@@ -11,19 +11,19 @@ concurrency:
 jobs:
   prepare-kernels:
     name: Prepare Kernels
-    runs-on: ubuntu-latest
-    container: archlinux
+    runs-on: ubuntu-22.04
     outputs:
       matrix: ${{ steps.kernels.outputs.matrix }}
     steps:
-      - name: Install dependencies
+      - name: Make gcc 12 the default
         run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel xmlto kmod inetutils bc libelf git cpio perl tar xz zstd git sbsigntools python python-protobuf
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
-        run:  ./prepare_kernels.sh
+        run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
         run: echo "::set-output name=matrix::$(echo [\"$(ls -d ./kernels/*  | cut -f3 -d'/' | sed -Ez '$ s/\n+$//' | sed -z 's#\n#","#g')\"])"
@@ -38,16 +38,18 @@ jobs:
   build-kernels:
     name: Build Kernels
     needs: prepare-kernels
-    runs-on: ubuntu-latest
-    container: archlinux
+    runs-on: ubuntu-22.04
     strategy:
         matrix:
             kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
     steps:
-      - name: Install dependencies
+      - name: Make gcc 12 the default
         run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel xmlto kmod inetutils bc libelf git cpio perl tar xz zstd git sbsigntools python python-protobuf
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
+      - name: Install dependencies
+        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels source
@@ -64,7 +66,7 @@ jobs:
           BRUNCH_PRIV: ${{ secrets.BRUNCH_PRIV }}
           BRUNCH_PEM: ${{ secrets.BRUNCH_PEM }}
         run: |
-          ln -s $RUNNER_TEMP /persist
+          sudo ln -s $RUNNER_TEMP /persist
           mkdir /persist/keys
           echo "$BRUNCH_PRIV" | base64 -d > /persist/keys/brunch.priv
           echo "$BRUNCH_PEM" | base64 -d > /persist/keys/brunch.pem
@@ -83,13 +85,13 @@ jobs:
   build-brunch:
     name: Build Brunch
     needs: build-kernels
-    runs-on: ubuntu-latest
-    container: archlinux
+    runs-on: ubuntu-22.04
     steps:
-      - name: Install dependencies
+      - name: Make gcc 12 the default
         run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm base-devel xmlto kmod inetutils bc libelf git cpio perl tar xz zstd git sbsigntools python python-protobuf
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download built kernels
@@ -105,7 +107,7 @@ jobs:
           done
           rm -r /tmp/kernels-source/kernels-source.tar.gz
       - name: Build brunch
-        run: ./build_brunch.sh
+        run: sudo bash build_brunch.sh
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -117,8 +119,7 @@ jobs:
     permissions:
       contents: write
     needs: build-brunch
-    runs-on: ubuntu-latest
-    container: archlinux
+    runs-on: ubuntu-22.04
     steps:
       - name: Download built artifacts
         uses: actions/download-artifact@v2

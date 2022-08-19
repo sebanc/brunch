@@ -11,7 +11,7 @@ concurrency:
 jobs:
   prepare-kernels:
     name: Prepare Kernels
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       matrix: ${{ steps.kernels.outputs.matrix }}
     steps:
@@ -37,7 +37,7 @@ jobs:
   build-kernels:
     name: Build Kernels
     needs: prepare-kernels
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
         matrix:
             kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
@@ -81,7 +81,7 @@ jobs:
   build-brunch:
     name: Build Brunch
     needs: build-kernels
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Install dependencies
         run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang lld

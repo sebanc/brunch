@@ -15,15 +15,12 @@ jobs:
     outputs:
       matrix: ${{ steps.kernels.outputs.matrix }}
     steps:
-      - name: Make gcc 11 the default
-        run: |
-          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
-          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-11 g++-11
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
-        run: ./prepare_kernels.sh
+        run: |
+          export LLVM=1
+          ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
         run: echo "::set-output name=matrix::$(echo [\"$(ls -d ./kernels/*  | cut -f3 -d'/' | sed -Ez '$ s/\n+$//' | sed -z 's#\n#","#g')\"])"
@@ -43,11 +40,6 @@ jobs:
         matrix:
             kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
     steps:
-      - name: Make gcc 11 the default
-        run: |
-          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
-          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-11 g++-11
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Install dependencies
         run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Checkout Brunch source code
@@ -71,7 +63,9 @@ jobs:
           echo "$BRUNCH_PRIV" | base64 -d > /persist/keys/brunch.priv
           echo "$BRUNCH_PEM" | base64 -d > /persist/keys/brunch.pem
       - name: Build kernels
-        run: ./build_kernels.sh ${{ matrix.kernel }}
+        run: |
+          export LLVM=1
+          ./build_kernels.sh ${{ matrix.kernel }}
       - name: Clear keys
         run: rm -r /persist/keys
       - name: Compress built kernel
@@ -87,11 +81,6 @@ jobs:
     needs: build-kernels
     runs-on: ubuntu-latest
     steps:
-      - name: Make gcc 11 the default
-        run: |
-          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
-          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-11 g++-11
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download built kernels
@@ -107,7 +96,9 @@ jobs:
           done
           rm -r /tmp/kernels-source/kernels-source.tar.gz
       - name: Build brunch
-        run: sudo bash build_brunch.sh
+        run: |
+          export LLVM=1
+          sudo bash build_brunch.sh
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:

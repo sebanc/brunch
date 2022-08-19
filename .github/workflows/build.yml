@@ -16,7 +16,10 @@ jobs:
       matrix: ${{ steps.kernels.outputs.matrix }}
     steps:
       - name: Make gcc 11 the default
-        run: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
+        run: |
+          yes | DEBIAN_FRONTEND=noninteractive apt update
+          yes | DEBIAN_FRONTEND=noninteractive apt install gcc-11 g++-11
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
@@ -41,9 +44,12 @@ jobs:
             kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
     steps:
       - name: Make gcc 11 the default
-        run: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
+        run: |
+          yes | DEBIAN_FRONTEND=noninteractive apt update
+          yes | DEBIAN_FRONTEND=noninteractive apt install gcc-11 g++-11
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Install dependencies
-        run: sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
+        run: yes | DEBIAN_FRONTEND=noninteractive apt install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels source
@@ -82,7 +88,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Make gcc 11 the default
-        run: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
+        run: |
+          yes | DEBIAN_FRONTEND=noninteractive apt update
+          yes | DEBIAN_FRONTEND=noninteractive apt install gcc-11 g++-11
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download built kernels

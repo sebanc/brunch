@@ -16,7 +16,7 @@ jobs:
       matrix: ${{ steps.kernels.outputs.matrix }}
     steps:
       - name: Install dependencies
-        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang lld
+        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang llvm lld lldb
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels and apply patches
@@ -43,7 +43,7 @@ jobs:
             kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
     steps:
       - name: Install dependencies
-        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang lld libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
+        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang llvm lld lldb libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download kernels source
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Install dependencies
-        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang lld
+        run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install clang llvm lld lldb
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
       - name: Download built kernels

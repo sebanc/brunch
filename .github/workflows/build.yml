@@ -18,7 +18,8 @@ jobs:
       - name: Make gcc 12 the default
         run: |
           yes | DEBIAN_FRONTEND=noninteractive sudo apt update
-          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt dist-upgrade
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12 linux-libc-dev linux-headers-generic
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
@@ -46,7 +47,8 @@ jobs:
       - name: Make gcc 12 the default
         run: |
           yes | DEBIAN_FRONTEND=noninteractive sudo apt update
-          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt dist-upgrade
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12 linux-libc-dev linux-headers-generic
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
       - name: Install dependencies
         run: yes | DEBIAN_FRONTEND=noninteractive sudo apt install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
@@ -90,7 +92,8 @@ jobs:
       - name: Make gcc 12 the default
         run: |
           yes | DEBIAN_FRONTEND=noninteractive sudo apt update
-          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt dist-upgrade
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12 linux-libc-dev linux-headers-generic
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
       - name: Checkout Brunch source code
         uses: actions/checkout@v2

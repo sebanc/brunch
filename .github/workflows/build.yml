@@ -17,8 +17,8 @@ jobs:
     steps:
       - name: Make gcc 11 the default
         run: |
-          yes | DEBIAN_FRONTEND=noninteractive apt update
-          yes | DEBIAN_FRONTEND=noninteractive apt install gcc-11 g++-11
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-11 g++-11
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Checkout Brunch source code
         uses: actions/checkout@v2
@@ -45,8 +45,8 @@ jobs:
     steps:
       - name: Make gcc 11 the default
         run: |
-          yes | DEBIAN_FRONTEND=noninteractive apt update
-          yes | DEBIAN_FRONTEND=noninteractive apt install gcc-11 g++-11
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-11 g++-11
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Install dependencies
         run: yes | DEBIAN_FRONTEND=noninteractive apt install libncurses-dev gawk flex bison openssl libssl-dev dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf sbsigntool
@@ -89,8 +89,8 @@ jobs:
     steps:
       - name: Make gcc 11 the default
         run: |
-          yes | DEBIAN_FRONTEND=noninteractive apt update
-          yes | DEBIAN_FRONTEND=noninteractive apt install gcc-11 g++-11
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-11 g++-11
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11 --slave /usr/bin/gcov gcov /usr/bin/gcov-11
       - name: Checkout Brunch source code
         uses: actions/checkout@v2

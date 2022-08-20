@@ -14,7 +14,7 @@ done
 
 make_config()
 {
-sed -iz 's@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n def_bool@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n      def_bool $(success,echo 0)\n    #def_bool@g' ./kernels/$1/init/Kconfig
+sed -i -z 's@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool $(success,echo 0)\n\t#def_bool@g' ./kernels/$1/init/Kconfig
 if [ "x$1" == "x5.15" ] || [ "x$1" == "x5.10" ] || [ "x$1" == "x5.4" ] || [ "x$1" == "xmacbook" ] || [ "x$1" == "xchromebook-5.4" ]; then config_subfolder="/chromeos"; fi 
 case "$1" in
 	5.15|5.10|5.4|4.19|macbook)

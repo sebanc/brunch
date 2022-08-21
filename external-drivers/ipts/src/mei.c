@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/stddef.h>
 #include <linux/types.h>
+#include <linux/version.h>
 
 #include "context.h"
 #include "control.h"
@@ -74,6 +75,21 @@ static int ipts_mei_probe(struct mei_cl_device *cldev, const struct mei_cl_devic
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
+static int ipts_mei_remove(struct mei_cl_device *cldev)
+{
+	int ret;
+	struct ipts_context *ipts = mei_cldev_get_drvdata(cldev);
+
+	ret = ipts_control_stop(ipts);
+	if (ret)
+		dev_err(&cldev->dev, "Failed to stop IPTS: %d\n", ret);
+
+	mei_cldev_disable(cldev);
+	
+	return 0;
+}
+#else
 static void ipts_mei_remove(struct mei_cl_device *cldev)
 {
 	int ret;
@@ -85,6 +101,7 @@ static void ipts_mei_remove(struct mei_cl_device *cldev)
 
 	mei_cldev_disable(cldev);
 }
+#endif
 
 static struct mei_cl_device_id ipts_mei_device_id_table[] = {
 	{ .uuid = IPTS_MEI_UUID, .version = MEI_CL_VERSION_ANY },

@@ -1,9 +1,9 @@
 # Brunch principle
 
-The Brunch framework purpose is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
+The Brunch framework purpose is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing custom kernels, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
 
 The source directory is composed of:
-- the build.sh script used to build the framework,
+- the 3 scripts used to build the framework,
 - Different Brunch Linux kernels based on ChromiumOS release including specific ChromeOS and surface devices patches (in the kernels directory),
 - An "efi-partition" folder containing shim and GRUB and the specific GRUB config,
 - An "extra-firmwares" directory to include firmware files which are not available in the mainline kernel firmware git (the mainline kernel firmware files are downloaded during the build process),
@@ -30,61 +30,32 @@ At boot, GRUB will load the kernel present on ROOTC partition and launch the ini
 - when the ROOTC partition is modified,
 - when an update has been applied.
 
-Thanks goes to project Croissant, the swtpm maintainer and the Chromebrew framework !
-
-# Build instructions
-
-Building the framework is currently only possible under Linux (should work with any distro).
-
-The build process consist of 4 successive steps:
-- getting the source,
-- building the kernels,
-- signing the kernel and GRUB for Secure Boot,
-- building the install package.
-
-Warning: The build scripts currently lacks many build process checks. I will try to work on that as soon as I have the time.
-
 ## Getting the source
 
 Clone the branch you want to use (usually the latest) and enter the source directory:
 
 ```
-git clone https://github.com/sebanc/brunch.git -b < ChromeOS version e.g. r79 >
+git clone https://github.com/sebanc/brunch.git -b < ChromeOS version e.g. r103 >
 cd brunch
 ```
 
-## Building the kernel
+## Build instructions
 
-1. Install all packages required to build the Linux kernel (refer to your distro's online resources).
-2. Launch the kernel build in each kernel subfolder:
-```
-cd kernel
-make -j$(nproc) O=out chromeos_defconfig
-make -j$(nproc) O=out
-```
-3. Make sure the kernel build process finished without errors.
-4. Go back to the main directory where you extracted the source.
-
-## Signing the kernel and GRUB for Secure Boot
-
-If you want to use Secure Boot, you will have to create your own certificate and sign both the kernel and the grub efi binary. (refer to online resources)
-If you do not need Secure Boot, you can skip this step.
-
-## Building the release package.
+Building the framework is currently only possible under Linux (should work with any distro).
 
 To build the release package, you need to have:
 - root access,
-- the `pv` and `cgpt` packages/binaries installed,
+- the `pv` package installed,
 - 16 GB free disk space available,
 - an internet connection.
 
-1. Download the "rammus" ChromeOS recovery image from here (https://cros-updates-serving.appspot.com/).
+The build process consist of 3 successive steps (only the last step needs to be run as root):
+- preparing the kernels source:
+`./prepare_kernels.sh`
+- building the kernels:
+`./build_kernels.sh`
+- building the brunch package:
+`sudo bash build_brunch.sh`
 
-2. Make sure you have 16GB of free space available for the build.
-
-3. Launch the build as root:
-```
-sudo bash build.sh < path to the ChromeOS recovery image >
-```
 4. Verify that everything worked well. You should have an "out" directory containing the brunch_< version >_<date>.tar.gz archive.
 

@@ -27,7 +27,7 @@ First of all, thanks goes to [Project Croissant][croissant], the [swtpm][swtpm] 
 The purpose of the Brunch framework is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
 
 **Warning: Brunch is not the intended way for ChromeOS to work, at some point ChromeOS could potentially become incompatible with Brunch and delete data unexpectedly (even on non-ChromeOS partitions). By installing Brunch you agree to take those risks and I cannot be held responsible for anything bad that would happen to your device including data loss.
-It is therefore highly recommended to only use this framework on a device which does not contain any sensitive data and to keep non-sensitive data synced with a cloud service.**
+It is therefore highly recommended to only use this framework on a device which does not contain any sensitive data and to keep data synced with a cloud service.**
 
 <!-- Supported Hardware -->
 ## Supported Hardware
@@ -37,24 +37,21 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 
 ✔ Base Requirements:
 - x86_64 based computer with UEFI boot support.
-  - MBR/Legacy devices may be supported with the MBR patch
 - Administrative privileges on the device.
 - An entry level understanding of the linux terminal.
   - This guide aims to make this process as easy as possible, but knowing the basics is expected.
 
 
 ✔ CPU Compatibility:
-- [Intel CPUs][intel-cpus] from starting with [Sandy Bridge *or later*][intel-list]
-  - [1st generation][intel-list] Intel Core i series were last supported on ChromeOS 81
-  - [Atom, Celeron and Pentium][atom-cpus] processors are supported as of [Baytrail *or later*][atom-list]
-- [AMD Stoney Ridge][amd-sr-list] or [AMD Ryzen][amd-ry-list] (AMD support is limited)
+- [Intel CPUs][intel-cpus] / [Celeron CPUs][celeron-cpus] from 4th Gen (Haswell)
+- [AMD Ryzen][amd-ry-list]
 
 
 ❌ Unsupported Hardware:
-- dGPUs are not supported
-- Virtual Machines are not supported
-- ARM CPUs are not supported
-- Intel Core 2 Duo *and older* are not supported
+- Older Intel/AMD CPUs are not supported.
+- dGPUs are not supported.
+- Virtual Machines are not supported.
+- ARM CPUs are not supported.
 
 
 ## Install Instructions
@@ -101,6 +98,7 @@ Additional troubleshooting and support tips can be found at the following page:
 [swtpm]: https://github.com/stefanberger/swtpm
 [linux-surface]: https://github.com/linux-surface/linux-surface
 [chromebrew]: https://github.com/skycocker/chromebrew
+[celeron-cpus]: https://en.wikipedia.org/wiki/List_of_Intel_Celeron_processors
 [intel-cpus]: https://en.wikipedia.org/wiki/Intel_Core
 [intel-list]: https://en.wikipedia.org/wiki/List_of_Intel_CPU_microarchitectures
 [atom-cpus]: https://en.wikipedia.org/wiki/Intel_Atom

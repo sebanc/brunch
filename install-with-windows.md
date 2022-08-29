@@ -35,13 +35,10 @@ This guide is for installing Brunch to a USB (or other disk) using Windows. This
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["rammus" is suggested for 1st gen -> 9th gen.][recovery-rammus]
-* ["volteer" is suggested for 10th & 11th gen.][recovery-volteer]
-  * [11th gen (and some 10th gen) may need kernel 5.10][changing-kernels] 
+* ["rammus" for 1st gen -> 9th gen.][recovery-rammus]
+* ["volteer" for 10th & 11th gen.][recovery-volteer]
 #### AMD
-* ["grunt" is suggested for Stoney Ridge & Bristol Ridge.][recovery-grunt]
-* ["zork" is suggested for Ryzen.][recovery-zork]
-  * [Ryzen 4xxx devices need kernel 5.10][changing-kernels]
+* ["zork" for Ryzen.][recovery-zork]
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 
@@ -206,13 +203,10 @@ This guide is for installing Brunch to a partition using Windows WSL2.
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["rammus" is suggested for 1st gen -> 9th gen.][recovery-rammus]
-* ["volteer" is suggested for 10th & 11th gen.][recovery-volteer]
-  * [11th gen (and some 10th gen) may need kernel 5.10][changing-kernels] 
+* ["rammus" for 1st gen -> 9th gen.][recovery-rammus]
+* ["volteer" for 10th & 11th gen.][recovery-volteer]
 #### AMD
-* ["grunt" is suggested for Stoney Ridge & Bristol Ridge.][recovery-grunt]
-* ["zork" is suggested for Ryzen.][recovery-zork]
-  * [Ryzen 4xxx devices need kernel 5.10][changing-kernels]
+* ["zork" for Ryzen.][recovery-zork]
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 

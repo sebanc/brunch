@@ -95,7 +95,7 @@ rm -rf ./fbv || { echo "Failed to make fbv"; exit 1; }
 
 git clone https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
 cd iptsd || { echo "Failed to make iptsd"; exit 1; }
-git checkout d9fb748f7e90a88dac47b784139c93802258c37d || { echo "Failed to make iptsd"; exit 1; }
+git checkout 0aa62f3e4d7f3b2da4a3c726e0d7a0a9a89fa3fa || { echo "Failed to make iptsd"; exit 1; }
 #sed -i "/'-ffast-math',/d" ./src/meson.build
 meson --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" -Dsample_config=false build/ || { echo "Failed to make iptsd"; exit 1; }
 DESTDIR=/home/chronos/ipts-pkg ninja -j"$NTHREADS" -C build/ install || { echo "Failed to make iptsd"; exit 1; }

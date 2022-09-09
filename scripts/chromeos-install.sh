@@ -231,6 +231,9 @@ for (( i=1; i<=12; i++ )); do
 			image="$(dirname $0)/rootc.img"
 			size=$(du -B 512 $image | sed 's/\t.*//g')
 		;;
+		9|10|11)
+			continue
+		;;
 		12)
 			source_start=0
 			if [ -z legacy_boot ]; then image="$(dirname $0)/efi_secure.img"; else image="$(dirname $0)/efi_legacy.img"; fi
@@ -320,6 +323,9 @@ for (( i=1; i<=12; i++ )); do
 		7)
 			source_part="$(dirname $0)/rootc.img"
 			size=$(ls -lp --block-size=512 "$source_part" | cut -d" " -f5)
+		;;
+		9|10|11)
+			continue
 		;;
 		12)
 			if [ -z legacy_boot ]; then source_part="$(dirname $0)/efi_secure.img"; else source_part="$(dirname $0)/efi_legacy.img"; fi

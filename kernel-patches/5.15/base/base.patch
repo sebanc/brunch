@@ -18335,7 +18335,7 @@ diff -ruN a/drivers/iio/light/cros_ec_light_prox.c b/drivers/iio/light/cros_ec_l
  	default:
  		ret = cros_ec_sensors_core_write(&st->core, chan, val, val2,
  						 mask);
-@@ -162,27 +304,133 @@
+@@ -162,26 +304,132 @@
  	return ret;
  }
  
@@ -18465,10 +18465,8 @@ diff -ruN a/drivers/iio/light/cros_ec_light_prox.c b/drivers/iio/light/cros_ec_l
  		return -ENOMEM;
  
  	ret = cros_ec_sensors_core_init(pdev, indio_dev, true,
--					cros_ec_sensors_capture,
--					cros_ec_sensors_push_data);
-+					cros_ec_light_capture,
-+					cros_ec_light_push_data);
+-					cros_ec_sensors_capture);
++					cros_ec_light_capture);
  	if (ret)
  		return ret;
  
@@ -74782,9 +74780,9 @@ diff -ruN a/kernel/sched/sched.h b/kernel/sched/sched.h
  	/*
  	 * The CPUs this group covers.
 @@ -2049,6 +2052,7 @@
+ 
  #define WF_SYNC     0x10 /* Waker goes to sleep after wakeup */
  #define WF_MIGRATED 0x20 /* Internal use, task got migrated */
- #define WF_ON_CPU   0x40 /* Wakee is on_cpu */
 +#define WF_CURRENT_CPU		0x80		/* Prefer to move wakee to the current CPU */
  
  #ifdef CONFIG_SMP

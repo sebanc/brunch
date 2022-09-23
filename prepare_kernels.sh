@@ -43,7 +43,7 @@ esac
 download_and_patch_kernels()
 {
 # Find the ChromiumOS kernel remote path corresponding to the release
-kernel_remote_path="$(git ls-remote https://chromium.googlesource.com/chromiumos/third_party/kernel/ | grep "refs/heads/release-$chromeos_version" | sed -e 's#.*\t##' -e 's#chromeos-.*##' | sort -u)chromeos-"
+kernel_remote_path="$(git ls-remote https://chromium.googlesource.com/chromiumos/third_party/kernel/ | grep "refs/heads/release-$chromeos_version" | head -1 | sed -e 's#.*\t##' -e 's#chromeos-.*##' | sort -u)chromeos-"
 [ ! "x$kernel_remote_path" == "x" ] || { echo "Remote path not found"; exit 1; }
 echo "kernel_remote_path=$kernel_remote_path"
 
@@ -124,6 +124,6 @@ done
 rm -rf ./kernels
 mkdir ./kernels
 
-chromeos_version="R106"
+chromeos_version="R107"
 download_and_patch_kernels
 

@@ -17272,7 +17272,7 @@ diff -ruN a/drivers/i2c/i2c-core-of.c b/drivers/i2c/i2c-core-of.c
 diff -ruN a/drivers/iio/common/cros_ec_sensors/cros_ec_activity.c b/drivers/iio/common/cros_ec_sensors/cros_ec_activity.c
 --- a/drivers/iio/common/cros_ec_sensors/cros_ec_activity.c	1970-01-01 01:00:00.000000000 +0100
 +++ b/drivers/iio/common/cros_ec_sensors/cros_ec_activity.c	2021-12-23 08:35:30.000000000 +0100
-@@ -0,0 +1,414 @@
+@@ -0,0 +1,404 @@
 +/*
 + * cros_ec_sensors_activity - Driver for activities/gesture recognition.
 + *
@@ -17580,7 +17580,7 @@ diff -ruN a/drivers/iio/common/cros_ec_sensors/cros_ec_activity.c b/drivers/iio/
 +		return -ENOMEM;
 +
 +	ret = cros_ec_sensors_core_init(pdev, indio_dev, true,
-+			cros_ec_activity_capture, cros_ec_activity_push_data);
++			cros_ec_activity_capture);
 +	if (ret)
 +		return ret;
 +
@@ -17662,17 +17662,8 @@ diff -ruN a/drivers/iio/common/cros_ec_sensors/cros_ec_activity.c b/drivers/iio/
 +
 +	st->core.read_ec_sensors_data = cros_ec_sensors_read_cmd;
 +
-+	/* Driver is incomplete: by itself, no way to get event directly */
-+	ret = iio_device_register(indio_dev);
++	ret = cros_ec_sensors_core_register(dev, indio_dev, cros_ec_activity_push_data);
 +	return ret;
-+}
-+
-+static int cros_ec_sensors_remove(struct platform_device *pdev)
-+{
-+	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-+
-+	iio_device_unregister(indio_dev);
-+	return 0;
 +}
 +
 +static struct platform_driver cros_ec_sensors_platform_driver = {
@@ -17680,7 +17671,6 @@ diff -ruN a/drivers/iio/common/cros_ec_sensors/cros_ec_activity.c b/drivers/iio/
 +		.name	= DRV_NAME,
 +	},
 +	.probe		= cros_ec_sensors_probe,
-+	.remove		= cros_ec_sensors_remove,
 +};
 +module_platform_driver(cros_ec_sensors_platform_driver);
 +
@@ -17924,7 +17914,7 @@ diff -ruN a/drivers/iio/common/cros_ec_sensors/cros_ec_sensors_sync.c b/drivers/
 +		return -ENOMEM;
 +
 +	ret = cros_ec_sensors_core_init(pdev, indio_dev, true,
-+			cros_ec_sensors_capture, cros_ec_sensors_push_data);
++			cros_ec_sensors_capture);
 +	if (ret)
 +		return ret;
 +
@@ -17956,7 +17946,7 @@ diff -ruN a/drivers/iio/common/cros_ec_sensors/cros_ec_sensors_sync.c b/drivers/
 +
 +	state->core.read_ec_sensors_data = cros_ec_sensors_read_cmd;
 +
-+	return devm_iio_device_register(dev, indio_dev);
++	return cros_ec_sensors_core_register(dev, indio_dev, cros_ec_sensors_push_data);
 +}
 +
 +static const struct platform_device_id cros_ec_sensors_sync_ids[] = {

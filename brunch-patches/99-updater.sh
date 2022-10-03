@@ -27,7 +27,7 @@ while [ $# -gt 0 ]; do
 			echo "$1 is not a valid ChromeOS recovey image (have you unzipped it ?)"
 			exit 1
 		fi
-		recovery="$(realpath $1)"
+		recovery="$1"
 		;;
 		-f | --framework)
 		shift
@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
 			echo "$1 is not a valid Brunch release archive"
 			exit 1
 		fi
-		framework="$(realpath $1)"
+		framework="$1"
 		;;
 		-e | --efi)
 		update_efi=1
@@ -61,7 +61,7 @@ else
 	partition="$destination"
 fi
 
-if [[ ! -z $framework ]]; then
+if [[ ! -z "$framework" ]]; then
 	tar zxf "$framework" -C /mnt/stateful_partition/unencrypted/brunch_updater
 	pv /mnt/stateful_partition/unencrypted/brunch_updater/rootc.img > "$partition"7
 	if [ ! -z $update_efi ]; then pv /mnt/stateful_partition/unencrypted/brunch_updater/efi_secure.img > "$partition"12; fi
@@ -69,7 +69,7 @@ if [[ ! -z $framework ]]; then
 	echo "Brunch updated."
 fi
 
-if [[ ! -z $recovery ]]; then
+if [[ ! -z "$recovery" ]]; then
 	loopdevice=$(losetup --show -fP "$recovery")
 	pv "$loopdevice"p3 > "$partition"5
 	losetup -d "$loopdevice"

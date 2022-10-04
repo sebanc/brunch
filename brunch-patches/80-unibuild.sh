@@ -114,10 +114,15 @@ if [ -f /roota/usr/share/chromeos-config/config.json ]; then
 CONFIG
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 4))); fi
 elif [ -f /roota/usr/share/chromeos-config/configfs.img ]; then
-	if [ ! -f /roota/usr/share/chromeos-config/identity.bin ] || [ "$(dd if=/roota/usr/share/chromeos-config/identity.bin bs=1 count=1 2>/dev/null | od -A none)" -eq 0 ]; then
+	if [ ! -f /roota/usr/share/chromeos-config/identity.bin ] || [ "$(dd if=/roota/usr/share/chromeos-config/identity.bin bs=1 count=1 2>/dev/null | od -A none)" -le 1 ]; then
 		echo -ne "\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x62\x72\x75\x6e\x63\x68\x00" > /roota/usr/share/chromeos-config/identity.bin
-	else
+	elif [ "$(dd if=/roota/usr/share/chromeos-config/identity.bin bs=1 count=1 2>/dev/null | od -A none)" -eq 2 ]; then
 		echo -ne "\x02\x00\x00\x00\x01\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x62\x72\x75\x6e\x63\x68\x00" > /roota/usr/share/chromeos-config/identity.bin
+	elif [ "$(dd if=/roota/usr/share/chromeos-config/identity.bin bs=1 count=1 2>/dev/null | od -A none)" -eq 3 ]; then
+		echo -ne "\x03\x00\x00\x00\x01\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x62\x72\x75\x6e\x63\x68\x00" > /roota/usr/share/chromeos-config/identity.bin
+	else
+		echo "New identity format detected, trying v3..." > /dev/kmsg
+		echo -ne "\x03\x00\x00\x00\x01\x00\x00\x00\x11\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x62\x72\x75\x6e\x63\x68\x00" > /roota/usr/share/chromeos-config/identity.bin
 	fi
 	rm /roota/usr/share/chromeos-config/configfs.img
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 5))); fi

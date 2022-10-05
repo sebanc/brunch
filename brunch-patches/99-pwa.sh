@@ -29,6 +29,7 @@ do
 			echo -e "$line":next:"$(curl -L -s "https://api.github.com/repos/sebanc/brunch/releases/latest" | grep '"name":' | head -1 | cut -d '"' -f 4)"
 		;;
 		"update-stable")
+            if [ $(( ($(df -k --output=avail /mnt/stateful_partition/unencrypted | sed 1d) / 1024 / 1024) - 4 )) -lt 0 ]; then echo "Not enough space to update Brunch, 4Gb of free disk space is required but only $(( ($(df -k --output=avail /mnt/stateful_partition/unencrypted | sed 1d) / 1024 / 1024) ))Gb available."; continue; fi
 			echo -e 'Do not turn off your PC while the update is in progress.'
 			if [ -d /mnt/stateful_partition/unencrypted/brunch_pwa ]; then rm -r /mnt/stateful_partition/unencrypted/brunch_pwa; fi
 			mkdir /mnt/stateful_partition/unencrypted/brunch_pwa
@@ -42,6 +43,7 @@ do
 			echo -e "$line":next:"$(curl -L -s "https://api.github.com/repos/sebanc/brunch-unstable/releases/latest" | grep '"name":' | head -1 | cut -d '"' -f 4)"
 		;;
 		"update-unstable")
+            if [ $(( ($(df -k --output=avail /mnt/stateful_partition/unencrypted | sed 1d) / 1024 / 1024) - 4 )) -lt 0 ]; then echo "Not enough space to update Brunch, 4Gb of free disk space is required but only $(( ($(df -k --output=avail /mnt/stateful_partition/unencrypted | sed 1d) / 1024 / 1024) ))Gb available."; continue; fi
 			echo -e 'Do not turn off your PC while the update is in progress.'
 			if [ -d /mnt/stateful_partition/unencrypted/brunch_pwa ]; then rm -r /mnt/stateful_partition/unencrypted/brunch_pwa; fi
 			mkdir /mnt/stateful_partition/unencrypted/brunch_pwa
@@ -65,6 +67,7 @@ do
 			echo -e "$line":next:"$recovery $version"
 		;;
 		"update-chromeos")
+			if [ $(( ($(df -k --output=avail /mnt/stateful_partition/unencrypted | sed 1d) / 1024 / 1024) - 8 )) -lt 0 ]; then echo "Not enough space to update ChromeOS, 8Gb of free disk space is required but only $(( ($(df -k --output=avail /mnt/stateful_partition/unencrypted | sed 1d) / 1024 / 1024) ))Gb available."; continue; fi
 			echo -e 'Do not turn off your PC while the update is in progress.'
 			if [ -d /mnt/stateful_partition/unencrypted/brunch_pwa ]; then rm -r /mnt/stateful_partition/unencrypted/brunch_pwa; fi
 			mkdir /mnt/stateful_partition/unencrypted/brunch_pwa

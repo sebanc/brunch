@@ -43,7 +43,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 
 
 ✔ CPU Compatibility:
-- [Intel CPUs][intel-cpus] / [Celeron CPUs][celeron-cpus] from 4th Gen (Haswell)
+- [Intel CPUs][intel-cpus] from Haswell (4th Gen) / [Celeron CPUs][celeron-cpus] from Braswell
 - [AMD Ryzen][amd-ry-list]
 
 

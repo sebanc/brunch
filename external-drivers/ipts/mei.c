@@ -12,6 +12,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 
 #include "context.h"
 #include "control.h"
@@ -64,6 +65,31 @@ static int ipts_mei_probe(struct mei_cl_device *cldev,
 	return ipts_control_start(ipts);
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
+static int ipts_mei_remove(struct mei_cl_device *cldev)
+{
+	int i;
+	struct ipts_context *ipts = mei_cldev_get_drvdata(cldev);
+
+	ipts_control_stop(ipts);
+
+	/*
+	 * We need to flush all buffers and clear their addresses to prevent
+	 * issues during or after suspend. Delay the removal until all of that
+	 * is done, but not for more than 500ms.
+	 */
+	for (i = 0; i < 20; i++) {
+		if (ipts->status == IPTS_HOST_STATUS_STOPPED)
+			break;
+
+		msleep(25);
+	}
+
+	mei_cldev_disable(cldev);
+	
+	return 0;
+}
+#else
 static void ipts_mei_remove(struct mei_cl_device *cldev)
 {
 	int i;
@@ -85,6 +111,7 @@ static void ipts_mei_remove(struct mei_cl_device *cldev)
 
 	mei_cldev_disable(cldev);
 }
+#endif
 
 static struct mei_cl_device_id ipts_mei_device_id_table[] = {
 	{ .uuid = IPTS_MEI_UUID, .version = MEI_CL_VERSION_ANY },

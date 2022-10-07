@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-config HID_IPTS
+config MISC_IPTS
 	tristate "Intel Precise Touch & Stylus"
 	depends on INTEL_MEI
-	depends on HID
 	help
 	  Say Y here if your system has a touchscreen using Intels
 	  Precise Touch & Stylus (IPTS) technology.

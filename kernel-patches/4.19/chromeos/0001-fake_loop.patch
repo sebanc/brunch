@@ -57,7 +57,7 @@
  	mutex_lock(&loop_ctl_mutex);
  	for (i = 0; i < nr; i++)
  		loop_add(&lo, i);
-+	loop_add(&lo, 4096);
++	//loop_add(&lo, 4096);
  	mutex_unlock(&loop_ctl_mutex);
  
  	printk(KERN_INFO "loop: module loaded\n");

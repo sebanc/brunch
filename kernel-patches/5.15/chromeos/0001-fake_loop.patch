@@ -55,7 +55,7 @@
  	/* pre-create number of devices given by config or max_loop */
  	for (i = 0; i < nr; i++)
  		loop_add(i);
-+	loop_add(4096);
++	//loop_add(4096);
  
  	printk(KERN_INFO "loop: module loaded\n");
  	return 0;

@@ -24,7 +24,7 @@ if { [ ! -z "$img_uuid" ] || [ ! -z "$img_part" ]; } && [ ! -z "$img_path" ]; th
 	until false; do
 		if [ ! -z "$img_uuid" ]; then img_part="$(blkid --match-token PARTUUID=$img_uuid | cut -d':' -f1)"; fi
 		if [ -b "$img_part" ]; then break; fi
-		if [ $brunch_timeout == 10 ]; then echo "The boot partition was not found, falling back to shell..." > /dev/kmsg; exec sh; fi
+		if [ $brunch_timeout == 5 ]; then echo "The boot partition was not found, falling back to shell..." > /dev/kmsg; exec sh; fi
 		brunch_timeout=$(( $brunch_timeout + 1 ))
 		sleep 1
 	done
@@ -33,7 +33,7 @@ else
 	if [ ! -z "$brunch_timeout" ]; then
 		sleep "$brunch_timeout"
 	else
-		sleep 10
+		sleep 5
 	fi
 fi
 
@@ -52,6 +52,7 @@ if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 		mount -n "$img_part" /mainroot
 	fi
 	if [ -f /mainroot/"$img_path" ]; then
+		mknod -m660 /dev/sdz b 7 4096
 		losetup -P /dev/sdz /mainroot"$img_path"
 		bootdevice=/dev/sdz
 		partpath=/dev/sdz
@@ -203,6 +204,8 @@ fi
 umount /rootc
 e2fsck -y "$partpath"3
 mount "$partpath"3 /roota
+
+touch /dev/cros_ec
 
 if [ ! -z "$brunch_debug" ] && [ "$brunch_debug" -eq 3 ]; then
 	echo 0 0 0 0 > /proc/sys/kernel/printk

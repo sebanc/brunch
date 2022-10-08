@@ -1864,3 +1864,15 @@ diff -ruN "a/drivers/hid/amd-sfh-hid/sfh1_1/amd_sfh_interface.h" "b/drivers/hid/
 +void sfh_interface_init(struct amd_mp2_dev *mp2);
 +void amd_sfh1_1_set_desc_ops(struct amd_mp2_ops *mp2_ops);
 +#endif
+diff --git a/include/uapi/linux/input.h b/include/uapi/linux/input.h
+index ee3127461ee00..ef4257ab30265 100644
+--- a/include/uapi/linux/input.h
++++ b/include/uapi/linux/input.h
+@@ -271,6 +271,7 @@ struct input_mask {
+ #define BUS_RMI			0x1D
+ #define BUS_CEC			0x1E
+ #define BUS_INTEL_ISHTP		0x1F
++#define BUS_AMD_SFH		0x20
+ 
+ /*
+  * MT_TOOL types

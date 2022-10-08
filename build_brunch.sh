@@ -299,7 +299,7 @@ if [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ];
 cp -r ./external-drivers/ipts ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-cp ./src/ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ipts.ko || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+cp ./ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ipts.ko || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 cd ../../.. || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 rm -r ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 

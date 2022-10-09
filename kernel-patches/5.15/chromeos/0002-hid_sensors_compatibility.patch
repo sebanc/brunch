@@ -15,7 +15,7 @@ diff -uN a/drivers/hid/hid-sensor-hub.c b/drivers/hid/hid-sensor-hub.c
 diff -ruN a/drivers/iio/common/hid-sensors/hid-sensor-cros-compat.c b/drivers/iio/common/hid-sensors/hid-sensor-cros-compat.c
 --- a/drivers/iio/common/hid-sensors/hid-sensor-cros-compat.c	1970-01-01 01:00:00.000000000 +0100
 +++ b/drivers/iio/common/hid-sensors/hid-sensor-cros-compat.c	2020-03-19 15:35:32.105606158 +0100
-@@ -0,0 +1,1001 @@
+@@ -0,0 +1,979 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -428,17 +428,6 @@ diff -ruN a/drivers/iio/common/hid-sensors/hid-sensor-cros-compat.c b/drivers/ii
 +	als_scale_factor_post_decml = (((st->scale_pre_decml * (s64)1000000000 + st->scale_post_decml) - (als_scale_factor_pre_decml * (s64)1000000000)) * ((s64)1000000000 / (s64)1000000000));
 +	st->scale_pre_decml = 1;
 +	st->scale_post_decml = 0;
-+
-+	if (st->common_attributes.sensitivity.index < 0) {
-+		sensor_hub_input_get_attribute_info(hsdev,
-+			HID_FEATURE_REPORT, usage_id,
-+			HID_USAGE_SENSOR_DATA_MOD_CHANGE_SENSITIVITY_ABS |
-+			HID_USAGE_SENSOR_DATA_LIGHT,
-+			&st->common_attributes.sensitivity);
-+		dev_dbg(&pdev->dev, "Sensitivity index:report %d:%d\n",
-+			st->common_attributes.sensitivity.index,
-+			st->common_attributes.sensitivity.report_id);
-+	}
 +	
 +	return ret;
 +}
@@ -448,7 +437,7 @@ diff -ruN a/drivers/iio/common/hid-sensors/hid-sensor-cros-compat.c b/drivers/ii
 +	int ret = 0;
 +	struct iio_dev *indio_dev;
 +	struct als_state *als_state;
-+	static const u32 als_sensitivity_addresses[] = { HID_USAGE_SENSOR_DATA_LIGHT, };
++	static const u32 als_sensitivity_addresses[] = { HID_USAGE_SENSOR_LIGHT_ILLUM, };
 +	
 +	struct hid_sensor_hub_device *hsdev = pdev->dev.platform_data;
 +
@@ -815,17 +804,6 @@ diff -ruN a/drivers/iio/common/hid-sensors/hid-sensor-cros-compat.c b/drivers/ii
 +	accel_scale_factor_post_decml = (((st->scale_pre_decml * (s64)1000000000 + st->scale_post_decml) - (accel_scale_factor_pre_decml * 980665)) * ((s64)1000000000 / 980665));
 +	st->scale_pre_decml = 0;
 +	st->scale_post_decml = 980665;
-+
-+	if (st->common_attributes.sensitivity.index < 0) {
-+		sensor_hub_input_get_attribute_info(hsdev,
-+			HID_FEATURE_REPORT, usage_id,
-+			HID_USAGE_SENSOR_DATA_MOD_CHANGE_SENSITIVITY_ABS |
-+			HID_USAGE_SENSOR_DATA_ACCELERATION,
-+			&st->common_attributes.sensitivity);
-+		dev_dbg(&pdev->dev, "Sensitivity index:report %d:%d\n",
-+			st->common_attributes.sensitivity.index,
-+			st->common_attributes.sensitivity.report_id);
-+	}
 +
 +	return ret;
 +}

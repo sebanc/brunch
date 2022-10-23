@@ -22,16 +22,16 @@ jobs:
           yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12 git fakeroot build-essential ncurses-dev xz-utils libssl-dev bc flex libelf-dev bison sbsigntool
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
       - name: Checkout Brunch source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Download kernels and apply patches
         run: ./prepare_kernels.sh
       - name: Define kernels matrix
         id: kernels
-        run: echo "::set-output name=matrix::$(echo [\"$(ls -d ./kernels/*  | cut -f3 -d'/' | sed -Ez '$ s/\n+$//' | sed -z 's#\n#","#g')\"])"
+        run: echo "matrix=$(echo [\"$(ls -d ./kernels/*  | cut -f3 -d'/' | sed -Ez '$ s/\n+$//' | sed -z 's#\n#","#g')\"])" >> $GITHUB_OUTPUT
       - name: Compress kernels source files
         run: tar zcf /tmp/kernels-source.tar.gz kernels
       - name: Upload kernels source
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: kernels-source
           path: /tmp/kernels-source.tar.gz
@@ -51,9 +51,9 @@ jobs:
           yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12 git fakeroot build-essential ncurses-dev xz-utils libssl-dev bc flex libelf-dev bison sbsigntool
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
       - name: Checkout Brunch source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Download kernels source
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: kernels-source
           path: /tmp
@@ -77,7 +77,7 @@ jobs:
       - name: Compress built kernel
         run: tar zcf /tmp/built-kernel-${{ matrix.kernel }}.tar.gz kernels/${{ matrix.kernel }}
       - name: Upload kernels source
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: built-kernel-${{ matrix.kernel }}
           path: /tmp/built-kernel-${{ matrix.kernel }}.tar.gz
@@ -95,9 +95,9 @@ jobs:
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
           pip3 install --upgrade google-api-python-client
       - name: Checkout Brunch source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Download built kernels
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: /tmp
       - name: Copy built kernels
@@ -111,7 +111,7 @@ jobs:
       - name: Build brunch
         run: sudo bash build_brunch.sh
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: brunch-build
           path: out/brunch_r*.tar.gz
@@ -124,7 +124,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Download built artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: brunch-build
       - name: Identify custom version

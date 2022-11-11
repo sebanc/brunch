@@ -52,6 +52,13 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
   ### My Touchpad, Touchscreen, Wifi or other hardware is not working properly!
   * ChromeOS is not optimized for every device. Brunch has several avaliable framework options and multiple customized kernels avaliable further down on this page to help with these issues. If you're still having issues, you can reach out to other users on one of our communities for help.
 
+  ### Grub doens't appears on the boot options
+  * Some older devices (usually Acer, Asus and Samsung) can't detect Brunch's Grub. To solve this, you can manually assign grub on the BIOS but if your bios doesn't have this option you can use `efibootmgr` to create a boot entry for grub
+
+Usually, this can be resolved in the bios settings and manually selecting an EFI to boot from, then it should become a default boot option.
+
+Usually, this can be resolved in the bios settings and manually selecting an EFI to boot from, then it should become a default boot option.
+
 [![Discord][discord-shield]][discord-url]
 [![Reddit][reddit-shield]][reddit-url]
 [![Telegram][telegram-shield]][telegram-url]

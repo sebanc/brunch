@@ -25,7 +25,7 @@ This guide is for installing Brunch to a USB (or other disk) using Windows. This
 - Administrator access.
 - Target Disk/USB must be 16 GB minimum.
   - You will also need about 16 GB of free space in your Windows installation.
-- A linux installation vis WSL2
+- A linux installation via WSL2
 - `pv`, `tar`, `unzip` and `cgpt` packages.
 - A [compatible PC][compatibility] to boot Brunch on.
 - An entry level understanding of the linux terminal.

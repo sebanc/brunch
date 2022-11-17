@@ -401,7 +401,8 @@ menuentry \"ChromeOS (settings)\" --class \"brunch-settings\" {$remove_tpm
 			echo -e "$finalise"
 		fi
 	else
-		grubinstall="The grub config needed to boot ChromeOS has been generated in the file \"$fullpath.grub.txt\".\n\nIf you have a linux distro installed which uses grub as bootloader, run the below command to generate the grub config automatically:\nsudo cat /etc/grub.d/40_custom $fullpath.grub.txt | sudo tee /etc/grub.d/99_brunch; sudo chmod 0755 /etc/grub.d/99_brunch; sudo grub-mkconfig -o /boot/grub/grub.cfg\n\nOtherwise, add this grub config (lines between stars) manually to another grub bootloader:\n\n ****************************************************************************************** \n$config\n ****************************************************************************************** \n\nOnce the above actions are completed, you can reboot your computer and start ChromeOS"
+		if [ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "fedora" ]; then grub="grub2"; else grub="grub"; fi
+		grubinstall="The grub config needed to boot ChromeOS has been generated in the file \"$fullpath.grub.txt\".\n\nIf you have a linux distro installed which uses grub as bootloader, run the below command to generate the grub config automatically:\nsudo cat /etc/grub.d/40_custom $fullpath.grub.txt | sudo tee /etc/grub.d/99_brunch; sudo chmod 0755 /etc/grub.d/99_brunch; sudo $grub-mkconfig -o /boot/$grub/grub.cfg\n\nOtherwise, add this grub config (lines between stars) manually to another grub bootloader:\n\n ****************************************************************************************** \n$config\n ****************************************************************************************** \n\nOnce the above actions are completed, you can reboot your computer and start ChromeOS"
 		if [ ! -z "$zenity" ]; then
 			zenity --height=480 --width=640 --title="Brunch installer" --info --text="$grubinstall" --ok-label="Exit"
 		else

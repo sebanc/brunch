@@ -156,9 +156,10 @@ WARNING: Changing kernel can prevent you from logging into your ChromeOS account
 ![Kernels][bcm-kernel]
   
 Several kernels can be enabled throught the configuration menu:
-- kernel 5.4: Default kernel which is considered to be the most stable.
-- kernel 5.10: Most recent kernel, needed for Intel Gen 10+ and AMD Ryzen Gen 4+ devices.
-- kernel 4.19: Previous brunch kernel.
+- kernel 5.15: Latest brunch kernel, this is the default kernel for Brunch 102 and newer.
+- kernel 5.4: Previous brunch kernel, useful for some older devices.
+- kernel 5.10: Previous brunch kernel, minimum needed for Intel Gen 10+ and AMD Ryzen Gen 4+ devices. (can also use 5.15)
+- kernel 4.19: Previous brunch kernel, useful for some surface devices.
 - kernel chromebook-5.4: Kernel with the best support for chromebooks.
 - kernel chromebook-4.4: Kernel compatible with some older chromebooks models.
 - kernel macbook: 5.10 kernel with specific patches for different generations of macbooks

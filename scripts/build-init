@@ -121,7 +121,7 @@ tar zcvf ../rootc/packages/ithc.tar.gz * --owner=0 --group=0 || { echo "Failed t
 cd .. || { echo "Failed to make ithcd"; exit 1; }
 rm -rf ./ithc-pkg || { echo "Failed to make ithcd"; exit 1; }
 
-git clone --depth=1 -b master https://github.com/jirka-h/haveged.git || { echo "Failed to make haveged"; exit 1; }
+git clone --depth=1 -b v1.9.18 https://github.com/jirka-h/haveged.git || { echo "Failed to make haveged"; exit 1; }
 cd haveged || { echo "Failed to make haveged"; exit 1; }
 autoreconf -i || { echo "Failed to make haveged"; exit 1; }
 ./configure --prefix=/usr --libdir=/usr/lib64 --disable-init --enable-tune=no || { echo "Failed to make haveged"; exit 1; }
@@ -206,28 +206,15 @@ tar zcvf ../rootc/packages/swtpm.tar.gz * --owner=0 --group=0 || { echo "Failed 
 cd .. || { echo "Failed to make swtpm package"; exit 1; }
 rm -rf ./swtpm-pkg || { echo "Failed to make swtpm package"; exit 1; }
 
-git clone --depth=1 -b master https://github.com/mirror/ncurses.git || { echo "Failed to make ncurses"; exit 1; }
-cd ./ncurses || { echo "Failed to make ncurses"; exit 1; }
-./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal || { echo "Failed to make ncurses"; exit 1; }
-make -j"$NTHREADS" || { echo "Failed to make ncurses"; exit 1; }
-make DESTDIR=/home/chronos/ncurses-pkg install || { echo "Failed to make ncurses"; exit 1; }
-cd ../ncurses-pkg || { echo "Failed to make ncurses"; exit 1; }
-tar zcvf ../rootc/packages/ncurses.tar.gz * --owner=0 --group=0 || { echo "Failed to make ncurses"; exit 1; }
-cd .. || { echo "Failed to make ncurses"; exit 1; }
-rm -rf ./ncurses || { echo "Failed to make ncurses"; exit 1; }
-
-git clone --depth=1 -b master https://git.savannah.gnu.org/git/nano.git || { echo "Failed to make nano"; exit 1; }
-cd ./nano || { echo "Failed to make nano"; exit 1; }
-./autogen.sh || { echo "Failed to make nano"; exit 1; }
-./configure --prefix=/usr --libdir=/usr/lib64 || { echo "Failed to make nano"; exit 1; }
-make -j"$NTHREADS" || { echo "Failed to make nano"; exit 1; }
-make DESTDIR=/home/chronos/nano-pkg install || { echo "Failed to make nano"; exit 1; }
-mkdir -p ../nano-pkg/usr/lib64 || { echo "Failed to make nano"; exit 1; }
-for i in $(ldd ../nano-pkg/usr/bin/nano | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../nano-pkg/usr/lib64/ || { echo "Failed to make nano"; exit 1; }; fi; done
-cd ../nano-pkg || { echo "Failed to make nano"; exit 1; }
-tar zcvf ../rootc/packages/nano.tar.gz * --owner=0 --group=0 || { echo "Failed to make nano"; exit 1; }
-cd .. || { echo "Failed to make nano"; exit 1; }
-rm -rf ./ncurses-pkg ./nano ./nano-pkg || { echo "Failed to make nano"; exit 1; }
+git clone --depth=1 -b v9.0.1024 https://github.com/vim/vim.git || { echo "Failed to make vim"; exit 1; }
+cd ./vim || { echo "Failed to make vim"; exit 1; }
+./configure  --prefix=/usr --libdir=/usr/lib64 || { echo "Failed to make vim"; exit 1; }
+make -j"$NTHREADS" || { echo "Failed to make vim"; exit 1; }
+make DESTDIR=/home/chronos/vim-pkg install || { echo "Failed to make vim"; exit 1; }
+cd ../vim-pkg || { echo "Failed to make vim"; exit 1; }
+tar zcvf ../rootc/packages/vim.tar.gz * --owner=0 --group=0 || { echo "Failed to make vim"; exit 1; }
+cd .. || { echo "Failed to make vim"; exit 1; }
+rm -rf ./vim || { echo "Failed to make vim"; exit 1; }
 
 git clone --depth=1 -b master https://github.com/plougher/squashfs-tools.git || { echo "Failed to make squashfs-tools"; exit 1; }
 cd squashfs-tools/squashfs-tools || { echo "Failed to make squashfs-tools"; exit 1; }

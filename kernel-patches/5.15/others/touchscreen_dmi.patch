@@ -126,7 +126,7 @@
  		swap(input->absinfo[axis_x], input->absinfo[axis_y]);
 --- a/drivers/platform/x86/touchscreen_dmi.c	2021-01-16 07:36:36.000000000 +0100
 +++ b/drivers/platform/x86/touchscreen_dmi.c	2021-02-06 16:37:33.560771412 +0100
-@@ -543,6 +543,36 @@
+@@ -543,6 +543,49 @@
  	.properties	= teclast_x98plus2_props,
  };
  
@@ -160,10 +160,23 @@
 +	.properties	= avita_wt9t12_props,
 +};
 +
++static const struct property_entry positivo_c464c_props[] = {
++	PROPERTY_ENTRY_U32("touchscreen-size-x", 1920),
++	PROPERTY_ENTRY_U32("touchscreen-size-y", 1270),
++	PROPERTY_ENTRY_STRING("firmware-name", "gsl1680-positivo_c464c.fw"),
++	PROPERTY_ENTRY_U32("silead,max-fingers", 10),
++	{ }
++};
++
++static const struct ts_dmi_data positivo_c464c_data = {
++	.acpi_name	= "MSSL1680:00",
++	.properties	= positivo_c464c_props,
++};
++
  static const struct property_entry trekstor_primebook_c11_props[] = {
  	PROPERTY_ENTRY_U32("touchscreen-size-x", 1970),
  	PROPERTY_ENTRY_U32("touchscreen-size-y", 1530),
-@@ -949,6 +965,22 @@
+@@ -949,6 +965,31 @@
  		},
  	},
  	{
@@ -180,6 +193,15 @@
 +		.matches = {
 +			DMI_MATCH(DMI_SYS_VENDOR, "AVITA"),
 +			DMI_MATCH(DMI_PRODUCT_NAME, "WT9T12"),
++		},
++	},
++	{
++		/* Positivo DUO C464C */
++		.driver_data = (void *)&positivo_c464c_data,
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Positivo Tecnologia SA"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "C464C"),
++			DMI_MATCH(DMI_BOARD_NAME, "K116R"),
 +		},
 +	},
 +	{

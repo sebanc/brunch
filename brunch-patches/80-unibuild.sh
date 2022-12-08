@@ -13,8 +13,9 @@ done
 
 ret=0
 board=$(fgrep 'CHROMEOS_RELEASE_DESCRIPTION' /roota/etc/lsb-release | cut -d' ' -f5 | tr a-z A-Z)
-
-if [ "$board" == "HATCH" ]; then
+if [ "$board" == "CORAL" ]; then
+	hwid="ASTRONAUT"
+elif [ "$board" == "HATCH" ]; then
 	hwid="JINLON-YTGY"
 elif [ "$board" == "NAMI" ]; then
 	hwid="AKALI"

@@ -37,6 +37,7 @@ This guide is for installing Brunch to a USB (or other disk) using Linux. This g
 * ["volteer" for 10th & 11th gen.][recovery-volteer]
 #### AMD
 * ["zork" for Ryzen.][recovery-zork]
+* ["guybrush" for Ryzen 5xxx U][recovery-guybrush]
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 
@@ -210,6 +211,7 @@ This guide is for installing Brunch to a partition using Linux. This guide is *n
 * ["volteer" for 10th & 11th gen.][recovery-volteer]
 #### AMD
 * ["zork" for Ryzen.][recovery-zork]
+* ["guybrush" for Ryzen 5xxx U][recovery-guybrush]
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 
@@ -390,6 +392,7 @@ In case you run into issues while installing or using Brunch, below are the main
 [recovery-volteer]: https://cros.tech/device/volteer
 [recovery-grunt]: https://cros.tech/device/grunt
 [recovery-zork]: https://cros.tech/device/zork
+[recovery-guybrush]: https://cros.tech/device/guybrush
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils

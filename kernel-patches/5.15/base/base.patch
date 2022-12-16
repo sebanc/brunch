@@ -469,309 +469,6 @@ diff -ruN a/arch/x86/kvm/emulate.c b/arch/x86/kvm/emulate.c
  		else if (ctxt->d & Mmx)
  			ctxt->op_bytes = 8;
  	}
-diff -ruN a/arch/x86/kvm/mmu/mmu.c b/arch/x86/kvm/mmu/mmu.c
---- a/arch/x86/kvm/mmu/mmu.c	2021-12-08 09:04:57.000000000 +0100
-+++ b/arch/x86/kvm/mmu/mmu.c	2021-12-23 08:35:15.000000000 +0100
-@@ -617,13 +617,6 @@
- 
- 	pfn = spte_to_pfn(old_spte);
- 
--	/*
--	 * KVM does not hold the refcount of the page used by
--	 * kvm mmu, before reclaiming the page, we should
--	 * unmap it from mmu first.
--	 */
--	WARN_ON(!kvm_is_reserved_pfn(pfn) && !page_count(pfn_to_page(pfn)));
--
- 	if (is_accessed_spte(old_spte))
- 		kvm_set_pfn_accessed(pfn);
- 
-@@ -2786,8 +2779,9 @@
- 	return ret;
- }
- 
--static kvm_pfn_t pte_prefetch_gfn_to_pfn(struct kvm_vcpu *vcpu, gfn_t gfn,
--				     bool no_dirty_log)
-+static kvm_pfn_t pte_prefetch_gfn_to_pfn_page(struct kvm_vcpu *vcpu,
-+					      gfn_t gfn, bool no_dirty_log,
-+					      struct page **page)
- {
- 	struct kvm_memory_slot *slot;
- 
-@@ -2795,7 +2789,7 @@
- 	if (!slot)
- 		return KVM_PFN_ERR_FAULT;
- 
--	return gfn_to_pfn_memslot_atomic(slot, gfn);
-+	return gfn_to_pfn_page_memslot_atomic(slot, gfn, page);
- }
- 
- static int direct_pte_prefetch_many(struct kvm_vcpu *vcpu,
-@@ -2842,11 +2836,13 @@
- 			if (!start)
- 				continue;
- 			if (direct_pte_prefetch_many(vcpu, sp, start, spte) < 0)
--				break;
-+				return;
- 			start = NULL;
- 		} else if (!start)
- 			start = spte;
- 	}
-+	if (start)
-+		direct_pte_prefetch_many(vcpu, sp, start, spte);
- }
- 
- static void direct_pte_prefetch(struct kvm_vcpu *vcpu, u64 *sptep)
-@@ -2926,7 +2922,8 @@
- 
- int kvm_mmu_hugepage_adjust(struct kvm_vcpu *vcpu, gfn_t gfn,
- 			    int max_level, kvm_pfn_t *pfnp,
--			    bool huge_page_disallowed, int *req_level)
-+			    struct page *page, bool huge_page_disallowed,
-+			    int *req_level)
- {
- 	struct kvm_memory_slot *slot;
- 	kvm_pfn_t pfn = *pfnp;
-@@ -2938,6 +2935,9 @@
- 	if (unlikely(max_level == PG_LEVEL_4K))
- 		return PG_LEVEL_4K;
- 
-+	if (!page)
-+		return PG_LEVEL_4K;
-+
- 	if (is_error_noslot_pfn(pfn) || kvm_is_reserved_pfn(pfn))
- 		return PG_LEVEL_4K;
- 
-@@ -2987,7 +2987,8 @@
- }
- 
- static int __direct_map(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
--			int map_writable, int max_level, kvm_pfn_t pfn,
-+			int map_writable, int max_level,
-+			kvm_pfn_t pfn, struct page *page,
- 			bool prefault, bool is_tdp)
- {
- 	bool nx_huge_page_workaround_enabled = is_nx_huge_page_enabled();
-@@ -3000,7 +3001,7 @@
- 	gfn_t gfn = gpa >> PAGE_SHIFT;
- 	gfn_t base_gfn = gfn;
- 
--	level = kvm_mmu_hugepage_adjust(vcpu, gfn, max_level, &pfn,
-+	level = kvm_mmu_hugepage_adjust(vcpu, gfn, max_level, &pfn, page,
- 					huge_page_disallowed, &req_level);
- 
- 	trace_kvm_mmu_spte_requested(gpa, level, pfn);
-@@ -3904,8 +3905,9 @@
- }
- 
- static bool kvm_faultin_pfn(struct kvm_vcpu *vcpu, bool prefault, gfn_t gfn,
--			 gpa_t cr2_or_gpa, kvm_pfn_t *pfn, hva_t *hva,
--			 bool write, bool *writable, int *r)
-+			 gpa_t cr2_or_gpa, kvm_pfn_t *pfn,
-+			 hva_t *hva, bool write, bool *writable,
-+			 struct page **page, int *r)
- {
- 	struct kvm_memory_slot *slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
- 	bool async;
-@@ -3939,8 +3941,8 @@
- 	}
- 
- 	async = false;
--	*pfn = __gfn_to_pfn_memslot(slot, gfn, false, &async,
--				    write, writable, hva);
-+	*pfn = __gfn_to_pfn_page_memslot(slot, gfn, false, &async,
-+					 write, writable, hva, page);
- 	if (!async)
- 		return false; /* *pfn has correct page already */
- 
-@@ -3954,8 +3956,8 @@
- 			goto out_retry;
- 	}
- 
--	*pfn = __gfn_to_pfn_memslot(slot, gfn, false, NULL,
--				    write, writable, hva);
-+	*pfn = __gfn_to_pfn_page_memslot(slot, gfn, false, NULL,
-+					 write, writable, hva, page);
- 	return false;
- 
- out_retry:
-@@ -3972,6 +3974,7 @@
- 	gfn_t gfn = gpa >> PAGE_SHIFT;
- 	unsigned long mmu_seq;
- 	kvm_pfn_t pfn;
-+	struct page *page;
- 	hva_t hva;
- 	int r;
- 
-@@ -3990,7 +3993,7 @@
- 	smp_rmb();
- 
- 	if (kvm_faultin_pfn(vcpu, prefault, gfn, gpa, &pfn, &hva,
--			 write, &map_writable, &r))
-+			 write, &map_writable, &page, &r))
- 		return r;
- 
- 	if (handle_abnormal_pfn(vcpu, is_tdp ? 0 : gpa, gfn, pfn, ACC_ALL, &r))
-@@ -4011,17 +4014,18 @@
- 
- 	if (is_tdp_mmu_fault)
- 		r = kvm_tdp_mmu_map(vcpu, gpa, error_code, map_writable, max_level,
--				    pfn, prefault);
-+				    pfn, page, prefault);
- 	else
--		r = __direct_map(vcpu, gpa, error_code, map_writable, max_level, pfn,
--				 prefault, is_tdp);
-+		r = __direct_map(vcpu, gpa, error_code, map_writable, max_level,
-+				 pfn, page, prefault, is_tdp);
- 
- out_unlock:
- 	if (is_tdp_mmu_fault)
- 		read_unlock(&vcpu->kvm->mmu_lock);
- 	else
- 		write_unlock(&vcpu->kvm->mmu_lock);
--	kvm_release_pfn_clean(pfn);
-+	if (page)
-+		put_page(page);
- 	return r;
- }
- 
-diff -ruN a/arch/x86/kvm/mmu/mmu_internal.h b/arch/x86/kvm/mmu/mmu_internal.h
---- a/arch/x86/kvm/mmu/mmu_internal.h	2021-12-08 09:04:57.000000000 +0100
-+++ b/arch/x86/kvm/mmu/mmu_internal.h	2021-12-23 08:35:15.000000000 +0100
-@@ -165,7 +165,8 @@
- 			      kvm_pfn_t pfn, int max_level);
- int kvm_mmu_hugepage_adjust(struct kvm_vcpu *vcpu, gfn_t gfn,
- 			    int max_level, kvm_pfn_t *pfnp,
--			    bool huge_page_disallowed, int *req_level);
-+			    struct page *page, bool huge_page_disallowed,
-+			    int *req_level);
- void disallowed_hugepage_adjust(u64 spte, gfn_t gfn, int cur_level,
- 				kvm_pfn_t *pfnp, int *goal_levelp);
- 
-diff -ruN a/arch/x86/kvm/mmu/paging_tmpl.h b/arch/x86/kvm/mmu/paging_tmpl.h
---- a/arch/x86/kvm/mmu/paging_tmpl.h	2021-12-08 09:04:57.000000000 +0100
-+++ b/arch/x86/kvm/mmu/paging_tmpl.h	2021-12-23 08:35:15.000000000 +0100
-@@ -564,6 +564,7 @@
- 	unsigned pte_access;
- 	gfn_t gfn;
- 	kvm_pfn_t pfn;
-+	struct page *page;
- 
- 	if (FNAME(prefetch_invalid_gpte)(vcpu, sp, spte, gpte))
- 		return false;
-@@ -573,8 +574,8 @@
- 	gfn = gpte_to_gfn(gpte);
- 	pte_access = sp->role.access & FNAME(gpte_access)(gpte);
- 	FNAME(protect_clean_gpte)(vcpu->arch.mmu, &pte_access, gpte);
--	pfn = pte_prefetch_gfn_to_pfn(vcpu, gfn,
--			no_dirty_log && (pte_access & ACC_WRITE_MASK));
-+	pfn = pte_prefetch_gfn_to_pfn_page(vcpu, gfn,
-+			no_dirty_log && (pte_access & ACC_WRITE_MASK), &page);
- 	if (is_error_pfn(pfn))
- 		return false;
- 
-@@ -585,7 +586,8 @@
- 	mmu_set_spte(vcpu, spte, pte_access, false, PG_LEVEL_4K, gfn, pfn,
- 		     true, true);
- 
--	kvm_release_pfn_clean(pfn);
-+	if (page)
-+		put_page(page);
- 	return true;
- }
- 
-@@ -665,8 +667,8 @@
-  */
- static int FNAME(fetch)(struct kvm_vcpu *vcpu, gpa_t addr,
- 			 struct guest_walker *gw, u32 error_code,
--			 int max_level, kvm_pfn_t pfn, bool map_writable,
--			 bool prefault)
-+			 int max_level, kvm_pfn_t pfn, struct page *page,
-+			 bool map_writable, bool prefault)
- {
- 	bool nx_huge_page_workaround_enabled = is_nx_huge_page_enabled();
- 	bool write_fault = error_code & PFERR_WRITE_MASK;
-@@ -742,7 +744,8 @@
- 	}
- 
- 	level = kvm_mmu_hugepage_adjust(vcpu, gw->gfn, max_level, &pfn,
--					huge_page_disallowed, &req_level);
-+					page, huge_page_disallowed,
-+					&req_level);
- 
- 	trace_kvm_mmu_spte_requested(addr, gw->level, pfn);
- 
-@@ -849,6 +852,7 @@
- 	struct guest_walker walker;
- 	int r;
- 	kvm_pfn_t pfn;
-+	struct page *page;
- 	hva_t hva;
- 	unsigned long mmu_seq;
- 	bool map_writable, is_self_change_mapping;
-@@ -901,7 +905,7 @@
- 	smp_rmb();
- 
- 	if (kvm_faultin_pfn(vcpu, prefault, walker.gfn, addr, &pfn, &hva,
--			 write_fault, &map_writable, &r))
-+			 write_fault, &map_writable, &page, &r))
- 		return r;
- 
- 	if (handle_abnormal_pfn(vcpu, addr, walker.gfn, pfn, walker.pte_access, &r))
-@@ -935,13 +939,14 @@
- 	r = make_mmu_pages_available(vcpu);
- 	if (r)
- 		goto out_unlock;
--	r = FNAME(fetch)(vcpu, addr, &walker, error_code, max_level, pfn,
-+	r = FNAME(fetch)(vcpu, addr, &walker, error_code, max_level, pfn, page,
- 			 map_writable, prefault);
- 	kvm_mmu_audit(vcpu, AUDIT_POST_PAGE_FAULT);
- 
- out_unlock:
- 	write_unlock(&vcpu->kvm->mmu_lock);
--	kvm_release_pfn_clean(pfn);
-+	if (page)
-+		put_page(page);
- 	return r;
- }
- 
-diff -ruN a/arch/x86/kvm/mmu/tdp_mmu.c b/arch/x86/kvm/mmu/tdp_mmu.c
---- a/arch/x86/kvm/mmu/tdp_mmu.c	2021-12-08 09:04:57.000000000 +0100
-+++ b/arch/x86/kvm/mmu/tdp_mmu.c	2021-12-23 08:35:15.000000000 +0100
-@@ -985,8 +985,8 @@
-  * page tables and SPTEs to translate the faulting guest physical address.
-  */
- int kvm_tdp_mmu_map(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
--		    int map_writable, int max_level, kvm_pfn_t pfn,
--		    bool prefault)
-+		    int map_writable, int max_level,
-+		    kvm_pfn_t pfn, struct page *page, bool prefault)
- {
- 	bool nx_huge_page_workaround_enabled = is_nx_huge_page_enabled();
- 	bool write = error_code & PFERR_WRITE_MASK;
-@@ -1002,7 +1002,7 @@
- 	int level;
- 	int req_level;
- 
--	level = kvm_mmu_hugepage_adjust(vcpu, gfn, max_level, &pfn,
-+	level = kvm_mmu_hugepage_adjust(vcpu, gfn, max_level, &pfn, page,
- 					huge_page_disallowed, &req_level);
- 
- 	trace_kvm_mmu_spte_requested(gpa, level, pfn);
-diff -ruN a/arch/x86/kvm/mmu/tdp_mmu.h b/arch/x86/kvm/mmu/tdp_mmu.h
---- a/arch/x86/kvm/mmu/tdp_mmu.h	2021-12-08 09:04:57.000000000 +0100
-+++ b/arch/x86/kvm/mmu/tdp_mmu.h	2021-12-23 08:35:15.000000000 +0100
-@@ -49,8 +49,8 @@
- void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm);
- 
- int kvm_tdp_mmu_map(struct kvm_vcpu *vcpu, gpa_t gpa, u32 error_code,
--		    int map_writable, int max_level, kvm_pfn_t pfn,
--		    bool prefault);
-+		    int map_writable, int max_level,
-+		    kvm_pfn_t pfn, struct page *page, bool prefault);
- 
- bool kvm_tdp_mmu_unmap_gfn_range(struct kvm *kvm, struct kvm_gfn_range *range,
- 				 bool flush);
 diff -ruN a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
 --- a/arch/x86/kvm/x86.c	2021-12-08 09:04:57.000000000 +0100
 +++ b/arch/x86/kvm/x86.c	2021-12-23 08:35:15.000000000 +0100
@@ -18917,14 +18614,14 @@ diff -ruN a/drivers/media/common/videobuf2/videobuf2-core.c b/drivers/media/comm
  		 * We already have buffers allocated, so first check if they
  		 * are not in use and can be freed.
 @@ -789,6 +814,7 @@
- 	num_buffers = min_t(unsigned int, num_buffers, VB2_MAX_FRAME);
- 	memset(q->alloc_devs, 0, sizeof(q->alloc_devs));
+ 	 */
+ 	mutex_lock(&q->mmap_lock);
  	q->memory = memory;
 +	set_queue_coherency(q, non_coherent_mem);
+ 	mutex_unlock(&q->mmap_lock);
  
  	/*
- 	 * Ask the driver how many buffers and planes per buffer it requires.
-@@ -873,12 +899,13 @@
+@@ -873,13 +899,14 @@
  EXPORT_SYMBOL_GPL(vb2_core_reqbufs);
  
  int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
@@ -18935,6 +18632,7 @@ diff -ruN a/drivers/media/common/videobuf2/videobuf2-core.c b/drivers/media/comm
  {
  	unsigned int num_planes = 0, num_buffers, allocated_buffers;
  	unsigned plane_sizes[VB2_MAX_PLANES] = { };
+ 	bool no_previous_buffers = !q->num_buffers;
 +	bool non_coherent_mem = flags & V4L2_MEMORY_FLAG_NON_COHERENT;
  	int ret;
  
@@ -64383,14 +64081,14 @@ diff -ruN a/fs/eventpoll.c b/fs/eventpoll.c
  #include <linux/uaccess.h>
  #include <asm/io.h>
  #include <asm/mman.h>
-@@ -1846,8 +1847,8 @@
+@@ -1912,8 +1913,8 @@
  		write_unlock_irq(&ep->lock);
  
  		if (!eavail)
 -			timed_out = !schedule_hrtimeout_range(to, slack,
 -							      HRTIMER_MODE_ABS);
 +			timed_out = !freezable_schedule_hrtimeout_range(to, slack,
-+									HRTIMER_MODE_ABS);
++							      HRTIMER_MODE_ABS);
  		__set_current_state(TASK_RUNNING);
  
  		/*

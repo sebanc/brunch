@@ -45320,16 +45320,17 @@ diff -ruN a/fs/eventpoll.c b/fs/eventpoll.c
  #include <linux/uaccess.h>
  #include <asm/io.h>
  #include <asm/mman.h>
-@@ -1912,7 +1913,8 @@
- 			break;
- 		}
+@@ -1912,8 +1913,8 @@
+ 		write_unlock_irq(&ep->lock);
  
--		if (!schedule_hrtimeout_range(to, slack, HRTIMER_MODE_ABS)) {
-+		if (!freezable_schedule_hrtimeout_range(to, slack,
-+						        HRTIMER_MODE_ABS)) {
- 			timed_out = 1;
- 			break;
- 		}
+ 		if (!eavail && !res)
+-			timed_out = !schedule_hrtimeout_range(to, slack,
+-							      HRTIMER_MODE_ABS);
++			timed_out = !freezable_schedule_hrtimeout_range(to, slack,
++							      HRTIMER_MODE_ABS);
+ 
+ 		/*
+ 		 * We were woken up, thus go and try to harvest some events.
 diff -ruN a/fs/exec.c b/fs/exec.c
 --- a/fs/exec.c	2019-12-04 22:31:09.000000000 +0100
 +++ b/fs/exec.c	2021-04-02 07:03:25.000000000 +0200

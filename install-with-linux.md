@@ -78,7 +78,7 @@ Once completed, you will have 4 new files from the brunch archive, and a recover
 
 ### Special instructions for Legacy devices **only**
 This step is only needed for legacy boot devices that do not support UEFI. If your PC supports UEFI, _skip this step!_
-* If you need it, this is when you should download the [MBR patch][mbr-patch] from the main branch and extract it with `tar`.
+* If you need it, this is when you should download the [MBR patch](https://github.com/sebanc/brunch/raw/main/mbr_support.tar.gz) from the main branch and extract it with `tar`.
   * This file will overwrite some of the files you've already extracted, this is supposed to happen.
 
 ```tar zxvf mbr_support.tar.gz```
@@ -357,7 +357,6 @@ In case you run into issues while installing or using Brunch, below are the main
 ### [![Install with Windows][windows-img]][windows-guide]  [Install with Windows][windows-guide]
 
 <!-- Reference Links -->
-<!-- Badges -->
 [license-shield]: https://img.shields.io/github/license/sebanc/brunch?label=License&logo=Github&style=flat-square
 [license-url]: ./LICENSE
 [forks-shield]: https://img.shields.io/github/forks/sebanc/brunch?label=Forks&logo=Github&style=flat-square

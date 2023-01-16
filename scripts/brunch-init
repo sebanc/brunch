@@ -19,7 +19,7 @@ if [ ! -z "$brunch_bootsplash" ] && [ -f /bootsplashes/"$brunch_bootsplash"/main
 
 haveged -w 1024 -v 1 -F > /dev/kmsg 2>&1 &
 
-if { [ ! -z "$img_uuid" ] || [ ! -z "$img_part" ]; } && [ ! -z "$img_path" ]; then
+if [ ! -z "$img_uuid" ]; then
 	brunch_timeout=0
 	until false; do
 		if [ ! -z "$img_uuid" ]; then img_part="$(blkid --match-token PARTUUID=$img_uuid | cut -d':' -f1)"; fi

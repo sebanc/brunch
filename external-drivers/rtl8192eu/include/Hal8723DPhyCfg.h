@@ -123,7 +123,7 @@ PHY_SetSwChnlBWMode8723D(
 );
 
 VOID phy_set_rf_path_switch_8723d(
-	IN	PADAPTER	pAdapter,
+	IN	struct dm_struct		*phydm,
 	IN	bool		bMain
 );
 /*--------------------------Exported Function prototype End---------------------*/

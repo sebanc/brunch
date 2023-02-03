@@ -47,10 +47,6 @@ jackson@realtek.com.tw
 #include <drv_types.h>
 #include <hal_data.h>
 
-#if defined(PLATFORM_LINUX) && defined (PLATFORM_WINDOWS)
-	#error "Shall be Linux or Windows, but not both!\n"
-#endif
-
 #if defined(CONFIG_SDIO_HCI) || defined(CONFIG_PLATFORM_RTL8197D)
 	#define rtw_le16_to_cpu(val)		val
 	#define rtw_le32_to_cpu(val)		val
@@ -64,7 +60,7 @@ jackson@realtek.com.tw
 #endif
 
 
-u8 _rtw_read8(_adapter *adapter, u32 addr)
+u8 rtw_read8(_adapter *adapter, u32 addr)
 {
 	u8 r_val;
 	/* struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue; */
@@ -77,7 +73,7 @@ u8 _rtw_read8(_adapter *adapter, u32 addr)
 	return r_val;
 }
 
-u16 _rtw_read16(_adapter *adapter, u32 addr)
+u16 rtw_read16(_adapter *adapter, u32 addr)
 {
 	u16 r_val;
 	/* struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue; */
@@ -90,7 +86,7 @@ u16 _rtw_read16(_adapter *adapter, u32 addr)
 	return rtw_le16_to_cpu(r_val);
 }
 
-u32 _rtw_read32(_adapter *adapter, u32 addr)
+u32 rtw_read32(_adapter *adapter, u32 addr)
 {
 	u32 r_val;
 	/* struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue; */
@@ -104,7 +100,7 @@ u32 _rtw_read32(_adapter *adapter, u32 addr)
 
 }
 
-int _rtw_write8(_adapter *adapter, u32 addr, u8 val)
+int rtw_write8(_adapter *adapter, u32 addr, u8 val)
 {
 	/* struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue; */
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -117,7 +113,7 @@ int _rtw_write8(_adapter *adapter, u32 addr, u8 val)
 
 	return RTW_STATUS_CODE(ret);
 }
-int _rtw_write16(_adapter *adapter, u32 addr, u16 val)
+int rtw_write16(_adapter *adapter, u32 addr, u16 val)
 {
 	/* struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue; */
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -131,7 +127,7 @@ int _rtw_write16(_adapter *adapter, u32 addr, u16 val)
 
 	return RTW_STATUS_CODE(ret);
 }
-int _rtw_write32(_adapter *adapter, u32 addr, u32 val)
+int rtw_write32(_adapter *adapter, u32 addr, u32 val)
 {
 	/* struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue; */
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -146,7 +142,7 @@ int _rtw_write32(_adapter *adapter, u32 addr, u32 val)
 	return RTW_STATUS_CODE(ret);
 }
 
-int _rtw_writeN(_adapter *adapter, u32 addr , u32 length , u8 *pdata)
+int rtw_writeN(_adapter *adapter, u32 addr , u32 length , u8 *pdata)
 {
 	/* struct	io_queue  	*pio_queue = (struct io_queue *)adapter->pio_queue; */
 	struct io_priv *pio_priv = &adapter->iopriv;
@@ -419,8 +415,12 @@ u32 _rtw_write_port_and_wait(_adapter *adapter, u32 addr, u32 cnt, u8 *pmem, int
 
 	ret = _rtw_write_port(adapter, addr, cnt, pmem);
 
-	if (ret == _SUCCESS)
+	if (ret == _SUCCESS) {
 		ret = rtw_sctx_wait(&sctx, __func__);
+
+		if (ret != _SUCCESS)
+			pxmitbuf->sctx = NULL;
+	}
 
 	return ret;
 }
@@ -465,7 +465,7 @@ int rtw_inc_and_chk_continual_io_error(struct dvobj_priv *dvobj)
 	int ret = _FALSE;
 	int value;
 
-	value = ATOMIC_INC_RETURN(&dvobj->continual_io_error);
+	value = atomic_inc_return(&dvobj->continual_io_error);
 	if (value > MAX_CONTINUAL_IO_ERR) {
 		RTW_INFO("[dvobj:%p][ERROR] continual_io_error:%d > %d\n", dvobj, value, MAX_CONTINUAL_IO_ERR);
 		ret = _TRUE;
@@ -480,43 +480,196 @@ int rtw_inc_and_chk_continual_io_error(struct dvobj_priv *dvobj)
 */
 void rtw_reset_continual_io_error(struct dvobj_priv *dvobj)
 {
-	ATOMIC_SET(&dvobj->continual_io_error, 0);
+	atomic_set(&dvobj->continual_io_error, 0);
 }
 
 #ifdef DBG_IO
+#define RTW_IO_SNIFF_TYPE_RANGE	0 /* specific address range is accessed */
+#define RTW_IO_SNIFF_TYPE_EN	1 /* part or all sniffed range is enabled */
+#define RTW_IO_SNIFF_TYPE_DIS	2 /* part or all sniffed range is disabled */
 
-u32 read_sniff_ranges[][2] = {
-	/* {0x520, 0x523}, */
+struct rtw_io_sniff_ent {
+	u8 chip;
+	u8 hci;
+	u32 addr;
+	u8 type;
+	union {
+		u32 end_addr;
+		u32 mask;
+	} u;
+	char *tag;
 };
 
-u32 write_sniff_ranges[][2] = {
-	/* {0x520, 0x523}, */
-	/* {0x4c, 0x4c}, */
-};
-
-int read_sniff_num = sizeof(read_sniff_ranges) / sizeof(u32) / 2;
-int write_sniff_num = sizeof(write_sniff_ranges) / sizeof(u32) / 2;
-
-bool match_read_sniff_ranges(u32 addr, u16 len)
+const char *rtw_io_sniff_ent_get_tag(const struct rtw_io_sniff_ent *ent)
 {
-	int i;
-	for (i = 0; i < read_sniff_num; i++) {
-		if (addr + len > read_sniff_ranges[i][0] && addr <= read_sniff_ranges[i][1])
-			return _TRUE;
-	}
-
-	return _FALSE;
+	return ent->tag;
 }
 
-bool match_write_sniff_ranges(u32 addr, u16 len)
+#define RTW_IO_SNIFF_RANGE_ENT(_chip, _hci, _addr, _end_addr, _tag) \
+	{.chip = _chip, .hci = _hci, .addr = _addr, .u.end_addr = _end_addr, .tag = _tag, .type = RTW_IO_SNIFF_TYPE_RANGE,}
+
+#define RTW_IO_SNIFF_EN_ENT(_chip, _hci, _addr, _mask, _tag) \
+	{.chip = _chip, .hci = _hci, .addr = _addr, .u.mask = _mask, .tag = _tag, .type = RTW_IO_SNIFF_TYPE_EN,}
+
+#define RTW_IO_SNIFF_DIS_ENT(_chip, _hci, _addr, _mask, _tag) \
+	{.chip = _chip, .hci = _hci, .addr = _addr, .u.mask = _mask, .tag = _tag, .type = RTW_IO_SNIFF_TYPE_DIS,}
+
+const struct rtw_io_sniff_ent read_sniff[] = {
+#ifdef DBG_IO_HCI_EN_CHK
+	RTW_IO_SNIFF_EN_ENT(MAX_CHIP_TYPE, RTW_SDIO, 0x02, 0x1FC, "SDIO 0x02[8:2] not all 0"),
+	RTW_IO_SNIFF_EN_ENT(MAX_CHIP_TYPE, RTW_USB, 0x02, 0x1E0, "USB 0x02[8:5] not all 0"),
+	RTW_IO_SNIFF_EN_ENT(MAX_CHIP_TYPE, RTW_PCIE, 0x02, 0x01C, "PCI 0x02[4:2] not all 0"),
+#endif
+#ifdef DBG_IO_SNIFF_EXAMPLE
+	RTW_IO_SNIFF_RANGE_ENT(MAX_CHIP_TYPE, 0, 0x522, 0x522, "read TXPAUSE"),
+	RTW_IO_SNIFF_DIS_ENT(MAX_CHIP_TYPE, 0, 0x02, 0x3, "0x02[1:0] not all 1"),
+#endif
+};
+
+const int read_sniff_num = sizeof(read_sniff) / sizeof(struct rtw_io_sniff_ent);
+
+const struct rtw_io_sniff_ent write_sniff[] = {
+#ifdef DBG_IO_HCI_EN_CHK
+	RTW_IO_SNIFF_EN_ENT(MAX_CHIP_TYPE, RTW_SDIO, 0x02, 0x1FC, "SDIO 0x02[8:2] not all 0"),
+	RTW_IO_SNIFF_EN_ENT(MAX_CHIP_TYPE, RTW_USB, 0x02, 0x1E0, "USB 0x02[8:5] not all 0"),
+	RTW_IO_SNIFF_EN_ENT(MAX_CHIP_TYPE, RTW_PCIE, 0x02, 0x01C, "PCI 0x02[4:2] not all 0"),
+#endif
+#ifdef DBG_IO_SNIFF_EXAMPLE
+	RTW_IO_SNIFF_RANGE_ENT(MAX_CHIP_TYPE, 0, 0x522, 0x522, "write TXPAUSE"),
+	RTW_IO_SNIFF_DIS_ENT(MAX_CHIP_TYPE, 0, 0x02, 0x3, "0x02[1:0] not all 1"),
+#endif
+};
+
+const int write_sniff_num = sizeof(write_sniff) / sizeof(struct rtw_io_sniff_ent);
+
+static bool match_io_sniff_ranges(_adapter *adapter
+	, const struct rtw_io_sniff_ent *sniff, int i, u32 addr, u16 len)
 {
-	int i;
-	for (i = 0; i < write_sniff_num; i++) {
-		if (addr + len > write_sniff_ranges[i][0] && addr <= write_sniff_ranges[i][1])
-			return _TRUE;
+
+	/* check if IO range after sniff end address */
+	if (addr > sniff->u.end_addr)
+		return 0;
+
+	return 1;
+}
+
+static bool match_io_sniff_en(_adapter *adapter
+	, const struct rtw_io_sniff_ent *sniff, int i, u32 addr, u8 len, u32 val)
+{
+	u8 sniff_len;
+	u8 shift;
+	u32 mask;
+	bool ret = 0;
+
+	/* check if IO range after sniff end address */
+	sniff_len = 4;
+	while (!(sniff->u.mask & (0xFF << ((sniff_len - 1) * 8)))) {
+		sniff_len--;
+		if (sniff_len == 0)
+			goto exit;
+	}
+	if (sniff->addr + sniff_len <= addr)
+		goto exit;
+
+	if (sniff->addr > addr) {
+		shift = (sniff->addr - addr) * 8;
+		mask = sniff->u.mask << shift;
+	} else if (sniff->addr < addr) {
+		shift = (addr - sniff->addr) * 8;
+		mask = sniff->u.mask >> shift;
+	} else {
+		shift = 0;
+		mask = sniff->u.mask;
 	}
 
-	return _FALSE;
+	if (sniff->type == RTW_IO_SNIFF_TYPE_DIS) {
+		if (len == 4)
+			mask &= 0xFFFFFFFF;
+		else if (len == 3)
+			mask &= 0x00FFFFFF;
+		else if (len == 2)
+			mask &= 0x0000FFFF;
+		else if (len == 1)
+			mask &= 0x000000FF;
+		else
+			mask &= 0x00000000;
+	}
+	
+	if ((sniff->type == RTW_IO_SNIFF_TYPE_EN && (mask & val))
+		|| (sniff->type == RTW_IO_SNIFF_TYPE_DIS && (mask & val) != mask)
+	) {
+		ret = 1;
+		if (0)
+			RTW_INFO(FUNC_ADPT_FMT" addr:0x%x len:%u val:0x%x i:%d sniff_len:%u shift:%u mask:0x%x\n"
+				, FUNC_ADPT_ARG(adapter), addr, len, val, i, sniff_len, shift, mask);
+	}
+
+exit:
+	return ret;
+}
+
+static bool match_io_sniff(_adapter *adapter
+	, const struct rtw_io_sniff_ent *sniff, int i, u32 addr, u8 len, u32 val)
+{
+	bool ret = 0;
+
+	if (sniff->chip != MAX_CHIP_TYPE
+		&& sniff->chip != rtw_get_chip_type(adapter))
+		goto exit;
+	if (sniff->hci
+		&& !(sniff->hci & rtw_get_intf_type(adapter)))
+		goto exit;
+	if (sniff->addr >= addr + len) /* IO range below sniff start address */
+		goto exit;
+
+	switch (sniff->type) {
+	case RTW_IO_SNIFF_TYPE_RANGE:
+		ret = match_io_sniff_ranges(adapter, sniff, i, addr, len);
+		break;
+	case RTW_IO_SNIFF_TYPE_EN:
+	case RTW_IO_SNIFF_TYPE_DIS:
+		if (len == 1 || len == 2 || len == 4)
+			ret = match_io_sniff_en(adapter, sniff, i, addr, len, val);
+		break;
+	default:
+		rtw_warn_on(1);
+		break;
+	}
+
+exit:
+	return ret;
+}
+
+const struct rtw_io_sniff_ent *match_read_sniff(_adapter *adapter
+	, u32 addr, u16 len, u32 val)
+{
+	int i;
+	bool ret = 0;
+
+	for (i = 0; i < read_sniff_num; i++) {
+		ret = match_io_sniff(adapter, &read_sniff[i], i, addr, len, val);
+		if (ret)
+			goto exit;
+	}
+
+exit:
+	return ret ? &read_sniff[i] : NULL;
+}
+
+const struct rtw_io_sniff_ent *match_write_sniff(_adapter *adapter
+	, u32 addr, u16 len, u32 val)
+{
+	int i;
+	bool ret = 0;
+
+	for (i = 0; i < write_sniff_num; i++) {
+		ret = match_io_sniff(adapter, &write_sniff[i], i, addr, len, val);
+		if (ret)
+			goto exit;
+	}
+
+exit:
+	return ret ? &write_sniff[i] : NULL;
 }
 
 struct rf_sniff_ent {
@@ -538,7 +691,7 @@ struct rf_sniff_ent rf_write_sniff_ranges[] = {
 int rf_read_sniff_num = sizeof(rf_read_sniff_ranges) / sizeof(struct rf_sniff_ent);
 int rf_write_sniff_num = sizeof(rf_write_sniff_ranges) / sizeof(struct rf_sniff_ent);
 
-bool match_rf_read_sniff_ranges(u8 path, u32 addr, u32 mask)
+bool match_rf_read_sniff_ranges(_adapter *adapter, u8 path, u32 addr, u32 mask)
 {
 	int i;
 
@@ -551,7 +704,7 @@ bool match_rf_read_sniff_ranges(u8 path, u32 addr, u32 mask)
 	return _FALSE;
 }
 
-bool match_rf_write_sniff_ranges(u8 path, u32 addr, u32 mask)
+bool match_rf_write_sniff_ranges(_adapter *adapter, u8 path, u32 addr, u32 mask)
 {
 	int i;
 
@@ -564,73 +717,18 @@ bool match_rf_write_sniff_ranges(u8 path, u32 addr, u32 mask)
 	return _FALSE;
 }
 
-u8 dbg_rtw_read8(_adapter *adapter, u32 addr, const char *caller, const int line)
-{
-	u8 val = _rtw_read8(adapter, addr);
-
-	if (match_read_sniff_ranges(addr, 1))
-		RTW_INFO("DBG_IO %s:%d rtw_read8(0x%04x) return 0x%02x\n", caller, line, addr, val);
-
-	return val;
-}
-
-u16 dbg_rtw_read16(_adapter *adapter, u32 addr, const char *caller, const int line)
-{
-	u16 val = _rtw_read16(adapter, addr);
-
-	if (match_read_sniff_ranges(addr, 2))
-		RTW_INFO("DBG_IO %s:%d rtw_read16(0x%04x) return 0x%04x\n", caller, line, addr, val);
-
-	return val;
-}
-
-u32 dbg_rtw_read32(_adapter *adapter, u32 addr, const char *caller, const int line)
-{
-	u32 val = _rtw_read32(adapter, addr);
-
-	if (match_read_sniff_ranges(addr, 4))
-		RTW_INFO("DBG_IO %s:%d rtw_read32(0x%04x) return 0x%08x\n", caller, line, addr, val);
-
-	return val;
-}
-
-int dbg_rtw_write8(_adapter *adapter, u32 addr, u8 val, const char *caller, const int line)
-{
-	if (match_write_sniff_ranges(addr, 1))
-		RTW_INFO("DBG_IO %s:%d rtw_write8(0x%04x, 0x%02x)\n", caller, line, addr, val);
-
-	return _rtw_write8(adapter, addr, val);
-}
-int dbg_rtw_write16(_adapter *adapter, u32 addr, u16 val, const char *caller, const int line)
-{
-	if (match_write_sniff_ranges(addr, 2))
-		RTW_INFO("DBG_IO %s:%d rtw_write16(0x%04x, 0x%04x)\n", caller, line, addr, val);
-
-	return _rtw_write16(adapter, addr, val);
-}
-int dbg_rtw_write32(_adapter *adapter, u32 addr, u32 val, const char *caller, const int line)
-{
-	if (match_write_sniff_ranges(addr, 4))
-		RTW_INFO("DBG_IO %s:%d rtw_write32(0x%04x, 0x%08x)\n", caller, line, addr, val);
-
-	return _rtw_write32(adapter, addr, val);
-}
-int dbg_rtw_writeN(_adapter *adapter, u32 addr , u32 length , u8 *data, const char *caller, const int line)
-{
-	if (match_write_sniff_ranges(addr, length))
-		RTW_INFO("DBG_IO %s:%d rtw_writeN(0x%04x, %u)\n", caller, line, addr, length);
-
-	return _rtw_writeN(adapter, addr, length, data);
-}
-
 #ifdef CONFIG_SDIO_HCI
 u8 dbg_rtw_sd_f0_read8(_adapter *adapter, u32 addr, const char *caller, const int line)
 {
 	u8 val = _rtw_sd_f0_read8(adapter, addr);
 
 #if 0
-	if (match_read_sniff_ranges(addr, 1))
-		RTW_INFO("DBG_IO %s:%d rtw_sd_f0_read8(0x%04x) return 0x%02x\n", caller, line, addr, val);
+	const struct rtw_io_sniff_ent *ent = match_read_sniff(adapter, addr, 1, val);
+
+	if (ent) {
+		RTW_INFO("DBG_IO %s:%d rtw_sd_f0_read8(0x%04x) return 0x%02x %s\n"
+			, caller, line, addr, val, rtw_io_sniff_ent_get_tag(ent));
+	}
 #endif
 
 	return val;
@@ -640,9 +738,12 @@ u8 dbg_rtw_sd_f0_read8(_adapter *adapter, u32 addr, const char *caller, const in
 u8 dbg_rtw_sd_iread8(_adapter *adapter, u32 addr, const char *caller, const int line)
 {
 	u8 val = rtw_sd_iread8(adapter, addr);
+	const struct rtw_io_sniff_ent *ent = match_read_sniff(adapter, addr, 1, val);
 
-	if (match_read_sniff_ranges(addr, 1))
-		RTW_INFO("DBG_IO %s:%d rtw_sd_iread8(0x%04x) return 0x%02x\n", caller, line, addr, val);
+	if (ent) {
+		RTW_INFO("DBG_IO %s:%d rtw_sd_iread8(0x%04x) return 0x%02x %s\n"
+			, caller, line, addr, val, rtw_io_sniff_ent_get_tag(ent));
+	}
 
 	return val;
 }
@@ -650,9 +751,12 @@ u8 dbg_rtw_sd_iread8(_adapter *adapter, u32 addr, const char *caller, const int 
 u16 dbg_rtw_sd_iread16(_adapter *adapter, u32 addr, const char *caller, const int line)
 {
 	u16 val = _rtw_sd_iread16(adapter, addr);
+	const struct rtw_io_sniff_ent *ent = match_read_sniff(adapter, addr, 2, val);
 
-	if (match_read_sniff_ranges(addr, 2))
-		RTW_INFO("DBG_IO %s:%d rtw_sd_iread16(0x%04x) return 0x%04x\n", caller, line, addr, val);
+	if (ent) {
+		RTW_INFO("DBG_IO %s:%d rtw_sd_iread16(0x%04x) return 0x%04x %s\n"
+			, caller, line, addr, val, rtw_io_sniff_ent_get_tag(ent));
+	}
 
 	return val;
 }
@@ -660,31 +764,46 @@ u16 dbg_rtw_sd_iread16(_adapter *adapter, u32 addr, const char *caller, const in
 u32 dbg_rtw_sd_iread32(_adapter *adapter, u32 addr, const char *caller, const int line)
 {
 	u32 val = _rtw_sd_iread32(adapter, addr);
+	const struct rtw_io_sniff_ent *ent = match_read_sniff(adapter, addr, 4, val);
 
-	if (match_read_sniff_ranges(addr, 4))
-		RTW_INFO("DBG_IO %s:%d rtw_sd_iread32(0x%04x) return 0x%08x\n", caller, line, addr, val);
+	if (ent) {
+		RTW_INFO("DBG_IO %s:%d rtw_sd_iread32(0x%04x) return 0x%08x %s\n"
+			, caller, line, addr, val, rtw_io_sniff_ent_get_tag(ent));
+	}
 
 	return val;
 }
 
 int dbg_rtw_sd_iwrite8(_adapter *adapter, u32 addr, u8 val, const char *caller, const int line)
 {
-	if (match_write_sniff_ranges(addr, 1))
-		RTW_INFO("DBG_IO %s:%d rtw_sd_iwrite8(0x%04x, 0x%02x)\n", caller, line, addr, val);
+	const struct rtw_io_sniff_ent *ent = match_write_sniff(adapter, addr, 1, val);
+
+	if (ent) {
+		RTW_INFO("DBG_IO %s:%d rtw_sd_iwrite8(0x%04x, 0x%02x) %s\n"
+			, caller, line, addr, val, rtw_io_sniff_ent_get_tag(ent));
+	}
 
 	return _rtw_sd_iwrite8(adapter, addr, val);
 }
 int dbg_rtw_sd_iwrite16(_adapter *adapter, u32 addr, u16 val, const char *caller, const int line)
 {
-	if (match_write_sniff_ranges(addr, 2))
-		RTW_INFO("DBG_IO %s:%d rtw_sd_iwrite16(0x%04x, 0x%04x)\n", caller, line, addr, val);
+	const struct rtw_io_sniff_ent *ent = match_write_sniff(adapter, addr, 2, val);
+
+	if (ent) {
+		RTW_INFO("DBG_IO %s:%d rtw_sd_iwrite16(0x%04x, 0x%04x) %s\n"
+			, caller, line, addr, val, rtw_io_sniff_ent_get_tag(ent));
+	}
 
 	return _rtw_sd_iwrite16(adapter, addr, val);
 }
 int dbg_rtw_sd_iwrite32(_adapter *adapter, u32 addr, u32 val, const char *caller, const int line)
 {
-	if (match_write_sniff_ranges(addr, 4))
-		RTW_INFO("DBG_IO %s:%d rtw_sd_iwrite32(0x%04x, 0x%08x)\n", caller, line, addr, val);
+	const struct rtw_io_sniff_ent *ent = match_write_sniff(adapter, addr, 4, val);
+
+	if (ent) {
+		RTW_INFO("DBG_IO %s:%d rtw_sd_iwrite32(0x%04x, 0x%08x) %s\n"
+			, caller, line, addr, val, rtw_io_sniff_ent_get_tag(ent));
+	}
 
 	return _rtw_sd_iwrite32(adapter, addr, val);
 }

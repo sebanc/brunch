@@ -483,8 +483,8 @@ struct	sta_info *rtw_alloc_stainfo(struct	sta_priv *pstapriv, const u8 *hwaddr)
 			preorder_ctrl->adapt = pstapriv->adapt;
 			preorder_ctrl->tid = i;
 			preorder_ctrl->enable = false;
-			preorder_ctrl->indicate_seq = 0xffff;
-			preorder_ctrl->wend_b = 0xffff;
+			preorder_ctrl->indicate_seq = cpu_to_le16(0xffff);
+			preorder_ctrl->wend_b = cpu_to_le16(0xffff);
 			/* preorder_ctrl->wsize_b = (NR_RECVBUFF-2); */
 			preorder_ctrl->wsize_b = 64;/* 64; */
 			preorder_ctrl->ampdu_size = RX_AMPDU_SIZE_INVALID;

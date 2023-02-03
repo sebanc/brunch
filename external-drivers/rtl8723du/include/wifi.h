@@ -393,13 +393,13 @@ static inline int IS_MCAST(const u8 *da)
 		return false;
 }
 
-static inline unsigned char *get_ra(unsigned char *pframe)
+static inline unsigned char *rtw_get_ra(unsigned char *pframe)
 {
 	unsigned char	*ra;
 	ra = GetAddr1Ptr(pframe);
 	return ra;
 }
-static inline unsigned char *get_ta(unsigned char *pframe)
+static inline unsigned char *rtw_get_ta(unsigned char *pframe)
 {
 	unsigned char	*ta;
 	ta = get_addr2_ptr(pframe);
@@ -407,7 +407,7 @@ static inline unsigned char *get_ta(unsigned char *pframe)
 }
 
 /* can't apply to mesh mode */
-static inline unsigned char *get_da(unsigned char *pframe)
+static inline unsigned char *rtw_get_da(unsigned char *pframe)
 {
 	unsigned char	*da;
 	u16	to_fr_ds	= (GetToDs(pframe) << 1) | GetFrDs(pframe);

@@ -1,0 +1,5 @@
+alias pci:v000010ECd0000A85Asv*sd*bc*sc*i* rtw_8852ae
+alias pci:v000010ECd00008852sv*sd*bc*sc*i* rtw_8852ae
+alias pci:v000010ECd0000B85Bsv*sd*bc*sc*i* rtw_8852be
+alias pci:v000010ECd0000B852sv*sd*bc*sc*i* rtw_8852be
+alias pci:v000010ECd0000C852sv*sd*bc*sc*i* rtw_8852ce

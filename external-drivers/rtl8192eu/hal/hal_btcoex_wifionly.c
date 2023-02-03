@@ -12,8 +12,11 @@
  * more details.
  *
  *****************************************************************************/
-#include "btc/mp_precomp.h"
 #include <hal_btcoex_wifionly.h>
+
+#if (CONFIG_BTCOEX_SUPPORT_WIFI_ONLY_CFG == 1)
+
+#include "btc/mp_precomp.h"
 
 struct  wifi_only_cfg GLBtCoexistWifiOnly;
 
@@ -109,10 +112,16 @@ void hal_btcoex_wifionly_switchband_notify(PADAPTER padapter)
 	if (pHalData->current_band_type == BAND_ON_5G)
 		is_5g = _TRUE;
 
-	if (IS_HARDWARE_TYPE_8822B(padapter))
+	if (IS_HARDWARE_TYPE_8822B(padapter)) {
+#ifdef CONFIG_RTL8822B
 		ex_hal8822b_wifi_only_switchbandnotify(&GLBtCoexistWifiOnly, is_5g);
+#endif
+	}
+
+#ifdef CONFIG_RTL8821C
 	else if (IS_HARDWARE_TYPE_8821C(padapter))
 		ex_hal8821c_wifi_only_switchbandnotify(&GLBtCoexistWifiOnly, is_5g);
+#endif
 }
 
 void hal_btcoex_wifionly_scan_notify(PADAPTER padapter)
@@ -123,22 +132,57 @@ void hal_btcoex_wifionly_scan_notify(PADAPTER padapter)
 	if (pHalData->current_band_type == BAND_ON_5G)
 		is_5g = _TRUE;
 
-	if (IS_HARDWARE_TYPE_8822B(padapter))
+	if (IS_HARDWARE_TYPE_8822B(padapter)) {
+#ifdef CONFIG_RTL8822B
 		ex_hal8822b_wifi_only_scannotify(&GLBtCoexistWifiOnly, is_5g);
+#endif
+	}
+
+#ifdef CONFIG_RTL8821C
 	else if (IS_HARDWARE_TYPE_8821C(padapter))
 		ex_hal8821c_wifi_only_scannotify(&GLBtCoexistWifiOnly, is_5g);
+#endif
+}
+
+void hal_btcoex_wifionly_connect_notify(PADAPTER padapter)
+{
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
+	u8 is_5g = _FALSE;
+
+	if (pHalData->current_band_type == BAND_ON_5G)
+		is_5g = _TRUE;
+
+	if (IS_HARDWARE_TYPE_8822B(padapter)) {
+#ifdef CONFIG_RTL8822B
+		ex_hal8822b_wifi_only_connectnotify(&GLBtCoexistWifiOnly, is_5g);
+#endif
+	}
+
+#ifdef CONFIG_RTL8821C
+	else if (IS_HARDWARE_TYPE_8821C(padapter))
+		ex_hal8821c_wifi_only_connectnotify(&GLBtCoexistWifiOnly, is_5g);
+#endif
 }
 
 void hal_btcoex_wifionly_hw_config(PADAPTER padapter)
 {
 	struct wifi_only_cfg *pwifionlycfg = &GLBtCoexistWifiOnly;
 
-	if (IS_HARDWARE_TYPE_8723B(padapter))
+	if (IS_HARDWARE_TYPE_8723B(padapter)) {
+#ifdef CONFIG_RTL8723B
 		ex_hal8723b_wifi_only_hw_config(pwifionlycfg);
+#endif
+	}
+
+#ifdef CONFIG_RTL8822B
 	else if (IS_HARDWARE_TYPE_8822B(padapter))
 		ex_hal8822b_wifi_only_hw_config(pwifionlycfg);
+#endif
+
+#ifdef CONFIG_RTL8821C
 	else if (IS_HARDWARE_TYPE_8821C(padapter))
 		ex_hal8821c_wifi_only_hw_config(pwifionlycfg);
+#endif
 }
 
 void hal_btcoex_wifionly_initlizevariables(PADAPTER padapter)
@@ -147,7 +191,7 @@ void hal_btcoex_wifionly_initlizevariables(PADAPTER padapter)
 	struct wifi_only_haldata	*pwifionly_haldata = &pwifionlycfg->haldata_info;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 
-	_rtw_memset(&GLBtCoexistWifiOnly, 0, sizeof(GLBtCoexistWifiOnly));
+	memset(&GLBtCoexistWifiOnly, 0, sizeof(GLBtCoexistWifiOnly));
 
 	pwifionlycfg->Adapter = padapter;
 
@@ -162,9 +206,19 @@ void hal_btcoex_wifionly_initlizevariables(PADAPTER padapter)
 #endif
 
 	pwifionly_haldata->customer_id = CUSTOMER_NORMAL;
+}
+
+void hal_btcoex_wifionly_AntInfoSetting(PADAPTER padapter)
+{
+	struct wifi_only_cfg		*pwifionlycfg = &GLBtCoexistWifiOnly;
+	struct wifi_only_haldata	*pwifionly_haldata = &pwifionlycfg->haldata_info;
+	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
+
 	pwifionly_haldata->efuse_pg_antnum = pHalData->EEPROMBluetoothAntNum;
 	pwifionly_haldata->efuse_pg_antpath = pHalData->ant_path;
 	pwifionly_haldata->rfe_type = pHalData->rfe_type;
 	pwifionly_haldata->ant_div_cfg = pHalData->AntDivCfg;
 }
+
+#endif
 

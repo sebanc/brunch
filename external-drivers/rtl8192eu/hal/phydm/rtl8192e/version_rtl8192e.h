@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2016 - 2017 Realtek Corporation.
+ * Copyright(c) 2007 - 2017  Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -8,8 +8,18 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
+ *
+ * The full GNU General Public License is included in this distribution in the
+ * file called LICENSE.
+ *
+ * Contact Information:
+ * wlanfae <wlanfae@realtek.com>
+ * Realtek Corporation, No. 2, Innovation Road II, Hsinchu Science Park,
+ * Hsinchu 300, Taiwan.
+ *
+ * Larry Finger <Larry.Finger@lwfinger.net>
  *
  *****************************************************************************/
 /*RTL8192E PHY Parameters*/
@@ -19,6 +29,6 @@
   You do not need to fill up the version.h anymore,
   only the maintenance supervisor fills it before formal release.
 */
-#define	RELEASE_DATE_8192E		20160314
-#define	COMMIT_BY_8192E			"BB_DINO"
-#define	RELEASE_VERSION_8192E		58
+#define	RELEASE_DATE_8192E		20180719
+#define	COMMIT_BY_8192E			"BB_Dino"
+#define	RELEASE_VERSION_8192E		60

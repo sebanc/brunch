@@ -31,32 +31,6 @@
  * Global var
  * ************************************************************ */
 
-
-static VOID
-dm_CheckProtection(
-	IN	PADAPTER	Adapter
-)
-{
-#if 0
-	PMGNT_INFO		pMgntInfo = &(Adapter->MgntInfo);
-	u1Byte			CurRate, RateThreshold;
-
-	if (pMgntInfo->pHTInfo->bCurBW40MHz)
-		RateThreshold = MGN_MCS1;
-	else
-		RateThreshold = MGN_MCS3;
-
-	if (Adapter->TxStats.CurrentInitTxRate <= RateThreshold) {
-		pMgntInfo->bDmDisableProtect = TRUE;
-		DbgPrint("Forced disable protect: %x\n", Adapter->TxStats.CurrentInitTxRate);
-	} else {
-		pMgntInfo->bDmDisableProtect = FALSE;
-		DbgPrint("Enable protect: %x\n", Adapter->TxStats.CurrentInitTxRate);
-	}
-#endif
-}
-
-
 #ifdef CONFIG_SUPPORT_HW_WPS_PBC
 static void dm_CheckPbcGPIO(_adapter *padapter)
 {
@@ -207,7 +181,7 @@ dm_InitGPIOSetting(
 static void Init_ODM_ComInfo_8192e(PADAPTER	Adapter)
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-	struct PHY_DM_STRUCT		*pDM_Odm = &(pHalData->odmpriv);
+	struct dm_struct		*pDM_Odm = &(pHalData->odmpriv);
 	u8	cut_ver, fab_ver;
 
 	Init_ODM_ComInfo(Adapter);
@@ -235,15 +209,13 @@ rtl8192e_InitHalDm(
 )
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-	struct PHY_DM_STRUCT		*pDM_Odm = &(pHalData->odmpriv);
+	struct dm_struct		*pDM_Odm = &(pHalData->odmpriv);
 
 #ifdef CONFIG_USB_HCI
 	dm_InitGPIOSetting(Adapter);
 #endif
-	odm_dm_init(pDM_Odm);
-
+	rtw_phydm_init(Adapter);
 	/* Adapter->fix_rate = 0xFF; */
-
 }
 
 
@@ -255,14 +227,15 @@ rtl8192e_HalDmWatchDog(
 	BOOLEAN		bFwCurrentInPSMode = _FALSE;
 	u8 bFwPSAwake = _TRUE;
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-	struct PHY_DM_STRUCT		*pDM_Odm = &(pHalData->odmpriv);
-
+	struct dm_struct		*pDM_Odm = &(pHalData->odmpriv);
+	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(Adapter);
+	u8 in_lps = _FALSE;
 
 	if (!rtw_is_hw_init_completed(Adapter))
 		goto skip_dm;
 
 #ifdef CONFIG_LPS
-	bFwCurrentInPSMode = adapter_to_pwrctl(Adapter)->bFwCurrentInPSMode;
+	bFwCurrentInPSMode = pwrpriv->bFwCurrentInPSMode;
 	rtw_hal_get_hwreg(Adapter, HW_VAR_FWLPS_RF_ON, &bFwPSAwake);
 #endif
 
@@ -296,7 +269,13 @@ rtl8192e_HalDmWatchDog(
 #ifdef CONFIG_DISABLE_ODM
 	goto skip_dm;
 #endif
-	rtw_phydm_watchdog(Adapter);
+
+#ifdef CONFIG_LPS
+	if (pwrpriv->bLeisurePs && bFwCurrentInPSMode && pwrpriv->pwr_mode != PS_MODE_ACTIVE)
+		in_lps = _TRUE;
+#endif
+
+	rtw_phydm_watchdog(Adapter, in_lps);
 
 skip_dm:
 
@@ -310,7 +289,7 @@ skip_dm:
 void rtl8192e_init_dm_priv(IN PADAPTER Adapter)
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-	struct PHY_DM_STRUCT		*podmpriv = &pHalData->odmpriv;
+	struct dm_struct		*podmpriv = &pHalData->odmpriv;
 	/* _rtw_spinlock_init(&(pHalData->odm_stainfo_lock)); */
 	Init_ODM_ComInfo_8192e(Adapter);
 	odm_init_all_timers(podmpriv);
@@ -320,7 +299,6 @@ void rtl8192e_init_dm_priv(IN PADAPTER Adapter)
 void rtl8192e_deinit_dm_priv(IN PADAPTER Adapter)
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-	struct PHY_DM_STRUCT		*podmpriv = &pHalData->odmpriv;
-	/* _rtw_spinlock_free(&pHalData->odm_stainfo_lock);		 */
+	struct dm_struct		*podmpriv = &pHalData->odmpriv;
 	odm_cancel_all_timers(podmpriv);
 }

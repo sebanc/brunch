@@ -2815,7 +2815,7 @@ static int rtw_wx_set_enc(struct net_device *dev,
 	if (rtw_set_802_11_add_wep(padapter, &wep) == _FALSE) {
 		if(rf_on == pwrpriv->rf_pwrstate )
 			pr_info("%s - rtw_set_802_11_add_wep() failed with rf on\n", __func__);
-			ret = -EOPNOTSUPP;
+		ret = -EOPNOTSUPP;
 		goto exit;
 	}
 

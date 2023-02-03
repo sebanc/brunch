@@ -1,6 +1,6 @@
-SHELL := /bin/sh
+SHELL := /bin/bash
 KVER  ?= $(shell uname -r)
-KSRC := ../kernel
+KSRC := /lib/modules/$(KVER)/build
 FIRMWAREDIR := /lib/firmware/
 PWD := $(shell pwd)
 CLR_MODULE_FILES := *.mod.c *.mod *.o .*.cmd *.ko *~ .tmp_versions* modules.order Module.symvers
@@ -11,6 +11,7 @@ MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/realtek/rtw89
 else
 MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/rtw89
 endif
+
 #Handle the compression option for modules in 3.18+
 ifneq ("","$(wildcard $(MODDESTDIR)/*.ko.gz)")
 COMPRESS_GZIP := y
@@ -18,39 +19,71 @@ endif
 ifneq ("","$(wildcard $(MODDESTDIR)/*.ko.xz)")
 COMPRESS_XZ := y
 endif
-MOK_KEY_DIR ?= /var/lib/shim-signed/mok
+ifeq ("","$(wildcard MOK.der)")
+NO_SKIP_SIGN := y
+endif
 
 EXTRA_CFLAGS += -O2
 EXTRA_CFLAGS += -DCONFIG_RTW89_DEBUGMSG
 EXTRA_CFLAGS += -DCONFIG_RTW89_DEBUGFS
+KEY_FILE ?= MOK.der
 
-obj-m += rtl8852ae.o
-rtl8852ae-y +=  core.o \
-		debug.o \
+obj-m += rtw89core.o
+rtw89core-y +=  core.o \
+		chan.o \
 		mac80211.o \
 		mac.o \
 		phy.o \
 		fw.o \
-		rtw8852a.o \
-		rtw8852a_table.o \
-		rtw8852a_rfk.o \
-		rtw8852a_rfk_table.o \
 		cam.o \
 		efuse.o \
 		regd.o \
+		sar.o \
 		coex.o \
 		ps.o \
-		sar.o \
+		debug.o \
 		ser.o \
-		util.o \
-		pci.o
+		wow.o
+
+obj-m += rtw_8852a.o
+rtw_8852a-y := rtw8852a.o \
+		    rtw8852a_table.o \
+		    rtw8852a_rfk.o \
+		    rtw8852a_rfk_table.o
+
+obj-m += rtw_8852ae.o
+rtw_8852ae-y := rtw8852ae.o
+
+obj-m += rtw_8852b.o
+rtw_8852b-y := rtw8852b.o \
+		    rtw8852b_table.o \
+		    rtw8852b_rfk.o \
+		    rtw8852b_rfk_table.o
+
+obj-m += rtw_8852be.o
+rtw_8852be-y := rtw8852be.o
+
+obj-m += rtw_8852c.o
+rtw_8852c-y := rtw8852c.o \
+	       rtw8852c_table.o \
+	       rtw8852c_rfk.o \
+	       rtw8852c_rfk_table.o
+
+obj-m += rtw_8852ce.o
+rtw_8852ce-y := rtw8852ce.o
+
+#obj-m += rtw89debug.o
+#rtw89debug-y := debug.o
+
+obj-m += rtw89pci.o
+rtw89pci-y := pci.o
 
 ccflags-y += -D__CHECK_ENDIAN__
 
 .PHONY: all install uninstall clean sign sign-install
 
 all:
-	$(MAKE) -C $(KSRC) O=out M=$(PWD) modules
+	$(MAKE) -C ../kernel O=out M=$(PWD) modules
 install: all
 	@rm -f $(MODDESTDIR)/rtw89*.ko
 
@@ -64,13 +97,10 @@ ifeq ($(COMPRESS_XZ), y)
 endif
 	@depmod -a $(KVER)
 
-	@mkdir -p /lib/firmware/rtw89/
-	cp *.bin /lib/firmware/rtw89/.
-
 	@echo "Install rtw89 SUCCESS"
 
 uninstall:
-	@rm -f $(MODDESTDIR)/rtw89.ko
+	@rm -f $(MODDESTDIR)/rtw89*.ko
 
 	@depmod -a
 
@@ -85,7 +115,20 @@ clean:
 	@rm -fr modules.order
 
 sign:
-	kmodsign sha512 $(MOK_KEY_DIR)/MOK.priv $(MOK_KEY_DIR)/MOK.der rtw89core.ko
-	kmodsign sha512 $(MOK_KEY_DIR)/MOK.priv $(MOK_KEY_DIR)/MOK.der rtw89pci.ko
+ifeq ($(NO_SKIP_SIGN), y)
+	@openssl req -new -x509 -newkey rsa:2048 -keyout MOK.priv -outform DER -out MOK.der -nodes -days 36500 -subj "/CN=Custom MOK/"
+	@mokutil --import MOK.der
+else
+	echo "Skipping key creation"
+endif
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89core.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89pci.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852a.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852ae.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852b.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852be.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852c.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852ce.ko
 
 sign-install: all sign install
+

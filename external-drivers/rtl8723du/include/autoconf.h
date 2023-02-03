@@ -27,6 +27,8 @@
 
 #define RTW_NOTCH_FILTER 0 /* 0:Disable, 1:Enable, */
 
+#define CONFIG_80211W
+
 /*
  * Others
  */

@@ -113,7 +113,6 @@ enum h2c_cmd_8188F {
 #define SET_8188F_H2CCMD_PWRMODE_PARM_ALL_QUEUE_UAPSD(__pH2CCmd, __Value)	SET_BITS_TO_LE_1BYTE((__pH2CCmd)+3, 0, 8, __Value)
 #define SET_8188F_H2CCMD_PWRMODE_PARM_BCN_EARLY_C2H_RPT(__pH2CCmd, __Value)	SET_BITS_TO_LE_1BYTE((__pH2CCmd)+3, 2, 1, __Value)
 #define SET_8188F_H2CCMD_PWRMODE_PARM_PWR_STATE(__pH2CCmd, __Value)			SET_BITS_TO_LE_1BYTE((__pH2CCmd)+4, 0, 8, __Value)
-#define SET_8188F_H2CCMD_PWRMODE_PARM_BYTE5(__pH2CCmd, __Value)				SET_BITS_TO_LE_1BYTE((__pH2CCmd)+5, 0, 8, __Value)
 
 #define GET_8188F_H2CCMD_PWRMODE_PARM_MODE(__pH2CCmd)					LE_BITS_TO_1BYTE(__pH2CCmd, 0, 8)
 
@@ -178,7 +177,6 @@ enum h2c_cmd_8188F {
 /* host message to firmware cmd */
 void rtl8188f_set_FwPwrMode_cmd(PADAPTER padapter, u8 Mode);
 void rtl8188f_set_FwJoinBssRpt_cmd(PADAPTER padapter, u8 mstatus);
-void rtl8188f_set_rssi_cmd(PADAPTER padapter, u8 *param);
 void rtl8188f_fw_try_ap_cmd(PADAPTER padapter, u32 need_ack);
 /* s32 rtl8188f_set_lowpwr_lps_cmd(PADAPTER padapter, u8 enable); */
 void rtl8188f_set_FwPsTuneParam_cmd(PADAPTER padapter);

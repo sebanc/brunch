@@ -107,6 +107,7 @@ static void rtw_dev_shutdown(struct device *dev)
 static struct usb_device_id rtw_usb_id_tbl[] = {
 	/*=== Realtek demoboard ===*/
 	{USB_DEVICE_AND_INTERFACE_INFO(USB_VENDER_ID_REALTEK, 0xD723, 0xff, 0xff, 0xff), .driver_info = RTL8723D}, /* 8723DU 1*1 */
+	{USB_DEVICE_AND_INTERFACE_INFO(0x7392, 0xD611, 0xff, 0xff, 0xff), .driver_info = RTL8723D}, /* 8723DU 1*1 */
 
 	{}	/* Terminating entry */
 };
@@ -280,26 +281,26 @@ static struct dvobj_priv *usb_dvobj_init(struct usb_interface *usb_intf, const s
 		if (phost_endp) {
 			pendp_desc = &phost_endp->desc;
 
-			RTW_INFO("\nusb_endpoint_descriptor(%d):\n", i);
-			RTW_INFO("bLength=%x\n", pendp_desc->bLength);
-			RTW_INFO("bDescriptorType=%x\n", pendp_desc->bDescriptorType);
-			RTW_INFO("bEndpointAddress=%x\n", pendp_desc->bEndpointAddress);
-			/* RTW_INFO("bmAttributes=%x\n",pendp_desc->bmAttributes); */
-			RTW_INFO("wMaxPacketSize=%d\n", le16_to_cpu(pendp_desc->wMaxPacketSize));
-			RTW_INFO("bInterval=%x\n", pendp_desc->bInterval);
-			/* RTW_INFO("bRefresh=%x\n",pendp_desc->bRefresh); */
-			/* RTW_INFO("bSynchAddress=%x\n",pendp_desc->bSynchAddress); */
+			RTW_DBG("\nusb_endpoint_descriptor(%d):\n", i);
+			RTW_DBG("bLength=%x\n", pendp_desc->bLength);
+			RTW_DBG("bDescriptorType=%x\n", pendp_desc->bDescriptorType);
+			RTW_DBG("bEndpointAddress=%x\n", pendp_desc->bEndpointAddress);
+			/* RTW_DBG("bmAttributes=%x\n",pendp_desc->bmAttributes); */
+			RTW_DBG("wMaxPacketSize=%d\n", le16_to_cpu(pendp_desc->wMaxPacketSize));
+			RTW_DBG("bInterval=%x\n", pendp_desc->bInterval);
+			/* RTW_DBG("bRefresh=%x\n",pendp_desc->bRefresh); */
+			/* RTW_DBG("bSynchAddress=%x\n",pendp_desc->bSynchAddress); */
 
 			if (RT_usb_endpoint_is_bulk_in(pendp_desc)) {
-				RTW_INFO("RT_usb_endpoint_is_bulk_in = %x\n", RT_usb_endpoint_num(pendp_desc));
+				RTW_DBG("RT_usb_endpoint_is_bulk_in = %x\n", RT_usb_endpoint_num(pendp_desc));
 				pdvobjpriv->RtInPipe[pdvobjpriv->RtNumInPipes] = RT_usb_endpoint_num(pendp_desc);
 				pdvobjpriv->RtNumInPipes++;
 			} else if (RT_usb_endpoint_is_int_in(pendp_desc)) {
-				RTW_INFO("RT_usb_endpoint_is_int_in = %x, Interval = %x\n", RT_usb_endpoint_num(pendp_desc), pendp_desc->bInterval);
+				RTW_DBG("RT_usb_endpoint_is_int_in = %x, Interval = %x\n", RT_usb_endpoint_num(pendp_desc), pendp_desc->bInterval);
 				pdvobjpriv->RtInPipe[pdvobjpriv->RtNumInPipes] = RT_usb_endpoint_num(pendp_desc);
 				pdvobjpriv->RtNumInPipes++;
 			} else if (RT_usb_endpoint_is_bulk_out(pendp_desc)) {
-				RTW_INFO("RT_usb_endpoint_is_bulk_out = %x\n", RT_usb_endpoint_num(pendp_desc));
+				RTW_DBG("RT_usb_endpoint_is_bulk_out = %x\n", RT_usb_endpoint_num(pendp_desc));
 				pdvobjpriv->RtOutPipe[pdvobjpriv->RtNumOutPipes] = RT_usb_endpoint_num(pendp_desc);
 				pdvobjpriv->RtNumOutPipes++;
 			}

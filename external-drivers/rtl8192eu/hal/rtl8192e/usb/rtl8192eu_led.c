@@ -197,7 +197,7 @@ rtl8192eu_InitSwLeds(
 	_adapter	*padapter
 )
 {
-	struct led_priv *pledpriv = &(padapter->ledpriv);
+	struct led_priv *pledpriv = adapter_to_led(padapter);
 
 	pledpriv->LedControlHandler = LedControlUSB;
 
@@ -219,7 +219,7 @@ rtl8192eu_DeInitSwLeds(
 	_adapter	*padapter
 )
 {
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 
 	DeInitLed(&(ledpriv->SwLed0));
 	DeInitLed(&(ledpriv->SwLed1));

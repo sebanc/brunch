@@ -25,37 +25,6 @@ struct pkt_file {
 	SIZE_T buf_len;
 };
 
-#ifdef PLATFORM_WINDOWS
-
-#ifdef PLATFORM_OS_XP
-#ifdef CONFIG_USB_HCI
-#include <usb.h>
-#include <usbdlib.h>
-#include <usbioctl.h>
-#endif
-#endif
-
-#ifdef CONFIG_GSPI_HCI
-	#define NR_XMITFRAME     64
-#else
-	#define NR_XMITFRAME     128
-#endif
-
-#define ETH_ALEN	6
-
-extern NDIS_STATUS rtw_xmit_entry(
-	IN _nic_hdl		cnxt,
-	IN NDIS_PACKET		*pkt,
-	IN UINT				flags
-);
-
-#endif /* PLATFORM_WINDOWS */
-
-#ifdef PLATFORM_FREEBSD
-#define NR_XMITFRAME	256
-extern int rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev);
-extern void rtw_xmit_entry_wrap(struct ifnet *pifp);
-#endif /* PLATFORM_FREEBSD */
 
 #ifdef PLATFORM_LINUX
 

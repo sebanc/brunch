@@ -63,7 +63,7 @@ union pn48	{
 
 	u64	val;
 
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 
 struct {
 	u8 TSC0;

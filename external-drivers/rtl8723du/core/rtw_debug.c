@@ -209,7 +209,8 @@ void sta_rx_reorder_ctl_dump(void *sel, struct sta_info *sta)
 
 	for (i = 0; i < 16; i++) {
 		reorder_ctl = &sta->recvreorder_ctrl[i];
-		if (reorder_ctl->ampdu_size != RX_AMPDU_SIZE_INVALID || reorder_ctl->indicate_seq != 0xFFFF) {
+		if (reorder_ctl->ampdu_size != RX_AMPDU_SIZE_INVALID ||
+		    le16_to_cpu(reorder_ctl->indicate_seq) != 0xFFFF) {
 			RTW_PRINT_SEL(sel, "tid=%d, enable=%d, ampdu_size=%u, indicate_seq=%u\n"
 				, i, reorder_ctl->enable, reorder_ctl->ampdu_size, reorder_ctl->indicate_seq
 				     );

@@ -372,8 +372,8 @@ static inline char *iwe_stream_rate_process(struct adapter *adapt,
 		ht_cap = true;
 		pht_capie = (struct rtw_ieee80211_ht_cap *)(p + 2);
 		memcpy(&mcs_rate , pht_capie->supp_mcs_set, 2);
-		bw_40MHz = (pht_capie->cap_info & IEEE80211_HT_CAP_SUP_WIDTH) ? 1 : 0;
-		short_GI = (pht_capie->cap_info & (IEEE80211_HT_CAP_SGI_20 | IEEE80211_HT_CAP_SGI_40)) ? 1 : 0;
+		bw_40MHz = (le16_to_cpu(pht_capie->cap_info) & IEEE80211_HT_CAP_SUP_WIDTH) ? 1 : 0;
+		short_GI = (le16_to_cpu(pht_capie->cap_info) & (IEEE80211_HT_CAP_SGI_20 | IEEE80211_HT_CAP_SGI_40)) ? 1 : 0;
 	}
 
 	/*Add basic and extended rates */
@@ -1579,7 +1579,7 @@ static int rtw_wx_set_mlme(struct net_device *dev,
 
 	RTW_INFO("%s\n", __func__);
 
-	reason = cpu_to_le16(mlme->reason_code);
+	reason = mlme->reason_code;
 
 
 	RTW_INFO("%s, cmd=%d, reason=%d\n", __func__, mlme->cmd, reason);
@@ -3494,14 +3494,15 @@ static int rtw_p2p_get_wps_configmethod(struct net_device *dev,
 		if (!memcmp(pnetwork->network.MacAddress, peerMAC, ETH_ALEN)) {
 			u8 *wpsie;
 			uint	wpsie_len = 0;
+			__be16 be_attr_content;
 
 			/*	The mac address is matched. */
 
 			wpsie = rtw_get_wps_ie_from_scan_queue(&pnetwork->network.IEs[0], pnetwork->network.IELength, NULL, &wpsie_len, pnetwork->network.Reserved[0]);
 			if (wpsie) {
-				rtw_get_wps_attr_content(wpsie, wpsie_len, WPS_ATTR_CONF_METHOD, (u8 *)&attr_content, &attr_contentlen);
+				rtw_get_wps_attr_content(wpsie, wpsie_len, WPS_ATTR_CONF_METHOD, (u8 *)&be_attr_content, &attr_contentlen);
 				if (attr_contentlen) {
-					attr_content = be16_to_cpu(attr_content);
+					attr_content = be16_to_cpu(be_attr_content);
 					sprintf(attr_content_str, "\n\nM=%.4d", attr_content);
 					blnMatch = 1;
 				}
@@ -3714,10 +3715,11 @@ static int rtw_p2p_get_device_type(struct net_device *dev,
 			if (wpsie) {
 				rtw_get_wps_attr_content(wpsie, wpsie_len, WPS_ATTR_PRIMARY_DEV_TYPE, dev_type, &dev_type_len);
 				if (dev_type_len) {
-					u16	type = 0;
+					__be16	be_type = 0;
+					u16 type;
 
-					memcpy(&type, dev_type, 2);
-					type = be16_to_cpu(type);
+					memcpy(&be_type, dev_type, 2);
+					type = be16_to_cpu(be_type);
 					sprintf(dev_type_str, "\n\nN=%.2d", type);
 					blnMatch = 1;
 				}

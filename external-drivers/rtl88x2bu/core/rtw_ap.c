@@ -4400,7 +4400,7 @@ static u8 rtw_ap_update_chbw_by_ifbmp(struct dvobj_priv *dvobj, u8 ifbmp
 	int i;
 
 	for (i = 0; i < dvobj->iface_nums; i++) {
-		if (!(ifbmp & BIT(i)) || !dvobj->padapters)
+		if (!(ifbmp & BIT(i)) || !dvobj->padapters[i])
 			continue;
 
 		iface = dvobj->padapters[i];
@@ -4420,7 +4420,7 @@ static u8 rtw_ap_update_chbw_by_ifbmp(struct dvobj_priv *dvobj, u8 ifbmp
 	}
 
 	for (i = 0; i < dvobj->iface_nums; i++) {
-		if (!(ifbmp & BIT(i)) || !dvobj->padapters)
+		if (!(ifbmp & BIT(i)) || !dvobj->padapters[i])
 			continue;
 
 		iface = dvobj->padapters[i];
@@ -4591,7 +4591,7 @@ u8 rtw_ap_chbw_decision(_adapter *adapter, u8 ifbmp, u8 excl_ifbmp
 
 #ifdef CONFIG_RTW_MESH
 	for (i = 0; i < dvobj->iface_nums; i++)
-		if ((ifbmp & BIT(i)) && dvobj->padapters)
+		if ((ifbmp & BIT(i)) && dvobj->padapters[i])
 			if (!MLME_IS_MESH(dvobj->padapters[i]))
 				break;
 	ifbmp_all_mesh = i >= dvobj->iface_nums ? 1 : 0;

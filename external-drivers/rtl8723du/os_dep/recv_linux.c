@@ -56,7 +56,7 @@ int rtw_os_alloc_recvframe(struct adapter *adapt, union recv_frame *precvframe, 
 	/*	For 8 bytes IP header alignment. */
 	shift_sz = pattrib->qos ? 6 : 0; /*	Qos data, wireless lan header length is 26 */
 
-	skb_len = pattrib->pkt_len;
+	skb_len = le16_to_cpu(pattrib->pkt_len);
 
 	/* for first fragment packet, driver need allocate 1536+drvinfo_sz+RXDESC_SIZE to defrag packet. */
 	/* modify alloc_sz for recvive crc error packet by thomas 2011-06-02 */
@@ -239,7 +239,7 @@ struct sk_buff *rtw_os_alloc_msdu_pkt(union recv_frame *prframe, u16 nSubframe_L
 	} else {
 		u16 len;
 		/* Leave Ethernet header part of hdr and full payload */
-		len = htons(sub_skb->len);
+		len = sub_skb->len;
 		memcpy(skb_push(sub_skb, 2), &len, 2);
 		memcpy(skb_push(sub_skb, ETH_ALEN), pdata + 6, ETH_ALEN);
 		memcpy(skb_push(sub_skb, ETH_ALEN), pdata, ETH_ALEN);
@@ -271,6 +271,7 @@ static int napi_recv(struct adapter *adapt, int budget)
 			if (rtw_napi_gro_receive(&adapt->napi, pskb) != GRO_DROP)
 				rx_ok = true;
 #else
+			rtw_napi_gro_receive(&adapt->napi, pskb);
 			rx_ok = true;
 #endif
 			goto next;

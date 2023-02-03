@@ -51,8 +51,8 @@ int	rtl8723bu_init_recv_priv(_adapter *padapter)
 #endif
 
 	tasklet_init(&precvpriv->recv_tasklet,
-	     (void(*)(unsigned long))rtl8723bu_recv_tasklet,
-	     (unsigned long)padapter);
+		     (void( *))rtl8723bu_recv_tasklet,
+		     (unsigned long)padapter);
 
 #ifdef CONFIG_USB_INTERRUPT_IN_PIPE
 	precvpriv->int_in_urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -288,7 +288,7 @@ void update_recvframe_phyinfo(
 		!pattrib->icv_err && !pattrib->crc_err &&
 		_rtw_memcmp(get_hdr_bssid(wlanhdr), get_bssid(&padapter->mlmepriv), ETH_ALEN));
 
-	pkt_info.bPacketToSelf = pkt_info.bPacketMatchBSSID && (_rtw_memcmp(get_ra(wlanhdr), myid(&padapter->eeprompriv), ETH_ALEN));
+	pkt_info.bPacketToSelf = pkt_info.bPacketMatchBSSID && (_rtw_memcmp(wifi_get_ra(wlanhdr), myid(&padapter->eeprompriv), ETH_ALEN));
 
 	pkt_info.bPacketBeacon = pkt_info.bPacketMatchBSSID && (GetFrameSubType(wlanhdr) == WIFI_BEACON);
 	sa = get_ta(wlanhdr);

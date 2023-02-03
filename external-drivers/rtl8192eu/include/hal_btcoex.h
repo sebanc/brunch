@@ -37,6 +37,7 @@ void hal_btcoex_SetPgAntNum(PADAPTER padapter, u8 antNum);
 
 u8 hal_btcoex_Initialize(PADAPTER padapter);
 void hal_btcoex_PowerOnSetting(PADAPTER padapter);
+void hal_btcoex_AntInfoSetting(PADAPTER padapter);
 void hal_btcoex_PowerOffSetting(PADAPTER padapter);
 void hal_btcoex_PreLoadFirmware(PADAPTER padapter);
 void hal_btcoex_InitHwConfig(PADAPTER padapter, u8 bWifiOnly);

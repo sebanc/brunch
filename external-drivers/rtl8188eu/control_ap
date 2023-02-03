@@ -34,7 +34,7 @@ esac
 IPTABLES=/sbin/iptables
 IFCONFIG=/usr/bin/ifconfig
 DHCPD=/sbin/dhcpd
-HOSTAPD=/home/finger/rtl8188eu/hostapd-2.9/hostapd/hostapd
+HOSTAPD=$(pwd)/hostapd-2.9/hostapd/hostapd
 
 # Symbols for AP and external interfaces
 

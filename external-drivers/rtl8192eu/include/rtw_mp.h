@@ -39,13 +39,7 @@ struct mp_xmit_frame {
 	u8 *mem_addr;
 	u32 sz[8];
 
-#if defined(PLATFORM_OS_XP) || defined(PLATFORM_LINUX)
 	PURB pxmit_urb[8];
-#endif
-
-#ifdef PLATFORM_OS_XP
-	PIRP pxmit_irp[8];
-#endif
 
 	u8 bpending[8];
 	sint ac_tag[8];
@@ -65,21 +59,6 @@ struct mp_wiparam {
 };
 
 typedef void(*wi_act_func)(void *padapter);
-
-#ifdef PLATFORM_WINDOWS
-struct mp_wi_cntx {
-	u8 bmpdrv_unload;
-
-	/* Work Item */
-	NDIS_WORK_ITEM mp_wi;
-	NDIS_EVENT mp_wi_evt;
-	_lock mp_wi_lock;
-	u8 bmp_wi_progress;
-	wi_act_func curractfunc;
-	/* Variable needed in each implementation of CurrActFunc. */
-	struct mp_wiparam param;
-};
-#endif
 
 struct mp_tx {
 	u8 stop;
@@ -271,6 +250,7 @@ enum {
 	MP_STOP,
 	MP_RATE,
 	MP_CHANNEL,
+	MP_CHL_OFFSET,
 	MP_BANDWIDTH,
 	MP_TXPOWER,
 	MP_ANT_TX,
@@ -307,6 +287,7 @@ enum {
 	MP_PWRBYRATE,
 	BT_EFUSE_FILE,
 	MP_SetBT,
+	MP_SWRFPath,
 	MP_NULL,
 #ifdef CONFIG_APPEND_VENDOR_IE_ENABLE
 	VENDOR_IE_SET ,
@@ -350,6 +331,7 @@ struct mp_priv {
 	u32 rx_pktloss;
 	BOOLEAN  rx_bindicatePkt;
 	struct recv_stat rxstat;
+	BOOLEAN brx_filter_beacon;
 
 	/* RF/BB relative */
 	u8 channel;
@@ -374,33 +356,11 @@ struct mp_priv {
 	u8 mac_filter[ETH_ALEN];
 	u8 bmac_filter;
 
+	/* RF PATH Setting for WLG WLA BTG BT */
+	u8 rf_path_cfg;
+
 	struct wlan_network mp_network;
 	NDIS_802_11_MAC_ADDRESS network_macaddr;
-
-#ifdef PLATFORM_WINDOWS
-	u32 rx_testcnt;
-	u32 rx_testcnt1;
-	u32 rx_testcnt2;
-	u32 tx_testcnt;
-	u32 tx_testcnt1;
-
-	struct mp_wi_cntx wi_cntx;
-
-	u8 h2c_result;
-	u8 h2c_seqnum;
-	u16 h2c_cmdcode;
-	u8 h2c_resp_parambuf[512];
-	_lock h2c_lock;
-	_lock wkitm_lock;
-	u32 h2c_cmdcnt;
-	NDIS_EVENT h2c_cmd_evt;
-	NDIS_EVENT c2h_set;
-	NDIS_EVENT h2c_clr;
-	NDIS_EVENT cpwm_int;
-
-	NDIS_EVENT scsir_full_evt;
-	NDIS_EVENT scsiw_empty_evt;
-#endif
 
 	u8 *pallocated_mp_xmitframe_buf;
 	u8 *pmp_xmtframe_buf;
@@ -417,6 +377,7 @@ struct mp_priv {
 
 
 	u8		*TXradomBuffer;
+	u8		CureFuseBTCoex;
 };
 
 typedef struct _IOCMD_STRUCT_ {
@@ -693,8 +654,6 @@ extern void mp_stop_test(PADAPTER padapter);
 extern u32 _read_rfreg(PADAPTER padapter, u8 rfpath, u32 addr, u32 bitmask);
 extern void _write_rfreg(PADAPTER padapter, u8 rfpath, u32 addr, u32 bitmask, u32 val);
 
-extern u32 read_macreg(_adapter *padapter, u32 addr, u32 sz);
-extern void write_macreg(_adapter *padapter, u32 addr, u32 val, u32 sz);
 extern u32 read_bbreg(_adapter *padapter, u32 addr, u32 bitmask);
 extern void write_bbreg(_adapter *padapter, u32 addr, u32 bitmask, u32 val);
 extern u32 read_rfreg(PADAPTER padapter, u8 rfpath, u32 addr);
@@ -748,6 +707,7 @@ void hal_mpt_SetSingleToneTx(PADAPTER pAdapter, u8 bStart);
 void hal_mpt_SetCarrierSuppressionTx(PADAPTER pAdapter, u8 bStart);
 void mpt_ProSetPMacTx(PADAPTER	Adapter);
 void MP_PHY_SetRFPathSwitch(PADAPTER pAdapter , BOOLEAN bMain);
+void mp_phy_switch_rf_path_set(PADAPTER pAdapter , u8 *pstate);
 u8 MP_PHY_QueryRFPathSwitch(PADAPTER pAdapter);
 ULONG mpt_ProQueryCalTxPower(PADAPTER	pAdapter, u8 RfPath);
 void MPT_PwrCtlDM(PADAPTER padapter, u32 bstart);
@@ -817,6 +777,9 @@ int rtw_mp_rate(struct net_device *dev,
 int rtw_mp_channel(struct net_device *dev,
 		struct iw_request_info *info,
 		struct iw_point *wrqu, char *extra);
+int rtw_mp_ch_offset(struct net_device *dev,
+		struct iw_request_info *info,
+		struct iw_point *wrqu, char *extra);
 int rtw_mp_bandwidth(struct net_device *dev,
 		struct iw_request_info *info,
 		struct iw_point *wrqu, char *extra);
@@ -874,6 +837,9 @@ int rtw_mp_phypara(struct net_device *dev,
 int rtw_mp_SetRFPath(struct net_device *dev,
 		struct iw_request_info *info,
 		struct iw_point *wrqu, char *extra);
+int rtw_mp_switch_rf_path(struct net_device *dev,
+			struct iw_request_info *info,
+			struct iw_point *wrqu, char *extra);
 int rtw_mp_QueryDrv(struct net_device *dev,
 		struct iw_request_info *info,
 		union iwreq_data *wrqu, char *extra);
@@ -918,7 +884,7 @@ u8 HwRateToMPTRate(u8 rate);
 int rtw_mp_iqk(struct net_device *dev,
 		 struct iw_request_info *info,
 		 struct iw_point *wrqu, char *extra);
-int rtw_mp_lck(struct net_device *dev, 
-		struct iw_request_info *info, 
+int rtw_mp_lck(struct net_device *dev,
+		struct iw_request_info *info,
 		struct iw_point *wrqu, char *extra);
 #endif /* _RTW_MP_H_ */

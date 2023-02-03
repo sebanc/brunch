@@ -25,6 +25,8 @@ extern void rtw_indicate_sta_disassoc_event(_adapter *padapter, struct sta_info 
 
 void init_mlme_ap_info(_adapter *padapter);
 void free_mlme_ap_info(_adapter *padapter);
+u8 rtw_set_tim_ie(u8 dtim_cnt, u8 dtim_period
+	, const u8 *tim_bmp, u8 tim_bmp_len, u8 *tim_ie);
 /* void update_BCNTIM(_adapter *padapter); */
 void rtw_add_bcn_ie(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 index, u8 *data, u8 len);
 void rtw_remove_bcn_ie(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 index);
@@ -41,11 +43,15 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len);
 void rtw_ap_restore_network(_adapter *padapter);
 
 #if CONFIG_RTW_MACADDR_ACL
-void rtw_set_macaddr_acl(_adapter *adapter, int mode);
-int rtw_acl_add_sta(_adapter *adapter, const u8 *addr);
-int rtw_acl_remove_sta(_adapter *adapter, const u8 *addr);
+void rtw_macaddr_acl_init(_adapter *adapter, u8 period);
+void rtw_macaddr_acl_deinit(_adapter *adapter, u8 period);
+void rtw_macaddr_acl_clear(_adapter *adapter, u8 period);
+void rtw_set_macaddr_acl(_adapter *adapter, u8 period, int mode);
+int rtw_acl_add_sta(_adapter *adapter, u8 period, const u8 *addr);
+int rtw_acl_remove_sta(_adapter *adapter, u8 period, const u8 *addr);
 #endif /* CONFIG_RTW_MACADDR_ACL */
 
+u8 rtw_ap_set_sta_key(_adapter *adapter, const u8 *addr, u8 alg, const u8 *key, u8 keyid, u8 gk);
 u8 rtw_ap_set_pairwise_key(_adapter *padapter, struct sta_info *psta);
 int rtw_ap_set_group_key(_adapter *padapter, u8 *key, u8 alg, int keyid);
 int rtw_ap_set_wep_key(_adapter *padapter, u8 *key, u8 keylen, int keyid, u8 set_tx);
@@ -64,12 +70,13 @@ void stop_ap_mode(_adapter *padapter);
 #endif
 
 void rtw_ap_update_bss_chbw(_adapter *adapter, WLAN_BSSID_EX *bss, u8 ch, u8 bw, u8 offset);
-bool rtw_ap_chbw_decision(_adapter *adapter, s16 req_ch, s8 req_bw, s8 req_offset, u8 *ch, u8 *bw, u8 *offset, u8 *chbw_allow);
+u8 rtw_ap_chbw_decision(_adapter *adapter, u8 ifbmp, u8 excl_ifbmp
+	, s16 req_ch, s8 req_bw, s8 req_offset, u8 *ch, u8 *bw, u8 *offset, u8 *chbw_allow);
 
 #ifdef CONFIG_AUTO_AP_MODE
+void rtw_auto_ap_rx_msg_dump(_adapter *padapter, union recv_frame *precv_frame, u8 *ehdr_pos);
 extern void rtw_start_auto_ap(_adapter *adapter);
 #endif /* CONFIG_AUTO_AP_MODE */
-void rtw_ap_acdata_control(_adapter *padapter, u8 power_mode);
 
 void rtw_ap_parse_sta_capability(_adapter *adapter, struct sta_info *sta, u8 *cap);
 u16 rtw_ap_parse_sta_supported_rates(_adapter *adapter, struct sta_info *sta, u8 *tlv_ies, u16 tlv_ies_len);
@@ -86,8 +93,15 @@ void rtw_update_bmc_sta_tx_rate(_adapter *adapter);
 
 void rtw_process_ht_action_smps(_adapter *padapter, u8 *ta, u8 ctrl_field);
 void rtw_process_public_act_bsscoex(_adapter *padapter, u8 *pframe, uint frame_len);
+#ifdef CONFIG_80211N_HT
 int rtw_ht_operation_update(_adapter *padapter);
-u8 rtw_ap_sta_linking_state_check(_adapter *adapter);
+#endif /* CONFIG_80211N_HT */
+u8 rtw_ap_sta_states_check(_adapter *adapter);
+
+#ifdef CONFIG_FW_HANDLE_TXBCN
+#define rtw_ap_get_nums(adapter)	(adapter_to_dvobj(adapter)->nr_ap_if)
+bool rtw_ap_nums_check(_adapter *adapter);
+#endif
 
 #ifdef CONFIG_SWTIMER_BASED_TXBCN
 void tx_beacon_handlder(struct dvobj_priv *pdvobj);

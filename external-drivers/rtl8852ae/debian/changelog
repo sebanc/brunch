@@ -1,3 +1,18 @@
+rtw89 (1.0.2-2) unstable; urgency=medium
+
+  * Upstream updates
+  * RTW8852C firmware
+  * Enable kernel 5.7
+
+ -- Greg Whiteley <greg.whiteley@gmail.com>  Sat, 15 Oct 2022 09:41:31 +1100
+
+rtw89 (1.0.2-1) unstable; urgency=medium
+
+  * Add RTW8852B/E, RTW8852C/E support
+  * conflict with separate rtw8852be-dkms package
+
+ -- Greg Whiteley <greg.whiteley@gmail.com>  Wed, 12 Oct 2022 17:12:28 +1100
+
 rtw89 (1.0.1-1) unstable; urgency=medium
 
   * fix Remove unnecessary dependencies.

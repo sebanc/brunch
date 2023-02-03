@@ -104,7 +104,7 @@ InsertEMContent_8192E(
 	u4Byte	dwtmp = 0;
 #endif
 
-	_rtw_memset(VirtualAddress, 0, EARLY_MODE_INFO_SIZE);
+	memset(VirtualAddress, 0, EARLY_MODE_INFO_SIZE);
 	if (pEMInfo->EMPktNum == 0)
 		return;
 
@@ -210,7 +210,7 @@ void UpdateEarlyModeInfo8192E(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmi
 		offset = pxmitpriv->agg_pkt[index].offset;
 		pktlen = pxmitpriv->agg_pkt[index].pkt_len;
 
-		_rtw_memset(&eminfo, 0, sizeof(struct EMInfo));
+		memset(&eminfo, 0, sizeof(struct EMInfo));
 		if (pframe->agg_num > EARLY_MODE_MAX_PKT_NUM) {
 			if (node_num_0 > EARLY_MODE_MAX_PKT_NUM) {
 				eminfo.EMPktNum = EARLY_MODE_MAX_PKT_NUM;
@@ -243,12 +243,12 @@ void UpdateEarlyModeInfo8192E(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmi
 
 
 	}
-	_rtw_memset(pxmitpriv->agg_pkt, 0, sizeof(struct agg_pkt_info) * MAX_AGG_PKT_NUM);
+	memset(pxmitpriv->agg_pkt, 0, sizeof(struct agg_pkt_info) * MAX_AGG_PKT_NUM);
 
 }
 #endif
 
-#if ((DEV_BUS_TYPE == RT_USB_INTERFACE) || (DEV_BUS_TYPE == RT_SDIO_INTERFACE))
+#if defined(CONFIG_USB_HCI) || defined(CONFIG_SDIO_HCI)
 void rtl8192e_cal_txdesc_chksum(u8 *ptxdesc)
 {
 	u16	*usPtr = (u16 *)ptxdesc;
@@ -476,7 +476,7 @@ void rtl8192e_fill_fake_txdesc(
 	struct xmit_priv		*pxmitpriv = &padapter->xmitpriv;
 
 	/* Clear all status */
-	_rtw_memset(pDesc, 0, TXDESC_SIZE);
+	memset(pDesc, 0, TXDESC_SIZE);
 
 	SET_TX_DESC_OFFSET_92E(pDesc, (TXDESC_SIZE + OFFSET_SZ));
 

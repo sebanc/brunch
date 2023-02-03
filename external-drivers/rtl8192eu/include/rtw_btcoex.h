@@ -12,6 +12,8 @@
  * more details.
  *
  *****************************************************************************/
+#ifdef CONFIG_BT_COEXIST
+
 #ifndef __RTW_BTCOEX_H__
 #define __RTW_BTCOEX_H__
 
@@ -364,6 +366,7 @@ struct bt_coex_info {
 
 void rtw_btcoex_Initialize(PADAPTER);
 void rtw_btcoex_PowerOnSetting(PADAPTER padapter);
+void rtw_btcoex_AntInfoSetting(PADAPTER padapter);
 void rtw_btcoex_PowerOffSetting(PADAPTER padapter);
 void rtw_btcoex_PreLoadFirmware(PADAPTER padapter);
 void rtw_btcoex_HAL_Initialize(PADAPTER padapter, u8 bWifiOnly);
@@ -446,3 +449,7 @@ void rtw_btcoex_LPS_Enter(PADAPTER padapter);
 u8 rtw_btcoex_LPS_Leave(PADAPTER padapter);
 
 #endif /* __RTW_BTCOEX_H__ */
+#endif /* CONFIG_BT_COEXIST */
+
+void rtw_btcoex_set_ant_info(PADAPTER padapter);
+

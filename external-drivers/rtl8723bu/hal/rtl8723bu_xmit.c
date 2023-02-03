@@ -28,7 +28,7 @@ s32	rtl8723bu_init_xmit_priv(_adapter *padapter)
 	struct xmit_priv	*pxmitpriv = &padapter->xmitpriv;
 
 	tasklet_init(&pxmitpriv->xmit_tasklet,
-	     (void(*)(unsigned long))rtl8723bu_xmit_tasklet,
+	     (void *)rtl8723bu_xmit_tasklet,
 	     (unsigned long)padapter);
 	return _SUCCESS;
 }

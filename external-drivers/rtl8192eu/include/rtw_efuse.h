@@ -50,7 +50,7 @@ enum _EFUSE_DEF_TYPE {
 #define		EFUSE_MAX_SECTION_NUM	128
 #define		EFUSE_MAX_BANK_SIZE		512
 
-/*RTL8822B 8821C BT EFUSE Define 1 BANK 128 size logical map 1024*/ 
+/*RTL8822B 8821C BT EFUSE Define 1 BANK 128 size logical map 1024*/
 #ifdef RTW_HALMAC
 #define BANK_NUM		1
 #define EFUSE_BT_REAL_BANK_CONTENT_LEN	128
@@ -179,13 +179,6 @@ extern u8 fakeBTEfuseModifiedMap[];
 #define		MAX_SEGMENT_NUM			200
 #define		MAX_BUF_SIZE				(MAX_SEGMENT_SIZE*MAX_SEGMENT_NUM)
 #define		TMP_BUF_SIZE				100
-
-static	u8	dcmd_Return_Buffer[MAX_BUF_SIZE] = {0};
-static	u32	dcmd_Buf_Idx = 0;
-static	u32	dcmd_Finifh_Flag = 0;
-
-static	char	dcmd_Buf[TMP_BUF_SIZE];
-
 #define		rtprintf					dcmd_Store_Return_Buf
 
 u8	efuse_bt_GetCurrentSize(PADAPTER padapter, u16 *size);
@@ -221,6 +214,9 @@ u8	Efuse_WordEnableDataWrite(PADAPTER pAdapter, u16 efuse_addr, u8 word_en, u8 *
 void	EFUSE_ShadowMapUpdate(PADAPTER pAdapter, u8 efuseType, BOOLEAN bPseudoTest);
 void	EFUSE_ShadowRead(PADAPTER pAdapter, u8 Type, u16 Offset, u32 *Value);
 #define efuse_logical_map_read(adapter, type, offset, value) EFUSE_ShadowRead((adapter), (type), (offset), (value))
+
+BOOLEAN rtw_file_efuse_IsMasked(PADAPTER pAdapter, u16 Offset);
+BOOLEAN efuse_IsMasked(PADAPTER pAdapter, u16 Offset);
 
 VOID	hal_ReadEFuse_BT_logic_map(
 	PADAPTER	padapter,

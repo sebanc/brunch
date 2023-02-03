@@ -67,7 +67,6 @@ void _ips_enter(struct adapter *adapt)
 
 	if (rf_off == pwrpriv->change_rfpwrstate) {
 		pwrpriv->bpower_saving = true;
-		RTW_PRINT("nolinked power save enter\n");
 
 		if (pwrpriv->ips_mode == IPS_LEVEL_2)
 			pwrpriv->bkeepfwalive = true;
@@ -108,8 +107,6 @@ int _ips_leave(struct adapter *adapt)
 			pwrpriv->rf_pwrstate = rf_on;
 		
 		pwrpriv->pwr_saving_time += rtw_get_passing_time_ms(pwrpriv->pwr_saving_start_time);
-
-		RTW_PRINT("nolinked power save leave\n");
 
 		RTW_INFO("==> ips_leave.....LED(0x%08x)...\n", rtw_read32(adapt, 0x4c));
 		pwrpriv->bips_processing = false;
@@ -231,8 +228,6 @@ void rtw_ps_processor(struct adapter *adapt)
 	ps_deny = rtw_ps_deny_get(adapt);
 	up(&adapter_to_pwrctl(adapt)->lock);
 	if (ps_deny != 0) {
-		RTW_INFO(FUNC_ADPT_FMT ": ps_deny=0x%08X, skip power save!\n",
-			 FUNC_ADPT_ARG(adapt), ps_deny);
 		goto exit;
 	}
 
@@ -552,9 +547,6 @@ void rtw_set_ps_mode(struct adapter * adapt, u8 ps_mode, u8 smart_ps, u8 bcn_ant
 			    && (!rtw_btcoex_IsLpsOn(adapt)))
 		       )
 		   ) {
-			RTW_INFO(FUNC_ADPT_FMT" Leave 802.11 power save - %s\n",
-				 FUNC_ADPT_ARG(adapt), msg);
-
 			if (pwrpriv->lps_leave_cnts < UINT_MAX)
 				pwrpriv->lps_leave_cnts++;
 			else
@@ -575,9 +567,6 @@ void rtw_set_ps_mode(struct adapter * adapt, u8 ps_mode, u8 smart_ps, u8 bcn_ant
 			&& (rtw_btcoex_IsLpsOn(adapt)))
 		   ) {
 			u8 pslv;
-
-			RTW_INFO(FUNC_ADPT_FMT" Enter 802.11 power save - %s\n",
-				 FUNC_ADPT_ARG(adapt), msg);
 
 			if (pwrpriv->lps_enter_cnts < UINT_MAX)
 				pwrpriv->lps_enter_cnts++;

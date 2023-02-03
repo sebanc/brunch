@@ -65272,27 +65272,26 @@ diff -ruN a/fs/overlayfs/dir.c b/fs/overlayfs/dir.c
  	struct cred *override_cred;
  	struct dentry *parent = dentry->d_parent;
  
-@@ -597,14 +597,15 @@
+@@ -597,13 +597,14 @@
+ 		override_cred->fsuid = inode->i_uid;
  		override_cred->fsgid = inode->i_gid;
- 		if (!attr->hardlink) {
- 			err = security_dentry_create_files_as(dentry,
--					attr->mode, &dentry->d_name, old_cred,
-+					attr->mode, &dentry->d_name,
-+					old_cred ? old_cred : current_cred(),
- 					override_cred);
- 			if (err) {
- 				put_cred(override_cred);
- 				goto out_revert_creds;
- 			}
+ 		err = security_dentry_create_files_as(dentry,
+-				attr->mode, &dentry->d_name, old_cred,
++				attr->mode, &dentry->d_name,
++				old_cred ? old_cred : current_cred(),
+ 				override_cred);
+ 		if (err) {
+ 			put_cred(override_cred);
+ 			goto out_revert_creds;
  		}
 -		put_cred(override_creds(override_cred));
 +		hold_cred = override_creds(override_cred);
  		put_cred(override_cred);
- 
- 		if (!ovl_dentry_is_whiteout(dentry))
-@@ -613,7 +614,9 @@
- 			err = ovl_create_over_whiteout(dentry, inode, attr);
  	}
+ 
+@@ -613,7 +614,9 @@
+ 		err = ovl_create_over_whiteout(dentry, inode, attr);
+ 
  out_revert_creds:
 -	revert_creds(old_cred);
 +	ovl_revert_creds(dentry->d_sb, old_cred ?: hold_cred);
@@ -65422,7 +65421,7 @@ diff -ruN a/fs/overlayfs/file.c b/fs/overlayfs/file.c
 @@ -453,7 +441,7 @@
  	file_end_write(real.file);
  	/* Update size */
- 	ovl_copyattr(realinode, inode);
+ 	ovl_copyattr(inode);
 -	revert_creds(old_cred);
 +	ovl_revert_creds(inode->i_sb, old_cred);
  	fdput(real);
@@ -71802,9 +71801,9 @@ diff -ruN a/kernel/fork.c b/kernel/fork.c
  #include <asm/pgalloc.h>
  #include <linux/uaccess.h>
 @@ -446,6 +447,7 @@
- 
- void free_task(struct task_struct *tsk)
- {
+ #ifdef CONFIG_SECCOMP
+ 	WARN_ON_ONCE(tsk->seccomp.filter);
+ #endif
 +	cpufreq_task_times_exit(tsk);
  	release_user_cpus_ptr(tsk);
  	scs_release(tsk);
@@ -71827,9 +71826,9 @@ diff -ruN a/kernel/fork.c b/kernel/fork.c
  	/*
  	 * Do this prior waking up the new thread - the thread pointer
  	 * might get invalid after that point, if the thread exits quickly.
-diff -ruN a/kernel/futex.c b/kernel/futex.c
---- a/kernel/futex.c	2021-12-08 09:04:57.000000000 +0100
-+++ b/kernel/futex.c	2021-12-23 08:35:57.000000000 +0100
+diff -ruN a/kernel/futex/core.c b/kernel/futex/core.c
+--- a/kernel/futex/core.c	2021-12-08 09:04:57.000000000 +0100
++++ b/kernel/futex/core.c	2021-12-23 08:35:57.000000000 +0100
 @@ -1238,7 +1238,7 @@
  	 *  tsk->futex_state =               } else {
  	 *	FUTEX_STATE_DEAD;              if (tsk->futex_state !=

@@ -122,7 +122,7 @@ static const char *const coexH2cResultString[] = {
 #define HALBTCOUTSRC_AGG_CHK_WINDOW_IN_MS	8000
 
 struct btc_coexist GLBtCoexist;
-struct gl_coex_offload coex_offload;
+static struct gl_coex_offload coex_offload;
 static u8 GLBtcWiFiInScanState;
 static u8 GLBtcWiFiInIQKState;
 static u8 GLBtcWiFiInIPS;

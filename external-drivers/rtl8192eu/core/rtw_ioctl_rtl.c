@@ -361,7 +361,7 @@ NDIS_STATUS oid_rt_get_rx_icv_err_hdl(struct oid_par_priv *poid_par_priv)
 		return status;
 	}
 	if (poid_par_priv->information_buf_len >= sizeof(u32)) {
-		/* _rtw_memcpy(*(uint *)poid_par_priv->information_buf,padapter->recvpriv.rx_icv_err,sizeof(u32)); */
+		/* memcpy(*(uint *)poid_par_priv->information_buf,padapter->recvpriv.rx_icv_err,sizeof(u32)); */
 		*(uint *)poid_par_priv->information_buf = padapter->recvpriv.rx_icv_err;
 		*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
 	} else
@@ -530,7 +530,7 @@ NDIS_STATUS oid_rt_get_total_rx_bytes_hdl(struct oid_par_priv *poid_par_priv)
 		return status;
 	}
 	if (poid_par_priv->information_buf_len >= sizeof(ULONG)) {
-		/* _rtw_memcpy(*(uint *)poid_par_priv->information_buf,padapter->recvpriv.rx_icv_err,sizeof(u32)); */
+		/* memcpy(*(uint *)poid_par_priv->information_buf,padapter->recvpriv.rx_icv_err,sizeof(u32)); */
 		*(u64 *)poid_par_priv->information_buf = padapter->recvpriv.rx_bytes;
 		*poid_par_priv->bytes_rw = poid_par_priv->information_buf_len;
 	} else

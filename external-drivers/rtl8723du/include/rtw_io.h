@@ -125,7 +125,7 @@ struct	intf_hdl {
 
 struct reg_protocol_rd {
 
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 
 	/* DW1 */
 	u32		NumOfTrans:4;
@@ -183,7 +183,7 @@ struct reg_protocol_rd {
 struct reg_protocol_wt {
 
 
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 
 	/* DW1 */
 	u32		NumOfTrans:4;

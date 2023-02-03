@@ -13,8 +13,8 @@
  *
  *****************************************************************************/
 
-#ifndef __HAL_PHY_RF_8192E_H__
-#define __HAL_PHY_RF_8192E_H__
+#ifndef __HALRF_8192E_H__
+#define __HALRF_8192E_H__
 
 /*--------------------------Define Parameters-------------------------------*/
 #if (DM_ODM_SUPPORT_TYPE & ODM_CE)
@@ -30,12 +30,12 @@
 #include "../halphyrf_ap.h"
 
 void configure_txpower_track_8192e(
-	struct _TXPWRTRACK_CFG	*p_config
+	struct txpwrtrack_cfg	*config
 );
 
 void
 get_delta_swing_table_8192e(
-	void		*p_dm_void,
+	void		*dm_void,
 	u8 **temperature_up_a,
 	u8 **temperature_down_a,
 	u8 **temperature_up_b,
@@ -43,7 +43,7 @@ get_delta_swing_table_8192e(
 );
 
 void do_iqk_8192e(
-	void		*p_dm_void,
+	void		*dm_void,
 	u8		delta_thermal_index,
 	u8		thermal_value,
 	u8		threshold
@@ -51,7 +51,7 @@ void do_iqk_8192e(
 
 void
 odm_tx_pwr_track_set_pwr92_e(
-	void		*p_dm_void,
+	void		*dm_void,
 	enum pwrtrack_method	method,
 	u8				rf_path,
 	u8				channel_mapped_index
@@ -61,7 +61,7 @@ odm_tx_pwr_track_set_pwr92_e(
 
 void
 phy_iq_calibrate_8192e(
-	void		*p_dm_void,
+	void		*dm_void,
 	boolean	is_recovery);
 
 
@@ -70,7 +70,7 @@ phy_iq_calibrate_8192e(
  *   */
 void
 phy_lc_calibrate_8192e(
-	void		*p_dm_void
+	void		*dm_void
 );
 
 /*
@@ -79,9 +79,9 @@ phy_lc_calibrate_8192e(
 void
 phy_ap_calibrate_8192e(
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
-	struct PHY_DM_STRUCT		*p_dm,
+	struct dm_struct		*dm,
 #else
-	struct _ADAPTER	*p_adapter,
+	void	*adapter,
 #endif
 	s8		delta);
 
@@ -89,9 +89,9 @@ phy_ap_calibrate_8192e(
 void
 _phy_save_adda_registers_92e(
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
-	struct PHY_DM_STRUCT		*p_dm,
+	struct dm_struct		*dm,
 #else
-	struct _ADAPTER	*p_adapter,
+	void	*adapter,
 #endif
 	u32		*adda_reg,
 	u32		*adda_backup,
@@ -101,9 +101,9 @@ _phy_save_adda_registers_92e(
 void
 _phy_path_adda_on_92e(
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
-	struct PHY_DM_STRUCT		*p_dm,
+	struct dm_struct		*dm,
 #else
-	struct _ADAPTER	*p_adapter,
+	void	*adapter,
 #endif
 	u32		*adda_reg,
 	boolean		is_path_a_on,
@@ -113,9 +113,9 @@ _phy_path_adda_on_92e(
 void
 _phy_mac_setting_calibration_92e(
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
-	struct PHY_DM_STRUCT		*p_dm,
+	struct dm_struct		*dm,
 #else
-	struct _ADAPTER	*p_adapter,
+	void	*adapter,
 #endif
 	u32		*mac_reg,
 	u32		*mac_backup
@@ -124,17 +124,17 @@ _phy_mac_setting_calibration_92e(
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
 void
 _phy_path_a_stand_by(
-	struct PHY_DM_STRUCT		*p_dm
+	struct dm_struct		*dm
 );
 #endif
 
 
 void
 halrf_rf_lna_setting_8192e(
-	struct PHY_DM_STRUCT	*p_dm,
-	enum phydm_lna_set type
+	struct dm_struct	*dm,
+	enum halrf_lna_set type
 );
 
 
 
-#endif	/* #ifndef __HAL_PHY_RF_8192E_H__*/
+#endif	/*#ifndef __HALRF_8192E_H__*/

@@ -65,36 +65,41 @@ sint rtw_endofpktfile(struct pkt_file *pfile)
 
 void rtw_set_tx_chksum_offload(_pkt *pkt, struct pkt_attrib *pattrib)
 {
-
-#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
+#ifdef CONFIG_TX_CSUM_OFFLOAD	
 	struct sk_buff *skb = (struct sk_buff *)pkt;
-	pattrib->hw_tcp_csum = 0;
+	struct iphdr *iph = NULL;
+	struct ipv6hdr *i6ph = NULL;
+	struct udphdr *uh = NULL;
+	struct tcphdr *th = NULL;
+	u8 	protocol = 0xFF;
 
-	if (skb->ip_summed == CHECKSUM_PARTIAL) {
-		if (skb_shinfo(skb)->nr_frags == 0) {
-			const struct iphdr *ip = ip_hdr(skb);
-			if (ip->protocol == IPPROTO_TCP) {
-				/* TCP checksum offload by HW */
-				RTW_INFO("CHECKSUM_PARTIAL TCP\n");
-				pattrib->hw_tcp_csum = 1;
-				/* skb_checksum_help(skb); */
-			} else if (ip->protocol == IPPROTO_UDP) {
-				/* RTW_INFO("CHECKSUM_PARTIAL UDP\n"); */
-#if 1
-				skb_checksum_help(skb);
-#else
-				/* Set UDP checksum = 0 to skip checksum check */
-				struct udphdr *udp = skb_transport_header(skb);
-				udp->check = 0;
-#endif
-			} else {
-				RTW_INFO("%s-%d TCP CSUM offload Error!!\n", __FUNCTION__, __LINE__);
-				WARN_ON(1);     /* we need a WARN() */
-			}
-		} else { /* IP fragmentation case */
-			RTW_INFO("%s-%d nr_frags != 0, using skb_checksum_help(skb);!!\n", __FUNCTION__, __LINE__);
-			skb_checksum_help(skb);
-		}
+	if (skb->protocol == htons(ETH_P_IP)) {
+		iph = (struct iphdr *)skb_network_header(skb);
+		protocol = iph->protocol;
+	} else if (skb->protocol == htons(ETH_P_IPV6)) {
+		i6ph = (struct ipv6hdr *)skb_network_header(skb);
+		protocol = i6ph->nexthdr;
+	} else
+		{}
+
+	/*	For HW rule, clear ipv4_csum & UDP/TCP_csum if it is UDP/TCP packet	*/
+	switch (protocol) {
+	case IPPROTO_UDP:
+		uh = (struct udphdr *)skb_transport_header(skb);
+		uh->check = 0;
+		if (iph)
+			iph->check = 0;
+		pattrib->hw_csum = _TRUE;
+		break;
+	case IPPROTO_TCP:
+		th = (struct tcphdr *)skb_transport_header(skb);
+		th->check = 0;
+		if (iph)
+			iph->check = 0;
+		pattrib->hw_csum = _TRUE;
+		break;
+	default:
+		break;
 	}
 #endif
 
@@ -313,7 +318,6 @@ void rtw_os_xmit_schedule(_adapter *padapter)
 static bool rtw_check_xmit_resource(_adapter *padapter, _pkt *pkt)
 {
 	bool busy = _FALSE;
-	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
 	u16	qidx;
 
@@ -385,7 +389,7 @@ int rtw_mlcst2unicst(_adapter *padapter, struct sk_buff *skb)
 	plist = get_next(phead);
 
 	/* free sta asoc_queue */
-	while ((rtw_end_of_queue_search(phead, plist)) == _FALSE) {
+	while (phead != plist) {
 		int stainfo_offset;
 		psta = LIST_CONTAINOR(plist, struct sta_info, asoc_list);
 		plist = get_next(plist);
@@ -404,9 +408,9 @@ int rtw_mlcst2unicst(_adapter *padapter, struct sk_buff *skb)
 		}
 
 		/* avoid come from STA1 and send back STA1 */
-		if (_rtw_memcmp(psta->cmn.mac_addr, &skb->data[6], 6) == _TRUE
-			|| _rtw_memcmp(psta->cmn.mac_addr, null_addr, 6) == _TRUE
-			|| _rtw_memcmp(psta->cmn.mac_addr, bc_addr, 6) == _TRUE
+		if (_rtw_memcmp(psta->cmn.mac_addr, &skb->data[6], ETH_ALEN) == _TRUE
+			|| _rtw_memcmp(psta->cmn.mac_addr, null_addr, ETH_ALEN) == _TRUE
+			|| _rtw_memcmp(psta->cmn.mac_addr, bc_addr, ETH_ALEN) == _TRUE
 		) {
 			DBG_COUNTER(padapter->tx_logs.os_tx_m2u_ignore_self);
 			continue;
@@ -417,7 +421,7 @@ int rtw_mlcst2unicst(_adapter *padapter, struct sk_buff *skb)
 		newskb = rtw_skb_copy(skb);
 
 		if (newskb) {
-			_rtw_memcpy(newskb->data, psta->cmn.mac_addr, 6);
+			memcpy(newskb->data, psta->cmn.mac_addr, ETH_ALEN);
 			res = rtw_xmit(padapter, &newskb);
 			if (res < 0) {
 				DBG_COUNTER(padapter->tx_logs.os_tx_m2u_entry_err_xmit);
@@ -445,14 +449,14 @@ int _rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(pnetdev);
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 #ifdef CONFIG_TX_MCAST2UNI
-	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	extern int rtw_mc2u_disable;
 #endif /* CONFIG_TX_MCAST2UNI	 */
-	s32 res = 0;
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
-	u16 queue;
+#ifdef CONFIG_TX_CSUM_OFFLOAD	
+	struct sk_buff *skb = pkt;
+	struct sk_buff *segs, *nskb;
+	netdev_features_t features = padapter->pnetdev->features;
 #endif
-
+	s32 res = 0;
 
 	if (padapter->registrypriv.mp_mode) {
 		RTW_INFO("MP_TX_DROP_OS_FRAME\n");
@@ -472,7 +476,7 @@ int _rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 
 #ifdef CONFIG_TX_MCAST2UNI
 	if (!rtw_mc2u_disable
-		&& (MLME_IS_AP(padapter) || MLME_IS_MESH(padapter))
+		&& MLME_IS_AP(padapter)
 		&& (IP_MCAST_MAC(pkt->data)
 			|| ICMPV6_MCAST_MAC(pkt->data)
 			#ifdef CONFIG_TX_BCAST2UNI
@@ -492,6 +496,33 @@ int _rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev)
 		}
 	}
 #endif /* CONFIG_TX_MCAST2UNI	 */
+
+#ifdef CONFIG_TX_CSUM_OFFLOAD
+	if (skb_shinfo(skb)->gso_size) {
+	/*	split a big(65k) skb into several small(1.5k) skbs */
+		features &= ~(NETIF_F_TSO | NETIF_F_TSO6);
+		segs = skb_gso_segment(skb, features);
+		if (IS_ERR(segs) || !segs)
+			goto drop_packet;
+
+		do {
+			nskb = segs;
+			segs = segs->next;
+			nskb->next = NULL;
+			rtw_mstat_update( MSTAT_TYPE_SKB, MSTAT_ALLOC_SUCCESS, nskb->truesize);
+			res = rtw_xmit(padapter, &nskb);
+			if (res < 0) {
+				#ifdef DBG_TX_DROP_FRAME
+				RTW_INFO("DBG_TX_DROP_FRAME %s rtw_xmit fail\n", __FUNCTION__);
+				#endif
+				pxmitpriv->tx_drop++;
+				rtw_os_pkt_complete(padapter, nskb);
+			}
+		} while (segs);
+		rtw_os_pkt_complete(padapter, skb);
+		goto exit;
+	}
+#endif
 
 	res = rtw_xmit(padapter, &pkt);
 	if (res < 0) {

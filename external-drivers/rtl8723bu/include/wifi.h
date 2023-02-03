@@ -373,7 +373,7 @@ __inline static int IS_MCAST(unsigned char *da)
 		return _FALSE;
 }
 
-__inline static unsigned char * get_ra(unsigned char *pframe)
+__inline static unsigned char * wifi_get_ra(unsigned char *pframe)
 {
 	unsigned char	*ra;
 	ra = GetAddr1Ptr(pframe);

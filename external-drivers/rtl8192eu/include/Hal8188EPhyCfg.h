@@ -162,7 +162,7 @@ PHY_SetRFEReg_8188E(
 /*
  * BB/MAC/RF other monitor API
  *   */
-VOID phy_set_rf_path_switch_8188e(IN	PADAPTER	pAdapter, IN	bool		bMain);
+VOID phy_set_rf_path_switch_8188e(IN	struct dm_struct	*phydm, IN	bool		bMain);
 
 extern	VOID
 PHY_SwitchEphyParameter(

@@ -147,8 +147,8 @@ endif
 
 EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped
 
-KBASE              ?= ../kernel
-KBUILD_DIR         ?= $(KBASE)
+KBASE              ?= /lib/modules/`uname -r`
+KBUILD_DIR         ?= $(KBASE)/build
 MDEST_DIR          ?= $(KBASE)/kernel/drivers/net/wireless
 
 # Cross compile setup.  Tool chain and kernel tree, replace with your own.
@@ -156,7 +156,7 @@ CROSS_TOOLS        = /path/to/tools
 CROSS_KBUILD_DIR   = /path/to/kernel/tree
 
 all:
-	KBUILD_NOPEDANTIC=1 make -C $(KBUILD_DIR) O=out M=`pwd`
+	KBUILD_NOPEDANTIC=1 make -C ../kernel O=out M=`pwd`
 
 cross:
 	KBUILD_NOPEDANTIC=1 make CROSS_COMPILE=${CROSS_TOOLS} -C $(CROSS_KBUILD_DIR) M=`pwd`

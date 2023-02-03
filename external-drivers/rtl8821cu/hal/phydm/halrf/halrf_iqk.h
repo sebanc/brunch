@@ -46,7 +46,8 @@
 	RTL8812F_SUPPORT == 1 ||	RTL8197G_SUPPORT == 1)
 #define NUM 2
 #else
-#define NUM 1
+/* Other radios only have 1 RF path, but a lot of code indexes both A and B. */
+#define NUM 2
 #endif
 
 /*@-----------------------End Define Parameters-----------------------*/

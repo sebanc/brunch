@@ -29,6 +29,8 @@ enum btc_wl_rfk_type {
 #define FC_EXEC true
 
 #define RTW89_COEX_ACT1_WORK_PERIOD	round_jiffies_relative(HZ * 4)
+#define RTW89_COEX_BT_DEVINFO_WORK_PERIOD	round_jiffies_relative(HZ * 16)
+#define RTW89_COEX_RFK_CHK_WORK_PERIOD	msecs_to_jiffies(300)
 #define BTC_RFK_PATH_MAP GENMASK(3, 0)
 #define BTC_RFK_PHY_MAP GENMASK(5, 4)
 #define BTC_RFK_BAND_MAP GENMASK(7, 6)
@@ -56,6 +58,29 @@ enum btc_bt_trs {
 	BTC_BT_MAX_GROUP,
 };
 
+enum btc_rssi_st {
+	BTC_RSSI_ST_LOW = 0x0,
+	BTC_RSSI_ST_HIGH,
+	BTC_RSSI_ST_STAY_LOW,
+	BTC_RSSI_ST_STAY_HIGH,
+	BTC_RSSI_ST_MAX
+};
+
+#define	BTC_RSSI_HIGH(_rssi_) \
+	({typeof(_rssi_) __rssi = (_rssi_); \
+	  ((__rssi == BTC_RSSI_ST_HIGH || \
+	    __rssi == BTC_RSSI_ST_STAY_HIGH) ? 1 : 0); })
+
+#define	BTC_RSSI_LOW(_rssi_) \
+	({typeof(_rssi_) __rssi = (_rssi_); \
+	  ((__rssi == BTC_RSSI_ST_LOW || \
+	    __rssi == BTC_RSSI_ST_STAY_LOW) ? 1 : 0); })
+
+#define BTC_RSSI_CHANGE(_rssi_) \
+	({typeof(_rssi_) __rssi = (_rssi_); \
+	  ((__rssi == BTC_RSSI_ST_LOW || \
+	    __rssi == BTC_RSSI_ST_HIGH) ? 1 : 0); })
+
 enum btc_ant {
 	BTC_ANT_SHARED = 0,
 	BTC_ANT_DEDICATED,
@@ -77,6 +102,7 @@ enum btc_pkt_type {
 	PACKET_ARP,
 	PACKET_EAPOL,
 	PACKET_EAPOL_END,
+	PACKET_ICMP,
 	PACKET_MAX
 };
 
@@ -104,6 +130,12 @@ enum btc_rfctrl {
 	BTC_RFCTRL_MAX
 };
 
+enum btc_lps_state {
+	BTC_LPS_OFF = 0,
+	BTC_LPS_RF_OFF = 1,
+	BTC_LPS_RF_ON = 2
+};
+
 void rtw89_btc_ntfy_poweron(struct rtw89_dev *rtwdev);
 void rtw89_btc_ntfy_poweroff(struct rtw89_dev *rtwdev);
 void rtw89_btc_ntfy_init(struct rtw89_dev *rtwdev, u8 mode);
@@ -115,29 +147,35 @@ void rtw89_btc_ntfy_specific_packet(struct rtw89_dev *rtwdev,
 void rtw89_btc_ntfy_eapol_packet_work(struct work_struct *work);
 void rtw89_btc_ntfy_arp_packet_work(struct work_struct *work);
 void rtw89_btc_ntfy_dhcp_packet_work(struct work_struct *work);
+void rtw89_btc_ntfy_icmp_packet_work(struct work_struct *work);
 void rtw89_btc_ntfy_role_info(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif,
 			      struct rtw89_sta *rtwsta, enum btc_role_state state);
 void rtw89_btc_ntfy_radio_state(struct rtw89_dev *rtwdev, enum btc_rfctrl rf_state);
 void rtw89_btc_ntfy_wl_rfk(struct rtw89_dev *rtwdev, u8 phy_map,
 			   enum btc_wl_rfk_type type,
 			   enum btc_wl_rfk_state state);
-void rtw89_btc_ntfy_wl_sta_work(struct work_struct *work);
+void rtw89_btc_ntfy_wl_sta(struct rtw89_dev *rtwdev);
 void rtw89_btc_c2h_handle(struct rtw89_dev *rtwdev, struct sk_buff *skb,
 			  u32 len, u8 class, u8 func);
 void rtw89_btc_dump_info(struct rtw89_dev *rtwdev, struct seq_file *m);
 void rtw89_coex_act1_work(struct work_struct *work);
+void rtw89_coex_bt_devinfo_work(struct work_struct *work);
+void rtw89_coex_rfk_chk_work(struct work_struct *work);
 void rtw89_coex_power_on(struct rtw89_dev *rtwdev);
+void rtw89_btc_set_policy(struct rtw89_dev *rtwdev, u16 policy_type);
+void rtw89_btc_set_policy_v1(struct rtw89_dev *rtwdev, u16 policy_type);
+void rtw89_coex_recognize_ver(struct rtw89_dev *rtwdev);
 
 static inline u8 rtw89_btc_phymap(struct rtw89_dev *rtwdev,
 				  enum rtw89_phy_idx phy_idx,
 				  enum rtw89_rf_path_bit paths)
 {
-	struct rtw89_hal *hal = &rtwdev->hal;
+	const struct rtw89_chan *chan = rtw89_chan_get(rtwdev, RTW89_SUB_ENTITY_0);
 	u8 phy_map;
 
 	phy_map = FIELD_PREP(BTC_RFK_PATH_MAP, paths) |
 		  FIELD_PREP(BTC_RFK_PHY_MAP, BIT(phy_idx)) |
-		  FIELD_PREP(BTC_RFK_BAND_MAP, hal->current_band_type);
+		  FIELD_PREP(BTC_RFK_BAND_MAP, chan->band_type);
 
 	return phy_map;
 }

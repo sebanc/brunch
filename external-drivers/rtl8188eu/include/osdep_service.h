@@ -67,7 +67,11 @@ struct	__queue	{
 	spinlock_t lock;
 };
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 #define thread_exit() complete_and_exit(NULL, 0)
+#else
+#define thread_exit() kthread_complete_and_exit(NULL, 0)
+#endif
 
 static inline struct list_head *get_list_head(struct __queue *queue)
 {

@@ -215,8 +215,8 @@ mptbt_BtFwOpCodeProcess(
 	pH2c->opCodeVer = opCodeVer;
 	pH2c->reqNum = pMptCtx->h2cReqNum;
 	/* PlatformMoveMemory(&pH2c->buf[0], pH2cPar, h2cParaLen); */
-	/* _rtw_memcpy(&pH2c->buf[0], pH2cPar, h2cParaLen); */
-	_rtw_memcpy(pH2c->buf, pH2cPar, h2cParaLen);
+	/* memcpy(&pH2c->buf[0], pH2cPar, h2cParaLen); */
+	memcpy(pH2c->buf, pH2cPar, h2cParaLen);
 
 	RTW_INFO("[MPT], pH2c->opCode=%d\n", pH2c->opCode);
 	RTW_INFO("[MPT], pH2c->opCodeVer=%d\n", pH2c->opCodeVer);
@@ -466,7 +466,7 @@ MPTBT_FwC2hBtMpCtrl(
 	PMPT_CONTEXT	pMptCtx = &(Adapter->mppriv.mpt_ctx);
 	PBT_EXT_C2H pExtC2h = (PBT_EXT_C2H)tmpBuf;
 
-	if (Adapter->bBTFWReady == _FALSE || Adapter->registrypriv.mp_mode == 0) {
+	if (GET_HAL_DATA(Adapter)->bBTFWReady == _FALSE || Adapter->registrypriv.mp_mode == 0) {
 		/* RTW_INFO("Ignore C2H BT MP Info since not in MP mode\n"); */
 		return;
 	}
@@ -499,7 +499,7 @@ MPTBT_FwC2hBtMpCtrl(
 
 	case EXT_C2H_TRIG_BY_BT_FW:
 		RTW_INFO("[MPT], EXT_C2H_TRIG_BY_BT_FW\n");
-		_rtw_memcpy(&pMptCtx->c2hBuf[0], tmpBuf, length);
+		memcpy(&pMptCtx->c2hBuf[0], tmpBuf, length);
 		RTW_INFO("[MPT], pExtC2h->statusCode=0x%x\n", pExtC2h->statusCode);
 		RTW_INFO("[MPT], pExtC2h->retLen=0x%x\n", pExtC2h->retLen);
 		RTW_INFO("[MPT], pExtC2h->opCodeVer=0x%x\n", pExtC2h->opCodeVer);
@@ -1522,7 +1522,7 @@ mptbt_BtControlProcess(
 		/* RTW_INFO("[MPT], parameters(hex):0x%x %d\n",&pBtReq->pParamStart[0], pBtReq->paraLength); */
 	}
 
-	_rtw_memset((void *)pMptCtx->mptOutBuf, 0, 100);
+	memset((void *)pMptCtx->mptOutBuf, 0, 100);
 	pMptCtx->mptOutLen = 4; /* length of (BT_RSP_CMD.status+BT_RSP_CMD.paraLength) */
 
 	pBtRsp = (PBT_RSP_CMD)pMptCtx->mptOutBuf;

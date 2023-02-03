@@ -1111,7 +1111,7 @@ static struct cmd_hdl wlancmds[] = {
 
 struct C2HEvent_Header {
 
-#ifdef __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 
 	unsigned int len:16;
 	unsigned int ID:8;

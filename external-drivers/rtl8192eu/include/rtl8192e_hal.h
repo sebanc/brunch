@@ -121,10 +121,15 @@ typedef struct _RT_FIRMWARE_8192E {
 #endif
 #define MAX_RX_DMA_BUFFER_SIZE_8192E		(RX_DMA_SIZE_8192E-RX_DMA_RESERVED_SIZE_8192E)	/*RX 16K*/
 
+
+#define PAGE_SIZE_TX_92E	PAGE_SIZE_256
+
 /* For General Reserved Page Number(Beacon Queue is reserved page)
  * if (CONFIG_2BCN_EN) Beacon:4, PS-Poll:1, Null Data:1,Prob Rsp:1,Qos Null Data:1
- * Beacon:2, PS-Poll:1, Null Data:1,Prob Rsp:1,Qos Null Data:1 */
-#define RSVD_PAGE_NUM_8192E		0x08
+ * Beacon: MAX_BEACON_LEN / PAGE_SIZE_TX_92E
+ * PS-Poll:1, Null Data:1,Prob Rsp:1,Qos Null Data:1,CTS-2-SELF / LTE QoS Null*/
+
+#define RSVD_PAGE_NUM_8192E		(MAX_BEACON_LEN / PAGE_SIZE_TX_92E + 6) /*0x08*/
 /* For WoWLan , more reserved page
  * ARP Rsp:1, RWC:1, GTK Info:1,GTK RSP:2,GTK EXT MEM:2, AOAC rpt: 1,PNO: 6
  * NS offload: 2 NDP info: 1
@@ -154,7 +159,6 @@ Total page numbers : 256(0x100)
 #define	TX_PAGE_BOUNDARY_8192E	(TX_TOTAL_PAGE_NUMBER_8192E) /* beacon header start address */
 
 
-#define PAGE_SIZE_TX_92E	PAGE_SIZE_256
 #define RSVD_PKT_LEN_92E	(TOTAL_RSVD_PAGE_NUMBER_8192E * PAGE_SIZE_TX_92E)
 
 #define TX_PAGE_LOAD_FW_BOUNDARY_8192E		0x47 /* 0xA5 */
@@ -304,8 +308,6 @@ GetHalDefVar8192E(
 void rtl8192e_set_hal_ops(struct hal_ops *pHalFunc);
 void init_hal_spec_8192e(_adapter *adapter);
 void rtl8192e_init_default_value(_adapter *padapter);
-/* register */
-void SetBcnCtrlReg(PADAPTER padapter, u8 SetBits, u8 ClearBits);
 
 void rtl8192e_start_thread(_adapter *padapter);
 void rtl8192e_stop_thread(_adapter *padapter);

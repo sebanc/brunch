@@ -124,7 +124,7 @@ exit:
 	return res;
 }
 
-void rtw_mfree_recv_priv_lock(struct recv_priv *precvpriv)
+static void rtw_mfree_recv_priv_lock(struct recv_priv *precvpriv)
 {
 }
 
@@ -684,7 +684,7 @@ static int recv_decache(union recv_frame *precv_frame, u8 bretry)
 #define PN_LESS_CHK(a, b)	(((a-b) & 0x800000000000L) != 0)
 #define VALID_PN_CHK(new, old)	(((old) == 0) || PN_LESS_CHK(old, new))
 #define CCMPH_2_KEYID(ch)	(((ch) & 0x00000000c0000000L) >> 30)
-int recv_ucast_pn_decache(union recv_frame *precv_frame)
+static int recv_ucast_pn_decache(union recv_frame *precv_frame)
 {
 	struct rx_pkt_attrib *pattrib = &precv_frame->u.hdr.attrib;
 	struct sta_info *sta = precv_frame->u.hdr.psta;
@@ -810,7 +810,7 @@ static void process_wmmps_data(struct adapter *adapt, union recv_frame *precv_fr
 	}
 }
 
-void count_rx_stats(struct adapter *adapt, union recv_frame *prframe, struct sta_info *sta)
+static void count_rx_stats(struct adapter *adapt, union recv_frame *prframe, struct sta_info *sta)
 {
 	int	sz;
 	struct sta_info		*psta = NULL;
@@ -1812,8 +1812,8 @@ static int wlanhdr_to_ethhdr(union recv_frame *precvframe)
 		memcpy(ptr + ETH_ALEN, pattrib->src, ETH_ALEN);
 
 		if (!bsnaphdr) {
-			len = htons(len);
-			memcpy(ptr + 12, &len, 2);
+			__be16 be_len = htons(len);
+			memcpy(ptr + 12, &be_len, 2);
 		}
 	}
 
@@ -2154,15 +2154,15 @@ exit:
 	return ret;
 }
 
-static int check_indicate_seq(struct recv_reorder_ctrl *preorder_ctrl, u16 seq_num)
+static int check_indicate_seq(struct recv_reorder_ctrl *preorder_ctrl, __le16 seq_num)
 {
 	struct adapter * adapt = preorder_ctrl->adapt;
 	struct recv_priv  *precvpriv = &adapt->recvpriv;
 	u8	wsize = preorder_ctrl->wsize_b;
-	u16	wend = (preorder_ctrl->indicate_seq + wsize - 1) & 0xFFF; /* % 4096; */
+	u16	wend = (le16_to_cpu(preorder_ctrl->indicate_seq) + wsize - 1) & 0xFFF; /* % 4096; */
 
 	/* Rx Reorder initialize condition. */
-	if (preorder_ctrl->indicate_seq == 0xFFFF) {
+	if (preorder_ctrl->indicate_seq == cpu_to_le16(0xFFFF)) {
 		preorder_ctrl->indicate_seq = seq_num;
 	}
 
@@ -2176,13 +2176,13 @@ static int check_indicate_seq(struct recv_reorder_ctrl *preorder_ctrl, u16 seq_n
 	* 2. Incoming SeqNum is larger than the WinEnd => Window shift N
 	*/
 	if (SN_EQUAL(seq_num, preorder_ctrl->indicate_seq)) {
-		preorder_ctrl->indicate_seq = (preorder_ctrl->indicate_seq + 1) & 0xFFF;
-	} else if (SN_LESS(wend, seq_num)) {
+		preorder_ctrl->indicate_seq = cpu_to_le16((le16_to_cpu(preorder_ctrl->indicate_seq) + 1) & 0xFFF);
+	} else if (SN_LESS(cpu_to_le16(wend), seq_num)) {
 		/* boundary situation, when seq_num cross 0xFFF */
-		if (seq_num >= (wsize - 1))
-			preorder_ctrl->indicate_seq = seq_num + 1 - wsize;
+		if (le16_to_cpu(seq_num) >= (wsize - 1))
+			preorder_ctrl->indicate_seq = cpu_to_le16(le16_to_cpu(seq_num) + 1 - wsize);
 		else
-			preorder_ctrl->indicate_seq = 0xFFF - (wsize - (seq_num + 1)) + 1;
+			preorder_ctrl->indicate_seq = cpu_to_le16(0xFFF - (wsize - (le16_to_cpu(seq_num) + 1)) + 1);
 
 		precvpriv->dbg_rx_ampdu_window_shift_cnt++;
 	}
@@ -2205,8 +2205,7 @@ static int enqueue_reorder_recvframe(struct recv_reorder_ctrl *preorder_ctrl, un
 		pnextrframe = container_of(plist, union recv_frame, u.list);
 		pnextattrib = &pnextrframe->u.hdr.attrib;
 
-		if (SN_LESS(le16_to_cpu(pnextattrib->seq_num),
-			    le16_to_cpu( pattrib->seq_num)))
+		if (SN_LESS(pnextattrib->seq_num, pattrib->seq_num))
 			plist = get_next(plist);
 		else if (SN_EQUAL(pnextattrib->seq_num, pattrib->seq_num)) {
 			/* Duplicate entry is found!! Do not insert current entry. */
@@ -2263,8 +2262,8 @@ static int recv_indicatepkts_in_order(struct adapter *adapt, struct recv_reorder
 		prframe = container_of(plist, union recv_frame, u.list);
 		pattrib = &prframe->u.hdr.attrib;
 
-		recv_indicatepkts_pkt_loss_cnt(adapt, preorder_ctrl->indicate_seq, le16_to_cpu(pattrib->seq_num));
-		preorder_ctrl->indicate_seq = le16_to_cpu(pattrib->seq_num);
+		recv_indicatepkts_pkt_loss_cnt(adapt, le16_to_cpu(preorder_ctrl->indicate_seq), le16_to_cpu(pattrib->seq_num));
+		preorder_ctrl->indicate_seq = pattrib->seq_num;
 	}
 
 	/* Prepare indication list and indication. */
@@ -2274,12 +2273,12 @@ static int recv_indicatepkts_in_order(struct adapter *adapt, struct recv_reorder
 		prframe = container_of(plist, union recv_frame, u.list);
 		pattrib = &prframe->u.hdr.attrib;
 
-		if (!SN_LESS(le16_to_cpu(preorder_ctrl->indicate_seq), le16_to_cpu(pattrib->seq_num))) {
+		if (!SN_LESS(preorder_ctrl->indicate_seq, pattrib->seq_num)) {
 			plist = get_next(plist);
 			rtw_list_delete(&(prframe->u.hdr.list));
 
 			if (SN_EQUAL(preorder_ctrl->indicate_seq, pattrib->seq_num))
-				preorder_ctrl->indicate_seq = (preorder_ctrl->indicate_seq + 1) & 0xFFF;
+				preorder_ctrl->indicate_seq = cpu_to_le16((le16_to_cpu(preorder_ctrl->indicate_seq) + 1) & 0xFFF);
 			if (recv_process_mpdu(adapt, prframe) != _SUCCESS)
 				precvpriv->dbg_rx_drop_count++;
 
@@ -2311,7 +2310,7 @@ static int recv_indicatepkt_reorder(struct adapter *adapt, union recv_frame *prf
 	_enter_critical_bh(&ppending_recvframe_queue->lock, &irql);
 
 	/* s2. check if winstart_b(indicate_seq) needs to been updated */
-	if (!check_indicate_seq(preorder_ctrl, le16_to_cpu(pattrib->seq_num))) {
+	if (!check_indicate_seq(preorder_ctrl, pattrib->seq_num)) {
 		precvpriv->dbg_rx_ampdu_drop_count++;
 		goto _err_exit;
 	}
@@ -2391,7 +2390,7 @@ void rtw_reordering_ctrl_timeout_handler(void *pcontext)
 
 }
 
-static void recv_set_iseq_before_mpdu_process(union recv_frame *rframe, u16 seq_num, const char *caller)
+static void recv_set_iseq_before_mpdu_process(union recv_frame *rframe, __le16 seq_num, const char *caller)
 {
 	struct recv_reorder_ctrl *reorder_ctrl = rframe->u.hdr.preorder_ctrl;
 
@@ -2399,12 +2398,12 @@ static void recv_set_iseq_before_mpdu_process(union recv_frame *rframe, u16 seq_
 		reorder_ctrl->indicate_seq = seq_num;
 }
 
-static void recv_set_iseq_after_mpdu_process(union recv_frame *rframe, u16 seq_num, const char *caller)
+static void recv_set_iseq_after_mpdu_process(union recv_frame *rframe, __le16 seq_num, const char *caller)
 {
 	struct recv_reorder_ctrl *reorder_ctrl = rframe->u.hdr.preorder_ctrl;
 
 	if (reorder_ctrl)
-		reorder_ctrl->indicate_seq = (reorder_ctrl->indicate_seq + 1) % 4096;
+		reorder_ctrl->indicate_seq = cpu_to_le16((le16_to_cpu(reorder_ctrl->indicate_seq) + 1) % 4096);
 }
 
 static int fill_radiotap_hdr(struct adapter *adapt, union recv_frame *precvframe, u8 *buf)
@@ -2456,7 +2455,7 @@ static int fill_radiotap_hdr(struct adapter *adapt, union recv_frame *precvframe
 		__le64 tmp_64bit;
 
 		rtap_hdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_TSFT);
-		tmp_64bit = cpu_to_le64(pattrib->tsfl);
+		tmp_64bit = cpu_to_le64(le32_to_cpu(pattrib->tsfl));
 		memcpy(&hdr_buf[rt_len], &tmp_64bit, 8);
 		rt_len += 8;
 	}
@@ -2756,9 +2755,9 @@ static int recv_func_posthandle(struct adapter *adapt, union recv_frame *prframe
 	} else if (ret == RTW_RX_HANDLED) /* queued OR indicated in order */
 		goto _exit_recv_func;
 
-	recv_set_iseq_before_mpdu_process(prframe, le16_to_cpu(pattrib->seq_num), __func__);
+	recv_set_iseq_before_mpdu_process(prframe, pattrib->seq_num, __func__);
 	ret = recv_process_mpdu(adapt, prframe);
-	recv_set_iseq_after_mpdu_process(prframe, le16_to_cpu(pattrib->seq_num), __func__);
+	recv_set_iseq_after_mpdu_process(prframe, pattrib->seq_num, __func__);
 	if (ret == _FAIL)
 		goto _recv_data_drop;
 
@@ -3027,8 +3026,8 @@ void rx_query_phy_status(
 
 	wlanhdr = get_recvframe_data(precvframe);
 
-	ta = get_ta(wlanhdr);
-	ra = get_ra(wlanhdr);
+	ta = rtw_get_ta(wlanhdr);
+	ra = rtw_get_ra(wlanhdr);
 	is_ra_bmc = IS_MCAST(ra);
 
 	if (!memcmp(adapter_mac_addr(adapt), ta, ETH_ALEN)) {
@@ -3131,7 +3130,7 @@ int pre_recv_entry(union recv_frame *precvframe, u8 *pphy_status)
 {
 	int ret = _SUCCESS;
 	u8 *pbuf = precvframe->u.hdr.rx_data;
-	u8 *pda = get_ra(pbuf);
+	u8 *pda = rtw_get_ra(pbuf);
 	u8 ra_is_bmc = IS_MCAST(pda);
 #ifdef CONFIG_CONCURRENT_MODE
 	struct adapter *iface = NULL;

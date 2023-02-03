@@ -38,7 +38,7 @@ void rtl8192e_sreset_xmit_status_check(_adapter *padapter)
 	/* total xmit irp = 4 */
 	/* RTW_INFO("==>%s free_xmitbuf_cnt(%d),txirp_cnt(%d)\n",__FUNCTION__,pxmitpriv->free_xmitbuf_cnt,pxmitpriv->txirp_cnt); */
 	/* if(pxmitpriv->txirp_cnt == NR_XMITBUFF+1) */
-	current_time = rtw_get_current_time();
+	current_time = jiffies;
 
 	if (0 == pxmitpriv->free_xmitbuf_cnt || 0 == pxmitpriv->free_xmit_extbuf_cnt) {
 

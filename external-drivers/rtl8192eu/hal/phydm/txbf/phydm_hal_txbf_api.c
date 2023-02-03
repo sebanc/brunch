@@ -17,75 +17,67 @@
 #include "phydm_precomp.h"
 
 #if (defined(CONFIG_BB_TXBF_API))
-#if (RTL8822B_SUPPORT == 1)
-/*Add by YuChen for 8822B MU-MIMO API*/
+#if (RTL8822B_SUPPORT == 1 || RTL8192F_SUPPORT == 1 ||\
+	RTL8822C_SUPPORT == 1 || RTL8198F_SUPPORT == 1 || RTL8814B_SUPPORT == 1)
+/*@Add by YuChen for 8822B MU-MIMO API*/
 
 /*this function is only used for BFer*/
-u8
-phydm_get_ndpa_rate(
-	void		*p_dm_void
-)
+u8 phydm_get_ndpa_rate(void *dm_void)
 {
-	struct PHY_DM_STRUCT	*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
-	u8		ndpa_rate = ODM_RATE6M;
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
+	u8 ndpa_rate = ODM_RATE6M;
 
-	if (p_dm->rssi_min >= 30)	/*link RSSI > 30%*/
+	if (dm->rssi_min >= 30) /*@link RSSI > 30%*/
 		ndpa_rate = ODM_RATE24M;
-	else if (p_dm->rssi_min <= 25)
+	else if (dm->rssi_min <= 25)
 		ndpa_rate = ODM_RATE6M;
 
-	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndpa_rate = 0x%x\n", __func__, ndpa_rate));
+	PHYDM_DBG(dm, DBG_TXBF, "[%s] ndpa_rate = 0x%x\n", __func__, ndpa_rate);
 
 	return ndpa_rate;
-
 }
 
 /*this function is only used for BFer*/
-u8
-phydm_get_beamforming_sounding_info(
-	void		*p_dm_void,
-	u16	*troughput,
-	u8	total_bfee_num,
-	u8	*tx_rate
-)
+u8 phydm_get_beamforming_sounding_info(void *dm_void, u16 *throughput,
+				       u8 total_bfee_num, u8 *tx_rate)
 {
-	u8	idx = 0;
-	u8	soundingdecision = 0xff;
-	struct PHY_DM_STRUCT	*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	u8 idx = 0;
+	u8 snddecision = 0xff;
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
 
 	for (idx = 0; idx < total_bfee_num; idx++) {
-		if (p_dm->support_ic_type & (ODM_RTL8814A)) {
-			if (((tx_rate[idx] >= ODM_RATEVHTSS3MCS7) && (tx_rate[idx] <= ODM_RATEVHTSS3MCS9)))
-				soundingdecision = soundingdecision & ~(1 << idx);
-		} else if (p_dm->support_ic_type & (ODM_RTL8822B | ODM_RTL8822C | ODM_RTL8812)) {
-			if (((tx_rate[idx] >= ODM_RATEVHTSS2MCS7) && (tx_rate[idx] <= ODM_RATEVHTSS2MCS9)))
-				soundingdecision = soundingdecision & ~(1 << idx);
-		} else if (p_dm->support_ic_type & (ODM_RTL8814B)) {
-			if (((tx_rate[idx] >= ODM_RATEVHTSS4MCS7) && (tx_rate[idx] <= ODM_RATEVHTSS4MCS9)))
-				soundingdecision = soundingdecision & ~(1 << idx);
+		if (dm->support_ic_type & (ODM_RTL8814A)) {
+			if ((tx_rate[idx] >= ODM_RATEVHTSS3MCS7 &&
+			     tx_rate[idx] <= ODM_RATEVHTSS3MCS9))
+				snddecision = snddecision & ~(1 << idx);
+		} else if (dm->support_ic_type & (ODM_RTL8822B | ODM_RTL8822C |
+			   ODM_RTL8812 | ODM_RTL8192F)) {
+			if ((tx_rate[idx] >= ODM_RATEVHTSS2MCS7 &&
+			     tx_rate[idx] <= ODM_RATEVHTSS2MCS9))
+				snddecision = snddecision & ~(1 << idx);
+		} else if (dm->support_ic_type & (ODM_RTL8814B)) {
+			if ((tx_rate[idx] >= ODM_RATEVHTSS4MCS7 &&
+			     tx_rate[idx] <= ODM_RATEVHTSS4MCS9))
+				snddecision = snddecision & ~(1 << idx);
 		}
 	}
 
 	for (idx = 0; idx < total_bfee_num; idx++) {
-		if (troughput[idx] <= 10)
-			soundingdecision = soundingdecision & ~(1 << idx);
+		if (throughput[idx] <= 10)
+			snddecision = snddecision & ~(1 << idx);
 	}
 
-	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] soundingdecision = 0x%x\n", __func__, soundingdecision));
+	PHYDM_DBG(dm, DBG_TXBF, "[%s] soundingdecision = 0x%x\n", __func__,
+		  snddecision);
 
-	return soundingdecision;
-
+	return snddecision;
 }
 
 /*this function is only used for BFer*/
-u8
-phydm_get_mu_bfee_snding_decision(
-	void		*p_dm_void,
-	u16	throughput
-)
+u8 phydm_get_mu_bfee_snding_decision(void *dm_void, u16 throughput)
 {
-	u8	snding_score = 0;
-	struct PHY_DM_STRUCT	*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	u8 snding_score = 0;
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
 
 	/*throughput unit is Mbps*/
 	if (throughput >= 500)
@@ -111,31 +103,26 @@ phydm_get_mu_bfee_snding_decision(
 	else
 		snding_score = 0;
 
-	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] snding_score = 0x%x\n", __func__, snding_score));
+	PHYDM_DBG(dm, DBG_TXBF, "[%s] snding_score = 0x%x\n", __func__,
+		  snding_score);
 
 	return snding_score;
-
 }
-
 
 #endif
 #if (DM_ODM_SUPPORT_TYPE != ODM_AP)
-u8
-beamforming_get_htndp_tx_rate(
-	void	*p_dm_void,
-	u8	comp_steering_num_of_bfer
-)
+u8 beamforming_get_htndp_tx_rate(void *dm_void, u8 bfer_str_num)
 {
-	struct PHY_DM_STRUCT	*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	u8 nr_index = 0;
 	u8 ndp_tx_rate;
-	/*Find nr*/
+/*@Find nr*/
 #if (RTL8814A_SUPPORT == 1)
-	if (p_dm->support_ic_type & ODM_RTL8814A)
-		nr_index = tx_bf_nr(hal_txbf_8814a_get_ntx(p_dm), comp_steering_num_of_bfer);
+	if (dm->support_ic_type & ODM_RTL8814A)
+		nr_index = tx_bf_nr(hal_txbf_8814a_get_ntx(dm), bfer_str_num);
 	else
 #endif
-		nr_index = tx_bf_nr(1, comp_steering_num_of_bfer);
+		nr_index = tx_bf_nr(1, bfer_str_num);
 
 	switch (nr_index) {
 	case 1:
@@ -156,25 +143,20 @@ beamforming_get_htndp_tx_rate(
 	}
 
 	return ndp_tx_rate;
-
 }
 
-u8
-beamforming_get_vht_ndp_tx_rate(
-	void	*p_dm_void,
-	u8	comp_steering_num_of_bfer
-)
+u8 beamforming_get_vht_ndp_tx_rate(void *dm_void, u8 bfer_str_num)
 {
-	struct PHY_DM_STRUCT	*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	u8 nr_index = 0;
 	u8 ndp_tx_rate;
-	/*Find nr*/
+/*@Find nr*/
 #if (RTL8814A_SUPPORT == 1)
-	if (p_dm->support_ic_type & ODM_RTL8814A)
-		nr_index = tx_bf_nr(hal_txbf_8814a_get_ntx(p_dm), comp_steering_num_of_bfer);
+	if (dm->support_ic_type & ODM_RTL8814A)
+		nr_index = tx_bf_nr(hal_txbf_8814a_get_ntx(dm), bfer_str_num);
 	else
 #endif
-		nr_index = tx_bf_nr(1, comp_steering_num_of_bfer);
+		nr_index = tx_bf_nr(1, bfer_str_num);
 
 	switch (nr_index) {
 	case 1:
@@ -195,8 +177,249 @@ beamforming_get_vht_ndp_tx_rate(
 	}
 
 	return ndp_tx_rate;
-
 }
 #endif
+#ifdef PHYDM_IC_JGR3_SERIES_SUPPORT
+/*this function is only used for BFer*/
+void phydm_txbf_rfmode(void *dm_void, u8 su_bfee_cnt, u8 mu_bfee_cnt)
+{
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
+	u8 i;
 
+	if (dm->rf_type == RF_1T1R)
+		return;
+#if (RTL8822C_SUPPORT == 1)
+	if (dm->support_ic_type == ODM_RTL8822C) {
+		if (su_bfee_cnt > 0 || mu_bfee_cnt > 0) {
+			for (i = RF_PATH_A; i <= RF_PATH_B; i++) {
+				/*RF mode table write enable*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef,
+					       BIT(19), 0x1);
+				/*Select RX mode*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x33,
+					       0xF, 3);
+				/*Set Table data*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3e,
+					       0x3, 0x2);
+				/*Set Table data*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3f,
+					       0xfffff, 0x61AFF);
+				/*RF mode table write disable*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef,
+					       BIT(19), 0x0);
+			}
+		}
+		/*@if Nsts > Nc, don't apply V matrix*/
+		odm_set_bb_reg(dm, R_0x1e24, BIT(11), 1);
+
+		if (su_bfee_cnt > 0 || mu_bfee_cnt > 0) {
+			/*@enable BB TxBF ant mapping register*/
+			odm_set_bb_reg(dm, R_0x1e24, BIT(28) | BIT29, 0x2);
+			odm_set_bb_reg(dm, R_0x1e24, BIT(30), 1);
+
+			/* logic mapping */
+			/* TX BF logic map and TX path en for Nsts = 1~2 */
+			odm_set_bb_reg(dm, R_0x820, 0xffff0000, 0x33);
+			odm_set_bb_reg(dm, R_0x1e30, 0xffff, 0x404);
+		} else {
+			/*@Disable BB TxBF ant mapping register*/
+			odm_set_bb_reg(dm, R_0x1e24, BIT(28) | BIT29, 0x0);
+			odm_set_bb_reg(dm, R_0x1e24, BIT(31), 0);
+			/*@1SS~2ss A, AB*/
+			odm_set_bb_reg(dm, R_0x820, 0xff, 0x31);
+			odm_set_bb_reg(dm, R_0x1e2c, 0xffff, 0x400);
+		}
+	}
 #endif
+#if (RTL8814B_SUPPORT)
+	if (dm->support_ic_type == ODM_RTL8814B) {
+		if (su_bfee_cnt > 0 || mu_bfee_cnt > 0) {
+			for (i = RF_PATH_A; i <= RF_PATH_D; i++) {
+				/*RF mode table write enable*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef,
+					       BIT(19), 0x1);
+				/*Select RX mode*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x33,
+					       0xF, 2);
+				/*Set Table data*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3e,
+					       0xfffff, 0x3fc);
+				/*Set Table data*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3f,
+					       0xfffff, 0x280f7);
+				/*Select RX mode*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x33,
+					       0xF, 3);
+				/*Set Table data*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3e,
+					       0xfffff, 0x365);
+				/*Set Table data*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3f,
+					       0xfffff, 0xafcf7);
+				/*RF mode table write disable*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef,
+					       BIT(19), 0x0);
+			}
+		}
+		/*@if Nsts > Nc, don't apply V matrix*/
+		odm_set_bb_reg(dm, R_0x1e24, BIT(11), 1);
+
+		if (su_bfee_cnt > 0 || mu_bfee_cnt > 0) {
+			/*@enable BB TxBF ant mapping register*/
+			odm_set_bb_reg(dm, R_0x1e24, BIT(28) | BIT29, 0x2);
+			odm_set_bb_reg(dm, R_0x1e24, BIT(30), 1);
+
+			/* logic mapping */
+			/* TX BF logic map and TX path en for Nsts = 1~4 */
+			odm_set_bb_reg(dm, R_0x820, 0xffff0000, 0xff55);
+			/*verification path-AC*/
+			odm_set_bb_reg(dm, R_0x1e30, 0xffffffff, 0xe4e41010);
+		} else {
+			/*@Disable BB TxBF ant mapping register*/
+			odm_set_bb_reg(dm, R_0x1e24, BIT(28) | BIT29, 0x0);
+			odm_set_bb_reg(dm, R_0x1e24, BIT(31), 0);
+			/*@1SS~4ss A, AB, ABC, ABCD*/
+			odm_set_bb_reg(dm, R_0x820, 0xffff, 0xf731);
+			odm_set_bb_reg(dm, R_0x1e2c, 0xffffffff, 0xe4240400);
+		}
+	}
+#endif
+#if (RTL8198F_SUPPORT)
+	if (dm->support_ic_type == ODM_RTL8198F) {
+		if (su_bfee_cnt > 0 || mu_bfee_cnt > 0) {
+			for (i = RF_PATH_A; i <= RF_PATH_D; i++) {
+				/*RF mode table write enable*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef,
+					       BIT(19), 0x1);
+				/*Select RX mode*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x30,
+					       0xfffff, 0x18000);
+				/*Set Table data*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x31,
+					       0xfffff, 0x4f);
+				/*Select RX mode*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0x32,
+					       0xfffff, 0x71fc0);
+				/*RF mode table write disable*/
+				odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef,
+					       BIT(19), 0x0);
+			}
+		}
+		/*@if Nsts > Nc, don't apply V matrix*/
+		odm_set_bb_reg(dm, R_0x1e24, BIT(11), 1);
+
+		if (su_bfee_cnt > 0 || mu_bfee_cnt > 0) {
+			/*@enable BB TxBF ant mapping register*/
+			odm_set_bb_reg(dm, R_0x1e24, BIT(28) | BIT29, 0x2);
+			odm_set_bb_reg(dm, R_0x1e24, BIT(30), 1);
+
+			/* logic mapping */
+			/* TX BF logic map and TX path en for Nsts = 1~4 */
+			odm_set_bb_reg(dm, R_0x820, 0xffff0000, 0xffff);
+			odm_set_bb_reg(dm, R_0x1e30, 0xffffffff, 0xe4e4e4e4);
+		} else {
+			/*@Disable BB TxBF ant mapping register*/
+			odm_set_bb_reg(dm, R_0x1e24, BIT(28) | BIT29, 0x0);
+			odm_set_bb_reg(dm, R_0x1e24, BIT(31), 0);
+			/*@1SS~4ss A, AB, ABC, ABCD*/
+			odm_set_bb_reg(dm, R_0x820, 0xffff, 0xf731);
+			odm_set_bb_reg(dm, R_0x1e2c, 0xffffffff, 0xe4240400);
+		}
+	}
+#endif
+}
+
+void phydm_txbf_avoid_hang(void *dm_void)
+{
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
+
+	/* avoid CCK CCA hang when the BF mode */
+	odm_set_bb_reg(dm, R_0x1e6c, 0x100000, 0x1);
+}
+
+#if (RTL8814B_SUPPORT == 1)
+void phydm_txbf_80p80_rfmode(void *dm_void, u8 su_bfee_cnt, u8 mu_bfee_cnt)
+{
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
+	u8 i;
+
+	if (dm->rf_type == RF_1T1R)
+		return;
+
+	if (su_bfee_cnt > 0 || mu_bfee_cnt > 0) {
+		for (i = RF_PATH_A; i <= RF_PATH_D; i += 3) {
+			/*RF mode table write enable*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef, BIT(19),
+				       0x1);
+			/*Select RX mode*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x33, 0xF, 2);
+			/*Set Table data*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3e, 0xfffff,
+				       0x3fc);
+			/*Set Table data*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3f, 0xfffff,
+				       0x280f7);
+			/*Select RX mode*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x33, 0xF, 3);
+			/*Set Table data*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3e, 0xfffff,
+				       0x365);
+			/*Set Table data*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3f, 0xfffff,
+				       0xafcf7);
+			/*RF mode table write disable*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef, BIT(19),
+				       0x0);
+		}
+		for (i = RF_PATH_B; i <= RF_PATH_C; i++) {
+			/*RF mode table write enable*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef, BIT(19),
+				       0x1);
+			/*Select RX mode*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x33, 0xF, 2);
+			/*Set Table data*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3f, 0xfffff,
+				       0x280c7);
+			/*Set Table data*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3f, 0xfffff,
+				       0x280c7);
+			/*Select RX mode*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x33, 0xF, 3);
+			/*Set Table data*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3e, 0xfffff,
+				       0x365);
+			/*Set Table data*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0x3f, 0xfffff,
+				       0xafcc7);
+			/*RF mode table write disable*/
+			odm_set_rf_reg(dm, (enum rf_path)i, RF_0xef, BIT(19),
+				       0x0);
+		}
+	}
+	/*@if Nsts > Nc, don't apply V matrix*/
+	odm_set_bb_reg(dm, R_0x1e24, BIT(11), 1);
+
+	if (su_bfee_cnt > 0 || mu_bfee_cnt > 0) {
+		/*@enable BB TxBF ant mapping register*/
+		odm_set_bb_reg(dm, R_0x1e24, BIT(28) | BIT29, 0x2);
+		odm_set_bb_reg(dm, R_0x1e24, BIT(30), 1);
+
+		/* logic mapping */
+		/* TX BF logic map and TX path en for Nsts = 1~2 */
+		odm_set_bb_reg(dm, R_0x820, 0xff0000, 0x33); /*seg0*/
+		odm_set_bb_reg(dm, R_0x824, 0xff00, 0xcc); /*seg1*/
+		odm_set_bb_reg(dm, R_0x1e30, 0xffff, 0xe4e4);
+
+	} else {
+		/*@Disable BB TxBF ant mapping register*/
+		odm_set_bb_reg(dm, R_0x1e24, BIT(28) | BIT29, 0x0);
+		odm_set_bb_reg(dm, R_0x1e24, BIT(31), 0);
+		/*@1SS~2ss A, AB*/
+		odm_set_bb_reg(dm, R_0x820, 0xff, 0x31); /*seg0*/
+		odm_set_bb_reg(dm, R_0x824, 0xff, 0xc8); /*seg1*/
+		odm_set_bb_reg(dm, R_0x1e2c, 0xffff, 0xe420);
+	}
+}
+#endif
+#endif /*PHYSTS_3RD_TYPE_IC*/
+#endif /*CONFIG_BB_TXBF_API*/

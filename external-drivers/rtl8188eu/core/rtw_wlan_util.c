@@ -946,6 +946,7 @@ int rtw_check_bcn_info(struct adapter  *Adapter, u8 *pframe, u32 packet_len)
 
 	bssid->Length = sizeof(struct wlan_bssid_ex) - MAX_IE_SZ + len;
 
+	spin_lock_bh(&Adapter->mlmepriv.scanned_queue.lock);
 	/* below is to copy the information element */
 	bssid->IELength = len;
 	memcpy(bssid->IEs, (pframe + sizeof(struct rtw_ieee80211_hdr_3addr)), bssid->IELength);
@@ -1047,6 +1048,7 @@ int rtw_check_bcn_info(struct adapter  *Adapter, u8 *pframe, u32 packet_len)
 	}
 
 	rtw_get_sec_ie(bssid->IEs, bssid->IELength, NULL, &rsn_len, NULL, &wpa_len);
+	spin_unlock_bh(&Adapter->mlmepriv.scanned_queue.lock);
 
 	if (rsn_len > 0) {
 		encryp_protocol = ENCRYP_PROTOCOL_WPA2;
@@ -1102,6 +1104,7 @@ int rtw_check_bcn_info(struct adapter  *Adapter, u8 *pframe, u32 packet_len)
 	return _SUCCESS;
 
 _mismatch:
+	spin_unlock_bh(&Adapter->mlmepriv.scanned_queue.lock);
 	kfree(bssid);
 	
 	return _FAIL;

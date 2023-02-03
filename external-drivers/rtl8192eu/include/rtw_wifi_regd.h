@@ -28,12 +28,7 @@ enum country_code_type_t {
 	COUNTRY_CODE_MAX
 };
 
-	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
-int rtw_regd_init(_adapter *padapter);
-void rtw_reg_notify_by_driver(_adapter *adapter);
-	#else
+void rtw_regd_apply_flags(struct wiphy *wiphy);
 void rtw_regd_init(struct wiphy *wiphy);
-void rtw_reg_notify_by_driver(struct wiphy *wiphy);
-	#endif
 
 #endif /* __RTW_WIFI_REGD_H__ */

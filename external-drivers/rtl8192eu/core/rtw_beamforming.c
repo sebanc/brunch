@@ -176,7 +176,7 @@ static u8 _send_ht_ndpa_packet(PADAPTER adapter, u8 *ra, enum channel_width bw)
 	u8 ActionHdr[4] = {ACT_CAT_VENDOR, 0x00, 0xE0, 0x4C};
 	/* MISC */
 	struct pkt_attrib		*attrib;
-	struct rtw_ieee80211_hdr	*pwlanhdr;
+	struct ieee80211_hdr	*pwlanhdr;
 	enum MGN_RATE txrate;
 	u8 *pframe;
 	u16 duration = 0;
@@ -205,7 +205,7 @@ static u8 _send_ht_ndpa_packet(PADAPTER adapter, u8 *ra, enum channel_width bw)
 	/* update attribute */
 	attrib = &pmgntframe->attrib;
 	update_mgntframe_attrib(adapter, attrib);
-	/*attrib->type = WIFI_MGT_TYPE;*/ /* set in update_mgntframe_attrib() */
+	/*attrib->type = IEEE80211_FTYPE_MGMT;*/ /* set in update_mgntframe_attrib() */
 	attrib->subtype = WIFI_ACTION_NOACK;
 	attrib->bwmode = bw;
 	/*attrib->qsel = QSLT_MGNT;*/ /* set in update_mgntframe_attrib() */
@@ -213,12 +213,12 @@ static u8 _send_ht_ndpa_packet(PADAPTER adapter, u8 *ra, enum channel_width bw)
 	attrib->rate = (u8)txrate;
 	attrib->bf_pkt_type = 0;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
 	/* Frame control */
-	pwlanhdr->frame_ctl = 0;
+	pwlanhdr->frame_control = 0;
 	set_frame_sub_type(pframe, attrib->subtype);
 	set_order_bit(pframe);
 
@@ -235,11 +235,11 @@ static u8 _send_ht_ndpa_packet(PADAPTER adapter, u8 *ra, enum channel_width bw)
 	set_duration(pframe, duration);
 
 	/* DA */
-	_rtw_memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
+	memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
 	/* SA */
-	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
+	memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
 	/* BSSID */
-	_rtw_memcpy(pwlanhdr->addr3, get_my_bssid(&pmlmeinfo->network), ETH_ALEN);
+	memcpy(pwlanhdr->addr3, get_my_bssid(&pmlmeinfo->network), ETH_ALEN);
 
 	/* HT control field */
 	SET_HT_CTRL_CSI_STEERING(pframe + 24, 3);
@@ -250,7 +250,7 @@ static u8 _send_ht_ndpa_packet(PADAPTER adapter, u8 *ra, enum channel_width bw)
 	 * Category field: vender-specific value, 0x7F
 	 * OUI: 0x00E04C
 	 */
-	_rtw_memcpy(pframe + 28, ActionHdr, 4);
+	memcpy(pframe + 28, ActionHdr, 4);
 
 	attrib->pktlen = 32;
 	attrib->last_txcmdsz = attrib->pktlen;
@@ -272,7 +272,7 @@ static u8 _send_vht_ndpa_packet(PADAPTER adapter, u8 *ra, u16 aid, enum channel_
 	struct ndpa_sta_info		sta_info;
 	/* MISC */
 	struct pkt_attrib		*attrib;
-	struct rtw_ieee80211_hdr	*pwlanhdr;
+	struct ieee80211_hdr	*pwlanhdr;
 	u8 *pframe;
 	enum MGN_RATE txrate;
 	u16 duration = 0;
@@ -301,19 +301,19 @@ static u8 _send_vht_ndpa_packet(PADAPTER adapter, u8 *ra, u16 aid, enum channel_
 	/* update attribute */
 	attrib = &pmgntframe->attrib;
 	update_mgntframe_attrib(adapter, attrib);
-	/*pattrib->type = WIFI_MGT_TYPE;*/ /* set in update_mgntframe_attrib() */
+	/*pattrib->type = IEEE80211_FTYPE_MGMT;*/ /* set in update_mgntframe_attrib() */
 	attrib->subtype = WIFI_NDPA;
 	attrib->bwmode = bw;
 	/*attrib->qsel = QSLT_MGNT;*/ /* set in update_mgntframe_attrib() */
 	attrib->rate = (u8)txrate;
 	attrib->bf_pkt_type = 0;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, TXDESC_OFFSET + WLANHDR_OFFSET);
+	memset(pmgntframe->buf_addr, 0, TXDESC_OFFSET + WLANHDR_OFFSET);
 	pframe = pmgntframe->buf_addr + TXDESC_OFFSET;
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
 	/* Frame control */
-	pwlanhdr->frame_ctl = 0;
+	pwlanhdr->frame_control = 0;
 	set_frame_sub_type(pframe, attrib->subtype);
 
 	/* Duration */
@@ -331,10 +331,10 @@ static u8 _send_vht_ndpa_packet(PADAPTER adapter, u8 *ra, u16 aid, enum channel_
 	set_duration(pframe, duration);
 
 	/* RA */
-	_rtw_memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
+	memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
 
 	/* TA */
-	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
+	memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
 
 	/* Sounding Sequence, bit0~1 is reserved */
 	sequence = info->sounding_sequence << 2;
@@ -342,7 +342,7 @@ static u8 _send_vht_ndpa_packet(PADAPTER adapter, u8 *ra, u16 aid, enum channel_
 		info->sounding_sequence = 0;
 	else
 		info->sounding_sequence++;
-	_rtw_memcpy(pframe + 16, &sequence, 1);
+	memcpy(pframe + 16, &sequence, 1);
 
 	/* STA Info */
 	/*
@@ -356,7 +356,7 @@ static u8 _send_vht_ndpa_packet(PADAPTER adapter, u8 *ra, u16 aid, enum channel_
 	sta_info.feedback_type = 0;
 	/* "Nc Index" reserved if the Feedback Type field indicates SU */
 	sta_info.nc_index = 0;
-	_rtw_memcpy(pframe + 17, (u8 *)&sta_info, 2);
+	memcpy(pframe + 17, (u8 *)&sta_info, 2);
 
 	attrib->pktlen = 19;
 	attrib->last_txcmdsz = attrib->pktlen;
@@ -379,7 +379,7 @@ static u8 _send_vht_mu_ndpa_packet(PADAPTER adapter, enum channel_width bw)
 	struct ndpa_sta_info		sta_info;
 	/* MISC */
 	struct pkt_attrib		*attrib;
-	struct rtw_ieee80211_hdr	*pwlanhdr;
+	struct ieee80211_hdr	*pwlanhdr;
 	enum MGN_RATE txrate;
 	u8 *pframe;
 	u8 *ra = NULL;
@@ -414,7 +414,7 @@ static u8 _send_vht_mu_ndpa_packet(PADAPTER adapter, enum channel_width bw)
 	/* update attribute */
 	attrib = &pmgntframe->attrib;
 	update_mgntframe_attrib(adapter, attrib);
-	/*attrib->type = WIFI_MGT_TYPE;*/ /* set in update_mgntframe_attrib() */
+	/*attrib->type = IEEE80211_FTYPE_MGMT;*/ /* set in update_mgntframe_attrib() */
 	attrib->subtype = WIFI_NDPA;
 	attrib->bwmode = bw;
 	/*attrib->qsel = QSLT_MGNT;*/ /* set in update_mgntframe_attrib() */
@@ -425,12 +425,12 @@ static u8 _send_vht_mu_ndpa_packet(PADAPTER adapter, enum channel_width bw)
 	else
 		attrib->bf_pkt_type = 0;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, TXDESC_OFFSET + WLANHDR_OFFSET);
+	memset(pmgntframe->buf_addr, 0, TXDESC_OFFSET + WLANHDR_OFFSET);
 	pframe = pmgntframe->buf_addr + TXDESC_OFFSET;
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
 	/* Frame control */
-	pwlanhdr->frame_ctl = 0;
+	pwlanhdr->frame_control = 0;
 	set_frame_sub_type(pframe, attrib->subtype);
 
 	/* Duration */
@@ -448,10 +448,10 @@ static u8 _send_vht_mu_ndpa_packet(PADAPTER adapter, enum channel_width bw)
 	set_duration(pframe, duration);
 
 	/* RA */
-	_rtw_memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
+	memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
 
 	/* TA */
-	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
+	memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
 
 	/* Sounding Sequence, bit0~1 is reserved */
 	sequence = info->sounding_sequence << 2;
@@ -459,7 +459,7 @@ static u8 _send_vht_mu_ndpa_packet(PADAPTER adapter, enum channel_width bw)
 		info->sounding_sequence = 0;
 	else
 		info->sounding_sequence++;
-	_rtw_memcpy(pframe + 16, &sequence, 1);
+	memcpy(pframe + 16, &sequence, 1);
 
 	attrib->pktlen = 17;
 
@@ -472,7 +472,7 @@ static u8 _send_vht_mu_ndpa_packet(PADAPTER adapter, enum channel_width bw)
 		sta_info.aid = bfee->aid;
 		sta_info.feedback_type = 1; /* 1'b1: MU */
 		sta_info.nc_index = 0;
-		_rtw_memcpy(pframe + attrib->pktlen, (u8 *)&sta_info, 2);
+		memcpy(pframe + attrib->pktlen, (u8 *)&sta_info, 2);
 		attrib->pktlen += 2;
 	}
 
@@ -490,7 +490,7 @@ static u8 _send_bf_report_poll(PADAPTER adapter, u8 *ra, u8 bFinalPoll)
 	struct xmit_frame *pmgntframe;
 	/* MISC */
 	struct pkt_attrib *attrib;
-	struct rtw_ieee80211_hdr *pwlanhdr;
+	struct ieee80211_hdr *pwlanhdr;
 	u8 *pframe;
 
 
@@ -507,7 +507,7 @@ static u8 _send_bf_report_poll(PADAPTER adapter, u8 *ra, u8 bFinalPoll)
 	/* update attribute */
 	attrib = &pmgntframe->attrib;
 	update_mgntframe_attrib(adapter, attrib);
-	/*attrib->type = WIFI_MGT_TYPE;*/ /* set in update_mgntframe_attrib() */
+	/*attrib->type = IEEE80211_FTYPE_MGMT;*/ /* set in update_mgntframe_attrib() */
 	attrib->subtype = WIFI_BF_REPORT_POLL;
 	attrib->bwmode = CHANNEL_WIDTH_20;
 	/*attrib->qsel = QSLT_MGNT;*/ /* set in update_mgntframe_attrib() */
@@ -517,22 +517,22 @@ static u8 _send_bf_report_poll(PADAPTER adapter, u8 *ra, u8 bFinalPoll)
 	else
 		attrib->bf_pkt_type = 2;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, TXDESC_OFFSET + WLANHDR_OFFSET);
+	memset(pmgntframe->buf_addr, 0, TXDESC_OFFSET + WLANHDR_OFFSET);
 	pframe = pmgntframe->buf_addr + TXDESC_OFFSET;
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
 	/* Frame control */
-	pwlanhdr->frame_ctl = 0;
+	pwlanhdr->frame_control = 0;
 	set_frame_sub_type(pframe, attrib->subtype);
 
 	/* Duration */
 	set_duration(pframe, 100);
 
 	/* RA */
-	_rtw_memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
+	memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
 
 	/* TA */
-	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
+	memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
 
 	/* Feedback Segment Retransmission Bitmap */
 	pframe[16] = 0xFF;
@@ -581,8 +581,8 @@ static void _sounding_update_min_period(PADAPTER adapter, u16 period, u8 leave)
 
 static void _sounding_init(struct sounding_info *sounding)
 {
-	_rtw_memset(sounding->su_sounding_list, 0xFF, MAX_NUM_BEAMFORMEE_SU);
-	_rtw_memset(sounding->mu_sounding_list, 0xFF, MAX_NUM_BEAMFORMEE_MU);
+	memset(sounding->su_sounding_list, 0xFF, MAX_NUM_BEAMFORMEE_SU);
+	memset(sounding->mu_sounding_list, 0xFF, MAX_NUM_BEAMFORMEE_MU);
 	sounding->state = SOUNDING_STATE_NONE;
 	sounding->su_bfee_curidx = 0xFF;
 	sounding->candidate_mu_bfee_cnt = 0;
@@ -600,8 +600,8 @@ static void _sounding_reset_vars(PADAPTER adapter)
 	info = GET_BEAMFORM_INFO(adapter);
 	sounding = &info->sounding_info;
 
-	_rtw_memset(sounding->su_sounding_list, 0xFF, MAX_NUM_BEAMFORMEE_SU);
-	_rtw_memset(sounding->mu_sounding_list, 0xFF, MAX_NUM_BEAMFORMEE_MU);
+	memset(sounding->su_sounding_list, 0xFF, MAX_NUM_BEAMFORMEE_SU);
+	memset(sounding->mu_sounding_list, 0xFF, MAX_NUM_BEAMFORMEE_MU);
 	sounding->su_bfee_curidx = 0xFF;
 	sounding->candidate_mu_bfee_cnt = 0;
 
@@ -1017,7 +1017,7 @@ static struct beamformer_entry *_bfer_add_entry(PADAPTER adapter,
 
 	bfer->used = _TRUE;
 	_get_txvector_parameter(adapter, sta, &bfer->g_id, &bfer->p_aid);
-	_rtw_memcpy(bfer->mac_addr, sta->cmn.mac_addr, ETH_ALEN);
+	memcpy(bfer->mac_addr, sta->cmn.mac_addr, ETH_ALEN);
 	bfer->cap = bf_cap;
 	bfer->state = BEAMFORM_ENTRY_HW_STATE_ADD_INIT;
 	bfer->NumofSoundingDim = sounding_dim;
@@ -1054,8 +1054,8 @@ static void _bfer_remove_entry(PADAPTER adapter, struct beamformer_entry *entry)
 
 	if (TEST_FLAG(entry->cap, BEAMFORMER_CAP_VHT_MU)) {
 		info->beamformer_mu_cnt -= 1;
-		_rtw_memset(entry->gid_valid, 0, 8);
-		_rtw_memset(entry->user_position, 0, 16);
+		memset(entry->gid_valid, 0, 8);
+		memset(entry->user_position, 0, 16);
 	} else if (TEST_FLAG(entry->cap, BEAMFORMER_CAP_VHT_SU|BEAMFORMER_CAP_HT_EXPLICIT)) {
 		info->beamformer_su_cnt -= 1;
 	}
@@ -1068,22 +1068,20 @@ static void _bfer_remove_entry(PADAPTER adapter, struct beamformer_entry *entry)
 
 static u8 _bfer_set_entry_gid(PADAPTER adapter, u8 *addr, u8 *gid, u8 *position)
 {
-	struct beamformer_entry *bfer = NULL;
+	struct beamformer_entry bfer;
 
-
-	bfer = _bfer_get_entry_by_addr(adapter, addr);
-	if (!bfer) {
-		RTW_INFO("%s: Cannot find BFer entry!!\n", __FUNCTION__);
-		return _FAIL;
-	}
+	memset(&bfer, 0, sizeof(bfer));
+	memcpy(bfer.mac_addr, addr, ETH_ALEN);
 
 	/* Parsing Membership Status Array */
-	_rtw_memcpy(bfer->gid_valid, gid, 8);
+	memcpy(bfer.gid_valid, gid, 8);
+
 	/* Parsing User Position Array */
-	_rtw_memcpy(bfer->user_position, position, 16);
+	memcpy(bfer.user_position, position, 16);
 
 	/* Config HW GID table */
-	rtw_bf_cmd(adapter, BEAMFORMING_CTRL_SET_GID_TABLE, (u8*)&bfer, sizeof(struct beamformer_entry *), 1);
+	rtw_bf_cmd(adapter, BEAMFORMING_CTRL_SET_GID_TABLE, (u8 *) &bfer,
+			sizeof(bfer), 1);
 
 	return _SUCCESS;
 }
@@ -1211,7 +1209,7 @@ static struct beamformee_entry *_bfee_add_entry(PADAPTER adapter,
 	sta->cmn.bf_info.g_id = bfee->g_id;
 	sta->cmn.bf_info.p_aid = bfee->p_aid;
 
-	_rtw_memcpy(bfee->mac_addr, sta->cmn.mac_addr, ETH_ALEN);
+	memcpy(bfee->mac_addr, sta->cmn.mac_addr, ETH_ALEN);
 	bfee->txbf = _FALSE;
 	bfee->sounding = _FALSE;
 	bfee->sound_period = 40;
@@ -1247,7 +1245,7 @@ static struct beamformee_entry *_bfee_add_entry(PADAPTER adapter,
 					RTW_ERR("%s: UNEXPECTED!! info->TargetSUBFee is NULL!", __FUNCTION__);
 				}
 				info->TargetSUBFee = NULL;
-				_rtw_memset(&info->TargetCSIInfo, 0, sizeof(struct _RT_CSI_INFO));
+				memset(&info->TargetCSIInfo, 0, sizeof(struct _RT_CSI_INFO));
 				rtw_bf_cmd(adapter, BEAMFORMING_CTRL_SET_CSI_REPORT, (u8*)&info->TargetCSIInfo, sizeof(struct _RT_CSI_INFO), 0);
 			}
 		}
@@ -1270,7 +1268,7 @@ static struct beamformee_entry *_bfee_add_entry(PADAPTER adapter,
 			/* Record the first SU BFee index. We only allow the first SU BFee to be sound */
 			if ((info->beamformee_su_cnt == 1) && (info->beamformee_mu_cnt == 0)) {
 				info->TargetSUBFee = bfee;
-				_rtw_memset(&info->TargetCSIInfo, 0, sizeof(struct _RT_CSI_INFO));
+				memset(&info->TargetCSIInfo, 0, sizeof(struct _RT_CSI_INFO));
 				bfee->bSuspendSUCap = _FALSE;
 			} else {
 				bfee->bSuspendSUCap = _TRUE;
@@ -1310,7 +1308,7 @@ static void _bfee_remove_entry(PADAPTER adapter, struct beamformee_entry *entry)
 			if ((info->beamformee_mu_cnt == 0) && (info->beamformee_su_cnt > 0)) {
 				idx = _bfee_get_first_su_entry_idx(adapter, NULL);
 				info->TargetSUBFee = &info->bfee_entry[idx];
-				_rtw_memset(&info->TargetCSIInfo, 0, sizeof(struct _RT_CSI_INFO));
+				memset(&info->TargetCSIInfo, 0, sizeof(struct _RT_CSI_INFO));
 				info->TargetSUBFee->bSuspendSUCap = _FALSE;
 			}
 		}
@@ -1322,7 +1320,7 @@ static void _bfee_remove_entry(PADAPTER adapter, struct beamformee_entry *entry)
 		    && (entry == info->TargetSUBFee)) {
 			entry->bSuspendSUCap = _TRUE;
 			info->TargetSUBFee = NULL;
-			_rtw_memset(&info->TargetCSIInfo, 0, sizeof(struct _RT_CSI_INFO));
+			memset(&info->TargetCSIInfo, 0, sizeof(struct _RT_CSI_INFO));
 			rtw_bf_cmd(adapter, BEAMFORMING_CTRL_SET_CSI_REPORT, (u8*)&info->TargetCSIInfo, sizeof(struct _RT_CSI_INFO), 0);
 		}
 	}
@@ -1629,12 +1627,12 @@ u32 rtw_bf_get_report_packet(PADAPTER adapter, union recv_frame *precv_frame)
 	if (!bfee)
 		return _FAIL;
 
-	frame_body = pframe + sizeof(struct rtw_ieee80211_hdr_3addr);
+	frame_body = pframe + sizeof(struct ieee80211_hdr_3addr);
 	category = frame_body[0];
 	action = frame_body[1];
 
-	if ((category == RTW_WLAN_CATEGORY_VHT)
-	    && (action == RTW_WLAN_ACTION_VHT_COMPRESSED_BEAMFORMING)) {
+	if ((category == WLAN_CATEGORY_VHT)
+	    && (action == WLAN_VHT_ACTION_COMPRESSED_BF)) {
 		pMIMOCtrlField = pframe + 26;
 		Nc = (*pMIMOCtrlField) & 0x7;
 		Nr = ((*pMIMOCtrlField) & 0x38) >> 3;
@@ -1648,8 +1646,8 @@ u32 rtw_bf_get_report_packet(PADAPTER adapter, union recv_frame *precv_frame)
 		pCSIMatrix = pMIMOCtrlField + 3 + Nc;
 		CSIMatrixLen = frame_len - 26 - 3 - Nc;
 		info->TargetCSIInfo.bVHT = _TRUE;
-	} else if ((category == RTW_WLAN_CATEGORY_HT)
-		   && (action == RTW_WLAN_ACTION_HT_COMPRESS_BEAMFORMING)) {
+	} else if ((category == WLAN_CATEGORY_HT)
+		   && (action == WLAN_HT_ACTION_COMPRESSED_BF)) {
 		pMIMOCtrlField = pframe + 26;
 		Nc = (*pMIMOCtrlField) & 0x3;
 		Nr = ((*pMIMOCtrlField) & 0xC) >> 2;
@@ -1695,7 +1693,7 @@ u8 rtw_bf_send_vht_gid_mgnt_packet(PADAPTER adapter, u8 *ra, u8 *gid, u8 *positi
 	struct xmit_frame *pmgntframe;
 	/* MISC */
 	struct pkt_attrib *attrib;
-	struct rtw_ieee80211_hdr *wlanhdr;
+	struct ieee80211_hdr *wlanhdr;
 	u8 *pframe, *ptr;
 
 
@@ -1711,31 +1709,31 @@ u8 rtw_bf_send_vht_gid_mgnt_packet(PADAPTER adapter, u8 *ra, u8 *gid, u8 *positi
 	update_mgntframe_attrib(adapter, attrib);
 	attrib->rate = MGN_6M;
 	attrib->bwmode = CHANNEL_WIDTH_20;
-	attrib->subtype = WIFI_ACTION;
+	attrib->subtype = IEEE80211_STYPE_ACTION;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)pmgntframe->buf_addr + TXDESC_OFFSET;
-	wlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	wlanhdr = (struct ieee80211_hdr *)pframe;
 
-	wlanhdr->frame_ctl = 0;
+	wlanhdr->frame_control = 0;
 	set_frame_sub_type(pframe, attrib->subtype);
 	set_duration(pframe, 0);
 	SetFragNum(pframe, 0);
 	SetSeqNum(pframe, 0);
 
-	_rtw_memcpy(wlanhdr->addr1, ra, ETH_ALEN);
-	_rtw_memcpy(wlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
-	_rtw_memcpy(wlanhdr->addr3, get_bssid(mlmepriv), ETH_ALEN);
+	memcpy(wlanhdr->addr1, ra, ETH_ALEN);
+	memcpy(wlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
+	memcpy(wlanhdr->addr3, get_bssid(mlmepriv), ETH_ALEN);
 
-	pframe[24] = RTW_WLAN_CATEGORY_VHT;
-	pframe[25] = RTW_WLAN_ACTION_VHT_GROUPID_MANAGEMENT;
+	pframe[24] = WLAN_CATEGORY_VHT;
+	pframe[25] = WLAN_VHT_ACTION_GROUPID_MGMT;
 	/* Set Membership Status Array */
 	ptr = pframe + 26;
-	_rtw_memcpy(ptr, gid, 8);
+	memcpy(ptr, gid, 8);
 	/* Set User Position Array */
 	ptr = pframe + 34;
-	_rtw_memcpy(ptr, position, 16);
+	memcpy(ptr, position, 16);
 
 	attrib->pktlen = 54;
 	attrib->last_txcmdsz = attrib->pktlen;
@@ -1794,6 +1792,7 @@ void rtw_bf_init(PADAPTER adapter)
 	info->beamformee_mu_reg_maping = 0;
 	info->first_mu_bfee_index = 0xFF;
 	info->mu_bfer_curidx = 0xFF;
+	info->cur_csi_rpt_rate = HALMAC_OFDM24;
 
 	_sounding_init(&info->sounding_info);
 	rtw_init_timer(&info->sounding_timer, adapter, _sounding_timer_handler, adapter);
@@ -1832,7 +1831,7 @@ void rtw_bf_cmd_hdl(PADAPTER adapter, u8 type, u8 *pbuf)
 		break;
 
 	case BEAMFORMING_CTRL_SET_GID_TABLE:
-		rtw_hal_set_hwreg(adapter, HW_VAR_SOUNDING_SET_GID_TABLE, *(void**)pbuf);
+		rtw_hal_set_hwreg(adapter, HW_VAR_SOUNDING_SET_GID_TABLE, pbuf);
 		break;
 
 	case BEAMFORMING_CTRL_SET_CSI_REPORT:
@@ -1880,7 +1879,7 @@ u8 rtw_bf_cmd(PADAPTER adapter, s32 type, u8 *pbuf, s32 size, u8 enqueue)
 			goto exit;
 		}
 
-		_rtw_memcpy(wk_buf, pbuf, size);
+		memcpy(wk_buf, pbuf, size);
 	} else {
 		wk_buf = NULL;
 		size = 0;
@@ -1953,7 +1952,7 @@ void rtw_bf_update_traffic(PADAPTER adapter)
 
 		last_timestamp = bfee->tx_timestamp;
 		last_bytes = bfee->tx_bytes;
-		bfee->tx_timestamp = rtw_get_current_time();
+		bfee->tx_timestamp = jiffies;
 		bfee->tx_bytes = sta->sta_stats.tx_bytes;
 		if (last_timestamp) {
 			if (bfee->tx_bytes >= last_bytes)
@@ -2078,7 +2077,7 @@ struct beamforming_entry	*beamforming_add_entry(PADAPTER adapter, u8 *ra, u16 ai
 			pEntry->p_aid = (pEntry->p_aid << 1) | (ra[4] >> 7);
 			pEntry->g_id = 0;
 		}
-		_rtw_memcpy(pEntry->mac_addr, ra, ETH_ALEN);
+		memcpy(pEntry->mac_addr, ra, ETH_ALEN);
 		pEntry->bSound = _FALSE;
 
 		/* 3 TODO SW/FW sound period */
@@ -2177,7 +2176,7 @@ BOOLEAN	issue_ht_sw_ndpa_packet(PADAPTER Adapter, u8 *ra, enum channel_width bw,
 {
 	struct xmit_frame		*pmgntframe;
 	struct pkt_attrib		*pattrib;
-	struct rtw_ieee80211_hdr	*pwlanhdr;
+	struct ieee80211_hdr	*pwlanhdr;
 	struct xmit_priv		*pxmitpriv = &(Adapter->xmitpriv);
 	struct mlme_ext_priv	*pmlmeext = &Adapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
@@ -2206,21 +2205,21 @@ BOOLEAN	issue_ht_sw_ndpa_packet(PADAPTER Adapter, u8 *ra, enum channel_width bw,
 	pattrib->order = 1;
 	pattrib->subtype = WIFI_ACTION_NOACK;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
-	fctrl = &pwlanhdr->frame_ctl;
+	fctrl =&pwlanhdr->frame_control;
 	*(fctrl) = 0;
 
 	set_order_bit(pframe);
 	set_frame_sub_type(pframe, WIFI_ACTION_NOACK);
 
-	_rtw_memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(Adapter), ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr3, get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+	memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
+	memcpy(pwlanhdr->addr2, adapter_mac_addr(Adapter), ETH_ALEN);
+	memcpy(pwlanhdr->addr3, get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
 
 	if (pmlmeext->cur_wireless_mode == WIRELESS_11B)
 		aSifsTime = 10;
@@ -2240,7 +2239,7 @@ BOOLEAN	issue_ht_sw_ndpa_packet(PADAPTER Adapter, u8 *ra, enum channel_width bw,
 	SET_HT_CTRL_CSI_STEERING(pframe + 24, 3);
 	SET_HT_CTRL_NDP_ANNOUNCEMENT(pframe + 24, 1);
 
-	_rtw_memcpy(pframe + 28, ActionHdr, 4);
+	memcpy(pframe + 28, ActionHdr, 4);
 
 	pattrib->pktlen = 32;
 
@@ -2256,7 +2255,7 @@ BOOLEAN	issue_ht_ndpa_packet(PADAPTER Adapter, u8 *ra, enum channel_width bw, u8
 {
 	struct xmit_frame		*pmgntframe;
 	struct pkt_attrib		*pattrib;
-	struct rtw_ieee80211_hdr	*pwlanhdr;
+	struct ieee80211_hdr	*pwlanhdr;
 	struct xmit_priv		*pxmitpriv = &(Adapter->xmitpriv);
 	struct mlme_ext_priv	*pmlmeext = &Adapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
@@ -2282,21 +2281,21 @@ BOOLEAN	issue_ht_ndpa_packet(PADAPTER Adapter, u8 *ra, enum channel_width bw, u8
 	pattrib->order = 1;
 	pattrib->subtype = WIFI_ACTION_NOACK;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
-	fctrl = &pwlanhdr->frame_ctl;
+	fctrl =&pwlanhdr->frame_control;
 	*(fctrl) = 0;
 
 	set_order_bit(pframe);
 	set_frame_sub_type(pframe, WIFI_ACTION_NOACK);
 
-	_rtw_memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(Adapter), ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr3, get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+	memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
+	memcpy(pwlanhdr->addr2, adapter_mac_addr(Adapter), ETH_ALEN);
+	memcpy(pwlanhdr->addr3, get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
 
 	if (pmlmeext->cur_wireless_mode == WIRELESS_11B)
 		aSifsTime = 10;
@@ -2316,7 +2315,7 @@ BOOLEAN	issue_ht_ndpa_packet(PADAPTER Adapter, u8 *ra, enum channel_width bw, u8
 	SET_HT_CTRL_CSI_STEERING(pframe + 24, 3);
 	SET_HT_CTRL_NDP_ANNOUNCEMENT(pframe + 24, 1);
 
-	_rtw_memcpy(pframe + 28, ActionHdr, 4);
+	memcpy(pframe + 28, ActionHdr, 4);
 
 	pattrib->pktlen = 32;
 
@@ -2335,7 +2334,7 @@ BOOLEAN	issue_vht_sw_ndpa_packet(PADAPTER Adapter, u8 *ra, u16 aid, enum channel
 {
 	struct xmit_frame		*pmgntframe;
 	struct pkt_attrib		*pattrib;
-	struct rtw_ieee80211_hdr	*pwlanhdr;
+	struct ieee80211_hdr	*pwlanhdr;
 	struct xmit_priv		*pxmitpriv = &(Adapter->xmitpriv);
 	struct mlme_ext_priv	*pmlmeext = &Adapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
@@ -2369,19 +2368,19 @@ BOOLEAN	issue_vht_sw_ndpa_packet(PADAPTER Adapter, u8 *ra, u16 aid, enum channel
 	pattrib->bwmode = bw;
 	pattrib->subtype = WIFI_NDPA;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
-	fctrl = &pwlanhdr->frame_ctl;
+	fctrl =&pwlanhdr->frame_control;
 	*(fctrl) = 0;
 
 	set_frame_sub_type(pframe, WIFI_NDPA);
 
-	_rtw_memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(Adapter), ETH_ALEN);
+	memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
+	memcpy(pwlanhdr->addr2, adapter_mac_addr(Adapter), ETH_ALEN);
 
 	if (is_supported_5g(pmlmeext->cur_wireless_mode) || is_supported_ht(pmlmeext->cur_wireless_mode))
 		aSifsTime = 16;
@@ -2405,7 +2404,7 @@ BOOLEAN	issue_vht_sw_ndpa_packet(PADAPTER Adapter, u8 *ra, u16 aid, enum channel
 	else
 		pBeamInfo->sounding_sequence++;
 
-	_rtw_memcpy(pframe + 16, &sequence, 1);
+	memcpy(pframe + 16, &sequence, 1);
 	if (((pmlmeinfo->state & 0x03) == WIFI_FW_ADHOC_STATE) || ((pmlmeinfo->state & 0x03) == WIFI_FW_AP_STATE))
 		aid = 0;
 
@@ -2413,7 +2412,7 @@ BOOLEAN	issue_vht_sw_ndpa_packet(PADAPTER Adapter, u8 *ra, u16 aid, enum channel
 	sta_info.feedback_type = 0;
 	sta_info.nc_index = 0;
 
-	_rtw_memcpy(pframe + 17, (u8 *)&sta_info, 2);
+	memcpy(pframe + 17, (u8 *)&sta_info, 2);
 
 	pattrib->pktlen = 19;
 
@@ -2429,7 +2428,7 @@ BOOLEAN	issue_vht_ndpa_packet(PADAPTER Adapter, u8 *ra, u16 aid, enum channel_wi
 {
 	struct xmit_frame		*pmgntframe;
 	struct pkt_attrib		*pattrib;
-	struct rtw_ieee80211_hdr	*pwlanhdr;
+	struct ieee80211_hdr	*pwlanhdr;
 	struct xmit_priv		*pxmitpriv = &(Adapter->xmitpriv);
 	struct mlme_ext_priv	*pmlmeext = &Adapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
@@ -2455,19 +2454,19 @@ BOOLEAN	issue_vht_ndpa_packet(PADAPTER Adapter, u8 *ra, u16 aid, enum channel_wi
 	pattrib->bwmode = bw;
 	pattrib->subtype = WIFI_NDPA;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
-	fctrl = &pwlanhdr->frame_ctl;
+	fctrl =&pwlanhdr->frame_control;
 	*(fctrl) = 0;
 
 	set_frame_sub_type(pframe, WIFI_NDPA);
 
-	_rtw_memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(Adapter), ETH_ALEN);
+	memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
+	memcpy(pwlanhdr->addr2, adapter_mac_addr(Adapter), ETH_ALEN);
 
 	if (is_supported_5g(pmlmeext->cur_wireless_mode) || is_supported_ht(pmlmeext->cur_wireless_mode))
 		aSifsTime = 16;
@@ -2491,7 +2490,7 @@ BOOLEAN	issue_vht_ndpa_packet(PADAPTER Adapter, u8 *ra, u16 aid, enum channel_wi
 	else
 		pBeamInfo->sounding_sequence++;
 
-	_rtw_memcpy(pframe + 16, &sequence, 1);
+	memcpy(pframe + 16, &sequence, 1);
 
 	if (((pmlmeinfo->state & 0x03) == WIFI_FW_ADHOC_STATE) || ((pmlmeinfo->state & 0x03) == WIFI_FW_AP_STATE))
 		aid = 0;
@@ -2500,7 +2499,7 @@ BOOLEAN	issue_vht_ndpa_packet(PADAPTER Adapter, u8 *ra, u16 aid, enum channel_wi
 	sta_info.feedback_type = 0;
 	sta_info.nc_index = 0;
 
-	_rtw_memcpy(pframe + 17, (u8 *)&sta_info, 2);
+	memcpy(pframe + 17, (u8 *)&sta_info, 2);
 
 	pattrib->pktlen = 19;
 
@@ -2917,7 +2916,7 @@ u32	rtw_beamforming_get_report_frame(PADAPTER	 Adapter, union recv_frame *precv_
 	u32	ret = _SUCCESS;
 #if (BEAMFORMING_SUPPORT == 1)
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-	struct PHY_DM_STRUCT		*pDM_Odm = &(pHalData->odmpriv);
+	struct dm_struct		*pDM_Odm = &(pHalData->odmpriv);
 
 	ret = beamforming_get_report_frame(pDM_Odm, precv_frame);
 
@@ -2948,7 +2947,7 @@ u32	rtw_beamforming_get_report_frame(PADAPTER	 Adapter, union recv_frame *precv_
 	else
 		pBeamformEntry->DefaultCsiCnt++;
 
-	_rtw_memcpy(&pBeamformEntry->PreCsiReport, pframe, frame_len);
+	memcpy(&pBeamformEntry->PreCsiReport, pframe, frame_len);
 
 	pBeamformEntry->bDefaultCSI = _FALSE;
 
@@ -2964,7 +2963,7 @@ void	rtw_beamforming_get_ndpa_frame(PADAPTER	 Adapter, union recv_frame *precv_f
 {
 #if (BEAMFORMING_SUPPORT == 1)
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-	struct PHY_DM_STRUCT		*pDM_Odm = &(pHalData->odmpriv);
+	struct dm_struct		*pDM_Odm = &(pHalData->odmpriv);
 
 	beamforming_get_ndpa_frame(pDM_Odm, precv_frame);
 
@@ -3040,7 +3039,7 @@ void	rtw_beamforming_get_ndpa_frame(PADAPTER	 Adapter, union recv_frame *precv_f
 void	beamforming_wk_hdl(_adapter *padapter, u8 type, u8 *pbuf)
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(padapter);
-	struct PHY_DM_STRUCT		*pDM_Odm = &(pHalData->odmpriv);
+	struct dm_struct		*pDM_Odm = &(pHalData->odmpriv);
 
 #if (BEAMFORMING_SUPPORT == 1) /*(BEAMFORMING_SUPPORT == 1)- for PHYDM beamfoming*/
 	switch (type) {
@@ -3048,7 +3047,7 @@ void	beamforming_wk_hdl(_adapter *padapter, u8 type, u8 *pbuf)
 		struct sta_info	*psta = (PVOID)pbuf;
 		u16			staIdx = psta->cmn.mac_id;
 
-		beamforming_enter(pDM_Odm, staIdx);
+		beamforming_enter(pDM_Odm, staIdx, adapter_mac_addr(psta->padapter));
 		break;
 	}
 	case BEAMFORMING_CTRL_LEAVE:
@@ -3121,7 +3120,7 @@ u8	beamforming_wk_cmd(_adapter *padapter, s32 type, u8 *pbuf, s32 size, u8 enque
 				goto exit;
 			}
 
-			_rtw_memcpy(wk_buf, pbuf, size);
+			memcpy(wk_buf, pbuf, size);
 		} else {
 			wk_buf = NULL;
 			size = 0;

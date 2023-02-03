@@ -683,7 +683,9 @@ unsigned int OnBeacon(struct adapter *padapter, struct recv_frame *precv_frame)
 			if (pbss) {
 				if (collect_bss_info(padapter, precv_frame, pbss) == _SUCCESS) {
 					update_network(&(pmlmepriv->cur_network.network), pbss, padapter, true);
+					spin_lock_bh(&padapter->mlmepriv.scanned_queue.lock);
 					rtw_get_bcn_info(&(pmlmepriv->cur_network));
+					spin_unlock_bh(&padapter->mlmepriv.scanned_queue.lock);
 				}
 				kfree(pbss);
 			}

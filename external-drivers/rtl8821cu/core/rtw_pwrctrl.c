@@ -231,6 +231,7 @@ bool rtw_pwr_unassociated_idle(_adapter *adapter)
 				|| check_fwstate(pmlmepriv, WIFI_UNDER_LINKING | WIFI_UNDER_WPS)
 				|| MLME_IS_AP(iface)
 				|| MLME_IS_MESH(iface)
+/* nrm */
 #ifdef CONFIG_WIFI_MONITOR
 				|| MLME_IS_MONITOR(iface)
 #endif
@@ -666,6 +667,7 @@ u8 PS_RDY_CHECK(_adapter *padapter)
 		|| check_fwstate(pmlmepriv, WIFI_UNDER_LINKING | WIFI_UNDER_WPS)
 		|| MLME_IS_AP(padapter)
 		|| MLME_IS_MESH(padapter)
+/* nrm */
 #ifdef CONFIG_WIFI_MONITOR
 		|| MLME_IS_MONITOR(padapter)
 #endif

@@ -34,14 +34,12 @@ int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u8 request, u16 value, u16 inde
 		goto exit;
 	}
 
-	_enter_critical_mutex(&pdvobjpriv->usb_vendor_req_mutex, NULL);
-	/* Acquire IO memory for vendorreq */
 	pIo_buf = pdvobjpriv->usb_vendor_req_buf;
 
 	if (!pIo_buf) {
 		RTW_INFO("[%s] pIo_buf is NULL\n", __func__);
 		status = -ENOMEM;
-		goto release_mutex;
+		goto exit;
 	}
 
 	while (++vendorreq_times <= MAX_USBCTRL_VENDORREQ_TIMES) {
@@ -93,8 +91,6 @@ int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u8 request, u16 value, u16 inde
 
 	}
 
-release_mutex:
-	_exit_critical_mutex(&pdvobjpriv->usb_vendor_req_mutex, NULL);
 exit:
 	return status;
 

@@ -1,0 +1,19 @@
+Source: rtl8821cu
+Section: non-free/kernel
+Priority: optional
+Maintainer: Rafael Diniz <rafael@rhizomatica.org>
+Build-Depends: debhelper-compat (= 13), dkms
+Standards-Version: 4.5.1
+Vcs-Git: https://github.com/morrownr/8821cu-20210118
+Vcs-Browser: https://github.com/morrownr/8821cu-20210118
+XS-Autobuild: yes
+
+Package: rtl8821cu-dkms
+Architecture: all
+Depends: ${misc:Depends}, dkms
+Description: dkms source for the rtl8821cu network driver
+ rtl8821cu is the driver for the RealTek RTL8811CU/RTL8821CU USB WiFi
+ controllers.
+ .
+ This package provides the dkms source code for the rtl8821cu kernel module.
+ Kernel source or headers are required to compile these modules.

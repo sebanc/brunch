@@ -106,18 +106,10 @@ typedef struct _RT_8723B_FIRMWARE_HDR {
 /* Note: We will divide number of page equally for each queue other than public queue! */
 
 /* For General Reserved Page Number(Beacon Queue is reserved page)
- * Beacon:2, PS-Poll:1, Null Data:1,Qos Null Data:1,BT Qos Null Data:1 */
-#define BCNQ_PAGE_NUM_8723B		0x08
-#ifdef CONFIG_CONCURRENT_MODE
-	#define BCNQ1_PAGE_NUM_8723B		0x08 /* 0x04 */
-#else
-	#define BCNQ1_PAGE_NUM_8723B		0x00
-#endif
+ * Beacon:MAX_BEACON_LEN/PAGE_SIZE_TX_8723B
+ * PS-Poll:1, Null Data:1,Qos Null Data:1,BT Qos Null Data:1,CTS-2-SELF,LTE QoS Null*/
+#define BCNQ_PAGE_NUM_8723B		(MAX_BEACON_LEN / PAGE_SIZE_TX_8723B + 6) /*0x08*/
 
-#ifdef CONFIG_PNO_SUPPORT
-	#undef BCNQ1_PAGE_NUM_8723B
-	#define BCNQ1_PAGE_NUM_8723B		0x00 /* 0x04 */
-#endif
 
 /* For WoWLan , more reserved page
  * ARP Rsp:1, RWC:1, GTK Info:1,GTK RSP:2,GTK EXT MEM:2, AOAC rpt: 1,PNO: 6
@@ -138,7 +130,7 @@ typedef struct _RT_8723B_FIRMWARE_HDR {
 	#define AP_WOWLAN_PAGE_NUM_8723B	0x02
 #endif
 
-#define TX_TOTAL_PAGE_NUMBER_8723B	(0xFF - BCNQ_PAGE_NUM_8723B - BCNQ1_PAGE_NUM_8723B - WOWLAN_PAGE_NUM_8723B)
+#define TX_TOTAL_PAGE_NUMBER_8723B	(0xFF - BCNQ_PAGE_NUM_8723B - WOWLAN_PAGE_NUM_8723B)
 #define TX_PAGE_BOUNDARY_8723B		(TX_TOTAL_PAGE_NUMBER_8723B + 1)
 
 #define WMM_NORMAL_TX_TOTAL_PAGE_NUMBER_8723B	TX_TOTAL_PAGE_NUMBER_8723B

@@ -77,14 +77,12 @@ int _rtw_write16(struct adapter *adapter, u32 addr, u16 val)
 {
 	struct io_priv *pio_priv = &adapter->iopriv;
 	struct	intf_hdl		*pintfhdl = &(pio_priv->intf);
-	int (*_write16)(struct intf_hdl *pintfhdl, u32 addr, __le16 val);
+	int (*_write16)(struct intf_hdl *pintfhdl, u32 addr, u16 val);
 	int ret;
-	__le16 le_tmp;
 
 	_write16 = pintfhdl->io_ops._write16;
 
-	le_tmp = cpu_to_le16(val);
-	ret = _write16(pintfhdl, addr, le_tmp);
+	ret = _write16(pintfhdl, addr, val);
 
 	return RTW_STATUS_CODE(ret);
 }
@@ -93,14 +91,12 @@ int _rtw_write32(struct adapter *adapter, u32 addr, u32 val)
 {
 	struct io_priv *pio_priv = &adapter->iopriv;
 	struct	intf_hdl		*pintfhdl = &(pio_priv->intf);
-	int (*_write32)(struct intf_hdl *pintfhdl, u32 addr, __le32 val);
+	int (*_write32)(struct intf_hdl *pintfhdl, u32 addr, u32 val);
 	int ret;
-	__le32 le_tmp;
 
 	_write32 = pintfhdl->io_ops._write32;
 
-	le_tmp = cpu_to_le32(val);
-	ret = _write32(pintfhdl, addr, le_tmp);
+	ret = _write32(pintfhdl, addr, val);
 
 	return RTW_STATUS_CODE(ret);
 }
@@ -136,13 +132,11 @@ int _rtw_write16_async(struct adapter *adapter, u32 addr, u16 val)
 {
 	struct io_priv *pio_priv = &adapter->iopriv;
 	struct	intf_hdl		*pintfhdl = &(pio_priv->intf);
-	int (*_write16_async)(struct intf_hdl *pintfhdl, u32 addr, __le16 val);
+	int (*_write16_async)(struct intf_hdl *pintfhdl, u32 addr, u16 val);
 	int ret;
-	__le16 le_tmp;
 
 	_write16_async = pintfhdl->io_ops._write16_async;
-	le_tmp = cpu_to_le16(val);
-	ret = _write16_async(pintfhdl, addr, le_tmp);
+	ret = _write16_async(pintfhdl, addr, val);
 
 	return RTW_STATUS_CODE(ret);
 }
@@ -151,13 +145,11 @@ int _rtw_write32_async(struct adapter *adapter, u32 addr, u32 val)
 {
 	struct io_priv *pio_priv = &adapter->iopriv;
 	struct	intf_hdl		*pintfhdl = &(pio_priv->intf);
-	int (*_write32_async)(struct intf_hdl *pintfhdl, u32 addr, __le32 val);
+	int (*_write32_async)(struct intf_hdl *pintfhdl, u32 addr, u32 val);
 	int ret;
-	__le32 le_tmp;
 
 	_write32_async = pintfhdl->io_ops._write32_async;
-	le_tmp = cpu_to_le32(val);
-	ret = _write32_async(pintfhdl, addr, le_tmp);
+	ret = _write32_async(pintfhdl, addr, val);
 
 	return RTW_STATUS_CODE(ret);
 }

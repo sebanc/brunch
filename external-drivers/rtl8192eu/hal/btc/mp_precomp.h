@@ -22,13 +22,9 @@
 
 #ifdef PLATFORM_LINUX
 #define rsprintf snprintf
-#elif defined(PLATFORM_WINDOWS)
-#define rsprintf sprintf_s
+#define rstrncat(dst, src, src_size) strncat(dst, src, src_size)
 #endif
-
 #define DCMD_Printf			DBG_BT_INFO
-
-#define delay_ms(ms)		rtw_mdelay_os(ms)
 
 #ifdef bEnable
 #undef bEnable
@@ -59,27 +55,73 @@ extern u4Byte GLBtcDbgType[];
 #define HS_SUPPORT		0
 #endif
 
-#include "halbtcoutsrc.h"
-#include "halbtc8192e1ant.h"
-#include "halbtc8192e2ant.h"
-#include "halbtc8723b1ant.h"
-#include "halbtc8723b2ant.h"
-#include "halbtc8812a1ant.h"
-#include "halbtc8812a2ant.h"
-#include "halbtc8821a1ant.h"
-#include "halbtc8821a2ant.h"
-#include "halbtc8703b1ant.h"
-#include "halbtc8723d1ant.h"
-#include "halbtc8723d2ant.h"
-#include "halbtc8822b1ant.h"
-#include "halbtc8822b2ant.h"
-#include "halbtc8821c1ant.h"
-#include "halbtc8821c2ant.h"
-
 /* for wifi only mode */
 #include "hal_btcoex_wifionly.h"
+
+#ifdef CONFIG_BT_COEXIST
+#define BTC_BTINFO_LENGTH_MAX 10
+
+struct wifi_only_cfg;
+struct btc_coexist;
+
+#ifdef CONFIG_RTL8192E
+#include "halbtc8192e1ant.h"
+#include "halbtc8192e2ant.h"
+#endif
+
+#ifdef CONFIG_RTL8723B
 #include "halbtc8723bwifionly.h"
+#include "halbtc8723b1ant.h"
+#include "halbtc8723b2ant.h"
+#endif
+
+#ifdef CONFIG_RTL8812A
+#include "halbtc8812a1ant.h"
+#include "halbtc8812a2ant.h"
+#endif
+
+#ifdef CONFIG_RTL8821A
+#include "halbtc8821a1ant.h"
+#include "halbtc8821a2ant.h"
+#endif
+
+#ifdef CONFIG_RTL8703B
+#include "halbtc8703b1ant.h"
+#endif
+
+#ifdef CONFIG_RTL8723D
+#include "halbtc8723d1ant.h"
+#include "halbtc8723d2ant.h"
+#endif
+
+#ifdef CONFIG_RTL8822B
 #include "halbtc8822bwifionly.h"
+#include "halbtc8822b1ant.h"
+#include "halbtc8822b2ant.h"
+#endif
+
+#ifdef CONFIG_RTL8821C
 #include "halbtc8821cwifionly.h"
+#include "halbtc8821c1ant.h"
+#include "halbtc8821c2ant.h"
+#endif
+
+#include "halbtcoutsrc.h"
+
+#else /* CONFIG_BT_COEXIST */
+
+#ifdef CONFIG_RTL8723B
+#include "halbtc8723bwifionly.h"
+#endif
+
+#ifdef CONFIG_RTL8822B
+#include "halbtc8822bwifionly.h"
+#endif
+
+#ifdef CONFIG_RTL8821C
+#include "halbtc8821cwifionly.h"
+#endif
+
+#endif /* CONFIG_BT_COEXIST */
 
 #endif /*  __MP_PRECOMP_H__ */

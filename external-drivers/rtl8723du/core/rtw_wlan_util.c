@@ -2610,10 +2610,6 @@ void update_wireless_mode(struct adapter *adapt)
 		update_mgnt_tx_rate(adapt, IEEE80211_OFDM_RATE_6MB);
 }
 
-void fire_write_MAC_cmd(struct adapter *adapt, unsigned int addr, unsigned int value)
-{
-}
-
 void update_sta_basic_rate(struct sta_info *psta, u8 wireless_mode)
 {
 	if (IsSupportedTxCCK(wireless_mode)) {
@@ -2707,7 +2703,7 @@ void rtw_process_bar_frame(struct adapter *adapt, union recv_frame *precv_frame)
 	tid = ((le16_to_cpu((*(__le16 *)(pframe + 16))) & 0xf000) >> 12);
 	preorder_ctrl = &psta->recvreorder_ctrl[tid];
 	start_seq = ((__le16_to_cpu(*(__le16 *)(pframe + 18))) >> 4);
-	preorder_ctrl->indicate_seq = start_seq;
+	preorder_ctrl->indicate_seq = cpu_to_le16(start_seq);
 
 exit:
 	return;

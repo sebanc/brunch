@@ -24,19 +24,6 @@
 
 #endif
 
-
-static void _dbg_dump_macreg(_adapter *padapter)
-{
-	u32 offset = 0;
-	u32 val32 = 0;
-	u32 index = 0 ;
-	for (index = 0; index < 64; index++) {
-		offset = index * 4;
-		val32 = rtw_read32(padapter, offset);
-		RTW_INFO("offset : 0x%02x ,val:0x%08x\n", offset, val32);
-	}
-}
-
 static VOID
 _ConfigChipOutEP_8192E(
 	IN	PADAPTER	pAdapter,
@@ -183,64 +170,64 @@ _InitBurstPktLen_8192EU(IN PADAPTER Adapter)
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
 
-	/* PlatformEFIOWrite2Byte(Adapter, REG_TRXDMA_CTRL_8195, 0xf5b0); */
-	/* PlatformEFIOWrite2Byte(Adapter, REG_TRXDMA_CTRL_8812, 0xf5b4); */
-	PlatformEFIOWrite2Byte(Adapter, REG_RXDMA_STATUS_8192E, 0x7400);  /* burset lenght=4, set 0x3400 for burset length=2 */
-	PlatformEFIOWrite1Byte(Adapter, 0x289, 0xf5);				/* for rxdma control */
-	/* PlatformEFIOWrite1Byte(Adapter, 0x3a, 0x46); */
+	/* rtw_write16(Adapter, REG_TRXDMA_CTRL_8195, 0xf5b0); */
+	/* rtw_write16(Adapter, REG_TRXDMA_CTRL_8812, 0xf5b4); */
+	rtw_write16(Adapter, REG_RXDMA_STATUS_8192E, 0x7400);  /* burset lenght=4, set 0x3400 for burset length=2 */
+	rtw_write8(Adapter, 0x289, 0xf5);				/* for rxdma control */
+	/* rtw_write8(Adapter, 0x3a, 0x46); */
 
 	/* 0x456 = 0x70, sugguested by Zhilin */
-	/* PlatformEFIOWrite1Byte(Adapter, REG_AMPDU_MAX_TIME_8192E, 0x70); */
+	/* rtw_write8(Adapter, REG_AMPDU_MAX_TIME_8192E, 0x70); */
 
 	/* Suggention by SD1 Jong and Pisa, by Maddest 20130107. */
-	PlatformEFIOWrite2Byte(Adapter, REG_MAX_AGGR_NUM_8192E, 0x0e0e);
-	PlatformEFIOWrite1Byte(Adapter, REG_FWHW_TXQ_CTRL_8192E, 0x80);/* EN_AMPDU_RTY_NEW */
-	PlatformEFIOWrite1Byte(Adapter, REG_AMPDU_MAX_TIME_8192E, 0x5e);
-	PlatformEFIOWrite4Byte(Adapter, REG_FAST_EDCA_CTRL_8192E, 0x03087777);
+	rtw_write16(Adapter, REG_MAX_AGGR_NUM_8192E, 0x0e0e);
+	rtw_write8(Adapter, REG_FWHW_TXQ_CTRL_8192E, 0x80);/* EN_AMPDU_RTY_NEW */
+	rtw_write8(Adapter, REG_AMPDU_MAX_TIME_8192E, 0x5e);
+	rtw_write32(Adapter, REG_FAST_EDCA_CTRL_8192E, 0x03087777);
 
 
-	/* PlatformEFIOWrite4Byte(Adapter, 0x458, 0xffffffff); */
-	PlatformEFIOWrite1Byte(Adapter, REG_USTIME_TSF_8192E, 0x50);
-	PlatformEFIOWrite1Byte(Adapter, REG_USTIME_EDCA_8192E, 0x50);
+	/* rtw_write32(Adapter, 0x458, 0xffffffff); */
+	rtw_write8(Adapter, REG_USTIME_TSF_8192E, 0x50);
+	rtw_write8(Adapter, REG_USTIME_EDCA_8192E, 0x50);
 
 	if (IS_HARDWARE_TYPE_8821U(Adapter) || IS_HARDWARE_TYPE_8192EU(Adapter))
 		speedvalue = BIT7;
 	else
-		speedvalue = PlatformEFIORead1Byte(Adapter, 0xff); /* check device operation speed: SS 0xff bit7 */
+		speedvalue = rtw_read8(Adapter, 0xff); /* check device operation speed: SS 0xff bit7 */
 
 	if (speedvalue & BIT7) { /* USB2/1.1 Mode */
-		temp = PlatformEFIORead1Byte(Adapter, REG_USB_INFO);
+		temp = rtw_read8(Adapter, REG_USB_INFO);
 		if (((temp >> 4) & 0x03) == 0) {
 			/* pHalData->UsbBulkOutSize = 512; */
-			provalue = PlatformEFIORead1Byte(Adapter, REG_RXDMA_PRO_8192E);
-			PlatformEFIOWrite1Byte(Adapter, REG_RXDMA_PRO_8192E, (provalue | BIT(4) & (~BIT(5)))); /* set burst pkt len=512B */
-			PlatformEFIOWrite2Byte(Adapter, REG_RXDMA_PRO_8192E, 0x1e);
+			provalue = rtw_read8(Adapter, REG_RXDMA_PRO_8192E);
+			rtw_write8(Adapter, REG_RXDMA_PRO_8192E, (provalue | BIT(4) & (~BIT(5)))); /* set burst pkt len=512B */
+			rtw_write16(Adapter, REG_RXDMA_PRO_8192E, 0x1e);
 		} else {
 			/* pHalData->UsbBulkOutSize = 64; */
-			provalue = PlatformEFIORead1Byte(Adapter, REG_RXDMA_PRO_8192E);
-			PlatformEFIOWrite1Byte(Adapter, REG_RXDMA_PRO_8192E, ((provalue | BIT(5)) & (~BIT(4)))); /* set burst pkt len=64B */
+			provalue = rtw_read8(Adapter, REG_RXDMA_PRO_8192E);
+			rtw_write8(Adapter, REG_RXDMA_PRO_8192E, ((provalue | BIT(5)) & (~BIT(4)))); /* set burst pkt len=64B */
 		}
 
-		PlatformEFIOWrite2Byte(Adapter, REG_RXDMA_AGG_PG_TH_8192E, 0x2005); /* dmc agg th 20K */
+		rtw_write16(Adapter, REG_RXDMA_AGG_PG_TH_8192E, 0x2005); /* dmc agg th 20K */
 
 		pHalData->bSupportUSB3 = FALSE;
 	}
 
-	PlatformEFIOWrite1Byte(Adapter, REG_DWBCN0_CTRL_8192E, 0x10);
+	rtw_write8(Adapter, REG_DWBCN0_CTRL_8192E, 0x10);
 
-	PlatformEFIOWrite1Byte(Adapter, 0x4c7, PlatformEFIORead1Byte(Adapter, 0x4c7) | BIT(7)); /* enable single pkt ampdu */
-	PlatformEFIOWrite1Byte(Adapter, REG_RX_PKT_LIMIT_8192E, 0x18);		/* for VHT packet length 11K */
+	rtw_write8(Adapter, 0x4c7, rtw_read8(Adapter, 0x4c7) | BIT(7)); /* enable single pkt ampdu */
+	rtw_write8(Adapter, REG_RX_PKT_LIMIT_8192E, 0x18);		/* for VHT packet length 11K */
 
-	/* PlatformEFIOWrite1Byte(Adapter, REG_MAX_AGGR_NUM_8192E, 0x1f); */
-	PlatformEFIOWrite1Byte(Adapter, REG_PIFS_8192E, 0x00);
-	/* PlatformEFIOWrite1Byte(Adapter, REG_FWHW_TXQ_CTRL_8192E, PlatformEFIORead1Byte(Adapter, REG_FWHW_TXQ_CTRL)&(~BIT(7))); */
+	/* rtw_write8(Adapter, REG_MAX_AGGR_NUM_8192E, 0x1f); */
+	rtw_write8(Adapter, REG_PIFS_8192E, 0x00);
+	/* rtw_write8(Adapter, REG_FWHW_TXQ_CTRL_8192E, rtw_read8(Adapter, REG_FWHW_TXQ_CTRL)&(~BIT(7))); */
 
 #ifdef CONFIG_TX_EARLY_MODE
 	if (pHalData->AMPDUBurstMode)
-		PlatformEFIOWrite1Byte(Adapter, REG_SW_AMPDU_BURST_MODE_CTRL_8192E,  0x5F);
+		rtw_write8(Adapter, REG_SW_AMPDU_BURST_MODE_CTRL_8192E,  0x5F);
 #endif
 
-	PlatformEFIOWrite1Byte(Adapter, 0x1c, PlatformEFIORead1Byte(Adapter, 0x1c) | BIT(5) | BIT(6)); /* to prevent mac is reseted by bus. 20111208, by Page */
+	rtw_write8(Adapter, 0x1c, rtw_read8(Adapter, 0x1c) | BIT(5) | BIT(6)); /* to prevent mac is reseted by bus. 20111208, by Page */
 #endif
 }
 
@@ -264,12 +251,12 @@ static u32 _InitPowerOn_8192EU(_adapter *padapter)
 		rtw_write8(padapter, REG_LDO_SWR_CTRL, 0xC3);
 	} else	{
 		/* SPS */
-		/* 0x7C [6] = 1¡¦b0 (IC default, 0x83) */
+		/* 0x7C [6] = 1ï¿½ï¿½b0 (IC default, 0x83) */
 
 
-		/* 0x14[23:20]=b¡¦0101 (raise 1.2V voltage)
-		   u1Byte	tmp1Byte = PlatformEFIORead1Byte(Adapter,0x16);
-		   PlatformEFIOWrite1Byte(Adapter,0x16,tmp1Byte |BIT4|BIT6); */
+		/* 0x14[23:20]=bï¿½ï¿½0101 (raise 1.2V voltage)
+		   u1Byte	tmp1Byte = rtw_read8(Adapter,0x16);
+		   rtw_write8(Adapter,0x16,tmp1Byte |BIT4|BIT6); */
 		u32 voltage = rtw_read32(padapter , REG_SYS_SWR_CTRL2_8192E);
 
 		if (((voltage & 0x00F00000) >> 20) == 0x4) {
@@ -351,7 +338,7 @@ _InitHardwareDropIncorrectBulkOut_8192E(
 #ifdef CONFIG_RTW_LED
 static void _InitHWLed(PADAPTER Adapter)
 {
-	struct led_priv *pledpriv = &(Adapter->ledpriv);
+	struct led_priv *pledpriv = adapter_to_led(Adapter);
 
 	if (pledpriv->LedStrategy != HW_LED)
 		return;
@@ -585,79 +572,10 @@ USB_AggModeSwitch(
 #endif
 }	/* USB_AggModeSwitch */
 
-static VOID _RfPowerSave(
-	IN	PADAPTER		Adapter
-)
-{
-#if 0
-	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(Adapter);
-	PMGNT_INFO		pMgntInfo	= &(Adapter->MgntInfo);
-	enum rf_path			eRFPath;
-
-#if (DISABLE_BB_RF)
-	return;
-#endif
-
-	if (pMgntInfo->RegRfOff == TRUE) { /* User disable RF via registry. */
-		MgntActSet_RF_State(Adapter, eRfOff, RF_CHANGE_BY_SW);
-		/* Those action will be discard in MgntActSet_RF_State because off the same state */
-		for (eRFPath = 0; eRFPath < pHalData->NumTotalRFPath; eRFPath++)
-			phy_set_rf_reg(Adapter, eRFPath, 0x4, 0xC00, 0x0);
-	} else if (pMgntInfo->RfOffReason > RF_CHANGE_BY_PS) { /* H/W or S/W RF OFF before sleep. */
-		MgntActSet_RF_State(Adapter, eRfOff, pMgntInfo->RfOffReason);
-	} else {
-		pHalData->eRFPowerState = eRfOn;
-		pMgntInfo->RfOffReason = 0;
-		if (Adapter->bInSetPower || Adapter->bResetInProgress)
-			PlatformUsbEnableInPipes(Adapter);
-	}
-#endif
-}
-
 enum {
 	Antenna_Lfet = 1,
 	Antenna_Right = 2,
 };
-
-/*
- * 2010/08/26 MH Add for selective suspend mode check.
- * If Efuse 0x0e bit1 is not enabled, we can not support selective suspend for Minicard and
- * slim card.
- *   */
-static VOID
-HalDetectSelectiveSuspendMode(
-	IN PADAPTER				Adapter
-)
-{
-#if 0
-	u8	tmpvalue;
-	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
-	struct dvobj_priv	*pdvobjpriv = adapter_to_dvobj(Adapter);
-
-	/* If support HW radio detect, we need to enable WOL ability, otherwise, we */
-	/* can not use FW to notify host the power state switch. */
-
-	EFUSE_ShadowRead(Adapter, 1, EEPROM_USB_OPTIONAL1, (u32 *)&tmpvalue);
-
-	RTW_INFO("HalDetectSelectiveSuspendMode(): SS ");
-	if (tmpvalue & BIT1)
-		RTW_INFO("Enable\n");
-	else {
-		RTW_INFO("Disable\n");
-		pdvobjpriv->RegUsbSS = _FALSE;
-	}
-
-	/* 2010/09/01 MH According to Dongle Selective Suspend INF. We can switch SS mode. */
-	if (pdvobjpriv->RegUsbSS && !SUPPORT_HW_RADIO_DETECT(pHalData)) {
-		/* PMGNT_INFO				pMgntInfo = &(Adapter->MgntInfo); */
-
-		/* if (!pMgntInfo->bRegDongleSS)	 */
-		/* { */
-		pdvobjpriv->RegUsbSS = _FALSE;
-		/* } */
-	}
-#endif
-}	/* HalDetectSelectiveSuspendMode */
 
 #if 0
 /*-----------------------------------------------------------------------------
@@ -775,7 +693,7 @@ u32 rtl8192eu_hal_init(PADAPTER Adapter)
 	rt_rf_power_state		eRfPowerStateToSet;
 
 
-	systime init_start_time = rtw_get_current_time();
+	systime init_start_time = jiffies;
 
 
 #ifdef DBG_HAL_INIT_PROFILING
@@ -845,7 +763,7 @@ u32 rtl8192eu_hal_init(PADAPTER Adapter)
 	for (hal_init_profiling_i = 0; hal_init_profiling_i < HAL_INIT_STAGES_NUM; hal_init_profiling_i++)
 		hal_init_stages_timestamp[hal_init_profiling_i] = 0;
 
-#define HAL_INIT_PROFILE_TAG(stage) do { hal_init_stages_timestamp[(stage)] = rtw_get_current_time(); } while (0)
+#define HAL_INIT_PROFILE_TAG(stage) do { hal_init_stages_timestamp[(stage)] = jiffies; } while (0)
 #else
 #define HAL_INIT_PROFILE_TAG(stage) do {} while (0)
 #endif /* DBG_HAL_INIT_PROFILING */
@@ -952,21 +870,17 @@ u32 rtl8192eu_hal_init(PADAPTER Adapter)
 	pHalData->current_channel = 6;/* default set to 6 */
 
 	HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_MAC);
-#if (HAL_MAC_ENABLE == 1)
 	status = PHY_MACConfig8192E(Adapter);
 	if (status == _FAIL)
 		goto exit;
-#endif
 
 	HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_BB);
-#if (HAL_BB_ENABLE == 1)
 	status = PHY_BBConfig8192E(Adapter);
 	if (status == _FAIL)
 		goto exit;
-#endif
 
 	HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_RF);
-#if (HAL_RF_ENABLE == 1)
+
 	status = PHY_RFConfig8192E(Adapter);
 	if (status == _FAIL)
 		goto exit;
@@ -1057,7 +971,6 @@ u32 rtl8192eu_hal_init(PADAPTER Adapter)
 #endif /* CONFIG_RTW_LED */
 
 	_BBTurnOnBlock_8192E(Adapter);
-#endif
 
 	/*  */
 	/* Joseph Note: Keep RfRegChnlVal for later use. */
@@ -1135,16 +1048,8 @@ u32 rtl8192eu_hal_init(PADAPTER Adapter)
 
 		HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_IQK);
 		if (pwrctrlpriv->rf_pwrstate == rf_on) {
-			pHalData->bNeedIQK = _TRUE;
-			if (pHalData->bIQKInitialized)
-				halrf_iqk_trigger(&pHalData->odmpriv, _TRUE);
-				/*phy_iq_calibrate_8192e(Adapter, _TRUE);*/
-			else {
-				halrf_iqk_trigger(&pHalData->odmpriv, _FALSE);
-				/*phy_iq_calibrate_8192e(Adapter, _FALSE);*/
-				pHalData->bIQKInitialized = _TRUE;
-			}
 
+			pHalData->neediqk_24g  = _TRUE;
 			HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_PW_TRACK);
 
 			odm_txpowertracking_check(&pHalData->odmpriv);
@@ -1201,10 +1106,10 @@ u32 rtl8192eu_hal_init(PADAPTER Adapter)
 #endif /* CONFIG_XMIT_ACK */
 	/* Fixed LDPC rx hang issue. */
 	{
-		u4Byte	tmp4Byte = PlatformEFIORead4Byte(Adapter, REG_SYS_SWR_CTRL1_8192E);
-		PlatformEFIOWrite1Byte(Adapter, REG_SYS_SWR_CTRL2_8192E, 0x75);
+		u4Byte	tmp4Byte = rtw_read32(Adapter, REG_SYS_SWR_CTRL1_8192E);
+		rtw_write8(Adapter, REG_SYS_SWR_CTRL2_8192E, 0x75);
 		tmp4Byte = (tmp4Byte & 0xfff00fff) | (0x7E << 12);
-		PlatformEFIOWrite4Byte(Adapter, REG_SYS_SWR_CTRL1_8192E, tmp4Byte);
+		rtw_write32(Adapter, REG_SYS_SWR_CTRL1_8192E, tmp4Byte);
 	}
 
 exit:
@@ -1213,7 +1118,7 @@ exit:
 	RTW_INFO("%s in %dms\n", __FUNCTION__, rtw_get_passing_time_ms(init_start_time));
 
 #ifdef DBG_HAL_INIT_PROFILING
-	hal_init_stages_timestamp[HAL_INIT_STAGES_END] = rtw_get_current_time();
+	hal_init_stages_timestamp[HAL_INIT_STAGES_END] = jiffies;
 
 	for (hal_init_profiling_i = 0; hal_init_profiling_i < HAL_INIT_STAGES_NUM - 1; hal_init_profiling_i++) {
 		RTW_INFO("DBG_HAL_INIT_PROFILING: %35s, %u, %5u, %5u\n"
@@ -1453,7 +1358,7 @@ hal_CustomizedBehavior_8192EU(
 #ifdef CONFIG_RTW_SW_LED
 
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
-	struct led_priv	*pledpriv = &(Adapter->ledpriv);
+	struct led_priv	*pledpriv = adapter_to_led(Adapter);
 
 
 	/* Led mode */
@@ -1564,7 +1469,7 @@ ReadLEDSetting_8192EU(
 )
 {
 #ifdef CONFIG_RTW_LED
-	struct led_priv *pledpriv = &(Adapter->ledpriv);
+	struct led_priv *pledpriv = adapter_to_led(Adapter);
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
 #ifdef CONFIG_RTW_SW_LED
@@ -1617,6 +1522,9 @@ InitAdapterVariablesByPROM_8192EU(
 	ReadLEDSetting_8192EU(Adapter, pHalData->efuse_eeprom_data, pHalData->bautoload_fail_flag);
 
 	Hal_EfuseParseKFreeData_8192E(Adapter, pHalData->efuse_eeprom_data, pHalData->bautoload_fail_flag);
+
+	/* set coex. ant info once efuse parsing is done */
+	rtw_btcoex_set_ant_info(Adapter);
 }
 
 static void Hal_ReadPROMContent_8192EU(
@@ -1726,6 +1634,8 @@ u8 SetHwReg8192EU(PADAPTER Adapter, u8 variable, u8 *val)
 					if ((Adapter->registrypriv.wifi_spec == 1) && (_FALSE == phtpriv->ht_option))
 #endif
 						rtw_write8(Adapter, REG_RXDMA_AGG_PG_TH + 1, 0);
+					else
+						rtw_write8(Adapter, REG_RXDMA_AGG_PG_TH + 1, pHalData->rxagg_usb_timeout);
 				}
 			}
 #endif/* #ifdef CONFIG_80211N_HT */
@@ -1776,11 +1686,6 @@ void GetHwReg8192EU(PADAPTER Adapter, u8 variable, u8 *val)
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
 	switch (variable) {
-	case HW_VAR_CPWM:
-#ifdef CONFIG_LPS_LCLK
-		*val = rtw_read8(Adapter, REG_USB_HCPWM);
-#endif /* CONFIG_LPS_LCLK */
-		break;
 	default:
 		GetHwReg8192E(Adapter, variable, val);
 		break;
@@ -1800,7 +1705,7 @@ GetHalDefVar8192EUsb(
 	switch (eVariable) {
 
 	case HW_VAR_MAX_RX_AMPDU_FACTOR:
-		*((u32 *)pValue) = MAX_AMPDU_FACTOR_64K; /* MAX_AMPDU_FACTOR_64K; */
+		*((u32 *)pValue) = IEEE80211_HT_MAX_AMPDU_64K; /* IEEE80211_HT_MAX_AMPDU_64K; */
 		break;
 	default:
 		GetHalDefVar8192E(Adapter, eVariable, pValue);

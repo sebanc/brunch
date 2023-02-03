@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+#DH_VERBOSE=1
+
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@ --with dkms
+
+override_dh_auto_install:
+	dh_install --package=$(DEB_SOURCE)-dkms core hal include os_dep platform Kconfig Makefile halmac.mk rtl8821c.mk usr/src/$(DEB_SOURCE)-$(DEB_VERSION_UPSTREAM)/
+
+
+override_dh_dkms:
+	dh_dkms -V $(VERSION)
+
+
+override_dh_auto_build:

@@ -8,7 +8,11 @@ endif
 
 EXTRA_CFLAGS += -I$(src)/include
 
-EXTRA_LDFLAGS += --strip-debug
+#EXTRA_LDFLAGS += --strip-debug
+
+ifeq ("","$(wildcard MOK.der)")
+NO_SKIP_SIGN := y
+endif
 
 ########################## Features ###########################
 CONFIG_EFUSE_CONFIG_FILE = y
@@ -239,6 +243,20 @@ endif
 	@/sbin/depmod -a ${KVER}
 	@echo "Please reboot your system"
 
+DRIVER_VERSION = $(shell grep "\#define DRIVERVERSION" include/drv_types.h | awk '{print $$3}' | tr -d v\")
+
+dkms_install:
+	@mkdir -vp /usr/src/$(MODULE_NAME)-$(DRIVER_VERSION)
+	cp -r * /usr/src/$(MODULE_NAME)-$(DRIVER_VERSION)
+	dkms add -m $(MODULE_NAME) -v $(DRIVER_VERSION)
+	+ dkms build -m $(MODULE_NAME) -v $(DRIVER_VERSION)
+	dkms install -m $(MODULE_NAME) -v $(DRIVER_VERSION)
+	dkms status -m $(MODULE_NAME)
+
+dkms_remove:
+	dkms remove $(MODULE_NAME)/$(DRIVER_VERSION) --all
+	rm -rf /usr/src/$(MODULE_NAME)-$(DRIVER_VERSION)
+
 config_r:
 	@echo "make config"
 	/bin/bash script/Configure script/config.in
@@ -248,14 +266,36 @@ config_r:
 
 clean:
 	#$(MAKE) -C $(KSRC) M=$(shell pwd) clean
-	cd hal ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko *.d .*.cmd
-	cd hal/phydm ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
-	cd core ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
-	cd os_dep ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
-	cd os_dep/linux ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
-	cd platform ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
-	rm -fr Module.symvers ; rm -fr Module.markers ; rm -fr modules.order
-	rm -fr *.mod.c *.mod *.o .*.cmd *.ko *~ .*.d
-	rm -fr .tmp_versions
+	@cd hal ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko *.d .*.cmd
+	@cd hal/phydm/halrf ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko *.d .*.cmd
+	@cd hal/phydm/halrf/rtl8723d ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko *.d .*.cmd
+	@cd hal/phydm/txbf ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko *.d .*.cmd
+	@cd hal/efuse/rtl8723d ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko *.d .*.cmd
+	@cd hal/phydm/rtl8723d ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko *.d .*.cmd
+	@cd hal/rtl8723d/usb ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko *.d .*.cmd
+	@cd hal/phydm ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d .*.cmd
+	@cd core ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
+	@cd core/crypto ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
+	@cd core/monitor ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
+	@cd core/mesh ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
+	@cd core/wds ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
+	@cd core/efuse ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
+	@cd os_dep ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
+	@cd os_dep/linux ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
+	@cd platform ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .*.d
+	@rm -fr Module.symvers ; rm -fr Module.markers ; rm -fr modules.order
+	@rm -fr *.mod.c *.mod *.o .*.cmd *.ko *~ .*.d
+	@rm -fr .tmp_versions
 endif
+
+sign:
+ifeq ($(NO_SKIP_SIGN), y)
+	@openssl req -new -x509 -newkey rsa:2048 -keyout MOK.priv -outform DER -out MOK.der -nodes -days 36500 -subj "/CN=Custom MOK/"
+	@mokutil --import MOK.der
+else
+	echo "Skipping key creation"
+endif
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der 8723du.ko
+
+sign-install: all sign install
 

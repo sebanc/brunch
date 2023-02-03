@@ -133,6 +133,9 @@ do {\
 #define		NORMAL_EXEC					FALSE
 #define		FORCE_EXEC						TRUE
 
+#define		NM_EXCU						FALSE
+#define		FC_EXCU						TRUE
+
 #define		BTC_RF_OFF					0x0
 #define		BTC_RF_ON					0x1
 
@@ -214,6 +217,7 @@ typedef enum _BTC_CHIP_TYPE {
 /* following is for command line utility */
 #define	CL_SPRINTF	rsprintf
 #define	CL_PRINTF	DCMD_Printf
+#define CL_STRNCAT(dst, dst_size, src, src_size) rstrncat(dst, src, src_size)
 
 struct btc_board_info {
 	/* The following is some board information */
@@ -234,6 +238,7 @@ struct btc_board_info {
 	boolean			ant_det_result_five_complete;
 	u32				antdetval;
 	u8				customerID;
+	u8				customer_id;
 };
 
 typedef enum _BTC_DBG_OPCODE {
@@ -271,6 +276,7 @@ typedef enum _BTC_WIFI_ROLE {
 typedef enum _BTC_WIRELESS_FREQ {
 	BTC_FREQ_2_4G					= 0x0,
 	BTC_FREQ_5G						= 0x1,
+	BTC_FREQ_25G					= 0x2,
 	BTC_FREQ_MAX
 } BTC_WIRELESS_FREQ, *PBTC_WIRELESS_FREQ;
 
@@ -293,6 +299,7 @@ typedef enum _BTC_WIFI_PNP {
 	BTC_WIFI_PNP_WAKE_UP					= 0x0,
 	BTC_WIFI_PNP_SLEEP						= 0x1,
 	BTC_WIFI_PNP_SLEEP_KEEP_ANT				= 0x2,
+	BTC_WIFI_PNP_WOWLAN					= 0x3,
 	BTC_WIFI_PNP_MAX
 } BTC_WIFI_PNP, *PBTC_WIFI_PNP;
 
@@ -353,6 +360,7 @@ typedef enum _BTC_GET_TYPE {
 	BTC_GET_BL_WIFI_FW_READY,
 	BTC_GET_BL_WIFI_CONNECTED,
 	BTC_GET_BL_WIFI_DUAL_BAND_CONNECTED,
+	BTC_GET_BL_WIFI_LINK_INFO,
 	BTC_GET_BL_WIFI_BUSY,
 	BTC_GET_BL_WIFI_SCAN,
 	BTC_GET_BL_WIFI_LINK,
@@ -366,6 +374,7 @@ typedef enum _BTC_GET_TYPE {
 	BTC_GET_BL_WIFI_IS_IN_MP_MODE,
 	BTC_GET_BL_IS_ASUS_8723B,
 	BTC_GET_BL_RF4CE_CONNECTED,
+	BTC_GET_BL_WIFI_LW_PWR_STATE,
 
 	/* type s4Byte */
 	BTC_GET_S4_WIFI_RSSI,
@@ -418,6 +427,7 @@ typedef enum _BTC_SET_TYPE {
 	BTC_SET_BL_INC_SCAN_DEV_NUM,
 	BTC_SET_BL_BT_TX_RX_MASK,
 	BTC_SET_BL_MIRACAST_PLUS_BT,
+	BTC_SET_BL_BT_LNA_CONSTRAIN_LEVEL,
 
 	/* type u1Byte */
 	BTC_SET_U1_RSSI_ADJ_VAL_FOR_AGC_TABLE_ON,
@@ -427,6 +437,9 @@ typedef enum _BTC_SET_TYPE {
 	BTC_SET_ACT_GET_BT_RSSI,
 	BTC_SET_ACT_AGGREGATE_CTRL,
 	BTC_SET_ACT_ANTPOSREGRISTRY_CTRL,
+
+	// for mimo ps mode setting
+	BTC_SET_MIMO_PS_MODE,
 	/*===== for 1Ant ======*/
 	/* type BOOLEAN */
 
@@ -472,6 +485,7 @@ typedef enum _BTC_NOTIFY_TYPE_SCAN {
 	BTC_SCAN_FINISH							= 0x0,
 	BTC_SCAN_START							= 0x1,
 	BTC_SCAN_START_2G						= 0x2,
+	BTC_SCAN_START_5G						= 0x3,
 	BTC_SCAN_MAX
 } BTC_NOTIFY_TYPE_SCAN, *PBTC_NOTIFY_TYPE_SCAN;
 typedef enum _BTC_NOTIFY_TYPE_SWITCHBAND {
@@ -491,6 +505,7 @@ typedef enum _BTC_NOTIFY_TYPE_ASSOCIATE {
 typedef enum _BTC_NOTIFY_TYPE_MEDIA_STATUS {
 	BTC_MEDIA_DISCONNECT					= 0x0,
 	BTC_MEDIA_CONNECT						= 0x1,
+	BTC_MEDIA_CONNECT_5G					= 0x02,
 	BTC_MEDIA_MAX
 } BTC_NOTIFY_TYPE_MEDIA_STATUS, *PBTC_NOTIFY_TYPE_MEDIA_STATUS;
 typedef enum _BTC_NOTIFY_TYPE_SPECIFIC_PACKET {
@@ -518,6 +533,8 @@ typedef enum _BTC_BT_OFFON {
 	BTC_BT_OFF				= 0x0,
 	BTC_BT_ON				= 0x1,
 } BTC_BTOFFON, *PBTC_BT_OFFON;
+
+#define BTC_5G_BAND 0x80
 
 /*==================================================
 For following block is for coex offload
@@ -627,6 +644,49 @@ typedef struct _BTC_OFFLOAD {
 } BTC_OFFLOAD, *PBTC_OFFLOAD;
 extern BTC_OFFLOAD				gl_coex_offload;
 /*==================================================*/
+
+/* BTC_LINK_MODE same as WIFI_LINK_MODE */
+typedef enum _BTC_LINK_MODE{
+	BTC_LINK_NONE=0,
+	BTC_LINK_ONLY_GO,
+	BTC_LINK_ONLY_GC,
+	BTC_LINK_ONLY_STA,
+	BTC_LINK_ONLY_AP,
+	BTC_LINK_2G_MCC_GO_STA,
+	BTC_LINK_5G_MCC_GO_STA,
+	BTC_LINK_25G_MCC_GO_STA,
+	BTC_LINK_2G_MCC_GC_STA,
+	BTC_LINK_5G_MCC_GC_STA,
+	BTC_LINK_25G_MCC_GC_STA,
+	BTC_LINK_2G_SCC_GO_STA,
+	BTC_LINK_5G_SCC_GO_STA,
+	BTC_LINK_2G_SCC_GC_STA,
+	BTC_LINK_5G_SCC_GC_STA,
+	BTC_LINK_MAX=30
+}BTC_LINK_MODE, *PBTC_LINK_MODE;
+
+
+struct btc_wifi_link_info {
+	BTC_LINK_MODE link_mode; /* LinkMode */
+	u1Byte sta_center_channel; /* StaCenterChannel */
+	u1Byte p2p_center_channel; /* P2PCenterChannel	*/
+	BOOLEAN bany_client_join_go;
+	BOOLEAN benable_noa;
+	BOOLEAN bhotspot;
+};
+
+typedef enum _BTC_MULTI_PORT_TDMA_MODE {
+	BTC_MULTI_PORT_TDMA_MODE_NONE=0,
+	BTC_MULTI_PORT_TDMA_MODE_2G_SCC_GO,
+	BTC_MULTI_PORT_TDMA_MODE_2G_P2P_GO,
+	BTC_MULTI_PORT_TDMA_MODE_2G_HOTSPOT_GO
+} BTC_MULTI_PORT_TDMA_MODE, *PBTC_MULTI_PORT_TDMA_MODE;
+
+typedef struct btc_multi_port_tdma_info {
+	BTC_MULTI_PORT_TDMA_MODE btc_multi_port_tdma_mode;
+	u1Byte start_time_from_bcn;
+	u1Byte bt_time;
+} BTC_MULTI_PORT_TDMA_INFO, *PBTC_MULTI_PORT_TDMA_INFO;
 
 typedef u1Byte
 (*BFP_BTC_R1)(
@@ -779,6 +839,14 @@ typedef u4Byte
 	IN	PVOID			pBtcContext
 	);
 
+typedef u4Byte
+(*BFP_BTC_SET_ATOMIC) 	(
+	IN	PVOID			pBtcContext,
+	IN	pu4Byte 		target,
+	IN	u4Byte			val
+	);
+
+
 typedef VOID
 (*BTC_PHYDM_MODIFY_RA_PCR_THRESHLOD)(
 	IN	PVOID		pDM_Odm,
@@ -909,6 +977,8 @@ struct btc_statistics {
 	u32					cnt_stack_operation_notify;
 	u32					cnt_dbg_ctrl;
 	u32					cnt_rate_id_notify;
+	u32					cnt_halt_notify;
+	u32					cnt_pnp_notify;
 };
 
 struct btc_coexist {
@@ -918,6 +988,7 @@ struct btc_coexist {
 	struct  btc_bt_info			bt_info;		/*some bt info referenced by non-bt module*/
 	struct  btc_stack_info		stack_info;
 	struct  btc_bt_link_info		bt_link_info;
+	struct btc_wifi_link_info	wifi_link_info;
 
 #ifdef CONFIG_RF4CE_COEXIST
 	struct  btc_rf4ce_info		rf4ce_info;
@@ -932,6 +1003,8 @@ struct btc_coexist {
 	pu1Byte					cli_buf;
 	struct btc_statistics		statistics;
 	u1Byte				pwrModeVal[10];
+	BOOLEAN dbg_mode;
+	BOOLEAN auto_report;
 
 	/* function pointers */
 	/* io related */
@@ -969,13 +1042,67 @@ struct btc_coexist {
 	BFP_BTC_GET_BT_COEX_SUPPORTED_FEATURE btc_get_bt_coex_supported_feature;
 	BFP_BTC_GET_BT_COEX_SUPPORTED_VERSION btc_get_bt_coex_supported_version;
 	BFP_BTC_GET_PHYDM_VERSION		btc_get_bt_phydm_version;
+	BFP_BTC_SET_ATOMIC			btc_set_atomic;
 	BTC_PHYDM_MODIFY_RA_PCR_THRESHLOD	btc_phydm_modify_RA_PCR_threshold;
 	BTC_PHYDM_CMNINFOQUERY				btc_phydm_query_PHY_counter;
-	BTC_PHYDM_MODIFY_ANTDIV_HWSW		btc_phydm_modify_ANTDIV_HwSw;
+	BTC_PHYDM_MODIFY_ANTDIV_HWSW		btc_phydm_modify_antdiv_hwsw;
 	BFP_BTC_GET_ANT_DET_VAL_FROM_BT		btc_get_ant_det_val_from_bt;
 	BFP_BTC_GET_BLE_SCAN_TYPE_FROM_BT	btc_get_ble_scan_type_from_bt;
 	BFP_BTC_GET_BLE_SCAN_PARA_FROM_BT	btc_get_ble_scan_para_from_bt;
 	BFP_BTC_GET_BT_AFH_MAP_FROM_BT		btc_get_bt_afh_map_from_bt;
+
+	union {
+		#ifdef CONFIG_RTL8822B
+		struct coex_dm_8822b_1ant	coex_dm_8822b_1ant;
+		struct coex_dm_8822b_2ant	coex_dm_8822b_2ant;
+		#endif /* 8822B */
+		#ifdef CONFIG_RTL8821C
+		struct coex_dm_8821c_1ant	coex_dm_8821c_1ant;
+		struct coex_dm_8821c_2ant	coex_dm_8821c_2ant;
+		#endif /* 8821C */
+        #ifdef CONFIG_RTL8723D
+        struct coex_dm_8723d_1ant   coex_dm_8723d_1ant;
+        struct coex_dm_8723d_2ant   coex_dm_8723d_2ant;
+        #endif /* 8723D */
+	};
+
+	union {
+		#ifdef CONFIG_RTL8822B
+		struct coex_sta_8822b_1ant	coex_sta_8822b_1ant;
+		struct coex_sta_8822b_2ant	coex_sta_8822b_2ant;
+		#endif /* 8822B */
+		#ifdef CONFIG_RTL8821C
+		struct coex_sta_8821c_1ant	coex_sta_8821c_1ant;
+		struct coex_sta_8821c_2ant	coex_sta_8821c_2ant;
+		#endif /* 8821C */
+        #ifdef CONFIG_RTL8723D
+        struct coex_sta_8723d_1ant  coex_sta_8723d_1ant;
+        struct coex_sta_8723d_2ant  coex_sta_8723d_2ant;
+        #endif /* 8723D */
+	};
+
+	union {
+		#ifdef CONFIG_RTL8822B
+		struct rfe_type_8822b_1ant	rfe_type_8822b_1ant;
+		struct rfe_type_8822b_2ant	rfe_type_8822b_2ant;
+		#endif /* 8822B */
+		#ifdef CONFIG_RTL8821C
+		struct rfe_type_8821c_1ant	rfe_type_8821c_1ant;
+		struct rfe_type_8821c_2ant	rfe_type_8821c_2ant;
+		#endif /* 8821C */
+	};
+
+	union {
+		#ifdef CONFIG_RTL8822B
+		struct wifi_link_info_8822b_1ant	wifi_link_info_8822b_1ant;
+		struct wifi_link_info_8822b_2ant	wifi_link_info_8822b_2ant;
+		#endif /* 8822B */
+		#ifdef CONFIG_RTL8821C
+		struct wifi_link_info_8821c_1ant	wifi_link_info_8821c_1ant;
+		struct wifi_link_info_8821c_2ant	wifi_link_info_8821c_2ant;
+		#endif /* 8821C */
+	};
+
 };
 typedef struct btc_coexist *PBTC_COEXIST;
 

@@ -137,7 +137,7 @@ static inline int  __nat25_has_expired(struct adapter *priv,
 
 
 static inline void __nat25_generate_ipv4_network_addr(unsigned char *networkAddr,
-		unsigned int *ipAddr)
+		__be32 *ipAddr)
 {
 	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
 
@@ -180,7 +180,7 @@ static inline void __nat25_generate_apple_network_addr(unsigned char *networkAdd
 
 
 static inline void __nat25_generate_pppoe_network_addr(unsigned char *networkAddr,
-		unsigned char *ac_mac, unsigned short *sid)
+		unsigned char *ac_mac, __be16 *sid)
 {
 	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
 
@@ -792,10 +792,10 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 	else if (protocol == __constant_htons(ETH_P_ARP)) {
 		struct arphdr *arp = (struct arphdr *)(skb->data + ETH_HLEN);
 		unsigned char *arp_ptr = (unsigned char *)(arp + 1);
-		unsigned int *sender, *target;
+		__be32 *sender, *target;
 
 		if (arp->ar_pro != __constant_htons(ETH_P_IP)) {
-			DEBUG_WARN("NAT25: arp protocol unknown (%4x)!\n", htons(arp->ar_pro));
+			DEBUG_WARN("NAT25: arp protocol unknown (%4x)!\n", be16_to_cpu(arp->ar_pro));
 			return -1;
 		}
 
@@ -811,7 +811,7 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 			memcpy(arp_ptr, GET_MY_HWADDR(priv), ETH_ALEN);
 
 			arp_ptr += arp->ar_hln;
-			sender = (unsigned int *)arp_ptr;
+			sender = (__be32 *)arp_ptr;
 
 			__nat25_generate_ipv4_network_addr(networkAddr, sender);
 
@@ -825,9 +825,9 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 			RTW_INFO("NAT25: Lookup ARP\n");
 
 			arp_ptr += arp->ar_hln;
-			sender = (unsigned int *)arp_ptr;
+			sender = (__be32 *)arp_ptr;
 			arp_ptr += (arp->ar_hln + arp->ar_pln);
-			target = (unsigned int *)arp_ptr;
+			target = (__be32 *)arp_ptr;
 
 			__nat25_generate_ipv4_network_addr(networkAddr, target);
 
@@ -1074,7 +1074,7 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 	else if ((protocol == __constant_htons(ETH_P_PPP_DISC)) ||
 		 (protocol == __constant_htons(ETH_P_PPP_SES))) {
 		struct pppoe_hdr *ph = (struct pppoe_hdr *)(skb->data + ETH_HLEN);
-		unsigned short *pMagic;
+		__be16 *pMagic;
 
 		switch (method) {
 		case NAT25_CHECK:
@@ -1113,7 +1113,7 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 						tag->tag_len = htons(MAGIC_CODE_LEN + RTL_RELAY_TAG_LEN + old_tag_len);
 
 						/* insert the magic_code+client mac in relay tag */
-						pMagic = (unsigned short *)tag->tag_data;
+						pMagic = (__be16 *)tag->tag_data;
 						*pMagic = htons(MAGIC_CODE);
 						memcpy(tag->tag_data + MAGIC_CODE_LEN, skb->data + ETH_ALEN, ETH_ALEN);
 
@@ -1176,7 +1176,7 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 						return -1;
 					}
 
-					pMagic = (unsigned short *)tag->tag_data;
+					pMagic = (__be16 *)tag->tag_data;
 					if (ntohs(*pMagic) != MAGIC_CODE) {
 						DEBUG_ERR("Can't find MAGIC_CODE in %s packet!\n",
 							(ph->code == PADO_CODE ? "PADO" : "PADS"));
@@ -1302,9 +1302,9 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 						struct icmp6hdr  *hdr = (struct icmp6hdr *)(skb->data + ETH_HLEN + sizeof(*iph));
 						hdr->icmp6_cksum = 0;
 						hdr->icmp6_cksum = csum_ipv6_magic(&iph->saddr, &iph->daddr,
-							iph->payload_len,
+							be16_to_cpu(iph->payload_len),
 							IPPROTO_ICMPV6,
-							csum_partial((__u8 *)hdr, iph->payload_len, 0));
+							csum_partial((__u8 *)hdr, be16_to_cpu(iph->payload_len), 0));
 					}
 				}
 			}
@@ -1391,9 +1391,9 @@ int nat25_handle_frame(struct adapter *priv, struct sk_buff *skb)
 				retval = nat25_db_handle(priv, skb, NAT25_LOOKUP);
 			}
 		} else {
-			if (((*((unsigned short *)(skb->data + ETH_ALEN * 2)) == __constant_htons(ETH_P_IP)) &&
+			if (((*((__be16 *)(skb->data + ETH_ALEN * 2)) == __constant_htons(ETH_P_IP)) &&
 			     !memcmp(priv->br_ip, skb->data + ETH_HLEN + 16, 4)) ||
-			    ((*((unsigned short *)(skb->data + ETH_ALEN * 2)) == __constant_htons(ETH_P_ARP)) &&
+			    ((*((__be16 *)(skb->data + ETH_ALEN * 2)) == __constant_htons(ETH_P_ARP)) &&
 			     !memcmp(priv->br_ip, skb->data + ETH_HLEN + 24, 4))) {
 				/* for traffic to upper TCP/IP */
 				retval = nat25_db_handle(priv, skb, NAT25_LOOKUP);
@@ -1490,7 +1490,7 @@ void *scdb_findEntry(struct adapter *priv, unsigned char *macAddr,
 	/* unsigned long irqL; */
 	/* _enter_critical_bh(&priv->br_ext_lock, &irqL); */
 
-	__nat25_generate_ipv4_network_addr(networkAddr, (unsigned int *)ipAddr);
+	__nat25_generate_ipv4_network_addr(networkAddr, (__be32 *)ipAddr);
 	hash = __nat25_network_hash(networkAddr);
 	db = priv->nethash[hash];
 	while (db) {

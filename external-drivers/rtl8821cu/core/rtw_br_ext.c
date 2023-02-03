@@ -17,6 +17,9 @@
 #ifdef __KERNEL__
 	#include <linux/if_arp.h>
 	#include <net/ip.h>
+//	#if (LINUX_VERSION_CODE <= KERNEL_VERSION(5, 14, 0))
+//	#include <net/ipx.h>
+//	#endif
 	#include <linux/atalk.h>
 	#include <linux/udp.h>
 	#include <linux/if_pppox.h>
@@ -167,6 +170,41 @@ static void __nat25_generate_ipv4_network_addr(unsigned char *networkAddr,
 	memcpy(networkAddr + 7, (unsigned char *)ipAddr, 4);
 }
 
+/* The following 3 functions are no longer used
+
+static void __nat25_generate_ipx_network_addr_with_node(unsigned char *networkAddr,
+		unsigned int *ipxNetAddr, unsigned char *ipxNodeAddr)
+{
+	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
+
+	networkAddr[0] = NAT25_IPX;
+	memcpy(networkAddr + 1, (unsigned char *)ipxNetAddr, 4);
+	memcpy(networkAddr + 5, ipxNodeAddr, 6);
+}
+
+
+static void __nat25_generate_ipx_network_addr_with_socket(unsigned char *networkAddr,
+		unsigned int *ipxNetAddr, unsigned short *ipxSocketAddr)
+{
+	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
+
+	networkAddr[0] = NAT25_IPX;
+	memcpy(networkAddr + 1, (unsigned char *)ipxNetAddr, 4);
+	memcpy(networkAddr + 5, (unsigned char *)ipxSocketAddr, 2);
+}
+
+
+static void __nat25_generate_apple_network_addr(unsigned char *networkAddr,
+		unsigned short *network, unsigned char *node)
+{
+	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
+
+	networkAddr[0] = NAT25_APPLE;
+	memcpy(networkAddr + 1, (unsigned char *)network, 2);
+	networkAddr[3] = *node;
+}
+
+*/
 
 static void __nat25_generate_pppoe_network_addr(unsigned char *networkAddr,
 		unsigned char *ac_mac, unsigned short *sid)

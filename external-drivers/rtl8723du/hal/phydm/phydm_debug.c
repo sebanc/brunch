@@ -1742,32 +1742,26 @@ phydm_cmd_parser(
 	case PHYDM_ANTDIV:
 
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
+			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
 
-				/*PHYDM_SNPRINTF((output+used, out_len-used, "new SET, PATHDIV_var[%d]= (( %d ))\n", i, var1[i]));*/
-				input_idx++;
-			}
+			/*PHYDM_SNPRINTF((output+used, out_len-used, "new SET, PATHDIV_var[%d]= (( %d ))\n", i, var1[i]));*/
+			input_idx++;
 		}
 		break;
 	case PHYDM_PATHDIV:
 
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
+			input_idx++;
 		}
 		break;
 
 	case PHYDM_DEBUG:
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
+			PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
 
-				/*PHYDM_SNPRINTF((output+used, out_len-used, "new SET, Debug_var[%d]= (( %d ))\n", i, var1[i]));*/
-				input_idx++;
-			}
+			/*PHYDM_SNPRINTF((output+used, out_len-used, "new SET, Debug_var[%d]= (( %d ))\n", i, var1[i]));*/
+			input_idx++;
 		}
 
 		if (input_idx >= 1) {
@@ -1778,10 +1772,8 @@ phydm_cmd_parser(
 	case PHYDM_FW_DEBUG:
 
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
+			input_idx++;
 		}
 
 		if (input_idx >= 1)
@@ -1792,12 +1784,10 @@ phydm_cmd_parser(
 	case PHYDM_SUPPORT_ABILITY:
 
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
+			PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
 
-				/*PHYDM_SNPRINTF((output+used, out_len-used, "new SET, support ablity_var[%d]= (( %d ))\n", i, var1[i]));*/
-				input_idx++;
-			}
+			/*PHYDM_SNPRINTF((output+used, out_len-used, "new SET, support ablity_var[%d]= (( %d ))\n", i, var1[i]));*/
+			input_idx++;
 		}
 
 		if (input_idx >= 1) {
@@ -1824,18 +1814,14 @@ phydm_cmd_parser(
 	case PHYDM_IQK_DEBUG:
 
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
+			input_idx++;
 		}
 		break;
 	case PHYDM_SMART_ANT:
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
+			input_idx++;
 		}
 
 		if (input_idx >= 1) {
@@ -1864,10 +1850,8 @@ phydm_cmd_parser(
 		bool		is_enable_dbg_mode;
 
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
+			input_idx++;
 		}
 
 		if ((strcmp(input[1], help) == 0)) {
@@ -1890,26 +1874,20 @@ phydm_cmd_parser(
 	break;
 
 	case PHYDM_TRX_PATH:
-
 		for (i = 0; i < 4; i++) {
-			if (input[i + 1])
-				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
+			PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
 		}
 		phydm_config_trx_path(p_dm, (u32 *)var1, &used, output, &out_len);
-
 		break;
-
 	case PHYDM_LA_MODE:
 		PHYDM_SNPRINTF((output + used, out_len - used, "This IC doesn't support LA mode\n"));
 		break;
 	case PHYDM_DUMP_REG:
 	{
-		u8	type = 0;
+		u8	type;
 
-		if (input[1]) {
-			PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
-			type = (u8)var1[0];
-		}
+		PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
+		type = (u8)var1[0];
 
 		if (type == 0)
 			phydm_dump_bb_reg(p_dm, &used, output, &out_len);
@@ -1926,14 +1904,11 @@ phydm_cmd_parser(
 		break;
 	case PHYDM_NBI_EN:
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
+			input_idx++;
 		}
 
 		if (input_idx >= 1) {
-
 			phydm_api_debug(p_dm, PHYDM_API_NBI, (u32 *)var1, &used, output, &out_len);
 			/**/
 		}
@@ -1944,10 +1919,8 @@ phydm_cmd_parser(
 	case PHYDM_CSI_MASK_EN:
 
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
+			input_idx++;
 		}
 
 		if (input_idx >= 1) {
@@ -2091,7 +2064,7 @@ phydm_cmd_parser(
 
 		phydm_bb_debug_info(p_dm, &used, output, &out_len);
 
-		if (p_dm->support_ic_type & ODM_RTL8822B && input[1]) {
+		if (p_dm->support_ic_type & ODM_RTL8822B) {
 			PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
 			odm_set_bb_reg(p_dm, 0x1988, 0x003fff00, var1[0]);
 			value32 = odm_get_bb_reg(p_dm, 0xf84, MASKDWORD);
@@ -2108,10 +2081,8 @@ phydm_cmd_parser(
 	case PHYDM_H2C:
 
 		for (i = 0; i < 8; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
+			input_idx++;
 		}
 
 		if (input_idx >= 1)
@@ -2123,10 +2094,8 @@ phydm_cmd_parser(
 	case PHYDM_ANT_SWITCH:
 
 		for (i = 0; i < 8; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
+			input_idx++;
 		}
 
 		if (input_idx >= 1) {
@@ -2194,8 +2163,7 @@ phydm_cmd_parser(
 		
 	case PHYDM_DIS_HTSTF_CONTROL:
 		{
-			if (input[1])
-				PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
+			PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
 
 			if (var1[0] == 1) {
 				
@@ -2219,10 +2187,8 @@ phydm_cmd_parser(
 	case PHYDM_ADAPTIVITY_DEBUG:
 
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
-				PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
-				input_idx++;
-			}
+			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &var1[i]);
+			input_idx++;
 		}
 
 		if (input_idx >= 1)
@@ -2264,8 +2230,7 @@ phydm_cmd_parser(
 
 	case PHYDM_DIS_RXHP_CTR:
 		{
-			if (input[1])
-				PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
+			PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
 
 			if (var1[0] == 1) {
 				/* the setting being on is at debug mode to disconnect RxHP seeting with SoML on/odd */

@@ -1713,8 +1713,7 @@ phydm_dig_debug(
 		PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
 
 		for (i = 1; i < 10; i++) {
-			if (input[i + 1])
-				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
+			PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var1[i]);
 		}
 
 		if (var1[0] == 0) {

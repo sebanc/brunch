@@ -8995,7 +8995,7 @@ static u32 rtw_append_assoc_req_owe_ie(_adapter *adapter, u8 *pbuf)
 	if (sec == NULL)
 		goto exit;
 
-	if (sec->owe_ie && sec->owe_ie_len > 0) {
+	if (sec->owe_ie_len > 0) {
 		len = sec->owe_ie_len;
 		_rtw_memcpy(pbuf, sec->owe_ie, len);
 	}
@@ -16655,4 +16655,3 @@ exit:
 	return _SUCCESS;
 #endif /* CONFIG_IOCTL_CFG80211 */
 }
-

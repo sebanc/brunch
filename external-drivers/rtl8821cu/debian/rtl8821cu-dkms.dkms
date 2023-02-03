@@ -1,0 +1,7 @@
+PACKAGE_NAME="rtl8821cu"
+PACKAGE_VERSION="#MODULE_VERSION#"
+BUILT_MODULE_NAME[0]="8821cu"
+MAKE="'make' ${parallel_jobs+-j$parallel_jobs} all KVER=${kernelver}"
+CLEAN="'make' clean"
+DEST_MODULE_LOCATION[0]="/updates/dkms"
+AUTOINSTALL="YES"

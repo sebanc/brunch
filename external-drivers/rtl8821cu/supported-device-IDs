@@ -31,6 +31,8 @@ ID 0BDA:C80C
 Seller specific IDs
 
 ID 2001:331d  -  D-Link DWA-171C
+ID 7392:C811  -  Edimax
+ID 7392:D811  -  Edimax
 
 If your adapter matches one of the default or seller specific
 IDs then this is the driver to use.

@@ -12208,6 +12208,7 @@ static void rtw_mlmeext_disconnect(_adapter *padapter)
 		self_action = MLME_STA_DISCONNECTED;
 	else if (MLME_IS_ADHOC(padapter) || MLME_IS_ADHOC_MASTER(padapter))
 		self_action = MLME_ADHOC_STOPPED;
+/* nrm */
 #ifdef CONFIG_WIFI_MONITOR
 	else if (MLME_IS_MONITOR(padapter))
 		self_action = MLME_ACTION_NONE;

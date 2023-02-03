@@ -204,7 +204,6 @@ struct center_chs_ent_t center_chs_5g_by_bw[] = {
  */
 u8 rtw_get_scch_by_cch_offset(u8 cch, u8 bw, u8 offset)
 {
-	int i;
 	u8 t_cch = 0;
 
 	if (bw == CHANNEL_WIDTH_20) {
@@ -470,7 +469,6 @@ bool rtw_chbw_to_freq_range(u8 ch, u8 bw, u8 offset, u32 *hi, u32 *lo)
 	u8 c_ch;
 	u32 freq;
 	u32 hi_ret = 0, lo_ret = 0;
-	int i;
 	bool valid = _FALSE;
 
 	if (hi)
@@ -509,22 +507,24 @@ exit:
 	return valid;
 }
 
-const char *const _ch_width_str[] = {
+const char *const _ch_width_str[CHANNEL_WIDTH_MAX] = {
 	"20MHz",
 	"40MHz",
 	"80MHz",
 	"160MHz",
 	"80_80MHz",
-	"CHANNEL_WIDTH_MAX",
+	"5MHz",
+	"10MHz",
 };
 
-const u8 _ch_width_to_bw_cap[] = {
+const u8 _ch_width_to_bw_cap[CHANNEL_WIDTH_MAX] = {
 	BW_CAP_20M,
 	BW_CAP_40M,
 	BW_CAP_80M,
 	BW_CAP_160M,
 	BW_CAP_80_80M,
-	0,
+	BW_CAP_5M,
+	BW_CAP_10M,
 };
 
 const char *const _band_str[] = {
@@ -565,461 +565,6 @@ const u8 _rf_type_to_rf_rx_cnt[] = {
 	1, /*RF_TYPE_MAX*/
 };
 
-#ifdef CONFIG_80211AC_VHT
-#define COUNTRY_CHPLAN_ASSIGN_EN_11AC(_val) , .en_11ac = (_val)
-#else
-#define COUNTRY_CHPLAN_ASSIGN_EN_11AC(_val)
-#endif
-
-#if RTW_DEF_MODULE_REGULATORY_CERT
-#define COUNTRY_CHPLAN_ASSIGN_DEF_MODULE_FLAGS(_val) , .def_module_flags = (_val)
-#else
-#define COUNTRY_CHPLAN_ASSIGN_DEF_MODULE_FLAGS(_val)
-#endif
-
-/* has def_module_flags specified, used by common map and HAL dfference map */
-#define COUNTRY_CHPLAN_ENT(_alpha2, _chplan, _en_11ac, _def_module_flags) \
-	{.alpha2 = (_alpha2), .chplan = (_chplan) \
-		COUNTRY_CHPLAN_ASSIGN_EN_11AC(_en_11ac) \
-		COUNTRY_CHPLAN_ASSIGN_DEF_MODULE_FLAGS(_def_module_flags) \
-	}
-
-#ifdef CONFIG_CUSTOMIZED_COUNTRY_CHPLAN_MAP
-
-#include "../platform/custom_country_chplan.h"
-
-#elif RTW_DEF_MODULE_REGULATORY_CERT
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8821AE_HMC_M2) /* 2013 certify */
-static const struct country_chplan RTL8821AE_HMC_M2_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("CA", 0x34, 1, 0x3FB), /* Canada */
-	COUNTRY_CHPLAN_ENT("CL", 0x30, 1, 0x3F1), /* Chile */
-	COUNTRY_CHPLAN_ENT("CN", 0x51, 1, 0x3FB), /* China */
-	COUNTRY_CHPLAN_ENT("MX", 0x34, 1, 0x3F1), /* Mexico */
-	COUNTRY_CHPLAN_ENT("MY", 0x47, 1, 0x3F1), /* Malaysia */
-	COUNTRY_CHPLAN_ENT("TW", 0x39, 1, 0x3FF), /* Taiwan */
-	COUNTRY_CHPLAN_ENT("UA", 0x36, 0, 0x3FB), /* Ukraine */
-	COUNTRY_CHPLAN_ENT("US", 0x34, 1, 0x3FF), /* United States of America (USA) */
-};
-#endif
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8821AU) /* 2014 certify */
-static const struct country_chplan RTL8821AU_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("CA", 0x34, 1, 0x3FB), /* Canada */
-	COUNTRY_CHPLAN_ENT("RU", 0x59, 0, 0x3FB), /* Russia(fac/gost), Kaliningrad */
-	COUNTRY_CHPLAN_ENT("TW", 0x39, 1, 0x3FF), /* Taiwan */
-	COUNTRY_CHPLAN_ENT("UA", 0x36, 0, 0x3FB), /* Ukraine */
-	COUNTRY_CHPLAN_ENT("US", 0x34, 1, 0x3FF), /* United States of America (USA) */
-};
-#endif
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8812AENF_NGFF) /* 2014 certify */
-static const struct country_chplan RTL8812AENF_NGFF_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("TW", 0x39, 1, 0x3FF), /* Taiwan */
-	COUNTRY_CHPLAN_ENT("US", 0x34, 1, 0x3FF), /* United States of America (USA) */
-};
-#endif
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8812AEBT_HMC) /* 2013 certify */
-static const struct country_chplan RTL8812AEBT_HMC_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("CA", 0x34, 1, 0x3FB), /* Canada */
-	COUNTRY_CHPLAN_ENT("RU", 0x59, 0, 0x3FB), /* Russia(fac/gost), Kaliningrad */
-	COUNTRY_CHPLAN_ENT("TW", 0x39, 1, 0x3FF), /* Taiwan */
-	COUNTRY_CHPLAN_ENT("UA", 0x36, 0, 0x3FB), /* Ukraine */
-	COUNTRY_CHPLAN_ENT("US", 0x34, 1, 0x3FF), /* United States of America (USA) */
-};
-#endif
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8188EE_HMC_M2) /* 2012 certify */
-static const struct country_chplan RTL8188EE_HMC_M2_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("CA", 0x20, 1, 0x3FB), /* Canada */
-	COUNTRY_CHPLAN_ENT("MX", 0x34, 1, 0x3F1), /* Mexico */
-	COUNTRY_CHPLAN_ENT("TW", 0x39, 1, 0x3FF), /* Taiwan */
-	COUNTRY_CHPLAN_ENT("US", 0x34, 1, 0x3FF), /* United States of America (USA) */
-};
-#endif
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8723BE_HMC_M2) /* 2013 certify */
-static const struct country_chplan RTL8723BE_HMC_M2_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("CA", 0x20, 1, 0x3FB), /* Canada */
-	COUNTRY_CHPLAN_ENT("MX", 0x34, 1, 0x3F1), /* Mexico */
-	COUNTRY_CHPLAN_ENT("TW", 0x39, 1, 0x3FF), /* Taiwan */
-	COUNTRY_CHPLAN_ENT("US", 0x34, 1, 0x3FF), /* United States of America (USA) */
-};
-#endif
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8723BS_NGFF1216) /* 2014 certify */
-static const struct country_chplan RTL8723BS_NGFF1216_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("CA", 0x20, 1, 0x3FB), /* Canada */
-	COUNTRY_CHPLAN_ENT("MX", 0x34, 1, 0x3F1), /* Mexico */
-	COUNTRY_CHPLAN_ENT("TW", 0x39, 1, 0x3FF), /* Taiwan */
-	COUNTRY_CHPLAN_ENT("US", 0x34, 1, 0x3FF), /* United States of America (USA) */
-};
-#endif
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8192EEBT_HMC_M2) /* 2013 certify */
-static const struct country_chplan RTL8192EEBT_HMC_M2_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("CA", 0x20, 1, 0x3FB), /* Canada */
-	COUNTRY_CHPLAN_ENT("MX", 0x34, 1, 0x3F1), /* Mexico */
-	COUNTRY_CHPLAN_ENT("TW", 0x39, 1, 0x3FF), /* Taiwan */
-	COUNTRY_CHPLAN_ENT("US", 0x34, 1, 0x3FF), /* United States of America (USA) */
-};
-#endif
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8723DE_NGFF1630) /* 2016 certify */
-static const struct country_chplan RTL8723DE_NGFF1630_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("CA", 0x2A, 1, 0x3FB), /* Canada */
-	COUNTRY_CHPLAN_ENT("MX", 0x34, 1, 0x3F1), /* Mexico */
-};
-#endif
-
-#if (RTW_DEF_MODULE_REGULATORY_CERT & RTW_MODULE_RTL8822BE) /* 2016 certify */
-static const struct country_chplan RTL8822BE_country_chplan_exc_map[] = {
-	COUNTRY_CHPLAN_ENT("CL", 0x30, 1, 0x3F1), /* Chile */
-};
-#endif
-
-/**
- * rtw_def_module_get_chplan_from_country -
- * @country_code: string of country code
- * @return:
- * Return NULL for case referring to common map
- */
-static const struct country_chplan *rtw_def_module_get_chplan_from_country(const char *country_code)
-{
-	const struct country_chplan *ent = NULL;
-	const struct country_chplan *hal_map = NULL;
-	u16 hal_map_sz = 0;
-	int i;
-
-	/* TODO: runtime selection for multi driver */
-#if (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8821AE_HMC_M2)
-	hal_map = RTL8821AE_HMC_M2_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8821AE_HMC_M2_country_chplan_exc_map) / sizeof(struct country_chplan);
-#elif (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8821AU)
-	hal_map = RTL8821AU_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8821AU_country_chplan_exc_map) / sizeof(struct country_chplan);
-#elif (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8812AENF_NGFF)
-	hal_map = RTL8812AENF_NGFF_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8812AENF_NGFF_country_chplan_exc_map) / sizeof(struct country_chplan);
-#elif (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8812AEBT_HMC)
-	hal_map = RTL8812AEBT_HMC_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8812AEBT_HMC_country_chplan_exc_map) / sizeof(struct country_chplan);
-#elif (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8188EE_HMC_M2)
-	hal_map = RTL8188EE_HMC_M2_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8188EE_HMC_M2_country_chplan_exc_map) / sizeof(struct country_chplan);
-#elif (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8723BE_HMC_M2)
-	hal_map = RTL8723BE_HMC_M2_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8723BE_HMC_M2_country_chplan_exc_map) / sizeof(struct country_chplan);
-#elif (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8723BS_NGFF1216)
-	hal_map = RTL8723BS_NGFF1216_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8723BS_NGFF1216_country_chplan_exc_map) / sizeof(struct country_chplan);
-#elif (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8192EEBT_HMC_M2)
-	hal_map = RTL8192EEBT_HMC_M2_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8192EEBT_HMC_M2_country_chplan_exc_map) / sizeof(struct country_chplan);
-#elif (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8723DE_NGFF1630)
-	hal_map = RTL8723DE_NGFF1630_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8723DE_NGFF1630_country_chplan_exc_map) / sizeof(struct country_chplan);
-#elif (RTW_DEF_MODULE_REGULATORY_CERT == RTW_MODULE_RTL8822BE)
-	hal_map = RTL8822BE_country_chplan_exc_map;
-	hal_map_sz = sizeof(RTL8822BE_country_chplan_exc_map) / sizeof(struct country_chplan);
-#endif
-
-	if (hal_map == NULL || hal_map_sz == 0)
-		goto exit;
-
-	for (i = 0; i < hal_map_sz; i++) {
-		if (strncmp(country_code, hal_map[i].alpha2, 2) == 0) {
-			ent = &hal_map[i];
-			break;
-		}
-	}
-
-exit:
-	return ent;
-}
-#endif /* CONFIG_CUSTOMIZED_COUNTRY_CHPLAN_MAP or RTW_DEF_MODULE_REGULATORY_CERT */
-
-static const struct country_chplan country_chplan_map[] = {
-	COUNTRY_CHPLAN_ENT("AD", 0x26, 1, 0x000), /* Andorra */
-	COUNTRY_CHPLAN_ENT("AE", 0x26, 1, 0x3FB), /* United Arab Emirates */
-	COUNTRY_CHPLAN_ENT("AF", 0x42, 1, 0x000), /* Afghanistan */
-	COUNTRY_CHPLAN_ENT("AG", 0x26, 1, 0x000), /* Antigua & Barbuda */
-	COUNTRY_CHPLAN_ENT("AI", 0x26, 1, 0x000), /* Anguilla(UK) */
-	COUNTRY_CHPLAN_ENT("AL", 0x26, 1, 0x3F1), /* Albania */
-	COUNTRY_CHPLAN_ENT("AM", 0x26, 1, 0x2B0), /* Armenia */
-	COUNTRY_CHPLAN_ENT("AN", 0x26, 1, 0x3F1), /* Netherlands Antilles */
-	COUNTRY_CHPLAN_ENT("AO", 0x47, 1, 0x2E0), /* Angola */
-	COUNTRY_CHPLAN_ENT("AQ", 0x26, 1, 0x000), /* Antarctica */
-	COUNTRY_CHPLAN_ENT("AR", 0x57, 1, 0x3F3), /* Argentina */
-	COUNTRY_CHPLAN_ENT("AS", 0x34, 1, 0x000), /* American Samoa */
-	COUNTRY_CHPLAN_ENT("AT", 0x26, 1, 0x3FB), /* Austria */
-	COUNTRY_CHPLAN_ENT("AU", 0x45, 1, 0x3FB), /* Australia */
-	COUNTRY_CHPLAN_ENT("AW", 0x34, 1, 0x0B0), /* Aruba */
-	COUNTRY_CHPLAN_ENT("AZ", 0x26, 1, 0x3F1), /* Azerbaijan */
-	COUNTRY_CHPLAN_ENT("BA", 0x26, 1, 0x3F1), /* Bosnia & Herzegovina */
-	COUNTRY_CHPLAN_ENT("BB", 0x34, 1, 0x250), /* Barbados */
-	COUNTRY_CHPLAN_ENT("BD", 0x26, 1, 0x3F1), /* Bangladesh */
-	COUNTRY_CHPLAN_ENT("BE", 0x26, 1, 0x3FB), /* Belgium */
-	COUNTRY_CHPLAN_ENT("BF", 0x26, 1, 0x2B0), /* Burkina Faso */
-	COUNTRY_CHPLAN_ENT("BG", 0x26, 1, 0x3F1), /* Bulgaria */
-	COUNTRY_CHPLAN_ENT("BH", 0x47, 1, 0x3F1), /* Bahrain */
-	COUNTRY_CHPLAN_ENT("BI", 0x26, 1, 0x2B0), /* Burundi */
-	COUNTRY_CHPLAN_ENT("BJ", 0x26, 1, 0x2B0), /* Benin */
-	COUNTRY_CHPLAN_ENT("BN", 0x47, 1, 0x210), /* Brunei */
-	COUNTRY_CHPLAN_ENT("BO", 0x73, 1, 0x3F1), /* Bolivia */
-	COUNTRY_CHPLAN_ENT("BR", 0x34, 1, 0x3F1), /* Brazil */
-	COUNTRY_CHPLAN_ENT("BS", 0x34, 1, 0x220), /* Bahamas */
-	COUNTRY_CHPLAN_ENT("BW", 0x26, 1, 0x2F1), /* Botswana */
-	COUNTRY_CHPLAN_ENT("BY", 0x26, 1, 0x3F1), /* Belarus */
-	COUNTRY_CHPLAN_ENT("BZ", 0x34, 1, 0x000), /* Belize */
-	COUNTRY_CHPLAN_ENT("CA", 0x2B, 1, 0x3FB), /* Canada */
-	COUNTRY_CHPLAN_ENT("CC", 0x26, 1, 0x000), /* Cocos (Keeling) Islands (Australia) */
-	COUNTRY_CHPLAN_ENT("CD", 0x26, 1, 0x2B0), /* Congo, Republic of the */
-	COUNTRY_CHPLAN_ENT("CF", 0x26, 1, 0x2B0), /* Central African Republic */
-	COUNTRY_CHPLAN_ENT("CG", 0x26, 1, 0x2B0), /* Congo, Democratic Republic of the. Zaire */
-	COUNTRY_CHPLAN_ENT("CH", 0x26, 1, 0x3FB), /* Switzerland */
-	COUNTRY_CHPLAN_ENT("CI", 0x26, 1, 0x3F1), /* Cote d'Ivoire */
-	COUNTRY_CHPLAN_ENT("CK", 0x26, 1, 0x000), /* Cook Islands */
-	COUNTRY_CHPLAN_ENT("CL", 0x73, 1, 0x3F1), /* Chile */
-	COUNTRY_CHPLAN_ENT("CM", 0x26, 1, 0x2B0), /* Cameroon */
-	COUNTRY_CHPLAN_ENT("CN", 0x48, 1, 0x3FB), /* China */
-	COUNTRY_CHPLAN_ENT("CO", 0x34, 1, 0x3F1), /* Colombia */
-	COUNTRY_CHPLAN_ENT("CR", 0x34, 1, 0x3F1), /* Costa Rica */
-	COUNTRY_CHPLAN_ENT("CV", 0x26, 1, 0x2B0), /* Cape Verde */
-	COUNTRY_CHPLAN_ENT("CX", 0x45, 1, 0x000), /* Christmas Island (Australia) */
-	COUNTRY_CHPLAN_ENT("CY", 0x26, 1, 0x3FB), /* Cyprus */
-	COUNTRY_CHPLAN_ENT("CZ", 0x26, 1, 0x3FB), /* Czech Republic */
-	COUNTRY_CHPLAN_ENT("DE", 0x26, 1, 0x3FB), /* Germany */
-	COUNTRY_CHPLAN_ENT("DJ", 0x26, 1, 0x280), /* Djibouti */
-	COUNTRY_CHPLAN_ENT("DK", 0x26, 1, 0x3FB), /* Denmark */
-	COUNTRY_CHPLAN_ENT("DM", 0x34, 1, 0x000), /* Dominica */
-	COUNTRY_CHPLAN_ENT("DO", 0x34, 1, 0x3F1), /* Dominican Republic */
-	COUNTRY_CHPLAN_ENT("DZ", 0x26, 1, 0x3F1), /* Algeria */
-	COUNTRY_CHPLAN_ENT("EC", 0x34, 1, 0x3F1), /* Ecuador */
-	COUNTRY_CHPLAN_ENT("EE", 0x26, 1, 0x3FB), /* Estonia */
-	COUNTRY_CHPLAN_ENT("EG", 0x47, 0, 0x3F1), /* Egypt */
-	COUNTRY_CHPLAN_ENT("EH", 0x47, 1, 0x280), /* Western Sahara */
-	COUNTRY_CHPLAN_ENT("ER", 0x26, 1, 0x000), /* Eritrea */
-	COUNTRY_CHPLAN_ENT("ES", 0x26, 1, 0x3FB), /* Spain, Canary Islands, Ceuta, Melilla */
-	COUNTRY_CHPLAN_ENT("ET", 0x26, 1, 0x0B0), /* Ethiopia */
-	COUNTRY_CHPLAN_ENT("FI", 0x26, 1, 0x3FB), /* Finland */
-	COUNTRY_CHPLAN_ENT("FJ", 0x34, 1, 0x200), /* Fiji */
-	COUNTRY_CHPLAN_ENT("FK", 0x26, 1, 0x000), /* Falkland Islands (Islas Malvinas) (UK) */
-	COUNTRY_CHPLAN_ENT("FM", 0x34, 1, 0x000), /* Micronesia, Federated States of (USA) */
-	COUNTRY_CHPLAN_ENT("FO", 0x26, 1, 0x000), /* Faroe Islands (Denmark) */
-	COUNTRY_CHPLAN_ENT("FR", 0x26, 1, 0x3FB), /* France */
-	COUNTRY_CHPLAN_ENT("GA", 0x26, 1, 0x2B0), /* Gabon */
-	COUNTRY_CHPLAN_ENT("GB", 0x26, 1, 0x3FB), /* Great Britain (United Kingdom; England) */
-	COUNTRY_CHPLAN_ENT("GD", 0x34, 1, 0x0B0), /* Grenada */
-	COUNTRY_CHPLAN_ENT("GE", 0x26, 1, 0x200), /* Georgia */
-	COUNTRY_CHPLAN_ENT("GF", 0x26, 1, 0x080), /* French Guiana */
-	COUNTRY_CHPLAN_ENT("GG", 0x26, 1, 0x000), /* Guernsey (UK) */
-	COUNTRY_CHPLAN_ENT("GH", 0x26, 1, 0x3F1), /* Ghana */
-	COUNTRY_CHPLAN_ENT("GI", 0x26, 1, 0x200), /* Gibraltar (UK) */
-	COUNTRY_CHPLAN_ENT("GL", 0x26, 1, 0x200), /* Greenland (Denmark) */
-	COUNTRY_CHPLAN_ENT("GM", 0x26, 1, 0x2B0), /* Gambia */
-	COUNTRY_CHPLAN_ENT("GN", 0x26, 1, 0x210), /* Guinea */
-	COUNTRY_CHPLAN_ENT("GP", 0x26, 1, 0x200), /* Guadeloupe (France) */
-	COUNTRY_CHPLAN_ENT("GQ", 0x26, 1, 0x2B0), /* Equatorial Guinea */
-	COUNTRY_CHPLAN_ENT("GR", 0x26, 1, 0x3FB), /* Greece */
-	COUNTRY_CHPLAN_ENT("GS", 0x26, 1, 0x000), /* South Georgia and the Sandwich Islands (UK) */
-	COUNTRY_CHPLAN_ENT("GT", 0x34, 1, 0x3F1), /* Guatemala */
-	COUNTRY_CHPLAN_ENT("GU", 0x34, 1, 0x200), /* Guam (USA) */
-	COUNTRY_CHPLAN_ENT("GW", 0x26, 1, 0x2B0), /* Guinea-Bissau */
-	COUNTRY_CHPLAN_ENT("GY", 0x44, 1, 0x000), /* Guyana */
-	COUNTRY_CHPLAN_ENT("HK", 0x26, 1, 0x3FB), /* Hong Kong */
-	COUNTRY_CHPLAN_ENT("HM", 0x45, 1, 0x000), /* Heard and McDonald Islands (Australia) */
-	COUNTRY_CHPLAN_ENT("HN", 0x32, 1, 0x3F1), /* Honduras */
-	COUNTRY_CHPLAN_ENT("HR", 0x26, 1, 0x3F9), /* Croatia */
-	COUNTRY_CHPLAN_ENT("HT", 0x34, 1, 0x250), /* Haiti */
-	COUNTRY_CHPLAN_ENT("HU", 0x26, 1, 0x3FB), /* Hungary */
-	COUNTRY_CHPLAN_ENT("ID", 0x54, 0, 0x3F3), /* Indonesia */
-	COUNTRY_CHPLAN_ENT("IE", 0x26, 1, 0x3FB), /* Ireland */
-	COUNTRY_CHPLAN_ENT("IL", 0x47, 1, 0x3F1), /* Israel */
-	COUNTRY_CHPLAN_ENT("IM", 0x26, 1, 0x000), /* Isle of Man (UK) */
-	COUNTRY_CHPLAN_ENT("IN", 0x48, 1, 0x3F1), /* India */
-	COUNTRY_CHPLAN_ENT("IQ", 0x26, 1, 0x000), /* Iraq */
-	COUNTRY_CHPLAN_ENT("IR", 0x26, 0, 0x000), /* Iran */
-	COUNTRY_CHPLAN_ENT("IS", 0x26, 1, 0x3FB), /* Iceland */
-	COUNTRY_CHPLAN_ENT("IT", 0x26, 1, 0x3FB), /* Italy */
-	COUNTRY_CHPLAN_ENT("JE", 0x26, 1, 0x000), /* Jersey (UK) */
-	COUNTRY_CHPLAN_ENT("JM", 0x51, 1, 0x3F1), /* Jamaica */
-	COUNTRY_CHPLAN_ENT("JO", 0x49, 1, 0x3FB), /* Jordan */
-	COUNTRY_CHPLAN_ENT("JP", 0x27, 1, 0x3FF), /* Japan- Telec */
-	COUNTRY_CHPLAN_ENT("KE", 0x47, 1, 0x3F9), /* Kenya */
-	COUNTRY_CHPLAN_ENT("KG", 0x26, 1, 0x3F1), /* Kyrgyzstan */
-	COUNTRY_CHPLAN_ENT("KH", 0x26, 1, 0x3F1), /* Cambodia */
-	COUNTRY_CHPLAN_ENT("KI", 0x26, 1, 0x000), /* Kiribati */
-	COUNTRY_CHPLAN_ENT("KN", 0x34, 1, 0x000), /* Saint Kitts and Nevis */
-	COUNTRY_CHPLAN_ENT("KR", 0x28, 1, 0x3FB), /* South Korea */
-	COUNTRY_CHPLAN_ENT("KW", 0x47, 1, 0x3FB), /* Kuwait */
-	COUNTRY_CHPLAN_ENT("KY", 0x34, 1, 0x000), /* Cayman Islands (UK) */
-	COUNTRY_CHPLAN_ENT("KZ", 0x26, 1, 0x300), /* Kazakhstan */
-	COUNTRY_CHPLAN_ENT("LA", 0x26, 1, 0x000), /* Laos */
-	COUNTRY_CHPLAN_ENT("LB", 0x26, 1, 0x3F1), /* Lebanon */
-	COUNTRY_CHPLAN_ENT("LC", 0x34, 1, 0x000), /* Saint Lucia */
-	COUNTRY_CHPLAN_ENT("LI", 0x26, 1, 0x3FB), /* Liechtenstein */
-	COUNTRY_CHPLAN_ENT("LK", 0x26, 1, 0x3F1), /* Sri Lanka */
-	COUNTRY_CHPLAN_ENT("LR", 0x26, 1, 0x2B0), /* Liberia */
-	COUNTRY_CHPLAN_ENT("LS", 0x26, 1, 0x3F1), /* Lesotho */
-	COUNTRY_CHPLAN_ENT("LT", 0x26, 1, 0x3FB), /* Lithuania */
-	COUNTRY_CHPLAN_ENT("LU", 0x26, 1, 0x3FB), /* Luxembourg */
-	COUNTRY_CHPLAN_ENT("LV", 0x26, 1, 0x3FB), /* Latvia */
-	COUNTRY_CHPLAN_ENT("LY", 0x26, 1, 0x000), /* Libya */
-	COUNTRY_CHPLAN_ENT("MA", 0x47, 1, 0x3F1), /* Morocco */
-	COUNTRY_CHPLAN_ENT("MC", 0x26, 1, 0x3FB), /* Monaco */
-	COUNTRY_CHPLAN_ENT("MD", 0x26, 1, 0x3F1), /* Moldova */
-	COUNTRY_CHPLAN_ENT("ME", 0x26, 1, 0x3F1), /* Montenegro */
-	COUNTRY_CHPLAN_ENT("MF", 0x34, 1, 0x000), /* Saint Martin */
-	COUNTRY_CHPLAN_ENT("MG", 0x26, 1, 0x220), /* Madagascar */
-	COUNTRY_CHPLAN_ENT("MH", 0x34, 1, 0x000), /* Marshall Islands (USA) */
-	COUNTRY_CHPLAN_ENT("MK", 0x26, 1, 0x3F1), /* Republic of Macedonia (FYROM) */
-	COUNTRY_CHPLAN_ENT("ML", 0x26, 1, 0x2B0), /* Mali */
-	COUNTRY_CHPLAN_ENT("MM", 0x26, 1, 0x000), /* Burma (Myanmar) */
-	COUNTRY_CHPLAN_ENT("MN", 0x26, 1, 0x000), /* Mongolia */
-	COUNTRY_CHPLAN_ENT("MO", 0x26, 1, 0x200), /* Macau */
-	COUNTRY_CHPLAN_ENT("MP", 0x34, 1, 0x000), /* Northern Mariana Islands (USA) */
-	COUNTRY_CHPLAN_ENT("MQ", 0x26, 1, 0x240), /* Martinique (France) */
-	COUNTRY_CHPLAN_ENT("MR", 0x26, 1, 0x2A0), /* Mauritania */
-	COUNTRY_CHPLAN_ENT("MS", 0x26, 1, 0x000), /* Montserrat (UK) */
-	COUNTRY_CHPLAN_ENT("MT", 0x26, 1, 0x3FB), /* Malta */
-	COUNTRY_CHPLAN_ENT("MU", 0x26, 1, 0x2B0), /* Mauritius */
-	COUNTRY_CHPLAN_ENT("MV", 0x47, 1, 0x000), /* Maldives */
-	COUNTRY_CHPLAN_ENT("MW", 0x26, 1, 0x2B0), /* Malawi */
-	COUNTRY_CHPLAN_ENT("MX", 0x61, 1, 0x3F1), /* Mexico */
-	COUNTRY_CHPLAN_ENT("MY", 0x63, 1, 0x3F1), /* Malaysia */
-	COUNTRY_CHPLAN_ENT("MZ", 0x26, 1, 0x3F1), /* Mozambique */
-	COUNTRY_CHPLAN_ENT("NA", 0x26, 1, 0x300), /* Namibia */
-	COUNTRY_CHPLAN_ENT("NC", 0x26, 1, 0x000), /* New Caledonia */
-	COUNTRY_CHPLAN_ENT("NE", 0x26, 1, 0x2B0), /* Niger */
-	COUNTRY_CHPLAN_ENT("NF", 0x45, 1, 0x000), /* Norfolk Island (Australia) */
-	COUNTRY_CHPLAN_ENT("NG", 0x75, 1, 0x3F9), /* Nigeria */
-	COUNTRY_CHPLAN_ENT("NI", 0x34, 1, 0x3F1), /* Nicaragua */
-	COUNTRY_CHPLAN_ENT("NL", 0x26, 1, 0x3FB), /* Netherlands */
-	COUNTRY_CHPLAN_ENT("NO", 0x26, 1, 0x3FB), /* Norway */
-	COUNTRY_CHPLAN_ENT("NP", 0x47, 1, 0x2F0), /* Nepal */
-	COUNTRY_CHPLAN_ENT("NR", 0x26, 1, 0x000), /* Nauru */
-	COUNTRY_CHPLAN_ENT("NU", 0x45, 1, 0x000), /* Niue */
-	COUNTRY_CHPLAN_ENT("NZ", 0x45, 1, 0x3FB), /* New Zealand */
-	COUNTRY_CHPLAN_ENT("OM", 0x26, 1, 0x3F9), /* Oman */
-	COUNTRY_CHPLAN_ENT("PA", 0x34, 1, 0x3F1), /* Panama */
-	COUNTRY_CHPLAN_ENT("PE", 0x34, 1, 0x3F1), /* Peru */
-	COUNTRY_CHPLAN_ENT("PF", 0x26, 1, 0x000), /* French Polynesia (France) */
-	COUNTRY_CHPLAN_ENT("PG", 0x26, 1, 0x3F1), /* Papua New Guinea */
-	COUNTRY_CHPLAN_ENT("PH", 0x26, 1, 0x3F1), /* Philippines */
-	COUNTRY_CHPLAN_ENT("PK", 0x51, 1, 0x3F1), /* Pakistan */
-	COUNTRY_CHPLAN_ENT("PL", 0x26, 1, 0x3FB), /* Poland */
-	COUNTRY_CHPLAN_ENT("PM", 0x26, 1, 0x000), /* Saint Pierre and Miquelon (France) */
-	COUNTRY_CHPLAN_ENT("PR", 0x34, 1, 0x3F1), /* Puerto Rico */
-	COUNTRY_CHPLAN_ENT("PT", 0x26, 1, 0x3FB), /* Portugal */
-	COUNTRY_CHPLAN_ENT("PW", 0x34, 1, 0x000), /* Palau */
-	COUNTRY_CHPLAN_ENT("PY", 0x34, 1, 0x3F1), /* Paraguay */
-	COUNTRY_CHPLAN_ENT("QA", 0x51, 1, 0x3F9), /* Qatar */
-	COUNTRY_CHPLAN_ENT("RE", 0x26, 1, 0x000), /* Reunion (France) */
-	COUNTRY_CHPLAN_ENT("RO", 0x26, 1, 0x3F1), /* Romania */
-	COUNTRY_CHPLAN_ENT("RS", 0x26, 1, 0x3F1), /* Serbia, Kosovo */
-	COUNTRY_CHPLAN_ENT("RU", 0x59, 1, 0x3FB), /* Russia(fac/gost), Kaliningrad */
-	COUNTRY_CHPLAN_ENT("RW", 0x26, 1, 0x2B0), /* Rwanda */
-	COUNTRY_CHPLAN_ENT("SA", 0x26, 1, 0x3FB), /* Saudi Arabia */
-	COUNTRY_CHPLAN_ENT("SB", 0x26, 1, 0x000), /* Solomon Islands */
-	COUNTRY_CHPLAN_ENT("SC", 0x34, 1, 0x290), /* Seychelles */
-	COUNTRY_CHPLAN_ENT("SE", 0x26, 1, 0x3FB), /* Sweden */
-	COUNTRY_CHPLAN_ENT("SG", 0x26, 1, 0x3FB), /* Singapore */
-	COUNTRY_CHPLAN_ENT("SH", 0x26, 1, 0x000), /* Saint Helena (UK) */
-	COUNTRY_CHPLAN_ENT("SI", 0x26, 1, 0x3FB), /* Slovenia */
-	COUNTRY_CHPLAN_ENT("SJ", 0x26, 1, 0x000), /* Svalbard (Norway) */
-	COUNTRY_CHPLAN_ENT("SK", 0x26, 1, 0x3FB), /* Slovakia */
-	COUNTRY_CHPLAN_ENT("SL", 0x26, 1, 0x2B0), /* Sierra Leone */
-	COUNTRY_CHPLAN_ENT("SM", 0x26, 1, 0x000), /* San Marino */
-	COUNTRY_CHPLAN_ENT("SN", 0x26, 1, 0x3F1), /* Senegal */
-	COUNTRY_CHPLAN_ENT("SO", 0x26, 1, 0x000), /* Somalia */
-	COUNTRY_CHPLAN_ENT("SR", 0x74, 1, 0x000), /* Suriname */
-	COUNTRY_CHPLAN_ENT("ST", 0x34, 1, 0x280), /* Sao Tome and Principe */
-	COUNTRY_CHPLAN_ENT("SV", 0x30, 1, 0x3F1), /* El Salvador */
-	COUNTRY_CHPLAN_ENT("SX", 0x34, 1, 0x000), /* Sint Marteen */
-	COUNTRY_CHPLAN_ENT("SZ", 0x26, 1, 0x020), /* Swaziland */
-	COUNTRY_CHPLAN_ENT("TC", 0x26, 1, 0x000), /* Turks and Caicos Islands (UK) */
-	COUNTRY_CHPLAN_ENT("TD", 0x26, 1, 0x2B0), /* Chad */
-	COUNTRY_CHPLAN_ENT("TF", 0x26, 1, 0x280), /* French Southern and Antarctic Lands (FR Southern Territories) */
-	COUNTRY_CHPLAN_ENT("TG", 0x26, 1, 0x2B0), /* Togo */
-	COUNTRY_CHPLAN_ENT("TH", 0x26, 1, 0x3F1), /* Thailand */
-	COUNTRY_CHPLAN_ENT("TJ", 0x26, 1, 0x240), /* Tajikistan */
-	COUNTRY_CHPLAN_ENT("TK", 0x45, 1, 0x000), /* Tokelau */
-	COUNTRY_CHPLAN_ENT("TM", 0x26, 1, 0x000), /* Turkmenistan */
-	COUNTRY_CHPLAN_ENT("TN", 0x47, 1, 0x3F1), /* Tunisia */
-	COUNTRY_CHPLAN_ENT("TO", 0x26, 1, 0x000), /* Tonga */
-	COUNTRY_CHPLAN_ENT("TR", 0x26, 1, 0x3F1), /* Turkey, Northern Cyprus */
-	COUNTRY_CHPLAN_ENT("TT", 0x42, 1, 0x3F1), /* Trinidad & Tobago */
-	COUNTRY_CHPLAN_ENT("TW", 0x76, 1, 0x3FF), /* Taiwan */
-	COUNTRY_CHPLAN_ENT("TZ", 0x26, 1, 0x2F0), /* Tanzania */
-	COUNTRY_CHPLAN_ENT("UA", 0x36, 1, 0x3FB), /* Ukraine */
-	COUNTRY_CHPLAN_ENT("UG", 0x26, 1, 0x2F1), /* Uganda */
-	COUNTRY_CHPLAN_ENT("US", 0x76, 1, 0x3FF), /* United States of America (USA) */
-	COUNTRY_CHPLAN_ENT("UY", 0x30, 1, 0x3F1), /* Uruguay */
-	COUNTRY_CHPLAN_ENT("UZ", 0x47, 1, 0x2F0), /* Uzbekistan */
-	COUNTRY_CHPLAN_ENT("VA", 0x26, 1, 0x000), /* Holy See (Vatican City) */
-	COUNTRY_CHPLAN_ENT("VC", 0x34, 1, 0x010), /* Saint Vincent and the Grenadines */
-	COUNTRY_CHPLAN_ENT("VE", 0x30, 1, 0x3F1), /* Venezuela */
-	COUNTRY_CHPLAN_ENT("VI", 0x34, 1, 0x000), /* United States Virgin Islands (USA) */
-	COUNTRY_CHPLAN_ENT("VN", 0x26, 1, 0x3F1), /* Vietnam */
-	COUNTRY_CHPLAN_ENT("VU", 0x26, 1, 0x000), /* Vanuatu */
-	COUNTRY_CHPLAN_ENT("WF", 0x26, 1, 0x000), /* Wallis and Futuna (France) */
-	COUNTRY_CHPLAN_ENT("WS", 0x34, 1, 0x000), /* Samoa */
-	COUNTRY_CHPLAN_ENT("YE", 0x26, 1, 0x040), /* Yemen */
-	COUNTRY_CHPLAN_ENT("YT", 0x26, 1, 0x280), /* Mayotte (France) */
-	COUNTRY_CHPLAN_ENT("ZA", 0x26, 1, 0x3F1), /* South Africa */
-	COUNTRY_CHPLAN_ENT("ZM", 0x26, 1, 0x2B0), /* Zambia */
-	COUNTRY_CHPLAN_ENT("ZW", 0x26, 1, 0x3F1), /* Zimbabwe */
-};
-
-/*
-* rtw_get_chplan_from_country -
-* @country_code: string of country code
-*
-* Return pointer of struct country_chplan entry or NULL when unsupported country_code is given
-*/
-const struct country_chplan *rtw_get_chplan_from_country(const char *country_code)
-{
-	const struct country_chplan *ent = NULL;
-	const struct country_chplan *map = NULL;
-	u16 map_sz = 0;
-	char code[2];
-	int i;
-
-	code[0] = alpha_to_upper(country_code[0]);
-	code[1] = alpha_to_upper(country_code[1]);
-
-#if !defined(CONFIG_CUSTOMIZED_COUNTRY_CHPLAN_MAP) && RTW_DEF_MODULE_REGULATORY_CERT
-	ent = rtw_def_module_get_chplan_from_country(code);
-	if (ent != NULL)
-		goto exit;
-#endif
-
-#ifdef CONFIG_CUSTOMIZED_COUNTRY_CHPLAN_MAP
-	map = CUSTOMIZED_country_chplan_map;
-	map_sz = sizeof(CUSTOMIZED_country_chplan_map) / sizeof(struct country_chplan);
-#else
-	map = country_chplan_map;
-	map_sz = sizeof(country_chplan_map) / sizeof(struct country_chplan);
-#endif
-
-	for (i = 0; i < map_sz; i++) {
-		if (strncmp(code, map[i].alpha2, 2) == 0) {
-			ent = &map[i];
-			break;
-		}
-	}
-
-exit:
-	#if RTW_DEF_MODULE_REGULATORY_CERT
-	if (ent && !(COUNTRY_CHPLAN_DEF_MODULE_FALGS(ent) & RTW_DEF_MODULE_REGULATORY_CERT))
-		ent = NULL;
-	#endif
-
-	return ent;
-}
-
 const char *const _regd_str[] = {
 	"NONE",
 	"FCC",
@@ -1027,10 +572,12 @@ const char *const _regd_str[] = {
 	"ETSI",
 	"IC",
 	"KCC",
+	"ACMA",
+	"CHILE",
 	"WW",
 };
 
-#ifdef CONFIG_TXPWR_LIMIT
+#if CONFIG_TXPWR_LIMIT
 void _dump_regd_exc_list(void *sel, struct rf_ctl_t *rfctl)
 {
 	struct regd_exc_ent *ent;
@@ -1046,7 +593,7 @@ void _dump_regd_exc_list(void *sel, struct rf_ctl_t *rfctl)
 	head = &rfctl->reg_exc_list;
 	cur = get_next(head);
 
-	while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+	while (head != cur) {
 		u8 has_country;
 
 		ent = LIST_CONTAINOR(cur, struct regd_exc_ent, list);
@@ -1090,9 +637,9 @@ void rtw_regd_exc_add_with_nlen(struct rf_ctl_t *rfctl, const char *country, u8 
 
 	_rtw_init_listhead(&ent->list);
 	if (country)
-		_rtw_memcpy(ent->country, country, 2);
+		memcpy(ent->country, country, 2);
 	ent->domain = domain;
-	_rtw_memcpy(ent->regd_name, regd_name, nlen);
+	memcpy(ent->regd_name, regd_name, nlen);
 
 	_enter_critical_mutex(&rfctl->txpwr_lmt_mutex, &irqL);
 
@@ -1119,7 +666,7 @@ struct regd_exc_ent *_rtw_regd_exc_search(struct rf_ctl_t *rfctl, const char *co
 	head = &rfctl->reg_exc_list;
 	cur = get_next(head);
 
-	while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+	while (head != cur) {
 		u8 has_country;
 
 		ent = LIST_CONTAINOR(cur, struct regd_exc_ent, list);
@@ -1147,7 +694,6 @@ struct regd_exc_ent *_rtw_regd_exc_search(struct rf_ctl_t *rfctl, const char *co
 		break;
 	}
 
-exit:
 	if (match)
 		return ent;
 	else
@@ -1177,7 +723,7 @@ void rtw_regd_exc_list_free(struct rf_ctl_t *rfctl)
 	head = &rfctl->reg_exc_list;
 	cur = get_next(head);
 
-	while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+	while (head != cur) {
 		ent = LIST_CONTAINOR(cur, struct regd_exc_ent, list);
 		cur = get_next(cur);
 		rtw_list_delete(&ent->list);
@@ -1190,10 +736,12 @@ void rtw_regd_exc_list_free(struct rf_ctl_t *rfctl)
 
 void dump_txpwr_lmt(void *sel, _adapter *adapter)
 {
+#define TMP_STR_LEN 16
 	struct rf_ctl_t *rfctl = adapter_to_rfctl(adapter);
 	struct hal_spec_t *hal_spec = GET_HAL_SPEC(adapter);
 	_irqL irqL;
 	char fmt[16];
+	char tmp_str[TMP_STR_LEN];
 	s8 *lmt_idx = NULL;
 	int bw, band, ch_num, tlrs, ntx_idx, rs, i, path;
 	u8 ch, n, rfpath_num;
@@ -1321,21 +869,21 @@ void dump_txpwr_lmt(void *sel, _adapter *adapter)
 
 					head = &rfctl->txpwr_lmt_list;
 					cur = get_next(head);
-					while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+					while (head != cur) {
 						ent = LIST_CONTAINOR(cur, struct txpwr_lmt_ent, list);
 						cur = get_next(cur);
 
-						sprintf(fmt, "%%%zus%%s ", strlen(ent->regd_name) < 4 ? 5 - strlen(ent->regd_name) : 1);
-						_RTW_PRINT_SEL(sel, fmt
+						sprintf(fmt, "%%%zus%%s ", strlen(ent->regd_name) >= 6 ? 1 : 6 - strlen(ent->regd_name));
+						snprintf(tmp_str, TMP_STR_LEN, fmt
 							, strcmp(ent->regd_name, rfctl->regd_name) == 0 ? "*" : ""
-							, ent->regd_name
-						);
+							, ent->regd_name);
+						_RTW_PRINT_SEL(sel, "%s", tmp_str);
 					}
-					sprintf(fmt, "%%%zus%%s ", strlen(regd_str(TXPWR_LMT_WW)) < 4 ? 5 - strlen(regd_str(TXPWR_LMT_WW)) : 1);
-					_RTW_PRINT_SEL(sel, fmt
+					sprintf(fmt, "%%%zus%%s ", strlen(regd_str(TXPWR_LMT_WW)) >= 6 ? 1 : 6 - strlen(regd_str(TXPWR_LMT_WW)));
+					snprintf(tmp_str, TMP_STR_LEN, fmt
 						, strcmp(rfctl->regd_name, regd_str(TXPWR_LMT_WW)) == 0 ? "*" : ""
-						, regd_str(TXPWR_LMT_WW)
-					);
+						, regd_str(TXPWR_LMT_WW));
+					_RTW_PRINT_SEL(sel, "%s", tmp_str);
 
 					/* header for limit offset */
 					for (path = 0; path < RF_PATH_MAX; path++) {
@@ -1344,7 +892,7 @@ void dump_txpwr_lmt(void *sel, _adapter *adapter)
 						_RTW_PRINT_SEL(sel, "|");
 						head = &rfctl->txpwr_lmt_list;
 						cur = get_next(head);
-						while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+						while (head != cur) {
 							ent = LIST_CONTAINOR(cur, struct txpwr_lmt_ent, list);
 							cur = get_next(cur);
 							_RTW_PRINT_SEL(sel, "%3c "
@@ -1374,35 +922,45 @@ void dump_txpwr_lmt(void *sel, _adapter *adapter)
 						RTW_PRINT_SEL(sel, "%3u ", ch);
 						head = &rfctl->txpwr_lmt_list;
 						cur = get_next(head);
-						while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+						while (head != cur) {
 							ent = LIST_CONTAINOR(cur, struct txpwr_lmt_ent, list);
 							cur = get_next(cur);
 							lmt = phy_get_txpwr_lmt_abs(adapter, ent->regd_name, band, bw, tlrs, ntx_idx, ch, 0);
-							if (lmt == MAX_POWER_INDEX) {
-								sprintf(fmt, "%%%zus ", strlen(ent->regd_name) >= 5 ? strlen(ent->regd_name) + 1 : 5);
-								_RTW_PRINT_SEL(sel, fmt, "NA");
-							} else {
-								if (lmt % 2) {
-									sprintf(fmt, "%%%zud.5 ", strlen(ent->regd_name) >= 5 ? strlen(ent->regd_name) - 1 : 3);
-									_RTW_PRINT_SEL(sel, fmt, lmt / 2);
-								} else {
-									sprintf(fmt, "%%%zud ", strlen(ent->regd_name) >= 5 ? strlen(ent->regd_name) + 1 : 5);
-									_RTW_PRINT_SEL(sel, fmt, lmt / 2);
-								}
+							if (lmt == hal_spec->txgi_max) {
+								sprintf(fmt, "%%%zus ", strlen(ent->regd_name) >= 6 ? strlen(ent->regd_name) + 1 : 6);
+								snprintf(tmp_str, TMP_STR_LEN, fmt, "NA");
+								_RTW_PRINT_SEL(sel, "%s", tmp_str);
+							} else if (lmt > -hal_spec->txgi_pdbm && lmt < 0) { /* -0.xx */
+								sprintf(fmt, "%%%zus-0.%%d ", strlen(ent->regd_name) >= 6 ? strlen(ent->regd_name) - 4 : 1);
+								snprintf(tmp_str, TMP_STR_LEN, fmt, "", (rtw_abs(lmt) % hal_spec->txgi_pdbm) * 100 / hal_spec->txgi_pdbm);
+								_RTW_PRINT_SEL(sel, "%s", tmp_str);
+							} else if (lmt % hal_spec->txgi_pdbm) { /* d.xx */
+								sprintf(fmt, "%%%zud.%%d ", strlen(ent->regd_name) >= 6 ? strlen(ent->regd_name) - 2 : 3);
+								snprintf(tmp_str, TMP_STR_LEN, fmt, lmt / hal_spec->txgi_pdbm, (rtw_abs(lmt) % hal_spec->txgi_pdbm) * 100 / hal_spec->txgi_pdbm);
+								_RTW_PRINT_SEL(sel, "%s", tmp_str);
+							} else { /* d */
+								sprintf(fmt, "%%%zud ", strlen(ent->regd_name) >= 6 ? strlen(ent->regd_name) + 1 : 6);
+								snprintf(tmp_str, TMP_STR_LEN, fmt, lmt / hal_spec->txgi_pdbm);
+								_RTW_PRINT_SEL(sel, "%s", tmp_str);
 							}
 						}
 						lmt = phy_get_txpwr_lmt_abs(adapter, regd_str(TXPWR_LMT_WW), band, bw, tlrs, ntx_idx, ch, 0);
-						if (lmt == MAX_POWER_INDEX) {
-							sprintf(fmt, "%%%zus ", strlen(regd_str(TXPWR_LMT_WW)) >= 5 ? strlen(regd_str(TXPWR_LMT_WW)) + 1 : 5);
-							_RTW_PRINT_SEL(sel, fmt, "NA");
-						} else {
-							if (lmt % 2) {
-								sprintf(fmt, "%%%zud.5 ", strlen(regd_str(TXPWR_LMT_WW)) >= 5 ? strlen(regd_str(TXPWR_LMT_WW)) - 1 : 3);
-								_RTW_PRINT_SEL(sel, fmt, lmt / 2);
-							} else {
-								sprintf(fmt, "%%%zud ", strlen(regd_str(TXPWR_LMT_WW)) >= 5 ? strlen(regd_str(TXPWR_LMT_WW)) + 1 : 5);
-								_RTW_PRINT_SEL(sel, fmt, lmt / 2);
-							}
+						if (lmt == hal_spec->txgi_max) {
+							sprintf(fmt, "%%%zus ", strlen(regd_str(TXPWR_LMT_WW)) >= 6 ? strlen(regd_str(TXPWR_LMT_WW)) + 1 : 6);
+							snprintf(tmp_str, TMP_STR_LEN, fmt, "NA");
+							_RTW_PRINT_SEL(sel, "%s", tmp_str);
+						} else if (lmt > -hal_spec->txgi_pdbm && lmt < 0) { /* -0.xx */
+							sprintf(fmt, "%%%zus-0.%%d ", strlen(regd_str(TXPWR_LMT_WW)) >= 6 ? strlen(regd_str(TXPWR_LMT_WW)) - 4 : 1);
+							snprintf(tmp_str, TMP_STR_LEN, fmt, "", (rtw_abs(lmt) % hal_spec->txgi_pdbm) * 100 / hal_spec->txgi_pdbm);
+							_RTW_PRINT_SEL(sel, "%s", tmp_str);
+						} else if (lmt % hal_spec->txgi_pdbm) { /* d.xx */
+							sprintf(fmt, "%%%zud.%%d ", strlen(regd_str(TXPWR_LMT_WW)) >= 6 ? strlen(regd_str(TXPWR_LMT_WW)) - 2 : 3);
+							snprintf(tmp_str, TMP_STR_LEN, fmt, lmt / hal_spec->txgi_pdbm, (rtw_abs(lmt) % hal_spec->txgi_pdbm) * 100 / hal_spec->txgi_pdbm);
+							_RTW_PRINT_SEL(sel, "%s", tmp_str);
+						} else { /* d */
+							sprintf(fmt, "%%%zud ", strlen(regd_str(TXPWR_LMT_WW)) >= 6 ? strlen(regd_str(TXPWR_LMT_WW)) + 1 : 6);
+							snprintf(tmp_str, TMP_STR_LEN, fmt, lmt / hal_spec->txgi_pdbm);
+							_RTW_PRINT_SEL(sel, "%s", tmp_str);
 						}
 
 						/* dump limit offset of each path */
@@ -1416,12 +974,12 @@ void dump_txpwr_lmt(void *sel, _adapter *adapter)
 							head = &rfctl->txpwr_lmt_list;
 							cur = get_next(head);
 							i = 0;
-							while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+							while (head != cur) {
 								ent = LIST_CONTAINOR(cur, struct txpwr_lmt_ent, list);
 								cur = get_next(cur);
 								lmt_offset = phy_get_txpwr_lmt(adapter, ent->regd_name, band, bw, path, rs, ntx_idx, ch, 0);
-								if (lmt_offset == MAX_POWER_INDEX) {
-									*(lmt_idx + i * RF_PATH_MAX + path) = MAX_POWER_INDEX;
+								if (lmt_offset == hal_spec->txgi_max) {
+									*(lmt_idx + i * RF_PATH_MAX + path) = hal_spec->txgi_max;
 									_RTW_PRINT_SEL(sel, "%3s ", "NA");
 								} else {
 									*(lmt_idx + i * RF_PATH_MAX + path) = lmt_offset + base;
@@ -1430,7 +988,7 @@ void dump_txpwr_lmt(void *sel, _adapter *adapter)
 								i++;
 							}
 							lmt_offset = phy_get_txpwr_lmt(adapter, regd_str(TXPWR_LMT_WW), band, bw, path, rs, ntx_idx, ch, 0);
-							if (lmt_offset == MAX_POWER_INDEX)
+							if (lmt_offset == hal_spec->txgi_max)
 								_RTW_PRINT_SEL(sel, "%3s ", "NA");
 							else
 								_RTW_PRINT_SEL(sel, "%3d ", lmt_offset);
@@ -1472,6 +1030,7 @@ release_lock:
 void rtw_txpwr_lmt_add_with_nlen(struct rf_ctl_t *rfctl, const char *regd_name, u32 nlen
 	, u8 band, u8 bw, u8 tlrs, u8 ntx_idx, u8 ch_idx, s8 lmt)
 {
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(dvobj_get_primary_adapter(rfctl_to_dvobj(rfctl)));
 	struct txpwr_lmt_ent *ent;
 	_irqL irqL;
 	_list *cur, *head;
@@ -1487,7 +1046,7 @@ void rtw_txpwr_lmt_add_with_nlen(struct rf_ctl_t *rfctl, const char *regd_name, 
 	/* search for existed entry */
 	head = &rfctl->txpwr_lmt_list;
 	cur = get_next(head);
-	while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+	while (head != cur) {
 		ent = LIST_CONTAINOR(cur, struct txpwr_lmt_ent, list);
 		cur = get_next(cur);
 
@@ -1497,12 +1056,12 @@ void rtw_txpwr_lmt_add_with_nlen(struct rf_ctl_t *rfctl, const char *regd_name, 
 	}
 
 	/* alloc new one */
-	ent = (struct txpwr_lmt_ent *)rtw_zvmalloc(sizeof(struct txpwr_lmt_ent) + nlen + 1);
+	ent = (struct txpwr_lmt_ent *)vzalloc(sizeof(struct txpwr_lmt_ent) + nlen + 1);
 	if (!ent)
 		goto release_lock;
 
 	_rtw_init_listhead(&ent->list);
-	_rtw_memcpy(ent->regd_name, regd_name, nlen);
+	memcpy(ent->regd_name, regd_name, nlen);
 	{
 		u8 j, k, l, m;
 
@@ -1510,13 +1069,13 @@ void rtw_txpwr_lmt_add_with_nlen(struct rf_ctl_t *rfctl, const char *regd_name, 
 			for (k = 0; k < TXPWR_LMT_RS_NUM_2G; ++k)
 				for (m = 0; m < CENTER_CH_2G_NUM; ++m)
 					for (l = 0; l < MAX_TX_COUNT; ++l)
-						ent->lmt_2g[j][k][m][l] = MAX_POWER_INDEX;
+						ent->lmt_2g[j][k][m][l] = hal_spec->txgi_max;
 		#ifdef CONFIG_IEEE80211_BAND_5GHZ
 		for (j = 0; j < MAX_5G_BANDWIDTH_NUM; ++j)
 			for (k = 0; k < TXPWR_LMT_RS_NUM_5G; ++k)
 				for (m = 0; m < CENTER_CH_5G_ALL_NUM; ++m)
 					for (l = 0; l < MAX_TX_COUNT; ++l)
-						ent->lmt_5g[j][k][m][l] = MAX_POWER_INDEX;
+						ent->lmt_5g[j][k][m][l] = hal_spec->txgi_max;
 		#endif
 	}
 
@@ -1533,7 +1092,7 @@ chk_lmt_val:
 	else
 		goto release_lock;
 
-	if (pre_lmt != MAX_POWER_INDEX)
+	if (pre_lmt != hal_spec->txgi_max)
 		RTW_PRINT("duplicate txpwr_lmt for [%s][%s][%s][%s][%uT][%d]\n"
 			, regd_name, band_str(band), ch_width_str(bw), txpwr_lmt_rs_str(tlrs), ntx_idx + 1
 			, band == BAND_ON_2_4G ? ch_idx + 1 : center_ch_5g_all[ch_idx]);
@@ -1575,7 +1134,7 @@ struct txpwr_lmt_ent *_rtw_txpwr_lmt_get_by_name(struct rf_ctl_t *rfctl, const c
 	head = &rfctl->txpwr_lmt_list;
 	cur = get_next(head);
 
-	while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+	while (head != cur) {
 		ent = LIST_CONTAINOR(cur, struct txpwr_lmt_ent, list);
 		cur = get_next(cur);
 
@@ -1613,13 +1172,13 @@ void rtw_txpwr_lmt_list_free(struct rf_ctl_t *rfctl)
 	head = &rfctl->txpwr_lmt_list;
 	cur = get_next(head);
 
-	while ((rtw_end_of_queue_search(head, cur)) == _FALSE) {
+	while (head != cur) {
 		ent = LIST_CONTAINOR(cur, struct txpwr_lmt_ent, list);
 		cur = get_next(cur);
 		if (ent->regd_name == rfctl->regd_name)
 			rfctl->regd_name = regd_str(TXPWR_LMT_NONE);
 		rtw_list_delete(&ent->list);
-		rtw_vmfree((u8 *)ent, sizeof(struct txpwr_lmt_ent) + strlen(ent->regd_name) + 1);
+		vfree(ent);
 	}
 	rfctl->txpwr_regd_num = 0;
 
@@ -1654,7 +1213,6 @@ s8 rtw_rf_get_kfree_tx_gain_offset(_adapter *padapter, u8 path, u8 ch)
 	s8 kfree_offset = 0;
 
 #ifdef CONFIG_RF_POWER_TRIM
-	HAL_DATA_TYPE *hal_data = GET_HAL_DATA(padapter);
 	struct kfree_data_t *kfree_data = GET_KFREE_DATA(padapter);
 	s8 bb_gain_sel = rtw_ch_to_bb_gain_sel(ch);
 
@@ -1680,7 +1238,9 @@ exit:
 
 void rtw_rf_set_tx_gain_offset(_adapter *adapter, u8 path, s8 offset)
 {
+#if !defined(CONFIG_RTL8814A) && !defined(CONFIG_RTL8822B) && !defined(CONFIG_RTL8821C)
 	u8 write_value;
+#endif
 	u8 target_path = 0;
 	u32 val32 = 0;
 
@@ -1719,6 +1279,12 @@ void rtw_rf_set_tx_gain_offset(_adapter *adapter, u8 path, s8 offset)
 		rtw_hal_write_rfreg(adapter, target_path, 0x55, 0x0fc000, write_value);
 		break;
 #endif /* CONFIG_RTL8188F */
+#ifdef CONFIG_RTL8188GTV
+	case RTL8188GTV:
+		write_value = RF_TX_GAIN_OFFSET_8188GTV(offset);
+		rtw_hal_write_rfreg(adapter, target_path, 0x55, 0x0fc000, write_value);
+		break;
+#endif /* CONFIG_RTL8188GTV */
 #ifdef CONFIG_RTL8192E
 	case RTL8192E:
 		write_value = RF_TX_GAIN_OFFSET_8192E(offset);
@@ -1732,10 +1298,11 @@ void rtw_rf_set_tx_gain_offset(_adapter *adapter, u8 path, s8 offset)
 		rtw_hal_write_rfreg(adapter, target_path, 0x55, 0x0f8000, write_value);
 		break;
 #endif /* CONFIG_RTL8821A */
-#if defined(CONFIG_RTL8814A) || defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C)
+#if defined(CONFIG_RTL8814A) || defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8192F)
 	case RTL8814A:
 	case RTL8822B:
 	case RTL8821C:
+	case RTL8192F:
 		RTW_INFO("\nkfree by PhyDM on the sw CH. path %d\n", path);
 		break;
 #endif /* CONFIG_RTL8814A || CONFIG_RTL8822B || CONFIG_RTL8821C */
@@ -1774,34 +1341,6 @@ void rtw_rf_apply_tx_gain_offset(_adapter *adapter, u8 ch)
 		total_offset = kfree_offset + tx_pwr_track_offset;
 		rtw_rf_set_tx_gain_offset(adapter, i, total_offset);
 	}
-}
-
-inline u8 rtw_is_5g_band1(u8 ch)
-{
-	if (ch >= 36 && ch <= 48)
-		return 1;
-	return 0;
-}
-
-inline u8 rtw_is_5g_band2(u8 ch)
-{
-	if (ch >= 52 && ch <= 64)
-		return 1;
-	return 0;
-}
-
-inline u8 rtw_is_5g_band3(u8 ch)
-{
-	if (ch >= 100 && ch <= 144)
-		return 1;
-	return 0;
-}
-
-inline u8 rtw_is_5g_band4(u8 ch)
-{
-	if (ch >= 149 && ch <= 177)
-		return 1;
-	return 0;
 }
 
 inline u8 rtw_is_dfs_range(u32 hi, u32 lo)

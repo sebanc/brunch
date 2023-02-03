@@ -1,4 +1,4 @@
-2021-12-03
+2022-12-27
 
 What is Concurrent Mode?
 
@@ -10,7 +10,7 @@ single WiFi adapter.
 
 For example:
 
-Use station mode (called managed or client mode also) to connect with an
+Use station mode (also called managed or client mode) to connect with an
 AP to access the internet at the same time as it also performs as an AP
 to allow other devices to connect to the second interface.
 
@@ -20,19 +20,45 @@ Note: Only supports 3 combinations
 2. Station mode + AP mode
 3. Station mode + P2P mode
 
+Note: Monitor mode is not supported.
+
 -----
 
 How do I Enable Concurrent Mode?
 
-Run the following as instructed during the installation process:
+Edit the `Makefile` with a text editor:
 
 ```
-./cmode-on.sh
+nano Makefile
+```
+
+Change the following line:
+
+```
+#EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE
+```
+
+to 
+
+```
+EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE
+```
+
+and then install the driver per the installation steps. If
+the driver is already installed, run the following first:
+
+```
+sudo ./remove-driver.sh
+```
+and then reinstall the driver with:
+
+```
+sudo ./install-driver.sh
 ```
 
 Once the driver is fully installed and you have rebooted the system, you
-can verify that this works by typing the “iw dev” command, You should
-see two wireless interfaces, and the MAC address of secondary interface
+can verify that this works by typing the “iw dev” command. You should
+see two wireless interfaces, and the MAC address of the secondary interface
 is nearly the same as the first except for one digit.
 
 -----

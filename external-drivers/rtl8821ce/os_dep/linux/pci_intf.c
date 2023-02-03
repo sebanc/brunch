@@ -25,7 +25,6 @@
 
 #endif
 
-
 #if defined(PLATFORM_LINUX) && defined(PLATFORM_WINDOWS)
 
 	#error "Shall be Linux or Windows, but not both!\n"
@@ -89,6 +88,7 @@ struct pci_device_id rtw_pci_id_tbl[] = {
 	{PCI_DEVICE(PCI_VENDER_ID_REALTEK, 0xB822), .driver_data = RTL8822B},
 #endif
 #ifdef CONFIG_RTL8821C
+	{PCI_DEVICE(PCI_VENDER_ID_REALTEK, 0xB821), .driver_data = RTL8821C},
 	{PCI_DEVICE(PCI_VENDER_ID_REALTEK, 0xC821), .driver_data = RTL8821C},
 	{PCI_DEVICE(PCI_VENDER_ID_REALTEK, 0xC82A), .driver_data = RTL8821C},
 	{PCI_DEVICE(PCI_VENDER_ID_REALTEK, 0xC82B), .driver_data = RTL8821C},
@@ -1195,9 +1195,17 @@ static struct dvobj_priv	*pci_dvobj_init(struct pci_dev *pdev, const struct pci_
 	}
 
 #ifdef CONFIG_64BIT_DMA
+	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0))
+	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64))) {
+	#else
 	if (!pci_set_dma_mask(pdev, DMA_BIT_MASK(64))) {
+	#endif
 		RTW_INFO("RTL819xCE: Using 64bit DMA\n");
+		#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0))
+		err = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(64));
+		#else
 		err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
+		#endif
 		if (err != 0) {
 			RTW_ERR("Unable to obtain 64bit DMA for consistent allocations\n");
 			goto disable_picdev;
@@ -1206,8 +1214,16 @@ static struct dvobj_priv	*pci_dvobj_init(struct pci_dev *pdev, const struct pci_
 	} else
 #endif
 	{
+		#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0))
+		if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(32))) {
+		#else
 		if (!pci_set_dma_mask(pdev, DMA_BIT_MASK(32))) {
+		#endif
+			#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0))
+			err = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+			#else
 			err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
+			#endif
 			if (err != 0) {
 				RTW_ERR("Unable to obtain 32bit DMA for consistent allocations\n");
 				goto disable_picdev;

@@ -206,7 +206,11 @@ u32 _rtw_down_sema(struct semaphore *sema)
 
 inline void thread_exit(struct completion *comp)
 {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
 	complete_and_exit(comp, 0);
+#else
+	kthread_complete_and_exit(comp, 0);
+#endif
 }
 
 void	_rtw_mutex_init(_mutex *pmutex)
@@ -856,8 +860,11 @@ int rtw_change_ifname(struct adapter *adapt, const char *ifname)
 
 	rtw_init_netdev_name(pnetdev, ifname);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	memcpy(pnetdev->dev_addr, adapter_mac_addr(adapt), ETH_ALEN);
-
+#else
+	dev_addr_set(pnetdev, adapter_mac_addr(adapt));
+#endif
 	if (rtnl_lock_needed)
 		ret = register_netdev(pnetdev);
 	else
@@ -896,7 +903,11 @@ u64 rtw_division64(u64 x, u64 y)
 inline u32 rtw_random32(void)
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+	return get_random_u32();
+#else
 	return prandom_u32();
+#endif
 #elif (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18))
 	u32 random_int;
 	get_random_bytes(&random_int , 4);

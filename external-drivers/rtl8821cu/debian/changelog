@@ -1,0 +1,11 @@
+rtl8821cu (5.12.0-2) unstable; urgency=medium
+
+  * Upstream support for kernel 6.1 and gcc-12
+
+ -- Rafael Diniz <rafael@rhizomatica.org>  Fri, 21 Oct 2022 11:41:40 +0300
+
+rtl8821cu (5.12.0-1) unstable; urgency=medium
+
+  * Sync with upstream, ready for packaging
+
+ -- Rafael Diniz <rafael@rhizomatica.org>  Tue, 27 Sep 2022 17:47:27 +0300

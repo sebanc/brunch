@@ -12,12 +12,10 @@
  * more details.
  *
  *****************************************************************************/
-#ifdef CONFIG_BT_COEXIST
-
 #include <drv_types.h>
-#include <hal_btcoex.h>
 #include <hal_data.h>
-
+#ifdef CONFIG_BT_COEXIST
+#include <hal_btcoex.h>
 
 void rtw_btcoex_Initialize(PADAPTER padapter)
 {
@@ -27,6 +25,11 @@ void rtw_btcoex_Initialize(PADAPTER padapter)
 void rtw_btcoex_PowerOnSetting(PADAPTER padapter)
 {
 	hal_btcoex_PowerOnSetting(padapter);
+}
+
+void rtw_btcoex_AntInfoSetting(PADAPTER padapter)
+{
+	hal_btcoex_AntInfoSetting(padapter);
 }
 
 void rtw_btcoex_PowerOffSetting(PADAPTER padapter)
@@ -434,7 +437,6 @@ u8 rtw_btcoex_LPS_Leave(PADAPTER padapter)
 
 	if (pwrpriv->pwr_mode != PS_MODE_ACTIVE) {
 		rtw_set_ps_mode(padapter, PS_MODE_ACTIVE, 0, 0, "BTCOEX");
-		LPS_RF_ON_check(padapter, 100);
 		pwrpriv->bpower_saving = _FALSE;
 	}
 
@@ -548,7 +550,7 @@ u8 rtw_btcoex_btinfo_cmd(_adapter *adapter, u8 *buf, u16 len)
 	pdrvextra_cmd_parm->size = len;
 	pdrvextra_cmd_parm->pbuf = btinfo;
 
-	_rtw_memcpy(btinfo, buf, len);
+	memcpy(btinfo, buf, len);
 
 	init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
 
@@ -622,7 +624,7 @@ u8 rtw_btcoex_parse_BT_info_notify_cmd(_adapter *padapter, u8 *pcmd, u16 cmdlen)
 	RTW_INFO("%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n"
 		,pcmd[4],pcmd[5],pcmd[6],pcmd[7],pcmd[8],pcmd[9],pcmd[10],pcmd[11]);*/
 
-	_rtw_memset(btinfo, 0, BT_INFO_LENGTH);
+	memset(btinfo, 0, BT_INFO_LENGTH);
 
 #if 1
 	if (BT_INFO_LENGTH != btInfoLen) {
@@ -633,7 +635,7 @@ u8 rtw_btcoex_parse_BT_info_notify_cmd(_adapter *padapter, u8 *pcmd, u16 cmdlen)
 #endif
 	{
 		if (0x1 == btInfoReason || 0x2 == btInfoReason) {
-			_rtw_memcpy(btinfo, &pcmd[4], btInfoLen);
+			memcpy(btinfo, &pcmd[4], btInfoLen);
 			btinfo[0] = btInfoReason;
 			rtw_btcoex_btinfo_cmd(padapter, btinfo, btInfoLen);
 		} else
@@ -1320,8 +1322,8 @@ void rtw_btcoex_recvmsgbysocket(void *data)
 
 		/*important: cut the udp header from skb->data! header length is 8 byte*/
 		recv_length = skb->len - 8;
-		_rtw_memset(recv_data, 0, sizeof(recv_data));
-		_rtw_memcpy(recv_data, skb->data + 8, recv_length);
+		memset(recv_data, 0, sizeof(recv_data));
+		memcpy(recv_data, skb->data + 8, recv_length);
 
 		parse_res = rtw_btcoex_parse_recv_data(recv_data, recv_length);
 #if 0
@@ -1441,7 +1443,9 @@ u8 rtw_btcoex_sendmsgbysocket(_adapter *padapter, u8 *msg, u8 msg_size, bool for
 {
 	u8 error;
 	struct msghdr	udpmsg;
+#ifdef set_fs
 	mm_segment_t	oldfs;
+#endif
 	struct iovec	iov;
 	struct bt_coex_info *pcoex_info = &padapter->coex_info;
 
@@ -1471,8 +1475,7 @@ u8 rtw_btcoex_sendmsgbysocket(_adapter *padapter, u8 *msg, u8 msg_size, bool for
 	udpmsg.msg_control	= NULL;
 	udpmsg.msg_controllen = 0;
 	udpmsg.msg_flags	= MSG_DONTWAIT | MSG_NOSIGNAL;
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
+#ifdef set_fs
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 #endif
@@ -1482,7 +1485,7 @@ u8 rtw_btcoex_sendmsgbysocket(_adapter *padapter, u8 *msg, u8 msg_size, bool for
 #else
 	error = sock_sendmsg(pcoex_info->udpsock, &udpmsg, msg_size);
 #endif
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
+#ifdef set_fs
 	set_fs(oldfs);
 #endif
 	if (error < 0) {
@@ -1513,12 +1516,12 @@ u8 rtw_btcoex_create_kernel_socket(_adapter *padapter)
 		RTW_INFO("Error during creation of socket error:%d\n", kernel_socket_err);
 		status = _FAIL;
 	} else {
-		_rtw_memset(&(pcoex_info->wifi_sockaddr), 0, sizeof(pcoex_info->wifi_sockaddr));
+		memset(&(pcoex_info->wifi_sockaddr), 0, sizeof(pcoex_info->wifi_sockaddr));
 		pcoex_info->wifi_sockaddr.sin_family = AF_INET;
 		pcoex_info->wifi_sockaddr.sin_port = htons(CONNECT_PORT);
 		pcoex_info->wifi_sockaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-		_rtw_memset(&(pcoex_info->bt_sockaddr), 0, sizeof(pcoex_info->bt_sockaddr));
+		memset(&(pcoex_info->bt_sockaddr), 0, sizeof(pcoex_info->bt_sockaddr));
 		pcoex_info->bt_sockaddr.sin_family = AF_INET;
 		pcoex_info->bt_sockaddr.sin_port = htons(CONNECT_PORT_BT);
 		pcoex_info->bt_sockaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -1567,7 +1570,7 @@ void rtw_btcoex_init_socket(_adapter *padapter)
 	struct bt_coex_info *pcoex_info = &padapter->coex_info;
 	RTW_INFO("%s\n", __func__);
 	if (_FALSE == pcoex_info->is_exist) {
-		_rtw_memset(pcoex_info, 0, sizeof(struct bt_coex_info));
+		memset(pcoex_info, 0, sizeof(struct bt_coex_info));
 		pcoex_info->btcoex_wq = create_workqueue("BTCOEX");
 		INIT_DELAYED_WORK(&pcoex_info->recvmsg_work,
 				  (void *)rtw_btcoex_recvmsgbysocket);
@@ -1647,7 +1650,7 @@ void rtw_btcoex_SendEventExtBtCoexControl(PADAPTER padapter, u8 bNeedDbgRsp, u8 
 
 	/* Return parameters starts from here */
 	pRetPar = &pEvent->Data[len];
-	_rtw_memcpy(&pRetPar[0], pData, dataLen);
+	memcpy(&pRetPar[0], pData, dataLen);
 
 	len += dataLen;
 
@@ -1689,7 +1692,7 @@ void rtw_btcoex_SendEventExtBtInfoControl(PADAPTER padapter, u8 dataLen, void *p
 
 	/* Return parameters starts from here */
 	pRetPar = &pEvent->Data[len];
-	_rtw_memcpy(&pRetPar[0], pData, dataLen);
+	memcpy(&pRetPar[0], pData, dataLen);
 
 	len += dataLen;
 
@@ -1744,3 +1747,22 @@ void rtw_btcoex_SendScanNotify(PADAPTER padapter, u8 scanType)
 }
 #endif /* CONFIG_BT_COEXIST_SOCKET_TRX */
 #endif /* CONFIG_BT_COEXIST */
+
+void rtw_btcoex_set_ant_info(PADAPTER padapter)
+{
+#ifdef CONFIG_BT_COEXIST
+	PHAL_DATA_TYPE hal = GET_HAL_DATA(padapter);
+
+	if (hal->EEPROMBluetoothCoexist == _TRUE) {
+		u8 bMacPwrCtrlOn = _FALSE;
+
+		rtw_btcoex_AntInfoSetting(padapter);
+		rtw_hal_get_hwreg(padapter, HW_VAR_APFM_ON_MAC, &bMacPwrCtrlOn);
+		if (bMacPwrCtrlOn == _TRUE)
+			rtw_btcoex_PowerOnSetting(padapter);
+	}
+	else
+#endif
+		rtw_btcoex_wifionly_AntInfoSetting(padapter);
+}
+

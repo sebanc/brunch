@@ -119,7 +119,7 @@ SwLedBlink1(
 {
 	_adapter				*padapter = pLed->padapter;
 	PHAL_DATA_TYPE		pHalData = GET_HAL_DATA(padapter);
-	struct led_priv		*ledpriv = &(padapter->ledpriv);
+	struct led_priv		*ledpriv = adapter_to_led(padapter);
 	struct mlme_priv		*pmlmepriv = &(padapter->mlmepriv);
 	PLED_USB			pLed1 = &(ledpriv->SwLed1);
 	u8					bStopBlinking = _FALSE;
@@ -507,7 +507,7 @@ SwLedBlink4(
 )
 {
 	_adapter			*padapter = pLed->padapter;
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
 	PLED_USB		pLed1 = &(ledpriv->SwLed1);
 	u8				bStopBlinking = _FALSE;
@@ -1733,7 +1733,7 @@ SwLedBlink15(
 void BlinkHandler(PLED_USB pLed)
 {
 	_adapter		*padapter = pLed->padapter;
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 
 	/* RTW_INFO("%s (%s:%d)\n",__FUNCTION__, current->comm, current->pid); */
 
@@ -1746,6 +1746,12 @@ void BlinkHandler(PLED_USB pLed)
 	}
 
 	switch (ledpriv->LedStrategy) {
+	#if CONFIG_RTW_SW_LED_TRX_DA_CLASSIFY
+	case SW_LED_MODE_UC_TRX_ONLY:
+		rtw_sw_led_blink_uc_trx_only(pLed);
+		break;
+	#endif
+
 	case SW_LED_MODE0:
 		SwLedBlink(pLed);
 		break;
@@ -1860,7 +1866,7 @@ SwLedControlMode0(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 	PLED_USB	pLed = &(ledpriv->SwLed1);
 
 	/* Decide led state */
@@ -1962,7 +1968,7 @@ SwLedControlMode1(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv		*ledpriv = &(padapter->ledpriv);
+	struct led_priv		*ledpriv = adapter_to_led(padapter);
 	PLED_USB			pLed = &(ledpriv->SwLed0);
 	struct mlme_priv		*pmlmepriv = &(padapter->mlmepriv);
 	PHAL_DATA_TYPE		pHalData = GET_HAL_DATA(padapter);
@@ -2199,7 +2205,7 @@ SwLedControlMode2(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	PLED_USB		pLed = &(ledpriv->SwLed0);
 
@@ -2338,7 +2344,7 @@ SwLedControlMode3(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	PLED_USB		pLed = &(ledpriv->SwLed0);
 
@@ -2493,7 +2499,7 @@ SwLedControlMode4(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	PLED_USB		pLed = &(ledpriv->SwLed0);
 	PLED_USB		pLed1 = &(ledpriv->SwLed1);
@@ -2798,7 +2804,7 @@ SwLedControlMode5(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(padapter);
 	PLED_USB		pLed = &(ledpriv->SwLed0);
@@ -2877,7 +2883,7 @@ SwLedControlMode6(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	PLED_USB	pLed0 = &(ledpriv->SwLed0);
 
@@ -2908,7 +2914,7 @@ SwLedControlMode7(
 	LED_CTL_MODE		 LedAction
 )
 {
-	struct led_priv	*ledpriv = &(Adapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(Adapter);
 	struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 	PLED_USB	pLed = &(ledpriv->SwLed0);
 
@@ -3047,7 +3053,7 @@ SwLedControlMode8(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(Adapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(Adapter);
 	struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 	PLED_USB	pLed0 = &(ledpriv->SwLed0);
 
@@ -3084,7 +3090,7 @@ SwLedControlMode9(
 	IN	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(Adapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(Adapter);
 	struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 	PLED_USB	pLed = &(ledpriv->SwLed0);
 	PLED_USB	pLed1 = &(ledpriv->SwLed1);
@@ -3387,7 +3393,7 @@ SwLedControlMode10(
 )
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
-	struct led_priv	*ledpriv = &(Adapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(Adapter);
 	struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 	PLED_USB	pLed = &(ledpriv->SwLed0);
 	PLED_USB	pLed1 = &(ledpriv->SwLed1);
@@ -3584,7 +3590,7 @@ SwLedControlMode11(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(Adapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(Adapter);
 	struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 	PLED_USB	pLed = &(ledpriv->SwLed0);
 
@@ -3683,7 +3689,7 @@ SwLedControlMode12(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(Adapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(Adapter);
 	struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 	PLED_USB	pLed = &(ledpriv->SwLed0);
 
@@ -3764,7 +3770,7 @@ SwLedControlMode13(
 	IN	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(Adapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(Adapter);
 	struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 	PLED_USB	pLed = &(ledpriv->SwLed0);
 
@@ -3910,7 +3916,7 @@ SwLedControlMode14(
 	IN	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(Adapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(Adapter);
 	PLED_USB	pLed = &(ledpriv->SwLed0);
 
 	switch (LedAction) {
@@ -3969,7 +3975,7 @@ SwLedControlMode15(
 	IN	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(Adapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(Adapter);
 	struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 	PLED_USB	pLed = &(ledpriv->SwLed0);
 
@@ -4118,7 +4124,7 @@ LedControlUSB(
 	LED_CTL_MODE		LedAction
 )
 {
-	struct led_priv	*ledpriv = &(padapter->ledpriv);
+	struct led_priv	*ledpriv = adapter_to_led(padapter);
 
 #if (MP_DRIVER == 1)
 	if (padapter->registrypriv.mp_mode == 1)
@@ -4139,12 +4145,6 @@ LedControlUSB(
 	/* if(priv->bInHctTest) */
 	/*	return; */
 
-#ifdef CONFIG_CONCURRENT_MODE
-	/* Only do led action for PRIMARY_ADAPTER */
-	if (padapter->adapter_type != PRIMARY_ADAPTER)
-		return;
-#endif
-
 	if ((adapter_to_pwrctl(padapter)->rf_pwrstate != rf_on &&
 	     adapter_to_pwrctl(padapter)->rfoff_reason > RF_CHANGE_BY_PS) &&
 	    (LedAction == LED_CTL_TX || LedAction == LED_CTL_RX ||
@@ -4155,6 +4155,12 @@ LedControlUSB(
 		return;
 
 	switch (ledpriv->LedStrategy) {
+	#if CONFIG_RTW_SW_LED_TRX_DA_CLASSIFY
+	case SW_LED_MODE_UC_TRX_ONLY:
+		rtw_sw_led_ctl_mode_uc_trx_only(padapter, LedAction);
+		break;
+	#endif
+
 	case SW_LED_MODE0:
 		SwLedControlMode0(padapter, LedAction);
 		break;

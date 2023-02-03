@@ -1,0 +1,38 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: rtl8821cu
+License: non-free
+Comment: There are no common place where one can download Realtek drivers.
+ Please see README.source for links and details.
+
+Files: *
+Copyright: 2007-2020 Realtek Corporation. All rights reserved
+License: GPL-2
+
+Files: hal/rtl8821c/hal8821c_fw.c
+Copyright: 2007-2020 Realtek Corporation. All rights reserved
+License: non-free
+
+License: non-free
+ Though it is stated that the file is GPL-2 licensed, this is compiled
+ BLOB firmware with no sources provided by Realtek. Thus tecnically makes
+ package non-free in terms of DFSG.
+
+License: GPL-2
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of version 2 of the GNU General
+ Public License as published by the Free Software Foundation.
+ .
+ This program is distributed in the hope that it will be
+ useful, but WITHOUT ANY WARRANTY; without even the implied
+ warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ PURPOSE.  See the GNU General Public License for more
+ details.
+ .
+ You should have received a copy of the GNU General Public
+ License along with this package; if not, write to the Free
+ Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ Boston, MA  02110-1301 USA
+ .
+ On Debian systems, the full text of the GNU General Public
+ License version 2 can be found in the file
+ `/usr/share/common-licenses/GPL-2'.

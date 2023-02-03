@@ -1743,6 +1743,7 @@ static void read_chip_version_8723d(struct adapter * adapt)
 	pHalData = GET_HAL_DATA(adapt);
 
 	value32 = rtw_read32(adapt, REG_SYS_CFG);
+
 	pHalData->version_id.ICType = CHIP_8723D;
 	pHalData->version_id.ChipType = ((value32 & RTL_ID) ? TEST_CHIP : NORMAL_CHIP);
 	pHalData->version_id.RFType = RF_TYPE_1T1R;
@@ -1956,9 +1957,9 @@ void rtl8723d_fill_fake_txdesc(
 	SET_TX_DESC_QUEUE_SEL_8723D(pDesc, QSLT_MGNT); /* Fixed queue of Mgnt queue */
 
 	/* Set NAVUSEHDR to prevent Ps-poll AId filed to be changed to error vlaue by Hw. */
-	if (IsPsPoll)
+	if (IsPsPoll) {
 		SET_TX_DESC_NAV_USE_HDR_8723D(pDesc, 1);
-	else {
+	} else {
 		SET_TX_DESC_HWSEQ_EN_8723D(pDesc, 1); /* Hw set sequence number */
 		SET_TX_DESC_HWSEQ_SEL_8723D(pDesc, 0);
 	}

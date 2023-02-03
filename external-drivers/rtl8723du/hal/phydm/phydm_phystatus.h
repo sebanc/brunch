@@ -20,7 +20,7 @@
  * ************************************************************ */
 
 __PACK struct _phy_rx_agc_info {
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8	gain: 7, trsw: 1;
 #else
 	u8	trsw: 1, gain: 7;
@@ -46,7 +46,7 @@ __PACK struct _phy_status_rpt_8192cd {
 	s8	sig_evm;
 	u8	rsvd_3;
 
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8	antsel_rx_keep_2: 1;	/*ex_intf_flg:1;*/
 	u8	sgi_en: 1;
 	u8	rxsc: 2;
@@ -69,7 +69,7 @@ struct _phy_status_rpt_8812 {
 	/*	DWORD 0*/
 	u8			gain_trsw[2];							/*path-A and path-B {TRSW, gain[6:0] }*/
 	u8			chl_num_LSB;							/*channel number[7:0]*/
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8			chl_num_MSB: 2;							/*channel number[9:8]*/
 	u8			sub_chnl: 4;								/*sub-channel location[3:0]*/
 	u8			r_RFMOD: 2;								/*RF mode[1:0]*/
@@ -82,7 +82,7 @@ struct _phy_status_rpt_8812 {
 	/*	DWORD 1*/
 	u8			pwdb_all;								/*CCK signal quality / OFDM pwdb all*/
 	s8			cfosho[2];		/*DW1 byte 1 DW1 byte2	CCK AGC report and CCK_BB_Power / OFDM path-A and path-B short CFO*/
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	/*this should be checked again because the definition of 8812 and 8814 is different*/
 	/*	u8			r_cck_rx_enable_pathc:2;					cck rx enable pathc[1:0]*/
 	/*	u8			cck_rx_path:4;							cck rx path[3:0]*/
@@ -94,7 +94,7 @@ struct _phy_status_rpt_8812 {
 #endif
 
 	/*	DWORD 2*/
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8			ant_div_sw_a: 1;							/*8812A: ant_div_sw_a    8814A: 1'b0*/
 	u8			ant_div_sw_b: 1;							/*8812A: ant_div_sw_b    8814A: 1'b0*/
 	u8			bt_RF_ch_LSB: 6;						/*8812A: 6'b0                   8814A: bt rf channel keep[5:0]*/
@@ -113,7 +113,7 @@ struct _phy_status_rpt_8812 {
 
 	/*	DWORD 4*/
 	u8			PCTS_MSK_RPT_2;						/*PCTS mask report[23:16]*/
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8			PCTS_MSK_RPT_3: 6;						/*PCTS mask report[29:24]*/
 	u8			pcts_rpt_valid: 1;							/*pcts_rpt_valid*/
 	u8			resvd_1: 1;								/*1'b0*/
@@ -130,7 +130,7 @@ struct _phy_status_rpt_8812 {
 
 	/*	DWORD 6*/
 	s8			sigevm;									/*signal field EVM*/
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8			antidx_antc: 3;							/*8812A: 3'b0		8814A: antidx_antc[2:0]*/
 	u8			antidx_antd: 3;							/*8812A: 3'b0		8814A: antidx_antd[2:0]*/
 	u8			dpdt_ctrl_keep: 1;						/*8812A: 1'b0		8814A: dpdt_ctrl_keep*/
@@ -141,7 +141,7 @@ struct _phy_status_rpt_8812 {
 	u8			antidx_antd: 3;
 	u8			antidx_antc: 3;
 #endif
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8			antidx_anta: 3;							/*antidx_anta[2:0]*/
 	u8			antidx_antb: 3;							/*antidx_antb[2:0]*/
 	u8			hw_antsw_occur: 2;								/*1'b0*/
@@ -157,7 +157,7 @@ __PACK struct _phy_status_rpt_jaguar2_type0 {
 	/* DW0 */
 	u8		page_num;
 	u8		pwdb;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		gain: 6;
 	u8		rsvd_0: 1;
 	u8		trsw: 1;
@@ -170,7 +170,7 @@ __PACK struct _phy_status_rpt_jaguar2_type0 {
 
 	/* DW1 */
 	u8		rsvd_2;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		rxsc: 4;
 	u8		agc_table: 4;
 #else
@@ -182,7 +182,7 @@ __PACK struct _phy_status_rpt_jaguar2_type0 {
 
 	/* DW2 */
 	u16		length;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		antidx_a: 3;
 	u8		antidx_b: 3;
 	u8		rsvd_3: 2;
@@ -200,7 +200,7 @@ __PACK struct _phy_status_rpt_jaguar2_type0 {
 
 	/* DW3 */
 	u8		signal_quality;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		vga:5;
 	u8		lna_l:3;
 	u8		bb_power:6;
@@ -229,7 +229,7 @@ __PACK struct _phy_status_rpt_jaguar2_type1 {
 	/* DW0 and DW1 */
 	u8		page_num;
 	u8		pwdb[4];
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		l_rxsc: 4;
 	u8		ht_rxsc: 4;
 #else
@@ -237,7 +237,7 @@ __PACK struct _phy_status_rpt_jaguar2_type1 {
 	u8		l_rxsc: 4;
 #endif
 	u8		channel;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		band: 2;
 	u8		rsvd_0: 1;
 	u8		hw_antsw_occu: 1;
@@ -257,7 +257,7 @@ __PACK struct _phy_status_rpt_jaguar2_type1 {
 
 	/* DW2 */
 	u16		lsig_length;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		antidx_a: 3;
 	u8		antidx_b: 3;
 	u8		rsvd_1: 2;
@@ -275,7 +275,7 @@ __PACK struct _phy_status_rpt_jaguar2_type1 {
 
 	/* DW3 */
 	u8		paid;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		paid_msb: 1;
 	u8		gid: 6;
 	u8		rsvd_3: 1;
@@ -285,7 +285,7 @@ __PACK struct _phy_status_rpt_jaguar2_type1 {
 	u8		paid_msb: 1;
 #endif
 	u8		intf_pos;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		intf_pos_msb: 1;
 	u8		rsvd_4: 2;
 	u8		nb_intf_flag: 1;
@@ -313,7 +313,7 @@ __PACK struct _phy_status_rpt_jaguar2_type2 {
 	/* DW0 ane DW1 */
 	u8		page_num;
 	u8		pwdb[4];
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		l_rxsc: 4;
 	u8		ht_rxsc: 4;
 #else
@@ -321,7 +321,7 @@ __PACK struct _phy_status_rpt_jaguar2_type2 {
 	u8		l_rxsc: 4;
 #endif
 	u8		channel;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		band: 2;
 	u8		rsvd_0: 1;
 	u8		hw_antsw_occu: 1;
@@ -340,7 +340,7 @@ __PACK struct _phy_status_rpt_jaguar2_type2 {
 #endif
 
 	/* DW2 */
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		shift_l_map: 6;
 	u8		rsvd_1: 2;
 #else
@@ -348,7 +348,7 @@ __PACK struct _phy_status_rpt_jaguar2_type2 {
 	u8		shift_l_map: 6;
 #endif
 	u8		cnt_pw2cca;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		agc_table_a: 4;
 	u8		agc_table_b: 4;
 	u8		agc_table_c: 4;
@@ -362,7 +362,7 @@ __PACK struct _phy_status_rpt_jaguar2_type2 {
 
 	/* DW3 ~ DW6*/
 	u8		cnt_cca2agc_rdy;
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		gain_a: 6;
 	u8		rsvd_2: 1;
 	u8		trsw_a: 1;
@@ -399,7 +399,7 @@ __PACK struct _phy_status_rpt_jaguar2_type2 {
 #endif
 	u8		ht_aagc_gain[4];
 	u8		dagc_gain[4];
-#if __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 	u8		counter: 6;
 	u8		rsvd_6: 2;
 	u8		syn_count: 5;

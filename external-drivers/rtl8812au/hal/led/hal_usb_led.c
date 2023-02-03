@@ -1750,10 +1750,10 @@ void BlinkHandler(PLED_USB pLed)
 	if (padapter->registrypriv.led_ctrl != 1) {
 		if (padapter->registrypriv.led_ctrl == 0)
 		{
-			// Set LED to be off
+			// Set LED to off
 			pLed->BlinkingLedState = RTW_LED_OFF;
 		} else {
-			// Set LED to be on solid for 2 or greater
+			// Set LED to solid for 2 or greater
 			pLed->BlinkingLedState = RTW_LED_ON;
 		}
 		// Skip various switch cases where SwLedBlink*() is called below

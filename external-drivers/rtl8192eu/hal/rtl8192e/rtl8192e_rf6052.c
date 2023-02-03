@@ -94,18 +94,18 @@ phy_RF6052_Config_ParaFile_8192E(
 
 		/*----Set RF_ENV enable----*/
 		phy_set_bb_reg(Adapter, pPhyReg->rfintfe | MaskforPhySet, bRFSI_RFENV << 16, 0x1);
-		rtw_udelay_os(1);/* PlatformStallExecution(1); */
+		udelay(1);/* PlatformStallExecution(1); */
 
 		/*----Set RF_ENV output high----*/
 		phy_set_bb_reg(Adapter, pPhyReg->rfintfo | MaskforPhySet, bRFSI_RFENV, 0x1);
-		rtw_udelay_os(1);/* PlatformStallExecution(1); */
+		udelay(1);/* PlatformStallExecution(1); */
 
 		/* Set bit number of Address and Data for RF register */
 		phy_set_bb_reg(Adapter, pPhyReg->rfHSSIPara2 | MaskforPhySet, b3WireAddressLength, 0x0);	/* Set 1 to 4 bits for 8255 */
-		rtw_udelay_os(1);/* PlatformStallExecution(1); */
+		udelay(1);/* PlatformStallExecution(1); */
 
 		phy_set_bb_reg(Adapter, pPhyReg->rfHSSIPara2 | MaskforPhySet, b3WireDataLength, 0x0);	/* Set 0 to 12  bits for 8255 */
-		rtw_udelay_os(1);/* PlatformStallExecution(1); */
+		udelay(1);/* PlatformStallExecution(1); */
 
 		/*----Initialize RF fom connfiguration file----*/
 		switch (eRFPath) {

@@ -12,10 +12,9 @@
  * more details.
  *
  *****************************************************************************/
-#ifndef	__ODM_RTL8192E_H__
+#ifndef __ODM_RTL8192E_H__
 #define __ODM_RTL8192E_H__
-
-
-
-
+#if (RTL8192E_SUPPORT == 1)
+s8 phydm_cck_rssi_8192e(struct dm_struct *dm, u16 lna_idx, u8 vga_idx);
+#endif
 #endif

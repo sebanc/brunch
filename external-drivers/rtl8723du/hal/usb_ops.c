@@ -52,8 +52,8 @@ int recvbuf2recvframe(struct adapter * adapt, void *ptr)
 			goto _exit_recvbuf2recvframe;
 		}
 
-		pkt_offset = RXDESC_SIZE + pattrib->drvinfo_sz + pattrib->shift_sz + pattrib->pkt_len;
-		if ((pattrib->pkt_len <= 0) || (pkt_offset > transfer_len)) {
+		pkt_offset = RXDESC_SIZE + pattrib->drvinfo_sz + pattrib->shift_sz + le16_to_cpu(pattrib->pkt_len);
+		if ((le16_to_cpu(pattrib->pkt_len) <= 0) || (pkt_offset > transfer_len)) {
 			RTW_INFO("%s: RX Error! pkt_len=%d pkt_offset=%d transfer_len=%d\n",
 				__func__, pattrib->pkt_len, pkt_offset, transfer_len);
 
@@ -81,7 +81,7 @@ int recvbuf2recvframe(struct adapter * adapt, void *ptr)
 			pre_recv_entry(precvframe, pattrib->physt ? (pbuf + RXDESC_OFFSET) : NULL);
 		else {
 			if (pattrib->pkt_rpt_type == C2H_PACKET)
-				rtw_hal_c2h_pkt_pre_hdl(adapt, precvframe->u.hdr.rx_data, pattrib->pkt_len);
+				rtw_hal_c2h_pkt_pre_hdl(adapt, precvframe->u.hdr.rx_data, le16_to_cpu(pattrib->pkt_len));
 			else {
 				RTW_INFO("%s: [WARNNING] RX type(%d) not be handled!\n",
 					 __func__, pattrib->pkt_rpt_type);

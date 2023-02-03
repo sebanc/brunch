@@ -13,7 +13,7 @@ void rtl8723d_query_rx_desc_status(union recv_frame *precvframe, u8 *pdesc)
 	pattrib = &precvframe->u.hdr.attrib;
 	memset(pattrib, 0, sizeof(struct rx_pkt_attrib));
 
-	pattrib->pkt_len = (u16)GET_RX_STATUS_DESC_PKT_LEN_8723D(pdesc);
+	pattrib->pkt_len = cpu_to_le16((u16)GET_RX_STATUS_DESC_PKT_LEN_8723D(pdesc));
 	pattrib->pkt_rpt_type = GET_RX_STATUS_DESC_RPT_SEL_8723D(pdesc) ? C2H_PACKET : NORMAL_RX;
 
 	if (pattrib->pkt_rpt_type == NORMAL_RX) {
@@ -34,7 +34,7 @@ void rtl8723d_query_rx_desc_status(union recv_frame *precvframe, u8 *pdesc)
 		pattrib->mfrag = (u8)GET_RX_STATUS_DESC_MORE_FRAG_8723D(pdesc);
 
 		/* Offset 8 */
-		pattrib->seq_num = cpu_to_be16(GET_RX_STATUS_DESC_SEQ_8723D(pdesc));
+		pattrib->seq_num = cpu_to_le16(GET_RX_STATUS_DESC_SEQ_8723D(pdesc));
 		pattrib->frag_num = (u8)GET_RX_STATUS_DESC_FRAG_8723D(pdesc);
 
 		/* Offset 12 */

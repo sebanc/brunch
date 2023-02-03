@@ -89,12 +89,13 @@ void _ips_enter(_adapter *padapter)
 
 	if (rf_off == pwrpriv->change_rfpwrstate) {
 		pwrpriv->bpower_saving = _TRUE;
-		RTW_PRINT("nolinked power save enter\n");
+/* nrm */
+//		RTW_PRINT("nolinked power save enter\n");
 
 		if (pwrpriv->ips_mode == IPS_LEVEL_2)
 			pwrpriv->bkeepfwalive = _TRUE;
 
-#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS		
+#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS
 		pwrpriv->pwr_saving_start_time = rtw_get_current_time();
 #endif /* CONFIG_RTW_CFGVENDOR_LLSTATS */
 
@@ -137,12 +138,13 @@ int _ips_leave(_adapter *padapter)
 		result = rtw_ips_pwr_up(padapter);
 		if (result == _SUCCESS)
 			pwrpriv->rf_pwrstate = rf_on;
-		
-#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS	
+
+#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS
 		pwrpriv->pwr_saving_time += rtw_get_passing_time_ms(pwrpriv->pwr_saving_start_time);
 #endif /* CONFIG_RTW_CFGVENDOR_LLSTATS */
 
-		RTW_PRINT("nolinked power save leave\n");
+/* nrm */
+//		RTW_PRINT("nolinked power save leave\n");
 
 		RTW_INFO("==> ips_leave.....LED(0x%08x)...\n", rtw_read32(padapter, 0x4c));
 		pwrpriv->bips_processing = _FALSE;
@@ -306,7 +308,7 @@ void rtw_ps_processor(_adapter *padapter)
 
 	/* RTW_INFO("==> fw report state(0x%x)\n",rtw_read8(padapter,0x1ca));	 */
 	if (pwrpriv->bHWPwrPindetect) {
-		
+
 		rfpwrstate = RfOnOffDetect(padapter);
 		RTW_INFO("@@@@- #2  %s==> rfstate:%s\n", __FUNCTION__, (rfpwrstate == rf_on) ? "rf_on" : "rf_off");
 
@@ -321,7 +323,7 @@ void rtw_ps_processor(_adapter *padapter)
 			}
 			RTW_INFO("current rf_pwrstate(%s)\n", (pwrpriv->rf_pwrstate == rf_off) ? "rf_off" : "rf_on");
 		}
-		
+
 		pwrpriv->pwr_state_check_cnts++;
 	}
 #endif /* SUPPORT_HW_RFOFF_DETECTED */
@@ -334,7 +336,7 @@ void rtw_ps_processor(_adapter *padapter)
 
 	if ((pwrpriv->rf_pwrstate == rf_on) && ((pwrpriv->pwr_state_check_cnts % 4) == 0)) {
 		RTW_INFO("==>%s .fw_state(%x)\n", __FUNCTION__, get_fwstate(pmlmepriv));
-		pwrpriv->change_rfpwrstate = rf_off;	
+		pwrpriv->change_rfpwrstate = rf_off;
 
 #ifdef CONFIG_IPS
 			ips_enter(padapter);
@@ -867,7 +869,7 @@ void rtw_lps_rfon_ctrl(_adapter *padapter, u8 rfon_ctrl)
 				} while (1);
 
 				if (ready == _FAIL)
-					RTW_INFO(FUNC_ADPT_FMT": It is not ready to leave 32K !!!\n", 
+					RTW_INFO(FUNC_ADPT_FMT": It is not ready to leave 32K !!!\n",
 						FUNC_ADPT_ARG(padapter));
 			}
 #endif /* CONFIG_LPS_LCLK */
@@ -888,7 +890,7 @@ void rtw_lps_rfon_ctrl(_adapter *padapter, u8 rfon_ctrl)
 #ifdef CONFIG_LPS_PG
 				if (pwrpriv->lps_level == LPS_PG) {
 						 if (rtw_hal_set_lps_pg_info_cmd(padapter) == _FAIL)
-						 	RTW_INFO(FUNC_ADPT_FMT": Send PG H2C command Fail! \n", 
+						 	RTW_INFO(FUNC_ADPT_FMT": Send PG H2C command Fail! \n",
 						 			    FUNC_ADPT_ARG(padapter));
 				}
 #endif /* CONFIG_LPS_PG */
@@ -918,14 +920,14 @@ void rtw_lps_rfon_ctrl(_adapter *padapter, u8 rfon_ctrl)
 					} while (polling_cnt < 100);
 
 					if (result == _FAIL )
-						RTW_INFO(FUNC_ADPT_FMT": It is not finished to enter 32K !!!\n", 
+						RTW_INFO(FUNC_ADPT_FMT": It is not finished to enter 32K !!!\n",
 							FUNC_ADPT_ARG(padapter));
 				}
 			}
 #endif /* CONFIG_LPS_LCLK */
 		}
 	} else {
-		RTW_INFO(FUNC_ADPT_FMT": RFON can't work due to ps state is not in LPS !\n", 
+		RTW_INFO(FUNC_ADPT_FMT": RFON can't work due to ps state is not in LPS !\n",
 							FUNC_ADPT_ARG(padapter));
 	}
 }
@@ -938,7 +940,7 @@ void rtw_set_ps_mode(PADAPTER padapter, u8 ps_mode, u8 smart_ps, u8 bcn_ant_mode
 	struct dvobj_priv *psdpriv = padapter->dvobj;
 	struct debug_priv *pdbgpriv = &psdpriv->drv_dbg;
 #endif
-#ifdef CONFIG_WMMPS_STA	
+#ifdef CONFIG_WMMPS_STA
 	struct registry_priv *pregistrypriv = &padapter->registrypriv;
 #endif
 #ifdef CONFIG_P2P
@@ -966,7 +968,7 @@ void rtw_set_ps_mode(PADAPTER padapter, u8 ps_mode, u8 smart_ps, u8 bcn_ant_mode
 			return;
 
 #ifndef CONFIG_BT_COEXIST
-#ifdef CONFIG_WMMPS_STA	
+#ifdef CONFIG_WMMPS_STA
 		if (!rtw_is_wmmps_mode(padapter))
 #endif /* CONFIG_WMMPS_STA */
 			if ((pwrpriv->smart_ps == smart_ps) &&
@@ -1152,12 +1154,12 @@ void rtw_set_ps_mode(PADAPTER padapter, u8 ps_mode, u8 smart_ps, u8 bcn_ant_mode
 			}
 #endif
 
-#ifdef CONFIG_WMMPS_STA	
+#ifdef CONFIG_WMMPS_STA
 			pwrpriv->wmm_smart_ps = pregistrypriv->wmm_smart_ps;
 #endif /* CONFIG_WMMPS_STA */
-			
+
 			rtw_exec_lps(padapter, ps_mode);
-			
+
 #ifdef CONFIG_WOWLAN
 			if (pwrpriv->wowlan_mode == _TRUE)
 				rtw_hal_set_hwreg(padapter, HW_VAR_H2C_INACTIVE_IPS, (u8 *)(&ps_mode));
@@ -1266,10 +1268,10 @@ void LPS_Enter(PADAPTER padapter, const char *msg)
 				if (rtw_is_wmmps_mode(padapter))
 					msg = "WMMPS_IDLE";
 #endif /* CONFIG_WMMPS_STA */
-				
+
 				sprintf(buf, "WIFI-%s", msg);
 				pwrpriv->bpower_saving = _TRUE;
-				
+
 #ifdef CONFIG_RTW_CFGVENDOR_LLSTATS
 				pwrpriv->pwr_saving_start_time = rtw_get_current_time();
 #endif /* CONFIG_RTW_CFGVENDOR_LLSTATS */
@@ -1322,11 +1324,11 @@ void LPS_Leave(PADAPTER padapter, const char *msg)
 			if (rtw_is_wmmps_mode(padapter))
 				msg = "WMMPS_BUSY";
 #endif /* CONFIG_WMMPS_STA */
-			
+
 			sprintf(buf, "WIFI-%s", msg);
 			rtw_set_ps_mode(padapter, PS_MODE_ACTIVE, 0, 0, buf);
 
-#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS	
+#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS
 			pwrpriv->pwr_saving_time += rtw_get_passing_time_ms(pwrpriv->pwr_saving_start_time);
 #endif /* CONFIG_RTW_CFGVENDOR_LLSTATS */
 		}
@@ -1488,14 +1490,14 @@ void LeaveAllPowerSaveMode(PADAPTER Adapter)
 #endif
 	} else {
 		if (adapter_to_pwrctl(Adapter)->rf_pwrstate == rf_off) {
-			
+
 #if defined(CONFIG_FWLPS_IN_IPS) || defined(CONFIG_SWLPS_IN_IPS) || (defined(CONFIG_PLATFORM_SPRD) && defined(CONFIG_RTL8188E))
 #ifdef CONFIG_IPS
 			if (_FALSE == ips_leave(Adapter))
 				RTW_INFO("======> ips_leave fail.............\n");
 #endif
 #endif /* CONFIG_SWLPS_IN_IPS || (CONFIG_PLATFORM_SPRD && CONFIG_RTL8188E) */
-			
+
 		}
 	}
 
@@ -2250,7 +2252,7 @@ void rtw_init_pwrctrl_priv(PADAPTER padapter)
 	pwrctrlpriv->tog = 0x80;
 	pwrctrlpriv->rpwm_retry = 0;
 
-	RTW_INFO("%s: IPS_mode=%d, LPS_mode=%d, LPS_level=%d"LPS_1T1R_FMT"\n", 
+	RTW_INFO("%s: IPS_mode=%d, LPS_mode=%d, LPS_level=%d"LPS_1T1R_FMT"\n",
 		__func__, pwrctrlpriv->ips_mode, pwrctrlpriv->power_mgnt, pwrctrlpriv->lps_level
 		LPS_1T1R_ARG
 	);
@@ -2325,7 +2327,7 @@ void rtw_init_pwrctrl_priv(PADAPTER padapter)
 		, pwrctrlpriv->wowlan_gpio_output_state);
 	rtw_hal_switch_gpio_wl_ctrl(padapter, pwrctrlpriv->wowlan_gpio_index, _TRUE);
 	RTW_INFO("%s: set GPIO_%d to OUTPUT %s state in initial and %s_ACTIVE.\n",
-		 __func__, pwrctrlpriv->wowlan_gpio_index, 
+		 __func__, pwrctrlpriv->wowlan_gpio_index,
 		 pwrctrlpriv->wowlan_gpio_output_state ? "HIGH" : "LOW",
 		 pwrctrlpriv->is_high_active ? "HIGI" : "LOW");
 	#endif /*CONFIG_WAKEUP_GPIO_INPUT_MODE*/
@@ -2700,7 +2702,7 @@ int _rtw_pwr_wakeup(_adapter *padapter, u32 ips_deffer_ms, const char *caller)
 	}
 
 	if (rf_off == pwrpriv->rf_pwrstate) {
-		
+
 #ifdef CONFIG_IPS
 		RTW_INFO("%s call ips_leave....\n", __FUNCTION__);
 		if (_FAIL ==  ips_leave(padapter)) {
@@ -2709,7 +2711,7 @@ int _rtw_pwr_wakeup(_adapter *padapter, u32 ips_deffer_ms, const char *caller)
 			goto exit;
 		}
 #endif
-		
+
 	}
 
 	/* TODO: the following checking need to be merged... */
@@ -2801,7 +2803,7 @@ int rtw_pm_set_wow_lps(_adapter *padapter, u8 mode)
 	struct pwrctrl_priv *pwrctrlpriv = adapter_to_pwrctl(padapter);
 
 	if (mode < PS_MODE_NUM) {
-		if (pwrctrlpriv->wowlan_power_mgmt != mode) 
+		if (pwrctrlpriv->wowlan_power_mgmt != mode)
 			pwrctrlpriv->wowlan_power_mgmt = mode;
 	} else
 		ret = -EINVAL;

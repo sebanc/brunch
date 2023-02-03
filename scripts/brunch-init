@@ -52,7 +52,7 @@ if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 		mount -n "$img_part" /mainroot
 	fi
 	if [ -f /mainroot/"$img_path" ]; then
-		mknod -m660 /dev/sdz b 7 4096
+		#mknod -m660 /dev/sdz b 7 4096
 		losetup -P /dev/sdz /mainroot"$img_path"
 		bootdevice=/dev/sdz
 		partpath=/dev/sdz
@@ -61,7 +61,7 @@ if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 	fi
 elif [ -e "$img_part" ]; then
 	echo "brunch: Trying to boot in nested GPT mode on device $img_part..." > /dev/kmsg
-	mknod -m660 /dev/sdz b 7 4096
+	#mknod -m660 /dev/sdz b 7 4096
 	losetup -P /dev/sdz "$img_part"
 	bootdevice=/dev/sdz
 	partpath=/dev/sdz

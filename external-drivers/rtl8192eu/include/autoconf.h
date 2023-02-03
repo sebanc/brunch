@@ -58,10 +58,6 @@
 
 #define CONFIG_RECV_REORDERING_CTRL
 
-/* #define CONFIG_TCP_CSUM_OFFLOAD_RX */
-
-/* #define CONFIG_DRVEXT_MODULE */
-
  /* #define CONFIG_SUPPORT_USB_INT */
  #ifdef CONFIG_SUPPORT_USB_INT
 /* #define CONFIG_USB_INTERRUPT_IN_PIPE */
@@ -79,24 +75,22 @@
 
 #define CONFIG_LPS
 
-#if defined(CONFIG_LPS) 
+#if defined(CONFIG_LPS) && defined(CONFIG_SUPPORT_USB_INT)
 	/* #define CONFIG_LPS_LCLK */
 #endif
 
 
 #ifdef CONFIG_LPS_LCLK
-	#ifdef CONFIG_POWER_SAVING
-		#define CONFIG_XMIT_THREAD_MODE
-	#endif
-	#ifndef CONFIG_SUPPORT_USB_INT
-		#define LPS_RPWM_WAIT_MS 300
-		#define CONFIG_DETECT_CPWM_BY_POLLING
-	#endif /* !CONFIG_SUPPORT_USB_INT */
-	/* #define DBG_CHECK_FW_PS_STATE */
+	/* #define CONFIG_XMIT_THREAD_MODE */
 #endif
 #endif /*CONFIG_POWER_SAVING*/
 /*#define CONFIG_ANTENNA_DIVERSITY*/
 
+/*#define CONFIG_SUPPORT_STATIC_SMPS*/
+#ifdef CONFIG_SUPPORT_STATIC_SMPS
+#define SSMPS_TX_TP_TH	60 /*Mbps*/
+#define SSMPS_RX_TP_TH	60 /*Mbps*/
+#endif
 
 
 /* #define CONFIG_CONCURRENT_MODE */
@@ -104,7 +98,6 @@
 	#define CONFIG_RUNTIME_PORT_SWITCH
 
 	/* #define DBG_RUNTIME_PORT_SWITCH */
-	#define CONFIG_SCAN_BACKOP
 	/* #define CONFIG_ATMEL_RC_PATCH */
 	/* #define CONFIG_TSF_RESET_OFFLOAD */			/* For 2 PORT TSF SYNC. */
 #endif
@@ -140,7 +133,7 @@
 	#define CONFIG_P2P_PS
 	#define CONFIG_P2P_OP_CHK_SOCIAL_CH
 	#define CONFIG_CFG80211_ONECHANNEL_UNDER_CONCURRENT  /* replace CONFIG_P2P_CHK_INVITE_CH_LIST flag */
-	#define CONFIG_P2P_INVITE_IOT
+	/*#define CONFIG_P2P_INVITE_IOT*/
 #endif
 
 /* Added by Kurt 20110511 */
@@ -244,9 +237,7 @@
 
 #define ENABLE_USB_DROP_INCORRECT_OUT
 
-
-#define DISABLE_BB_RF	0
-
+#define RTW_CONFIG_RFREG18_WA
 /* #define RTL8191C_FPGA_NETWORKTYPE_ADHOC 0 */
 
 #ifdef CONFIG_MP_INCLUDED
@@ -278,17 +269,12 @@
 #define	RTL8192E_EARLY_MODE_PKT_NUM_10	0
 #endif
 
-/* Try to handle the Beacon error found in some types of TP-LINK APs */
-#define CONFIG_ATTEMPT_TO_FIX_AP_BEACON_ERROR
-
-#define CONFIG_80211D
-
 #define CONFIG_RF_POWER_TRIM
 
 /*
  * Debug Related Config
  */
-#define DBG	0
+#define DBG	1
 
 #define CONFIG_PROC_DEBUG
 
@@ -298,7 +284,6 @@
 
 /* #define DBG_CMD_QUEUE */
 /* #define DBG_IO */
-/* #define DBG_DELAY_OS */
 /* #define DBG_MEM_ALLOC */
 /* #define DBG_IOCTL */
 

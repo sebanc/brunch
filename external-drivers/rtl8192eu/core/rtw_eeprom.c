@@ -22,7 +22,7 @@ void up_clk(_adapter	*padapter,	 u16 *x)
 {
 	*x = *x | _EESK;
 	rtw_write8(padapter, EE_9346CR, (u8)*x);
-	rtw_udelay_os(CLOCK_RATE);
+	udelay(CLOCK_RATE);
 
 
 }
@@ -31,7 +31,7 @@ void down_clk(_adapter	*padapter, u16 *x)
 {
 	*x = *x & ~_EESK;
 	rtw_write8(padapter, EE_9346CR, (u8)*x);
-	rtw_udelay_os(CLOCK_RATE);
+	udelay(CLOCK_RATE);
 }
 
 void shift_out_bits(_adapter *padapter, u16 data, u16 count)
@@ -54,7 +54,7 @@ void shift_out_bits(_adapter *padapter, u16 data, u16 count)
 			goto out;
 		}
 		rtw_write8(padapter, EE_9346CR, (u8)x);
-		rtw_udelay_os(CLOCK_RATE);
+		udelay(CLOCK_RATE);
 		up_clk(padapter, &x);
 		down_clk(padapter, &x);
 		mask = mask >> 1;
@@ -106,10 +106,10 @@ void standby(_adapter	*padapter)
 	x &= ~(_EECS | _EESK);
 	rtw_write8(padapter, EE_9346CR, x);
 
-	rtw_udelay_os(CLOCK_RATE);
+	udelay(CLOCK_RATE);
 	x |= _EECS;
 	rtw_write8(padapter, EE_9346CR, x);
-	rtw_udelay_os(CLOCK_RATE);
+	udelay(CLOCK_RATE);
 }
 
 u16 wait_eeprom_cmd_done(_adapter *padapter)
@@ -123,7 +123,7 @@ u16 wait_eeprom_cmd_done(_adapter *padapter)
 			res = _TRUE;
 			goto exit;
 		}
-		rtw_udelay_os(CLOCK_RATE);
+		udelay(CLOCK_RATE);
 	}
 exit:
 	return res;

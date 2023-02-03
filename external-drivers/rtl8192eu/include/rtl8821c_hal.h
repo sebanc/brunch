@@ -75,6 +75,7 @@ void init_hal_spec_rtl8821c(PADAPTER);
 void rtl8821c_prepare_mp_txdesc(PADAPTER, struct mp_priv *);	/* rtw_mp.c */
 void rtl8821c_mp_config_rfpath(PADAPTER);			/* hal_mp.c */
 #endif
+void rtl8821c_dl_rsvd_page(PADAPTER adapter, u8 mstatus);
 
 #ifdef CONFIG_PCI_HCI
 u16 get_txbd_rw_reg(u16 q_idx);

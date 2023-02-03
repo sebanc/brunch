@@ -13,7 +13,7 @@ int	usb_init_recv_priv(struct adapter *adapt, u16 ini_in_buf_sz)
 	struct recv_buf *precvbuf;
 
 	tasklet_init(&precvpriv->recv_tasklet,
-		     (void(*)(unsigned long))usb_recv_tasklet,
+		     (void(*))usb_recv_tasklet,
 		     (unsigned long)adapt);
 
 	/* init recv_buf */
@@ -178,7 +178,7 @@ u16 usb_read16(struct intf_hdl *pintfhdl, u32 addr)
 	u16 wvalue;
 	u16 index;
 	u16 len;
-	__le16 data = 0;
+	__le32 data = 0;
 
 	request = 0x05;
 	requesttype = 0x01;/* read_in */
@@ -189,7 +189,7 @@ u16 usb_read16(struct intf_hdl *pintfhdl, u32 addr)
 	usbctrl_vendorreq(pintfhdl, request, wvalue, index,
 			  &data, len, requesttype);
 
-	return le16_to_cpu(data);
+	return (u16)(le32_to_cpu(data)&0xffff);
 }
 
 u32 usb_read32(struct intf_hdl *pintfhdl, u32 addr)
@@ -247,7 +247,7 @@ int usb_write16(struct intf_hdl *pintfhdl, u32 addr, u16 val)
 	u16 wvalue;
 	u16 index;
 	u16 len;
-	u16 data;
+	__le32 data;
 	int ret;
 
 
@@ -258,7 +258,7 @@ int usb_write16(struct intf_hdl *pintfhdl, u32 addr, u16 val)
 	wvalue = (u16)(addr & 0x0000ffff);
 	len = 2;
 
-	data = val;
+	data = cpu_to_le32(val & 0x0000ffff);
 	ret = usbctrl_vendorreq(pintfhdl, request, wvalue, index,
 				&data, len, requesttype);
 
@@ -274,7 +274,7 @@ int usb_write32(struct intf_hdl *pintfhdl, u32 addr, u32 val)
 	u16 wvalue;
 	u16 index;
 	u16 len;
-	u32 data;
+	__le32 data;
 	int ret;
 
 
@@ -284,7 +284,7 @@ int usb_write32(struct intf_hdl *pintfhdl, u32 addr, u32 val)
 
 	wvalue = (u16)(addr & 0x0000ffff);
 	len = 4;
-	data = val;
+	data = cpu_to_le32(val);
 	ret = usbctrl_vendorreq(pintfhdl, request, wvalue, index,
 				&data, len, requesttype);
 

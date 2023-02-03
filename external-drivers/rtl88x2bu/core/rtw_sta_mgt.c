@@ -380,13 +380,13 @@ static void	_rtw_free_sta_recv_priv_lock(struct sta_recv_priv *psta_recvpriv)
 void rtw_mfree_stainfo(struct sta_info *psta);
 void rtw_mfree_stainfo(struct sta_info *psta)
 {
-
-	if (&psta->lock != NULL)
-		_rtw_spinlock_free(&psta->lock);
-
-	_rtw_free_sta_xmit_priv_lock(&psta->sta_xmitpriv);
-	_rtw_free_sta_recv_priv_lock(&psta->sta_recvpriv);
-
+    // Here used to be some calls to helper functions that would call
+    // _rtw_spinlock_free several times. However, _rtw_spinlock_free does not
+    // do anything on Linux. Since this project is concerned only with Linux,
+    // it is safe to remove the calls entirely.
+    // This function is kept. Removing it would force us to remove it in the
+    // callers, which has the danger of becoming incompatible with possible
+    // future patches.
 }
 
 
@@ -1342,4 +1342,3 @@ void dump_pre_link_sta_ctl(void *sel, struct sta_priv *stapriv)
 	}
 }
 #endif /* CONFIG_RTW_PRE_LINK_STA */
-

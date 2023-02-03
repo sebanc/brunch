@@ -55,7 +55,7 @@ git clone https://github.com/tomaspinho/rtl8821ce.git
 cd rtl8821ce
 ```
 
-Then run the installation script:
+Then run the removal script:
 ```
 sudo ./dkms-remove.sh
 ```
@@ -123,7 +123,9 @@ This may be due to the Kernel loading up the wrong firmware file for this card. 
 
 ### Secure Boot
 
-If your system uses Secure Boot, disable it via BIOS settings, otherwise the kernel will not accept user-supplied modules.
+If your system uses Secure Boot, the kernel will not accept user-supplied modules. There are two ways to solve this issue:
+1. Disable Secure Boot via BIOS/UEFI settings.
+2. Create or use an existing MOK (Machine Owner Key) to sign the compiled `.ko` linux kernel object produced by DKMS.
 
 ### Unstable connection - slowdowns or dropouts
 
@@ -143,7 +145,7 @@ We are going to disable the *Connectivity Check* option in NetworkManager. This 
 Then, just reboot or restart the NetworkManager unit to fix the problem.
 
 ### Wi-Fi not working for kernel >= 5.9
-The Linux Kernel 5.9 version comes with a broken `rtw88` module developed by Realtek that has poor compatibility with most revision of the 8821ce chip.
+The Linux Kernel 5.9 version comes with a broken `rtw88` module developed by Realtek that has poor compatibility with most revisions of the 8821ce chip.
 
 You must disable it by adding the following to your module blacklists (`/etc/modprobe.d/blacklist.conf`):
 

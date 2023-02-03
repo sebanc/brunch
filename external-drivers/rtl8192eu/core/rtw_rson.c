@@ -77,7 +77,7 @@ void init_rtw_rson_data(struct dvobj_priv *dvobj)
 	dvobj->rson_data.connectible = RTW_RSON_DENYCONNECT;
 #endif
 	dvobj->rson_data.loading = 0;
-	_rtw_memset(dvobj->rson_data.res, 0xAA, sizeof(dvobj->rson_data.res));
+	memset(dvobj->rson_data.res, 0xAA, sizeof(dvobj->rson_data.res));
 }
 
 void	rtw_rson_get_property_str(_adapter *padapter, char *rson_data_str)
@@ -218,7 +218,7 @@ int rtw_get_rson_struct(WLAN_BSSID_EX *bssid, struct  rtw_rson_struct *rson_data
 	limit = bssid->IELength - _BEACON_IE_OFFSET_;
 
 	for (p = bssid->IEs + _BEACON_IE_OFFSET_; ; p += (len + 2)) {
-		p = rtw_get_ie(p, _VENDOR_SPECIFIC_IE_, &len, limit);
+		p = rtw_get_ie(p, WLAN_EID_VENDOR_SPECIFIC, &len, limit);
 		limit -= len;
 		if ((p == NULL) || (len == 0))
 			break;
@@ -252,9 +252,9 @@ u32 rtw_rson_append_ie(_adapter *padapter, unsigned char *pframe, u32 *len)
 	if ((!pdvobj) || (!pframe))
 		return 0;
 	ptr = ori = pframe;
-	*ptr++ = _VENDOR_SPECIFIC_IE_;
+	*ptr++ = WLAN_EID_VENDOR_SPECIFIC;
 	*ptr++ = ie_len = sizeof(RTW_RSON_OUI)+sizeof(pdvobj->rson_data);
-	_rtw_memcpy(ptr, RTW_RSON_OUI, sizeof(RTW_RSON_OUI));
+	memcpy(ptr, RTW_RSON_OUI, sizeof(RTW_RSON_OUI));
 	ptr = ptr + sizeof(RTW_RSON_OUI);
 	*ptr++ = pdvobj->rson_data.ver;
 	*(s32 *)ptr = cpu_to_le32(pdvobj->rson_data.id);
@@ -262,7 +262,7 @@ u32 rtw_rson_append_ie(_adapter *padapter, unsigned char *pframe, u32 *len)
 	*ptr++ = pdvobj->rson_data.hopcnt;
 	*ptr++ = pdvobj->rson_data.connectible;
 	*ptr++ = pdvobj->rson_data.loading;
-	_rtw_memcpy(ptr, pdvobj->rson_data.res, sizeof(pdvobj->rson_data.res));
+	memcpy(ptr, pdvobj->rson_data.res, sizeof(pdvobj->rson_data.res));
 	pframe = ptr;
 /*
 	iii = iii % 20;
@@ -326,6 +326,9 @@ int rtw_rson_isupdate_roamcan(struct mlme_priv *mlme
 		|| (rson_comp.id != CONFIG_RTW_REPEATER_SON_ID))
 		return _FALSE;
 
+	if (is_match_bssid(competitor->network.MacAddress, rtw_rson_block_bssid, rtw_rson_block_bssid_idx) == _TRUE)
+		return _FALSE;
+
 	if ((!mlme->cur_network_scanned)
 		|| (mlme->cur_network_scanned == competitor)
 		|| (rtw_get_rson_struct(&(mlme->cur_network_scanned->network), &rson_curr)) != _TRUE)
@@ -386,14 +389,14 @@ void rtw_rson_show_survey_info(struct seq_file *m, _list *plist, _list *phead)
 
 	RTW_PRINT_SEL(m, "%5s  %-17s  %3s  %5s %14s  %10s  %-3s  %5s %32s\n", "index", "bssid", "ch", "id", "hop_cnt", "loading", "RSSI", "score", "ssid");
 	while (1) {
-		if (rtw_end_of_queue_search(phead, plist) == _TRUE)
+		if (phead == plist)
 			break;
 
 		pnetwork = LIST_CONTAINOR(plist, struct wlan_network, list);
 		if (!pnetwork)
 			break;
 
-		_rtw_memset(&rson_data, 0, sizeof(rson_data));
+		memset(&rson_data, 0, sizeof(rson_data));
 		rson_score = 0;
 		if (rtw_get_rson_struct(&(pnetwork->network), &rson_data) == _TRUE)
 			rson_score = rtw_cal_rson_score(&rson_data, pnetwork->network.Rssi);
@@ -429,9 +432,9 @@ u8 rtw_rson_ap_check_sta(_adapter *padapter, u8 *pframe, uint pkt_len, unsigned 
 	u8 *p;
 
 #ifndef CONFIG_RTW_REPEATER_SON_ROOT
-	_rtw_memset(&rson_target, 0, sizeof(rson_target));
+	memset(&rson_target, 0, sizeof(rson_target));
 	for (p = pframe + WLAN_HDR_A3_LEN + ie_offset; ; p += (len + 2)) {
-		p = rtw_get_ie(p, _VENDOR_SPECIFIC_IE_, &len, pkt_len - WLAN_HDR_A3_LEN - ie_offset);
+		p = rtw_get_ie(p, WLAN_EID_VENDOR_SPECIFIC, &len, pkt_len - WLAN_HDR_A3_LEN - ie_offset);
 
 		if ((p == NULL) || (len == 0))
 			break;
@@ -510,7 +513,7 @@ void rtw_rson_scan_cmd_hdl(_adapter *padapter, int op)
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	u8 val8;
 
-	if (mlmeext_chk_scan_state(pmlmeext, SCAN_DISABLE) != _FALSE)
+	if (mlmeext_chk_scan_state(pmlmeext, SCAN_DISABLE) != _TRUE)
 		return;
 	if (op == RSON_SCAN_PROCESS) {
 		padapter->rtw_rson_scanstage = RSON_SCAN_PROCESS;
@@ -547,12 +550,12 @@ void rtw_rson_scan_cmd_hdl(_adapter *padapter, int op)
 							rtw_set_to_roam(padapter, 0);
 #ifdef CONFIG_INTEL_WIDI
 							if (padapter->mlmepriv.widi_state == INTEL_WIDI_STATE_ROAMING) {
-								_rtw_memset(pmlmepriv->sa_ext, 0x00, L2SDTA_SERVICE_VE_LEN);
+								memset(pmlmepriv->sa_ext, 0x00, L2SDTA_SERVICE_VE_LEN);
 								intel_widi_wk_cmd(padapter, INTEL_WIDI_LISTEN_WK, NULL, 0);
 								RTW_INFO("change to widi listen\n");
 							}
 #endif /* CONFIG_INTEL_WIDI */
-							rtw_free_assoc_resources(padapter, 1);
+							rtw_free_assoc_resources(padapter, _TRUE);
 							rtw_indicate_disconnect(padapter, 0, _FALSE);
 						} else
 							pmlmepriv->to_join = _TRUE;

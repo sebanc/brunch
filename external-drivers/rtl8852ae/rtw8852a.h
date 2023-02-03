@@ -8,7 +8,6 @@
 #include "core.h"
 
 #define RF_PATH_NUM_8852A 2
-#define NTX_NUM_8852A 2
 
 enum rtw8852a_pmac_mode {
 	NONE_TEST,
@@ -92,6 +91,8 @@ struct rtw8852a_bb_pmac_info {
 	u16 tx_time;
 	u8 duty_cycle;
 };
+
+extern const struct rtw89_chip_info rtw8852a_chip_info;
 
 void rtw8852a_bb_set_plcp_tx(struct rtw89_dev *rtwdev);
 void rtw8852a_bb_set_pmac_tx(struct rtw89_dev *rtwdev,

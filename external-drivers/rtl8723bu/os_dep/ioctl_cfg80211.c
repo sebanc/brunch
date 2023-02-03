@@ -747,8 +747,13 @@ check_bss:
 
 		DBG_871X(FUNC_ADPT_FMT" call cfg80211_roamed\n", FUNC_ADPT_ARG(padapter));
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,12,0))
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
 		roam_info.channel = notify_channel;
 		roam_info.bssid = cur_network->network.MacAddress;
+#else
+		roam_info.links[0].channel = notify_channel;
+		roam_info.links[0].bssid = cur_network->network.MacAddress;
+#endif
 		roam_info.req_ie =
 			pmlmepriv->assoc_req+sizeof(struct rtw_ieee80211_hdr_3addr)+2;
 		roam_info.req_ie_len =
@@ -1424,7 +1429,9 @@ exit:
 }
 
 static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)) || defined(COMPAT_KERNEL_RELEASE)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0)) || defined(COMPAT_KERNEL_RELEASE)
+				int link_id, u8 key_index, bool pairwise, const u8 *mac_addr,
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)) || defined(COMPAT_KERNEL_RELEASE)
 				u8 key_index, bool pairwise, const u8 *mac_addr,
 #else	// (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
 				u8 key_index, const u8 *mac_addr,
@@ -1561,7 +1568,9 @@ addkey_end:
 }
 
 static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)) || defined(COMPAT_KERNEL_RELEASE)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0)) || defined(COMPAT_KERNEL_RELEASE)
+				int link_id, u8 key_index, bool pairwise, const u8 *mac_addr,
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)) || defined(COMPAT_KERNEL_RELEASE)
 				u8 key_index, bool pairwise, const u8 *mac_addr,
 #else	// (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
 				u8 key_index, const u8 *mac_addr,
@@ -1575,7 +1584,9 @@ static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev,
 }
 
 static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)) || defined(COMPAT_KERNEL_RELEASE)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0)) || defined(COMPAT_KERNEL_RELEASE)
+				int link_id, u8 key_index, bool pairwise, const u8 *mac_addr)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)) || defined(COMPAT_KERNEL_RELEASE)
 				u8 key_index, bool pairwise, const u8 *mac_addr)
 #else	// (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
 				u8 key_index, const u8 *mac_addr)
@@ -1596,10 +1607,14 @@ static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev,
 }
 
 static int cfg80211_rtw_set_default_key(struct wiphy *wiphy,
-	struct net_device *ndev, u8 key_index
-	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)) || defined(COMPAT_KERNEL_RELEASE)
-	, bool unicast, bool multicast
-	#endif
+					struct net_device *ndev,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0)) || defined(COMPAT_KERNEL_RELEASE)
+					int link_id,
+#endif
+					u8 key_index
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)) || defined(COMPAT_KERNEL_RELEASE)
+					, bool unicast, bool multicast
+#endif
 	)
 {
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(ndev);
@@ -2822,8 +2837,6 @@ static int cfg80211_rtw_leave_ibss(struct wiphy *wiphy, struct net_device *ndev)
 
 	DBG_871X(FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(ndev));
 
-	padapter->mlmepriv.not_indic_disco = _TRUE;
-
 	old_type = rtw_wdev->iftype;
 
 	rtw_set_to_roam(padapter, 0);
@@ -2845,8 +2858,6 @@ static int cfg80211_rtw_leave_ibss(struct wiphy *wiphy, struct net_device *ndev)
 	}
 
 leave_ibss:
-	padapter->mlmepriv.not_indic_disco = _FALSE;
-
 	return 0;
 }
 
@@ -3111,8 +3122,6 @@ static int cfg80211_rtw_disconnect(struct wiphy *wiphy, struct net_device *ndev,
 
 	DBG_871X(FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(ndev));
 
-	padapter->mlmepriv.not_indic_disco = _TRUE;
-
 	rtw_set_to_roam(padapter, 0);
 
 	//if(check_fwstate(&padapter->mlmepriv, _FW_LINKED))
@@ -3128,8 +3137,6 @@ static int cfg80211_rtw_disconnect(struct wiphy *wiphy, struct net_device *ndev,
 		rtw_free_assoc_resources(padapter, 1);
 		rtw_pwr_wakeup(padapter);
 	}
-
-	padapter->mlmepriv.not_indic_disco = _FALSE;
 
 	DBG_871X(FUNC_NDEV_FMT" return 0\n", FUNC_NDEV_ARG(ndev));
 	return 0;
@@ -3977,7 +3984,12 @@ static int cfg80211_rtw_change_beacon(struct wiphy *wiphy, struct net_device *nd
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(5, 19, 1))
 static int cfg80211_rtw_stop_ap(struct wiphy *wiphy, struct net_device *ndev)
+#else
+static int cfg80211_rtw_stop_ap(struct wiphy *wiphy, struct net_device *ndev,
+                                unsigned int link_id)
+#endif
 {
 	DBG_871X(FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(ndev));
 	return 0;

@@ -4857,6 +4857,8 @@ static void do_queue_select(_adapter	*padapter, struct pkt_attrib *pattrib)
 s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev)
 {
 	u16 frame_ctl;
+/* nrm */
+//	struct ieee80211_radiotap_header rtap_hdr;
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(ndev);
 	struct pkt_file pktfile;
 	struct rtw_ieee80211_hdr *pwlanhdr;
@@ -4865,29 +4867,45 @@ s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev)
 	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
 	struct xmit_priv	*pxmitpriv = &(padapter->xmitpriv);
 	unsigned char	*pframe;
+/* nrm */
+//	u8 dummybuf[32];
+//	int len = skb->len, rtap_len;
 	int len = skb->len, rtap_len, rtap_remain, alloc_tries, ret;
 	struct ieee80211_radiotap_header *rtap_hdr; // net/ieee80211_radiotap.h
 	struct ieee80211_radiotap_iterator iterator; // net/cfg80211.h
 	u8 rtap_buf[256];
 
-
 	rtw_mstat_update(MSTAT_TYPE_SKB, MSTAT_ALLOC_SUCCESS, skb->truesize);
 
 #ifndef CONFIG_CUSTOMER_ALIBABA_GENERAL
+/* nrm */
+//	if (unlikely(skb->len < sizeof(struct ieee80211_radiotap_header)))
+//		goto fail;
 	if (ndev->type == ARPHRD_IEEE80211_RADIOTAP) {
 		if (unlikely(skb->len < sizeof(struct ieee80211_radiotap_header)))
 			goto fail;
 
+/* nrm */
+//	_rtw_open_pktfile((_pkt *)skb, &pktfile);
+//	_rtw_pktfile_read(&pktfile, (u8 *)(&rtap_hdr), sizeof(struct ieee80211_radiotap_header));
+//	rtap_len = ieee80211_get_radiotap_len((u8 *)(&rtap_hdr));
+//	if (unlikely(rtap_hdr.it_version))
+//		goto fail;
 		_rtw_open_pktfile((_pkt *)skb, &pktfile);
 		_rtw_pktfile_read(&pktfile, rtap_buf, sizeof(struct ieee80211_radiotap_header));
 		rtap_hdr = (struct ieee80211_radiotap_header*)(rtap_buf);
 		rtap_len = ieee80211_get_radiotap_len(rtap_buf);
 
+/* nrm */
+//	if (unlikely(skb->len < rtap_len))
+//		goto fail;
 		if (unlikely(rtap_hdr->it_version))
 			goto fail;
 
-		if (unlikely(skb->len < rtap_len))
-			goto fail;
+/* nrm */
+//	if (rtap_len != 12) {
+//		RTW_INFO("radiotap len (should be 14): %d\n", rtap_len);
+//		goto fail;
 
 		if (unlikely(rtap_len < sizeof(struct ieee80211_radiotap_header)))
 			goto fail;
@@ -4902,8 +4920,17 @@ s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev)
 
 		// NOTE: we process the radiotap header details later
 	}
+
+/* nrm */
+//	_rtw_pktfile_read(&pktfile, dummybuf, rtap_len-sizeof(struct ieee80211_radiotap_header));
+//	len = len - rtap_len;
 #endif
 
+/* nrm */
+//	pmgntframe = alloc_mgtxmitframe(pxmitpriv);
+//	if (pmgntframe == NULL) {
+//		rtw_udelay_os(500);
+//		goto fail;
 	// v5.2.20 had an allocation wrapper (monitor_alloc_mgtxmitframe) that performed a few
 	// tries to allocate an xmit frame before giving up.  This can be beneficial when there
 	// is a rapid-fire sequence of injected frames. Without it, frames can be randomly
@@ -4920,16 +4947,15 @@ s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev)
 		rtw_udelay_os(100);
 	}
 
-
 	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 //	_rtw_memcpy(pframe, (void *)checking, len);
 	_rtw_pktfile_read(&pktfile, pframe, len);
 
-
 	/* Check DATA/MGNT frames */
 	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
-
+/* nrm */
+//	frame_ctl = le16_to_cpu(pwlanhdr->frame_ctl);
 	if (unlikely(len < sizeof(struct rtw_ieee80211_hdr_3addr)))
 		frame_ctl = 0;
 	else
@@ -4940,6 +4966,9 @@ s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev)
 		pattrib = &pmgntframe->attrib;
 		update_monitor_frame_attrib(padapter, pattrib);
 
+/* nrm */
+//		if (is_broadcast_mac_addr(pwlanhdr->addr3) || is_broadcast_mac_addr(pwlanhdr->addr1))
+//			pattrib->rate = MGN_24M;
 		pattrib->rate = MGN_1M; // Override a more practical default rate
 
 	} else {
@@ -4955,7 +4984,7 @@ s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev)
 	pmlmeext->mgnt_seq++;
 	pattrib->last_txcmdsz = pattrib->pktlen;
 
-
+/* nrm */
 #ifndef CONFIG_CUSTOMER_ALIBABA_GENERAL
 
 	if (ndev->type == ARPHRD_IEEE80211_RADIOTAP) {
@@ -5125,6 +5154,7 @@ s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev)
 #endif // CONFIG_CUSTOMER_ALIBABA_GENERAL
 
 	dump_mgntframe(padapter, pmgntframe);
+/* nrm */
 	pxmitpriv->tx_pkts++;
 	pxmitpriv->tx_bytes += skb->len;
 

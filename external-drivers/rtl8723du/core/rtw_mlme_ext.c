@@ -1922,7 +1922,7 @@ unsigned int OnAuthClient(struct adapter *adapt, union recv_frame *precv_frame)
 	RTW_INFO("%s\n", __func__);
 
 	/* check A1 matches or not */
-	if (memcmp(adapter_mac_addr(adapt), get_da(pframe), ETH_ALEN))
+	if (memcmp(adapter_mac_addr(adapt), rtw_get_da(pframe), ETH_ALEN))
 		return _SUCCESS;
 
 	if (!(pmlmeinfo->state & WIFI_FW_AUTH_STATE) || pmlmeext->join_abort)
@@ -2267,7 +2267,7 @@ unsigned int OnAssocRsp(struct adapter *adapt, union recv_frame *precv_frame)
 	RTW_INFO("%s\n", __func__);
 
 	/* check A1 matches or not */
-	if (memcmp(adapter_mac_addr(adapt), get_da(pframe), ETH_ALEN))
+	if (memcmp(adapter_mac_addr(adapt), rtw_get_da(pframe), ETH_ALEN))
 		return _SUCCESS;
 
 	if (!(pmlmeinfo->state & (WIFI_FW_AUTH_SUCCESS | WIFI_FW_ASSOC_STATE)) || pmlmeext->join_abort)
@@ -13183,7 +13183,7 @@ u8 add_ba_rsp_hdl(struct adapter *adapt, unsigned char *pbuf)
 		preorder_ctrl->indicate_seq = pparm->start_seq;
 	}
 #else
-	preorder_ctrl->indicate_seq = 0xffff;
+	preorder_ctrl->indicate_seq = cpu_to_le16(0xffff);
 #endif
 
 	/*

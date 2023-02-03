@@ -71,6 +71,9 @@ typedef enum _C2H_EVT {
 	C2H_CUSTOMER_STR_RPT = 0x24,
 	C2H_CUSTOMER_STR_RPT_2 = 0x25,
 	C2H_WLAN_INFO = 0x27,
+#ifdef RTW_PER_CMD_SUPPORT_FW
+	C2H_PER_RATE_RPT = 0x2c,
+#endif
 	C2H_DEFEATURE_RSVD = 0xFD,
 	C2H_EXTEND = 0xff,
 } C2H_EVT;
@@ -111,5 +114,10 @@ int c2h_customer_str_rpt_hdl(_adapter *adapter, u8 *data, u8 len);
 #define CUSTOMER_STR_RPT_2_LEN 8
 int c2h_customer_str_rpt_2_hdl(_adapter *adapter, u8 *data, u8 len);
 #endif /* CONFIG_RTW_CUSTOMER_STR */
+
+#ifdef RTW_PER_CMD_SUPPORT_FW
+/* C2H_PER_RATE_RPT, 0x2c */
+int c2h_per_rate_rpt_hdl(_adapter *adapter, u8 *data, u8 len);
+#endif
 
 #endif /* __COMMON_C2H_H__ */

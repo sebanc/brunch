@@ -45,8 +45,8 @@ struct recv_reorder_ctrl {
 	struct adapter	*adapt;
 	u8 tid;
 	u8 enable;
-	u16 indicate_seq;/* =wstart_b, init_value=0xffff */
-	u16 wend_b;
+	__le16 indicate_seq;/* =wstart_b, init_value=0xffff */
+	__le16 wend_b;
 	u8 wsize_b;
 	u8 ampdu_size;
 	struct __queue pending_recvframe_queue;
@@ -142,7 +142,10 @@ struct rx_pkt_attrib	{
 
 
 /* These definition is used for Rx packet reordering. */
-#define SN_LESS(a, b)		(((a-b) & 0x800) != 0)
+static inline bool SN_LESS(__le16 a, __le16 b)
+{
+	return (((le16_to_cpu(a)-le16_to_cpu(b)) & 0x800) != 0);
+}
 #define SN_EQUAL(a, b)	(a == b)
 /* #define REORDER_WIN_SIZE	128 */
 /* #define REORDER_ENTRY_NUM	128 */

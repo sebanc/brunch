@@ -3216,6 +3216,7 @@ static void fill_default_txdesc(struct xmit_frame *pxmitframe, u8 *pbuf)
 			if (pattrib->retry_ctrl == _TRUE)
 				SET_TX_DESC_RTS_DATA_RTY_LMT_8821C(pbuf, 6);
 			else
+/* nrm */
 				SET_TX_DESC_RTS_DATA_RTY_LMT_8821C(pbuf, 0);
 		}
 

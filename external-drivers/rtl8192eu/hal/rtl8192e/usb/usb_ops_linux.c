@@ -12,7 +12,6 @@
  * more details.
  *
  *****************************************************************************/
-#define _HCI_OPS_OS_C_
 
 /* #include <drv_types.h> */
 #include <rtl8192e_hal.h>
@@ -29,16 +28,16 @@ void interrupt_handler_8192eu(_adapter *padapter, u16 pkt_len, u8 *pbuf)
 	}
 
 	/* HISR */
-	_rtw_memcpy(&(pHalData->IntArray[0]), &(pbuf[USB_INTR_CONTENT_HISR_OFFSET]), 4);
-	_rtw_memcpy(&(pHalData->IntArray[1]), &(pbuf[USB_INTR_CONTENT_HISRE_OFFSET]), 4);
+	memcpy(&(pHalData->IntArray[0]), &(pbuf[USB_INTR_CONTENT_HISR_OFFSET]), 4);
+	memcpy(&(pHalData->IntArray[1]), &(pbuf[USB_INTR_CONTENT_HISRE_OFFSET]), 4);
 
 #if 0 /* DBG */
 	{
 		u32 hisr = 0 , hisr_ex = 0;
-		_rtw_memcpy(&hisr, &(pHalData->IntArray[0]), 4);
+		memcpy(&hisr, &(pHalData->IntArray[0]), 4);
 		hisr = le32_to_cpu(hisr);
 
-		_rtw_memcpy(&hisr_ex, &(pHalData->IntArray[1]), 4);
+		memcpy(&hisr_ex, &(pHalData->IntArray[1]), 4);
 		hisr_ex = le32_to_cpu(hisr_ex);
 
 		if ((hisr != 0) || (hisr_ex != 0))
@@ -51,8 +50,8 @@ void interrupt_handler_8192eu(_adapter *padapter, u16 pkt_len, u8 *pbuf)
 	if (pHalData->IntArray[0] & IMR_BCNDMAINT0_88E) {
 		struct tdls_ch_switch *pchsw_info = &padapter->tdlsinfo.chsw_info;
 		u32	last_time = pchsw_info->cur_time;
-		pchsw_info->cur_time = rtw_systime_to_ms(rtw_get_current_time());
-		if ((ATOMIC_READ(&pchsw_info->chsw_on) == _TRUE) &&
+		pchsw_info->cur_time = jiffies_to_msecs(jiffies);
+		if ((atomic_read(&pchsw_info->chsw_on) == _TRUE) &&
 		    /* Sometimes we receive multiple interrupts in very little time period, use the follow condition test to filter */
 		    (pchsw_info->cur_time - last_time > padapter->mlmeextpriv.mlmext_info.bcn_interval - 5) &&
 		    (padapter->mlmeextpriv.cur_channel != rtw_get_oper_ch(padapter))) {
@@ -69,8 +68,8 @@ void interrupt_handler_8192eu(_adapter *padapter, u16 pkt_len, u8 *pbuf)
 
 #ifdef CONFIG_LPS_LCLK
 	if (pHalData->IntArray[0]  & IMR_CPWM_88E) {
-		_rtw_memcpy(&pwr_rpt.state, &(pbuf[USB_INTR_CONTENT_CPWM1_OFFSET]), 1);
-		/* _rtw_memcpy(&pwr_rpt.state2, &(pbuf[USB_INTR_CONTENT_CPWM2_OFFSET]), 1); */
+		memcpy(&pwr_rpt.state, &(pbuf[USB_INTR_CONTENT_CPWM1_OFFSET]), 1);
+		/* memcpy(&pwr_rpt.state2, &(pbuf[USB_INTR_CONTENT_CPWM2_OFFSET]), 1); */
 
 		/* 88e's cpwm value only change BIT0, so driver need to add PS_STATE_S2 for LPS flow.		 */
 		pwr_rpt.state |= PS_STATE_S2;
@@ -180,7 +179,7 @@ int recvbuf2recvframe(PADAPTER padapter, void *ptr)
 #ifdef CONFIG_RX_PACKET_APPEND_FCS
 		if (check_fwstate(&padapter->mlmepriv, WIFI_MONITOR_STATE) == _FALSE)
 			if ((pattrib->pkt_rpt_type == NORMAL_RX) && rtw_hal_rcr_check(padapter, RCR_APPFCS))
-				pattrib->pkt_len -= IEEE80211_FCS_LEN;
+				pattrib->pkt_len -= FCS_LEN;
 #endif
 
 		if (rtw_os_alloc_recvframe(padapter, precvframe,

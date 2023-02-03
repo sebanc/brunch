@@ -13,10 +13,8 @@
  *
  *****************************************************************************/
 
-#ifndef	__PHYDMPOWERTRACKING_H__
-#define    __PHYDMPOWERTRACKING_H__
-
-#define HALRF_POWRTRACKING_VER	"1.1"
+#ifndef __HALRF_POWERTRACKING_H__
+#define __HALRF_POWERTRACKING_H__
 
 #if (DM_ODM_SUPPORT_TYPE == ODM_AP)
 	#ifdef RTK_AC_SUPPORT
@@ -45,9 +43,10 @@
 
 #define IQK_BB_REG_NUM		9
 
-#define HP_THERMAL_NUM		8
-
 #define AVG_THERMAL_NUM		8
+#define AVG_THERMAL_NUM_DPK		8
+#define THERMAL_DPK_AVG_NUM		4
+
 #define iqk_matrix_reg_num	8
 /* #define IQK_MATRIX_SETTINGS_NUM	1+24+21 */
 #define IQK_MATRIX_SETTINGS_NUM	(14+24+21) /* Channels_2_4G_NUM + Channels_5G_20M_NUM + Channels_5G */
@@ -57,6 +56,7 @@
 	#define	OFDM_TABLE_SIZE	37
 	#define	CCK_TABLE_SIZE		33
 	#define	CCK_TABLE_SIZE_88F	21
+	#define	CCK_TABLE_SIZE_8192F	41
 
 
 
@@ -73,6 +73,7 @@
 	extern	u8 cck_swing_table_ch1_ch14_88f[CCK_TABLE_SIZE_88F][16];
 	extern	u8 cck_swing_table_ch1_ch13_88f[CCK_TABLE_SIZE_88F][16];
 	extern	u8 cck_swing_table_ch14_88f[CCK_TABLE_SIZE_88F][16];
+	extern	u32 cck_swing_table_ch1_ch14_8192f[CCK_TABLE_SIZE_8192F];
 
 #endif
 
@@ -100,7 +101,9 @@ static u8 delta_swing_table_idx_2ga_n_8188e[] = {0, 0, 0, 2, 2, 3, 3, 4, 4, 4, 4
 #define	OFDM_TABLE_SIZE_8812	43
 #define	AVG_THERMAL_NUM_8812	4
 
-#if (RTL8814A_SUPPORT == 1 || RTL8822B_SUPPORT == 1 || RTL8821C_SUPPORT == 1)
+#if (RTL8814A_SUPPORT == 1 || RTL8822B_SUPPORT == 1 ||\
+	RTL8821C_SUPPORT == 1 || RTL8198F_SUPPORT == 1 ||\
+	RTL8814B_SUPPORT == 1)
 	extern u32 tx_scaling_table_jaguar[TXSCALE_TABLE_SIZE];
 	#elif(ODM_IC_11AC_SERIES_SUPPORT)
 	extern unsigned int ofdm_swing_table_8812[OFDM_TABLE_SIZE_8812];
@@ -112,12 +115,12 @@ extern u32 cck_swing_table_ch1_ch14_8710b[CCK_TABLE_SIZE_8710B];
 
 #define dm_check_txpowertracking	odm_txpowertracking_check
 
-struct _IQK_MATRIX_REGS_SETTING {
+struct iqk_matrix_regs_setting {
 	boolean	is_iqk_done;
 	s32		value[1][iqk_matrix_reg_num];
 };
 
-struct odm_rf_calibration_structure {
+struct dm_rf_calibration_struct {
 	/* for tx power tracking */
 
 	u32	rega24; /* for TempCCK */
@@ -139,7 +142,7 @@ struct odm_rf_calibration_structure {
 	u8	thermal_value_lck;
 	u8	thermal_value_iqk;
 	s8  	thermal_value_delta; /* delta of thermal_value and efuse thermal */
-	u8	thermal_value_dpk;
+
 	u8	thermal_value_avg[AVG_THERMAL_NUM];
 	u8	thermal_value_avg_index;
 	u8	thermal_value_rx_gain;
@@ -147,7 +150,7 @@ struct odm_rf_calibration_structure {
 	u8	thermal_value_dpk_store;
 	u8	thermal_value_dpk_track;
 	boolean	txpowertracking_in_progress;
-	boolean	is_dpk_enable;
+
 
 	boolean	is_reloadtxpowerindex;
 	u8	is_rf_pi_enable;
@@ -161,9 +164,7 @@ struct odm_rf_calibration_structure {
 	s8	delta_power_index_last;
 	boolean is_tx_power_changed;
 
-	u8	thermal_value_hp[HP_THERMAL_NUM];
-	u8	thermal_value_hp_index;
-	struct _IQK_MATRIX_REGS_SETTING iqk_matrix_reg_setting[IQK_MATRIX_SETTINGS_NUM];
+	struct iqk_matrix_regs_setting iqk_matrix_reg_setting[IQK_MATRIX_SETTINGS_NUM];
 	u8	delta_lck;
 	u8  delta_swing_table_idx_2g_cck_a_p[DELTA_SWINGIDX_SIZE];
 	u8  delta_swing_table_idx_2g_cck_a_n[DELTA_SWINGIDX_SIZE];
@@ -201,6 +202,8 @@ struct odm_rf_calibration_structure {
 	u8  delta_swing_tssi_table_5gb[BAND_NUM][DELTA_SWINTSSI_SIZE];
 	u8  delta_swing_tssi_table_5gc[BAND_NUM][DELTA_SWINTSSI_SIZE];
 	u8  delta_swing_tssi_table_5gd[BAND_NUM][DELTA_SWINTSSI_SIZE];
+	s8  delta_swing_table_xtal_p[DELTA_SWINGIDX_SIZE];
+	s8  delta_swing_table_xtal_n[DELTA_SWINGIDX_SIZE];
 	u8  delta_swing_table_idx_2ga_p_8188e[DELTA_SWINGIDX_SIZE];
 	u8  delta_swing_table_idx_2ga_n_8188e[DELTA_SWINGIDX_SIZE];
 
@@ -229,6 +232,7 @@ struct odm_rf_calibration_structure {
 	boolean			modify_tx_agc_flag_path_c;
 	boolean			modify_tx_agc_flag_path_d;
 	boolean			modify_tx_agc_flag_path_a_cck;
+	boolean			modify_tx_agc_flag_path_b_cck;
 
 	s8			kfree_offset[MAX_RF_PATH];
 
@@ -275,8 +279,51 @@ struct odm_rf_calibration_structure {
 	u8	is_ap_kdone;
 	u8	is_apk_thermal_meter_ignore;
 	u8	is_dp_done;
+#if 0 /*move below members to halrf_dpk.h*/
 	u8	is_dp_path_aok;
 	u8	is_dp_path_bok;
+	u8	is_dp_path_cok;
+	u8	is_dp_path_dok;
+	u8 	dp_path_a_result[3];
+	u8 	dp_path_b_result[3];
+	u8 	dp_path_c_result[3];
+	u8 	dp_path_d_result[3];
+	boolean	is_dpk_enable;
+	u32	txrate[11];
+	u8 	pwsf_2g_a[3];
+	u8 	pwsf_2g_b[3];
+	u8 	pwsf_2g_c[3];
+	u8 	pwsf_2g_d[3];
+	u32	lut_2g_even_a[3][64];
+	u32	lut_2g_odd_a[3][64];
+	u32	lut_2g_even_b[3][64];
+	u32	lut_2g_odd_b[3][64];
+	u32	lut_2g_even_c[3][64];
+	u32	lut_2g_odd_c[3][64];
+	u32	lut_2g_even_d[3][64];
+	u32	lut_2g_odd_d[3][64];
+	u1Byte 	is_5g_pdk_a_ok;
+	u1Byte 	is_5g_pdk_b_ok;
+	u1Byte 	is_5g_pdk_c_ok;
+	u1Byte 	is_5g_pdk_d_ok;
+	u1Byte 	pwsf_5g_a[9];
+	u1Byte 	pwsf_5g_b[9];
+	u1Byte 	pwsf_5g_c[9];
+	u1Byte 	pwsf_5g_d[9];
+	u4Byte	lut_5g_even_a[9][16];
+	u4Byte	lut_5g_odd_a[9][16];
+	u4Byte	lut_5g_even_b[9][16];
+	u4Byte	lut_5g_odd_b[9][16];
+	u4Byte	lut_5g_even_c[9][16];
+	u4Byte	lut_5g_odd_c[9][16];
+	u4Byte	lut_5g_even_d[9][16];
+	u4Byte	lut_5g_odd_d[9][16];
+	u8	thermal_value_dpk;
+	u8	thermal_value_dpk_avg[AVG_THERMAL_NUM_DPK];
+	u8	thermal_value_dpk_avg_index;
+#endif
+	s8  modify_tx_agc_value_ofdm;
+	s8  modify_tx_agc_value_cck;
 
 	/*Add by Yuchen for Kfree Phydm*/
 	u8			reg_rf_kfree_enable;	/*for registry*/
@@ -286,34 +333,34 @@ struct odm_rf_calibration_structure {
 
 void
 odm_txpowertracking_check_ap(
-	void		*p_dm_void
+	void		*dm_void
 );
 
 void
 odm_txpowertracking_check(
-	void		*p_dm_void
+	void		*dm_void
 );
 
 
 void
 odm_txpowertracking_thermal_meter_init(
-	void		*p_dm_void
+	void		*dm_void
 );
 
 void
 odm_txpowertracking_init(
-	void		*p_dm_void
+	void		*dm_void
 );
 
 void
 odm_txpowertracking_check_mp(
-	void		*p_dm_void
+	void		*dm_void
 );
 
 
 void
 odm_txpowertracking_check_ce(
-	void		*p_dm_void
+	void		*dm_void
 );
 
 
@@ -321,31 +368,31 @@ odm_txpowertracking_check_ce(
 
 void
 odm_txpowertracking_callback_thermal_meter92c(
-	struct _ADAPTER	*adapter
+	void	*adapter
 );
 
 void
 odm_txpowertracking_callback_rx_gain_thermal_meter92d(
-	struct _ADAPTER	*adapter
+	void	*adapter
 );
 
 void
 odm_txpowertracking_callback_thermal_meter92d(
-	struct _ADAPTER	*adapter
+	void	*adapter
 );
 
 void
 odm_txpowertracking_direct_call92c(
-	struct _ADAPTER		*adapter
+	void		*adapter
 );
 
 void
 odm_txpowertracking_thermal_meter_check(
-	struct _ADAPTER		*adapter
+	void		*adapter
 );
 
 #endif
 
 
 
-#endif
+#endif	/*#ifndef __HALRF_POWER_TRACKING_H__*/

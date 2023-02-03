@@ -47761,27 +47761,26 @@ diff -ruN a/fs/overlayfs/dir.c b/fs/overlayfs/dir.c
  	struct cred *override_cred;
  	struct dentry *parent = dentry->d_parent;
  
-@@ -563,14 +563,15 @@
+@@ -563,13 +563,14 @@
+ 		override_cred->fsuid = inode->i_uid;
  		override_cred->fsgid = inode->i_gid;
- 		if (!attr->hardlink) {
- 			err = security_dentry_create_files_as(dentry,
--					attr->mode, &dentry->d_name, old_cred,
-+					attr->mode, &dentry->d_name,
-+					old_cred ? old_cred : current_cred(),
- 					override_cred);
- 			if (err) {
- 				put_cred(override_cred);
- 				goto out_revert_creds;
- 			}
- 		}
+ 		err = security_dentry_create_files_as(dentry,
+-				attr->mode, &dentry->d_name, old_cred,
++				attr->mode, &dentry->d_name,
++				old_cred ? old_cred : current_cred(),
+ 				override_cred);
+		if (err) {
+			put_cred(override_cred);
+			goto out_revert_creds;
+		}
 -		put_cred(override_creds(override_cred));
 +		hold_cred = override_creds(override_cred);
  		put_cred(override_cred);
- 
- 		if (!ovl_dentry_is_whiteout(dentry))
-@@ -579,7 +580,9 @@
- 			err = ovl_create_over_whiteout(dentry, inode, attr);
  	}
+ 
+@@ -579,7 +580,9 @@
+ 		err = ovl_create_over_whiteout(dentry, inode, attr);
+ 
  out_revert_creds:
 -	revert_creds(old_cred);
 +	ovl_revert_creds(dentry->d_sb, old_cred ?: hold_cred);

@@ -1,3 +1,7 @@
-debhelper-build-stamp
 files
-rtw89-dkms*
+*.debhelper
+*.substvars
+*stamp
+*.log
+rtw89-dkms/
+rtw89-firmware/

@@ -1354,32 +1354,6 @@ int rtw_make_wlanhdr(struct adapter *adapt , u8 *hdr, struct pkt_attrib *pattrib
 	int res = _SUCCESS;
 	__le16 *fctrl = &pwlanhdr->frame_ctl;
 
-	/* struct sta_info *psta; */
-
-	/* int bmcst = IS_MCAST(pattrib->ra); */
-
-
-	/*
-		psta = rtw_get_stainfo(&adapt->stapriv, pattrib->ra);
-		if(pattrib->psta != psta)
-		{
-			RTW_INFO("%s, pattrib->psta(%p) != psta(%p)\n", __func__, pattrib->psta, psta);
-			return;
-		}
-
-		if(psta==NULL)
-		{
-			RTW_INFO("%s, psta==NUL\n", __func__);
-			return _FAIL;
-		}
-
-		if(!(psta->state &_FW_LINKED))
-		{
-			RTW_INFO("%s, psta->state(0x%x) != _FW_LINKED\n", __func__, psta->state);
-			return _FAIL;
-		}
-	*/
-
 	memset(hdr, 0, WLANHDR_OFFSET);
 
 	set_frame_sub_type(fctrl, pattrib->subtype);
@@ -1474,7 +1448,7 @@ int rtw_make_wlanhdr(struct adapter *adapt , u8 *hdr, struct pkt_attrib *pattrib
 					tx_seq = psta->BA_starting_seqctrl[pattrib->priority & 0x0f];
 
 					/* check BA_starting_seqctrl */
-					if (SN_LESS(pattrib->seqnum, tx_seq)) {
+					if (SN_LESS(cpu_to_le16(pattrib->seqnum), cpu_to_le16(tx_seq))) {
 						/* RTW_INFO("tx ampdu seqnum(%d) < tx_seq(%d)\n", pattrib->seqnum, tx_seq); */
 						pattrib->ampdu_en = false;/* AGG BK */
 					} else if (SN_EQUAL(pattrib->seqnum, tx_seq)) {

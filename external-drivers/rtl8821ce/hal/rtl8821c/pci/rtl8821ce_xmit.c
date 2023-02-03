@@ -293,8 +293,13 @@ static void rtl8821ce_update_txbd(struct xmit_frame *pxmitframe,
 	u16 page_size_length = 0;
 
 	/* map TX DESC buf_addr (including TX DESC + tx data) */
+	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	mapping = pci_map_single(pdvobjpriv->ppcidev, pxmitframe->buf_addr,
 				 sz + TX_WIFI_INFO_SIZE, PCI_DMA_TODEVICE);
+	#else
+	mapping = dma_map_single(&(pdvobjpriv->ppcidev)->dev, pxmitframe->buf_addr,
+				 sz + TX_WIFI_INFO_SIZE, DMA_TO_DEVICE);
+	#endif
 
 	/* Calculate page size.
 	 * Total buffer length including TX_WIFI_INFO and PacketLen
@@ -1248,7 +1253,11 @@ int rtl8821ce_init_txbd_ring(_adapter *padapter, unsigned int q_idx,
 
 	RTW_INFO("%s entries num:%d\n", __func__, entries);
 
+	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	txbd = pci_alloc_consistent(pdev, sizeof(*txbd) * entries, &dma);
+	#else
+	txbd = dma_alloc_coherent(&pdev->dev, sizeof(*txbd) * entries, &dma, GFP_KERNEL);
+	#endif
 
 	if (!txbd || (unsigned long)txbd & 0xFF) {
 		RTW_INFO("Cannot allocate TXBD (q_idx = %d)\n", q_idx);
@@ -1294,9 +1303,15 @@ void rtl8821ce_free_txbd_ring(_adapter *padapter, unsigned int prio)
 		#ifdef CONFIG_64BIT_DMA
 			mapping |= (dma_addr_t)GET_TX_BD_PHYSICAL_ADDR0_HIGH(txbd) << 32;
 		#endif
+			#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 			pci_unmap_single(pdev,
 				mapping,
 				pxmitbuf->len, PCI_DMA_TODEVICE);
+			#else
+			dma_unmap_single(&pdev->dev,
+				mapping,
+				pxmitbuf->len, DMA_TO_DEVICE);
+			#endif
 
 			rtw_free_xmitbuf(t_priv, pxmitbuf);
 
@@ -1307,8 +1322,13 @@ void rtl8821ce_free_txbd_ring(_adapter *padapter, unsigned int prio)
 		}
 	}
 
+	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	pci_free_consistent(pdev, sizeof(*ring->buf_desc) * ring->entries,
 			    ring->buf_desc, ring->dma);
+	#else
+	dma_free_coherent(&pdev->dev, sizeof(*ring->buf_desc) * ring->entries,
+			    ring->buf_desc, ring->dma);
+	#endif
 	ring->buf_desc = NULL;
 
 }
@@ -1442,9 +1462,15 @@ void rtl8821ce_tx_isr(PADAPTER Adapter, int prio)
 		#ifdef CONFIG_64BIT_DMA
 			mapping |= (dma_addr_t)GET_TX_BD_PHYSICAL_ADDR0_HIGH(tx_desc) << 32;
 		#endif
+			#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 			pci_unmap_single(pdvobjpriv->ppcidev,
 				mapping,
 				pxmitbuf->len, PCI_DMA_TODEVICE);
+			#else
+			dma_unmap_single(&(pdvobjpriv->ppcidev)->dev,
+				mapping,
+				pxmitbuf->len, DMA_TO_DEVICE);
+			#endif
 			rtw_sctx_done(&pxmitbuf->sctx);
 			rtw_free_xmitbuf(&(pxmitbuf->padapter->xmitpriv),
 					 pxmitbuf);

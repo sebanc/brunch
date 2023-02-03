@@ -28,6 +28,7 @@
 #define MCC_SWCH_FW_EARLY_TIME 10 /* ms */
 #define MCC_EXPIRE_TIME 50 /* ms */
 #define MCC_TOLERANCE_TIME 2 /* 2*2 = 4s */
+#define MCC_UPDATE_PARAMETER_THRESHOLD 5 /* ms */
 
 #define MCC_ROLE_STA_GC_MGMT_QUEUE_MACID 0
 #define MCC_ROLE_SOFTAP_GO_MGMT_QUEUE_MACID 1
@@ -55,8 +56,19 @@
 #define MAX_MCC_NUM 2
 
 #define MCC_STOP(adapter) (adapter->mcc_adapterpriv.mcc_tx_stop)
-#define MCC_EN(adapter) (adapter->registrypriv.en_mcc)
-
+#define MCC_EN(adapter) (adapter_to_dvobj(adapter)->mcc_objpriv.en_mcc)
+#define SET_MCC_EN_FLAG(adapter, flag)\
+	do { \
+		adapter_to_dvobj(adapter)->mcc_objpriv.en_mcc = (flag); \
+	} while (0)
+#define SET_MCC_DURATION(adapter, val)\
+	do { \
+		adapter_to_dvobj(adapter)->mcc_objpriv.duration = (val); \
+	} while (0)
+#define SET_MCC_RUNTIME_DURATION(adapter, flag)\
+	do { \
+		adapter_to_dvobj(adapter)->mcc_objpriv.enable_runtime_duration = (flag); \
+	} while (0)
 /* Represent Channel Tx Null setting */
 enum mcc_channel_tx_null {
 	MCC_ENABLE_TX_NULL = 0,
@@ -84,10 +96,11 @@ enum mcc_status_rpt {
 	MCC_RPT_READY = 3,
 	MCC_RPT_SWICH_CHANNEL_NOTIFY = 7,
 	MCC_RPT_UPDATE_NOA_START_TIME = 8,
+	MCC_RPT_TSF = 9,
 	MCC_RPT_MAX,
 };
 
-enum MCC_ROLE {
+enum mcc_role {
 	MCC_ROLE_STA = 0,
 	MCC_ROLE_AP = 1,
 	MCC_ROLE_GC = 2,
@@ -102,10 +115,21 @@ struct mcc_iqk_backup {
 	u16 RX_Y;
 };
 
+enum MCC_DURATION_SETTING {
+	MCC_DURATION_MAPPING = 0,
+	MCC_DURATION_DIRECET = 1,
+};
+
+enum MCC_SCHED_MODE {
+	MCC_FAIR_SCHEDULE = 0,
+	MCC_FAVOE_STA = 1,
+	MCC_FAVOE_P2P = 2,
+};
+
 /*  mcc data for adapter */
 struct mcc_adapter_priv {
 	u8 order;		/* FW document, softap/AP must be 0 */
-	u8 role;			/* MCC role(AP,STA,GO,GC) */
+	enum mcc_role role;			/* MCC role(AP,STA,GO,GC) */
 	u8 mcc_duration; /* channel stay period, UNIT:1TU */
 
 	/* flow control */
@@ -134,10 +158,20 @@ struct mcc_adapter_priv {
 
 	u8 p2p_go_noa_ie[MAX_P2P_IE_LEN];
 	u32 p2p_go_noa_ie_len;
+	u64 tsf;
+#ifdef CONFIG_TDLS
+	u8 backup_tdls_en;
+#endif /* CONFIG_TDLS */
+
+	u8 null_early;
+	u8 null_rty_num;
 };
 
 struct mcc_obj_priv {
-	u8 duration; /* channel stay period, UNIT:1TU */
+	u8 en_mcc; /* enable MCC or not */
+	u8 duration; /* store duration(%) from registry, for primary adapter */
+	u8 interval;
+	u8 start_time;
 	u8 mcc_c2h_status;
 	u8 cur_mcc_success_cnt; /* used for check mcc switch channel success */
 	u8 prev_mcc_success_cnt; /* used for check mcc switch channel success */
@@ -145,11 +179,25 @@ struct mcc_obj_priv {
 	u8 mcc_loc_rsvd_paga[MAX_MCC_NUM];  /* mcc rsvd page */
 	u8 mcc_status; /* mcc status stop or start .... */
 	u8 policy_index;
+	u8 mcc_stop_threshold;
+	u8 current_order;
+	u8 last_tsfdiff;
 	systime mcc_launch_time; /* mcc launch time, used for starting detect mcc switch channel success */
 	_mutex mcc_mutex;
 	_lock mcc_lock;
 	PADAPTER iface[MAX_MCC_NUM]; /* by order, use for mcc parameter cmd */
 	struct submit_ctx mcc_sctx;
+	struct submit_ctx mcc_tsf_req_sctx;
+	_mutex mcc_tsf_req_mutex;
+	u8 mcc_tsf_req_sctx_order; /* record current order for mcc_tsf_req_sctx */
+#ifdef CONFIG_MCC_MODE_V2
+	u8 mcc_iqk_value_rsvd_page[3];
+#endif /* CONFIG_MCC_MODE_V2 */
+	u8 mcc_pwr_idx_rsvd_page[MAX_MCC_NUM];
+	u8 enable_runtime_duration;
+	u32 backup_phydm_ability;
+	/* for LG */
+	u8 mchan_sched_mode;
 };
 
 /* backup IQK val */
@@ -166,7 +214,7 @@ void rtw_hal_clear_mcc_status(PADAPTER padapter, u8 mcc_status);
 
 /* dl mcc rsvd page */
 u8 rtw_hal_dl_mcc_fw_rsvd_page(_adapter *adapter, u8 *pframe, u16 *index
-	, u8 tx_desc, u32 page_size, u8 *page_num, u32 *total_pkt_len, RSVDPAGE_LOC *rsvd_page_loc);
+	, u8 tx_desc, u32 page_size, u8 *total_page_num, RSVDPAGE_LOC *rsvd_page_loc, u8 *page_num);
 
 /* handle C2H */
 void rtw_hal_mcc_c2h_handler(PADAPTER padapter, u8 buflen, u8 *tmpBuf);
@@ -208,9 +256,16 @@ void rtw_hal_mcc_issue_null_data(_adapter *padapter, u8 chbw_allow, u8 ps_mode);
 
 u8 *rtw_hal_mcc_append_go_p2p_ie(PADAPTER padapter, u8 *pframe, u32 *len);
 
-void rtw_hal_mcc_update_switch_channel_policy_table(PADAPTER padapter);
-
 void rtw_hal_dump_mcc_policy_table(void *sel);
 
+void rtw_hal_mcc_update_macid_bitmap(PADAPTER padapter, int mac_id, u8 add);
+
+void rtw_hal_mcc_process_noa(PADAPTER padapter);
+
+void rtw_hal_mcc_parameter_init(PADAPTER padapter);
+
+u8 rtw_set_mcc_duration_hdl(PADAPTER adapter, u8 type, const u8 *val);
+
+u8 rtw_set_mcc_duration_cmd(_adapter *adapter, u8 type, u8 val);
 #endif /* _RTW_MCC_H_ */
 #endif /* CONFIG_MCC_MODE */

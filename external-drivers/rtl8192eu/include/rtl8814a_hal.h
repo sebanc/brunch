@@ -51,7 +51,10 @@ typedef struct _RT_FIRMWARE_8814 {
 } RT_FIRMWARE_8814, *PRT_FIRMWARE_8814;
 
 #define PAGE_SIZE_TX_8814	PAGE_SIZE_128
-#define BCNQ_PAGE_NUM_8814		0x08
+/* BCN rsvd_page_num = MAX_BEACON_LEN / PAGE_SIZE_TX_8814
+ * PS-Poll:1, Null Data:1,Qos Null Data:1,BT Qos Null Data:1,CTS-2-SELF,LTE QoS Null*/
+
+#define BCNQ_PAGE_NUM_8814		(MAX_BEACON_LEN / PAGE_SIZE_TX_8814 + 6) /*0x08*/
 
 #define Rtl8814A_NIC_PWR_ON_FLOW				rtl8814A_power_on_flow
 #define Rtl8814A_NIC_RF_OFF_FLOW				rtl8814A_radio_off_flow
@@ -309,9 +312,6 @@ u8 GetHalDefVar8814A(PADAPTER padapter, HAL_DEF_VARIABLE variable, void *pval);
 void rtl8814_set_hal_ops(struct hal_ops *pHalFunc);
 void init_hal_spec_8814a(_adapter *adapter);
 
-/* register */
-void SetBcnCtrlReg(PADAPTER padapter, u8 SetBits, u8 ClearBits);
-void SetBcnCtrlReg(PADAPTER	Adapter, u8	SetBits, u8	ClearBits);
 void rtl8814_start_thread(PADAPTER padapter);
 void rtl8814_stop_thread(PADAPTER padapter);
 

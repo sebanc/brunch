@@ -1016,7 +1016,7 @@ struct ieee80211_security {
 	u8 key_sizes[WEP_KEYS];
 	u8 keys[WEP_KEYS][WEP_KEY_LEN];
 	u8 level;
-	u16 flags;
+	__le16 flags;
 } __attribute__((packed));
 
 /*
@@ -1092,18 +1092,18 @@ struct ieee80211_info_element {
 
 struct ieee80211_authentication {
 	struct ieee80211_header_data header;
-	u16 algorithm;
-	u16 transaction;
-	u16 status;
+	__le16 algorithm;
+	__le16 transaction;
+	__le16 status;
 	/* struct ieee80211_info_element_hdr info_element; */
 } __attribute__((packed));
 
 
 struct ieee80211_probe_response {
 	struct ieee80211_header_data header;
-	u32 time_stamp[2];
-	u16 beacon_interval;
-	u16 capability;
+	__le32 time_stamp[2];
+	__le16 beacon_interval;
+	__le16 capability;
 	struct ieee80211_info_element info_element;
 } __attribute__((packed));
 
@@ -1114,26 +1114,26 @@ struct ieee80211_probe_request {
 
 struct ieee80211_assoc_request_frame {
 	struct rtw_ieee80211_hdr_3addr header;
-	u16 capability;
-	u16 listen_interval;
+	__le16 capability;
+	__le16 listen_interval;
 	/* u8 current_ap[ETH_ALEN]; */
 	struct ieee80211_info_element_hdr info_element;
 } __attribute__((packed));
 
 struct ieee80211_assoc_response_frame {
 	struct rtw_ieee80211_hdr_3addr header;
-	u16 capability;
-	u16 status;
-	u16 aid;
+	__le16 capability;
+	__le16 status;
+	__le16 aid;
 	/*	struct ieee80211_info_element info_element;  supported rates  */
 } __attribute__((packed));
 
 struct ieee80211_txb {
 	u8 nr_frags;
 	u8 encrypted;
-	u16 reserved;
-	u16 frag_size;
-	u16 payload_size;
+	__le16 reserved;
+	__le16 frag_size;
+	__le16 payload_size;
 	struct sk_buff *fragments[0];
 };
 

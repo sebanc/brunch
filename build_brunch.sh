@@ -152,7 +152,7 @@ rm -r ./chroot/tmp/rtl8192eu || { echo "Failed to build external rtl8192eu modul
 
 fi
 
-if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
+if [ "$kernel" == "6.1" ]; then
 
 cp -r ./external-drivers/rtl8723bs ./chroot/tmp/ || { echo "Failed to build external rtl8723bs module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8723bs || { echo "Failed to build external rtl8723bs module for kernel $kernel"; exit 1; }
@@ -251,7 +251,7 @@ rm -r ./chroot/tmp/rtl88x2bu || { echo "Failed to build external rtl88x2bu modul
 
 fi
 
-if [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
+if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 
 cp -r ./external-drivers/rtl8852ae ./chroot/tmp/ || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8852ae || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }

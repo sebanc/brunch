@@ -1,0 +1,141 @@
+#
+# backport Kconfig
+#
+# Some options are user-selectable ("BPAUTO_USERSEL_*")
+#
+# Most options, however, follow a few different schemes:
+#
+# A) An option that is selected by drivers ("select FOO") will be
+#    changed to "select BPAUTO_FOO" (if the option BPAUTO_FOO
+#    exists). The option BPAUTO_FOO then controls setting of the
+#    BPAUTO_BUILD_FOO option, which is a module, like this:
+#
+# config BPAUTO_BUILD_FOO
+#	tristate
+#	# or bool
+#
+#	# not possible on kernel < X.Y, build will fail if any
+#	# drivers are allowed to build on kernels < X.Y
+#	depends on KERNEL_X_Y
+#
+#	# don't build the backport code if FOO is in the kernel
+#	# already, but only if the kernel version is also >= X.Z;
+#	# this is an example of backporting where the version of
+#	# the FOO subsystem that we need is only available from
+#	# kernel version X.Z
+#	depends on !FOO || KERNEL_X_Z
+#
+#	# build if driver needs it (it selects BPAUTO_FOO)
+#	default m if BPAUTO_FOO
+#
+#	# or for build-testing (BPAUTO_USERSEL_BUILD_ALL is enabled)
+#	default m if BPAUTO_USERSEL_BUILD_ALL
+#
+# config BPAUTO_FOO
+#	bool
+#
+# This only works as-is if the kernel code is usable on any version,
+# otherwise the "&& !FOO" part needs to be different.
+#
+#
+# B) An option for code always present on some kernels (e.g. KFIFO).
+#    This simply depends on/sets the default based on the version:
+#
+# config BPAUTO_BUILD_KFIFO
+#	def_bool y
+#	depends on KERNEL_2_6_36
+#
+#
+# C) similarly, a kconfig symbol for an option, e.g.
+#    BPAUTO_OPTION_SOME_FIX (no examples provided) check git log
+#
+#
+# Variations are obviously possible.
+#
+
+config BP_MODULES
+	option modules
+	bool
+	default MODULES
+
+	help
+	This symbol is necessary for the newer kconf tool, it looks
+	for the "option modules" to control the 'm' state.
+
+config BPAUTO_BUILD_NLATTR
+	def_bool y
+	depends on KERNEL_5_2
+	#c-file lib/nlattr.c
+
+config BPAUTO_USERSEL_BUILD_ALL
+	bool "Build all compat code"
+	help
+	  This option selects all the compat code options
+	  that would otherwise only be selected by drivers.
+
+	  It's only really useful for compat testing, so
+	  you probably shouldn't enable it.
+
+config BPAUTO_WANT_DEV_COREDUMP
+	bool
+
+config BPAUTO_RHASHTABLE
+	bool
+	# current API of rhashtable was introduced in version 4.9
+	# (the one including rhltable)
+	depends on KERNEL_4_9
+	# not very nice - but better than always having it
+	default y if BACKPORTED_MAC80211
+	#h-file linux/rhashtable.h
+	#h-file linux/rhashtable-types.h
+	#c-file lib/rhashtable.c
+
+config BPAUTO_BUCKET_LOCKS
+	bool
+	# the API of bucket_locks that we need was introduced in version 4.16
+	depends on KERNEL_4_16
+	default y if BPAUTO_RHASHTABLE
+	#c-file lib/bucket_locks.c
+
+config BPAUTO_REFCOUNT
+	bool
+	default y
+	depends on KERNEL_4_11
+	#h-file linux/refcount.h
+	#c-file lib/refcount.c
+
+config BPAUTO_SYSTEM_DATA_VERIFICATION
+	bool
+
+config BPAUTO_BUILD_SYSTEM_DATA_VERIFICATION
+	bool
+	default y if BPAUTO_SYSTEM_DATA_VERIFICATION
+	depends on (KERNEL_4_7 || !SYSTEM_DATA_VERIFICATION) && CRYPTO_HASH_INFO
+	select BPAUTO_ASN1_DECODER
+	select BPAUTO_PUBLIC_KEY
+	select BPAUTO_PKCS7
+	#h-file linux/oid_registry.h
+	#c-file lib/oid_registry.c
+
+config BPAUTO_PUBLIC_KEY
+	bool
+	#h-file crypto/public_key.h
+
+config BPAUTO_ASN1_DECODER
+	bool
+	#h-file linux/asn1_decoder.h
+	#c-file lib/asn1_decoder.c
+
+config BPAUTO_PKCS7
+	bool
+	#h-file crypto/pkcs7.h
+
+config BPAUTO_CRYPTO_LIB_ARC4
+	bool
+
+config BPAUTO_BUILD_CRYPTO_LIB_ARC4
+	bool
+	default y if BPAUTO_CRYPTO_LIB_ARC4
+	depends on !(CRYPTO_LIB_ARC4=y || CRYPTO_LIB_ARC4=m)
+	#h-file crypto/arc4.h
+	#c-file lib/crypto/arc4.c

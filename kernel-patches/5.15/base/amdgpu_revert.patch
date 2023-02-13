@@ -1,0 +1,12 @@
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_vcn.c	2022-12-14 11:37:31.000000000 +0100
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_vcn.c	2022-11-03 15:59:20.000000000 +0100
+@@ -149,9 +149,6 @@
+ 		break;
+ 	case CHIP_VANGOGH:
+ 		fw_name = FIRMWARE_VANGOGH;
+-		if ((adev->firmware.load_type == AMDGPU_FW_LOAD_PSP) &&
+-		    (adev->pg_flags & AMD_PG_SUPPORT_VCN_DPG))
+-			adev->vcn.indirect_sram = true;
+ 		break;
+ 	case CHIP_DIMGREY_CAVEFISH:
+ 		fw_name = FIRMWARE_DIMGREY_CAVEFISH;

@@ -57,9 +57,12 @@ for kernel in $kernels; do
 		6.1)
 			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"
 			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
-			mkdir "./kernels/6.1"
+			mkdir "./kernels/chromebook-6.1" "./kernels/6.1"
+			tar -C "./kernels/chromebook-6.1" -zxf "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source extraction failed"; exit 1; }
 			tar -C "./kernels/6.1" -zxf "./kernels/chromiumos-$kernel.tar.gz" chromeos || { echo "Kernel source extraction failed"; exit 1; }
 			rm -f "./kernels/chromiumos-$kernel.tar.gz"
+			apply_patches "chromebook-6.1"
+			make_config "chromebook-6.1"
 			echo "Downloading Mainline kernel source for kernel $kernel version $kernel_version"
 			curl -L "https://mirrors.edge.kernel.org/pub/linux/kernel/v6.x/linux-$kernel_version.tar.gz" -o "./kernels/mainline-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
 			tar -C "./kernels/6.1" -zxf "./kernels/mainline-$kernel.tar.gz" --strip 1 || { echo "Kernel source extraction failed"; exit 1; }
@@ -70,9 +73,12 @@ for kernel in $kernels; do
 		5.15)
 			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"
 			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
-			mkdir "./kernels/5.15"
+			mkdir "./kernels/chromebook-5.15" "./kernels/5.15"
+			tar -C "./kernels/chromebook-5.15" -zxf "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source extraction failed"; exit 1; }
 			tar -C "./kernels/5.15" -zxf "./kernels/chromiumos-$kernel.tar.gz" chromeos || { echo "Kernel source extraction failed"; exit 1; }
 			rm -f "./kernels/chromiumos-$kernel.tar.gz"
+			apply_patches "chromebook-5.15"
+			make_config "chromebook-5.15"
 			echo "Downloading Mainline kernel source for kernel $kernel version $kernel_version"
 			curl -L "https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-$kernel_version.tar.gz" -o "./kernels/mainline-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
 			tar -C "./kernels/5.15" -zxf "./kernels/mainline-$kernel.tar.gz" --strip 1 || { echo "Kernel source extraction failed"; exit 1; }

@@ -181,7 +181,7 @@ reset
 
 returned_values=""
 
-available_kernels="6.1;5.15;5.10;5.4;4.19;chromebook-5.10;chromebook-5.4"
+available_kernels="6.1;5.15;5.10;5.4;4.19;chromebook-6.1;chromebook-5.15;chromebook-5.10;chromebook-5.4;steamdeck;macbook-t2"
 echo "Select your kernel (press ENTER to validate your choice)"
 singleselect "$available_kernels"
 selected_kernel="$returned_values"
@@ -236,7 +236,7 @@ reset
 
 fi
 
-available_cmdline_params="enforce_hyperthreading=1;snd-intel-dspcfg.dsp_driver=1;i915.enable_fbc=0 i915.enable_psr=0;psmouse.elantech_smbus=1;psmouse.synaptics_intertouch=1"
+available_cmdline_params="enforce_hyperthreading=1;snd-intel-dspcfg.dsp_driver=1;snd-intel-dspcfg.dsp_driver=4;i915.enable_fbc=0 i915.enable_psr=0;psmouse.elantech_smbus=1;psmouse.synaptics_intertouch=1"
 echo "Select your kernel commandline parameters (press SPACE to select an item and ENTER to validate your choice)"
 multiselect "$available_cmdline_params" " "
 selected_cmdline_params="$returned_values"

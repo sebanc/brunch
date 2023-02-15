@@ -270,6 +270,7 @@ rm -rf ./busybox || { echo "Failed to finalise initramfs"; exit 1; }
 cd ./image
 dd if=/dev/zero of=../brunch/rootc.img bs=1G seek=1 count=0 || { echo "Failed to create rootc image"; exit 1; }
 yes | sudo mkfs.ext4 -F -b 4096 -L "ROOT-C" ../brunch/rootc.img || { echo "Failed to format rootc image"; exit 1; }
+yes | sudo tune2fs -m 0  ../brunch/rootc.img || { echo "Failed to tune rootc image"; exit 1; }
 sudo mount ../brunch/rootc.img ./tmp || { echo "Failed to mount rootc image"; exit 1; }
 sudo cp -r ../rootc/* ./tmp/ || { echo "Failed to copy files to rootc image"; exit 1; }
 sudo umount ./tmp || { echo "Failed to umount rootc image"; exit 1; }

@@ -21,25 +21,25 @@ mkdir -p ./chroot/out ./out || { echo "Failed to create output directory"; exit 
 chmod 0777 ./out || { echo "Failed to fix output directory permissions"; exit 1; }
 
 if [ ! -z $1 ] && [ "$1" != "skip" ] ; then
-if [ ! -f "$1" ]; then echo "ChromeOS recovery image $1 not found"; exit 1; fi
-if [ ! $(dd if="$1" bs=1 count=4 status=none | od -A n -t x1 | sed 's/ //g') == '33c0fa8e' ] || [ $(cgpt show -i 12 -b "$1") -eq 0 ] || [ $(cgpt show -i 13 -b "$1") -gt 0 ] || [ ! $(cgpt show -i 3 -l "$1") == 'ROOT-A' ]; then echo "$1 is not a valid ChromeOS recovery image"; fi
-recovery_image=$(losetup --show -fP "$1")
-[ -b "$recovery_image"p3 ] || { echo "Failed to setup loop device"; exit 1; }
-mount -o ro "$recovery_image"p3 ./out || { echo "Failed to mount ChromeOS rootfs"; exit 1; }
-cp -a ./out/* ./chroot/ || { echo "Failed to copy ChromeOS rootfs content"; exit 1; }
-umount ./out || { echo "Failed to unmount ChromeOS rootfs"; exit 1; }
-losetup -d "$recovery_image" || { echo "Failed to detach loop device"; exit 1; }
+	if [ ! -f "$1" ]; then echo "ChromeOS recovery image $1 not found"; exit 1; fi
+	if [ ! $(dd if="$1" bs=1 count=4 status=none | od -A n -t x1 | sed 's/ //g') == '33c0fa8e' ] || [ $(cgpt show -i 12 -b "$1") -eq 0 ] || [ $(cgpt show -i 13 -b "$1") -gt 0 ] || [ ! $(cgpt show -i 3 -l "$1") == 'ROOT-A' ]; then echo "$1 is not a valid ChromeOS recovery image"; fi
+	recovery_image=$(losetup --show -fP "$1")
+	[ -b "$recovery_image"p3 ] || { echo "Failed to setup loop device"; exit 1; }
+	mount -o ro "$recovery_image"p3 ./out || { echo "Failed to mount ChromeOS rootfs"; exit 1; }
+	cp -a ./out/* ./chroot/ || { echo "Failed to copy ChromeOS rootfs content"; exit 1; }
+	umount ./out || { echo "Failed to unmount ChromeOS rootfs"; exit 1; }
+	losetup -d "$recovery_image" || { echo "Failed to detach loop device"; exit 1; }
 else
-git clone -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
-cd rootfs
-curl -L https://dl.google.com/chromeos/rammus/15236.66.0/stable-channel/chromeos_15236.66.0_rammus_stable-channel_full_mp-v2.bin-gyzweztdmqyto6stdjq5ptjxpkddeiq6.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
-python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
-cd ..
-[ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }
-mount -o ro ./rootfs/root.img ./out || { echo "Failed to mount ChromeOS rootfs image"; exit 1; }
-cp -a ./out/* ./chroot/ || { echo "Failed to copy ChromeOS rootfs content"; exit 1; }
-umount ./out || { echo "Failed to unmount ChromeOS rootfs image"; exit 1; }
-rm -r ./rootfs
+	git clone -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
+	cd rootfs
+	curl -L https://dl.google.com/chromeos/rammus/15236.66.0/stable-channel/chromeos_15236.66.0_rammus_stable-channel_full_mp-v2.bin-gyzweztdmqyto6stdjq5ptjxpkddeiq6.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
+	python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
+	cd ..
+	[ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }
+	mount -o ro ./rootfs/root.img ./out || { echo "Failed to mount ChromeOS rootfs image"; exit 1; }
+	cp -a ./out/* ./chroot/ || { echo "Failed to copy ChromeOS rootfs content"; exit 1; }
+	umount ./out || { echo "Failed to unmount ChromeOS rootfs image"; exit 1; }
+	rm -r ./rootfs
 fi
 
 mkdir -p ./chroot/home/chronos/image/tmp || { echo "Failed to create image directory"; exit 1; }
@@ -66,7 +66,9 @@ chown -R 1000:1000 ./chroot/home/chronos/initramfs || { echo "Failed to fix init
 mkdir ./chroot/home/chronos/rootc || { echo "Failed to create rootc directory"; exit 1; }
 ln -s kernel-6.1 ./chroot/home/chronos/rootc/kernel || { echo "Failed to make the default kernel symlink"; exit 1; }
 ln -s kernel-chromebook-5.10 ./chroot/home/chronos/rootc/kernel-macbook || { echo "Failed to make the macbook kernel symlink"; exit 1; }
+ln -s kernel-chromebook-5.10 ./chroot/home/chronos/rootc/kernel-macbook-t2 || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 ln -s kernel-chromebook-5.10 ./chroot/home/chronos/rootc/kernel-chromebook || { echo "Failed to make the default chromebook kernel symlink"; exit 1; }
+ln -s kernel-chromebook-5.15 ./chroot/home/chronos/rootc/kernel-steamdeck || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 cp -r ./packages ./chroot/home/chronos/rootc/ || { echo "Failed to copy brunch packages"; exit 1; }
 cp -r ./brunch-patches ./chroot/home/chronos/rootc/patches || { echo "Failed to copy brunch patches"; exit 1; }
 chmod -R 0755 ./chroot/home/chronos/rootc/patches || { echo "Failed to change patches directory permissions"; exit 1; }

@@ -129,14 +129,6 @@ diff -ruN a/sound/soc/amd/vangogh/acp5x-i2s.c b/sound/soc/amd/vangogh/acp5x-i2s.
  		val = acp_readl(rtd->acp5x_base + reg_val);
  		val = val | BIT(0);
  		acp_writel(val, rtd->acp5x_base + reg_val);
-@@ -357,7 +345,6 @@
- 
- static const struct snd_soc_component_driver acp5x_dai_component = {
- 	.name = "acp5x-i2s",
--	.legacy_dai_naming = 1,
- };
- 
- static struct snd_soc_dai_driver acp5x_i2s_dai = {
 @@ -400,8 +387,8 @@
  	}
  	adata->acp5x_base = devm_ioremap(&pdev->dev, res->start,
@@ -587,14 +579,6 @@ diff -ruN a/sound/soc/amd/vangogh/pci-acp5x.c b/sound/soc/amd/vangogh/pci-acp5x.
   * @freq_in:  frequency of input clock source
   * @freq_out:  must be 256*Fs in order to achieve the best performance
   *
-@@ -1498,6 +1428,7 @@
- 	.dapm_routes		= nau8821_dapm_routes,
- 	.num_dapm_routes	= ARRAY_SIZE(nau8821_dapm_routes),
- 	.suspend_bias_off	= 1,
-+	.non_legacy_dai_naming	= 1,
- 	.idle_bias_on		= 1,
- 	.use_pmdown_time	= 1,
- 	.endianness		= 1,
 @@ -1557,7 +1488,6 @@
  		nau8821->jack_eject_debounce);
  	dev_dbg(dev, "dmic-clk-threshold:       %d\n",

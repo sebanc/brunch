@@ -94,6 +94,10 @@ jobs:
           yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12 git fakeroot build-essential ncurses-dev xz-utils libssl-dev bc flex libelf-dev bison sbsigntool python3-protobuf
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
           pip3 install --upgrade google-api-python-client
+      - name: Free some disk space
+        run: |
+	  sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+	  sudo apt clean
       - name: Checkout Brunch source code
         uses: actions/checkout@v3
       - name: Download built kernels

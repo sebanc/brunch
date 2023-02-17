@@ -1,0 +1,69 @@
+From 86078789c49823b218c0f821d864d515d83368c7 Mon Sep 17 00:00:00 2001
+From: Hector Martin <marcan@marcan.st>
+Date: Tue, 21 Dec 2021 17:27:19 +0900
+Subject: [PATCH 05/27] brcmfmac: of: Fetch Apple properties
+
+On Apple ARM64 platforms, firmware selection requires two properties
+that come from system firmware: the module-instance (aka "island", a
+codename representing a given hardware platform) and the antenna-sku.
+We map Apple's module codenames to board_types in the form
+"apple,<module-instance>".
+
+The mapped board_type is added to the DTS file in that form, while the
+antenna-sku is forwarded by our bootloader from the Apple Device Tree
+into the FDT. Grab them from the DT so firmware selection can use
+them.
+
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Hector Martin <marcan@marcan.st>
+[Redecorating: added ", len" in third last context line]
+---
+ .../wireless/broadcom/brcm80211/brcmfmac/common.h    |  1 +
+ .../net/wireless/broadcom/brcm80211/brcmfmac/of.c    | 12 +++++++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/common.h b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/common.h
+index 8b5f49997c8b..d4aa25d646fe 100644
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/common.h
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/common.h
+@@ -50,6 +50,7 @@ struct brcmf_mp_device {
+ 	bool		ignore_probe_fail;
+ 	struct brcmfmac_pd_cc *country_codes;
+ 	const char	*board_type;
++	const char	*antenna_sku;
+ 	union {
+ 		struct brcmfmac_sdio_pd sdio;
+ 	} bus;
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/of.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/of.c
+index 8623bde5eb70..05414ac0d28e 100644
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/of.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/of.c
+@@ -63,14 +63,24 @@ void brcmf_of_probe(struct device *dev, enum brcmf_bus_type bus_type,
+ {
+ 	struct brcmfmac_sdio_pd *sdio = &settings->bus.sdio;
+ 	struct device_node *root, *np = dev->of_node;
++	const char *prop;
+ 	int irq;
+ 	int err;
+ 	u32 irqf;
+ 	u32 val;
+ 
++	/* Apple ARM64 platforms have their own idea of board type, passed in
++	 * via the device tree. They also have an antenna SKU parameter
++	 */
++	if (!of_property_read_string(np, "brcm,board-type", &prop))
++		settings->board_type = prop;
++
++	if (!of_property_read_string(np, "apple,antenna-sku", &prop))
++		settings->antenna_sku = prop;
++
+ 	/* Set board-type to the first string of the machine compatible prop */
+ 	root = of_find_node_by_path("/");
+-	if (root) {
++	if (root && !settings->board_type) {
+ 		int i, len;
+ 		char *board_type;
+ 		const char *tmp;
+-- 
+2.36.0
+

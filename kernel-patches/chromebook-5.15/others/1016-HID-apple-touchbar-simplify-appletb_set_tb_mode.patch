@@ -1,0 +1,68 @@
+From 19b1e4c8aea89d67d299f885d07846e756c9fe2d Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Sat, 12 Nov 2022 20:44:07 +0300
+Subject: [PATCH 12/13] HID: apple-touchbar: simplify appletb_set_tb_mode
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/apple-touchbar.c | 31 +++++++++++++++++--------------
+ 1 file changed, 17 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/hid/apple-touchbar.c b/drivers/hid/apple-touchbar.c
+index 5e41e62b1a6c..40c12886e651 100644
+--- a/drivers/hid/apple-touchbar.c
++++ b/drivers/hid/apple-touchbar.c
+@@ -258,8 +258,11 @@ static int appletb_set_tb_mode(struct appletb_device *tb_dev,
+ 			       unsigned char mode)
+ {
+ 	struct hid_report *report;
+-	void *buf;
+ 	bool autopm_off = false;
++	__u8 usbtype;
++	char data[2];
++	size_t len;
++	void *buf;
+ 	int rc;
+ 
+ 	if (!tb_dev->mode_iface.hdev)
+@@ -268,24 +271,24 @@ static int appletb_set_tb_mode(struct appletb_device *tb_dev,
+ 	report = tb_dev->mode_field->report;
+ 
+ 	if (tb_dev->is_t1) {
+-		buf = kmemdup(&mode, 1, GFP_KERNEL);
++		len = sizeof(mode);
++		buf = &mode;
++		usbtype = USB_TYPE_VENDOR;
+ 	} else {
+-		char data[] = { report->id, mode };
+-		buf = kmemdup(data, sizeof(data), GFP_KERNEL);
++		len = sizeof(data);
++		data[0] = report->id;
++		data[1] = mode;
++		buf = data;
++		usbtype = USB_TYPE_CLASS;
+ 	}
+-	if (!buf)
+-		return -ENOMEM;
++
++	buf = kmemdup(buf, len, GFP_KERNEL);
+ 
+ 	autopm_off = appletb_disable_autopm(tb_dev->mode_iface.hdev);
+ 
+-	if (tb_dev->is_t1)
+-		rc = appletb_hw_raw_request(&tb_dev->mode_iface, report->id,
+-					   (__u8 *) buf, 1, report->type,
+-					   HID_REQ_SET_REPORT, USB_TYPE_VENDOR);
+-	else
+-		rc = appletb_hw_raw_request(&tb_dev->mode_iface, report->id,
+-					   (__u8 *) buf, 2, report->type,
+-					   HID_REQ_SET_REPORT, USB_TYPE_CLASS);
++	rc = appletb_hw_raw_request(&tb_dev->mode_iface, report->id,
++				    buf, len, HID_OUTPUT_REPORT,
++				    HID_REQ_SET_REPORT, usbtype);
+ 
+ 	if (rc < 0)
+ 		dev_err(tb_dev->log_dev,
+-- 
+2.38.1
+

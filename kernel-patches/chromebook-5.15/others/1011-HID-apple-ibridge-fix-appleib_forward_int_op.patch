@@ -1,0 +1,45 @@
+From be7dd12ddd1a85366a989c6c7bda21adc556013d Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Mon, 7 Nov 2022 22:00:09 +0300
+Subject: [PATCH 07/13] HID: apple-ibridge: fix appleib_forward_int_op
+
+This commit fixes an issue mentioned in
+https://lore.kernel.org/lkml/20210228150239.00007d34@Huawei.com/.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/apple-ibridge.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/hid/apple-ibridge.c b/drivers/hid/apple-ibridge.c
+index d4d15e54eedf..4caa7820fcf6 100644
+--- a/drivers/hid/apple-ibridge.c
++++ b/drivers/hid/apple-ibridge.c
+@@ -161,7 +161,7 @@ static int appleib_forward_int_op(struct hid_device *hdev,
+ {
+ 	struct appleib_hid_dev_info *hdev_info = hid_get_drvdata(hdev);
+ 	struct hid_device *sub_hdev;
+-	int rc = 0;
++	int rc;
+ 	int i;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(hdev_info->sub_hdevs); i++) {
+@@ -169,13 +169,11 @@ static int appleib_forward_int_op(struct hid_device *hdev,
+ 		if (sub_hdev->driver) {
+ 			rc = forward(sub_hdev->driver, sub_hdev, args);
+ 			if (rc)
+-				break;
++				return rc;
+ 		}
+-
+-		break;
+ 	}
+ 
+-	return rc;
++	return 0;
+ }
+ 
+ static int appleib_hid_suspend_fwd(struct hid_driver *drv,
+-- 
+2.38.1
+

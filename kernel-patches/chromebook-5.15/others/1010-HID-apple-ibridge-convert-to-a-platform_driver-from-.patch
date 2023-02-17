@@ -1,0 +1,210 @@
+From 6afbbbbb3c8d576c5c15c593e3fd64b80e9474f0 Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Mon, 7 Nov 2022 21:37:44 +0300
+Subject: [PATCH 06/13] HID: apple-ibridge: convert to a platform_driver from
+ an acpi_driver
+
+This commit addresses the issues raised in
+https://lore.kernel.org/lkml/CAHp75Vd13nobdyiUbYoTbeoqG4rGP-Vfswcuuy3oYjXgTXzNSw@mail.gmail.com/.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/Kconfig         |  3 +-
+ drivers/hid/apple-ibridge.c | 67 +++++++++++++++----------------------
+ 2 files changed, 28 insertions(+), 42 deletions(-)
+
+diff --git a/drivers/hid/Kconfig b/drivers/hid/Kconfig
+index d5a61773a163..476c1fd50520 100644
+--- a/drivers/hid/Kconfig
++++ b/drivers/hid/Kconfig
+@@ -140,9 +140,8 @@ config HID_APPLE
+ 
+ config HID_APPLE_IBRIDGE
+ 	tristate "Apple iBridge"
+-	depends on ACPI
+ 	depends on USB_HID
+-	depends on X86 || COMPILE_TEST
++	depends on (X86 && ACPI) || COMPILE_TEST
+ 	imply HID_APPLE_TOUCHBAR
+ 	imply HID_SENSOR_HUB
+ 	imply HID_SENSOR_ALS
+diff --git a/drivers/hid/apple-ibridge.c b/drivers/hid/apple-ibridge.c
+index 5f2b71c19974..d4d15e54eedf 100644
+--- a/drivers/hid/apple-ibridge.c
++++ b/drivers/hid/apple-ibridge.c
+@@ -40,6 +40,7 @@
+  * iBridge when suspending and resuming.
+  */
+ 
++#include <linux/platform_device.h>
+ #include <linux/acpi.h>
+ #include <linux/device.h>
+ #include <linux/hid.h>
+@@ -54,8 +55,6 @@
+ 
+ #define APPLEIB_BASIC_CONFIG	1
+ 
+-#define	LOG_DEV(ib_dev)		(&(ib_dev)->acpi_dev->dev)
+-
+ static struct hid_device_id appleib_sub_hid_ids[] = {
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_LINUX_FOUNDATION,
+ 			 USB_DEVICE_ID_IBRIDGE_TB) },
+@@ -78,8 +77,7 @@ static struct {
+ };
+ 
+ struct appleib_device {
+-	struct acpi_device	*acpi_dev;
+-	acpi_handle		asoc_socw;
++	acpi_handle asoc_socw;
+ };
+ 
+ struct appleib_hid_dev_info {
+@@ -561,21 +559,19 @@ static struct hid_driver appleib_hid_driver = {
+ #endif
+ };
+ 
+-static struct appleib_device *appleib_alloc_device(struct acpi_device *acpi_dev)
++static struct appleib_device *appleib_alloc_device(struct platform_device *platform_dev)
+ {
+ 	struct appleib_device *ib_dev;
+ 	acpi_status sts;
+ 
+-	ib_dev = devm_kzalloc(&acpi_dev->dev, sizeof(*ib_dev), GFP_KERNEL);
++	ib_dev = devm_kzalloc(&platform_dev->dev, sizeof(*ib_dev), GFP_KERNEL);
+ 	if (!ib_dev)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	ib_dev->acpi_dev = acpi_dev;
+-
+ 	/* get iBridge acpi power control method for suspend/resume */
+-	sts = acpi_get_handle(acpi_dev->handle, "SOCW", &ib_dev->asoc_socw);
++	sts = acpi_get_handle(ACPI_HANDLE(&platform_dev->dev), "SOCW", &ib_dev->asoc_socw);
+ 	if (ACPI_FAILURE(sts)) {
+-		dev_err(LOG_DEV(ib_dev),
++		dev_err(&platform_dev->dev,
+ 			"Error getting handle for ASOC.SOCW method: %s\n",
+ 			acpi_format_exception(sts));
+ 		return ERR_PTR(-ENXIO);
+@@ -584,76 +580,70 @@ static struct appleib_device *appleib_alloc_device(struct acpi_device *acpi_dev)
+ 	/* ensure iBridge is powered on */
+ 	sts = acpi_execute_simple_method(ib_dev->asoc_socw, NULL, 1);
+ 	if (ACPI_FAILURE(sts))
+-		dev_warn(LOG_DEV(ib_dev), "SOCW(1) failed: %s\n",
++		dev_warn(&platform_dev->dev, "SOCW(1) failed: %s\n",
+ 			 acpi_format_exception(sts));
+ 
+ 	return ib_dev;
+ }
+ 
+-static int appleib_probe(struct acpi_device *acpi)
++static int appleib_probe(struct platform_device *platform_dev)
+ {
+ 	struct appleib_device *ib_dev;
+ 	int ret;
+ 
+-	ib_dev = appleib_alloc_device(acpi);
++	ib_dev = appleib_alloc_device(platform_dev);
+ 	if (IS_ERR(ib_dev))
+ 		return PTR_ERR(ib_dev);
+ 
+ 	ret = hid_register_driver(&appleib_hid_driver);
+ 	if (ret) {
+-		dev_err(LOG_DEV(ib_dev), "Error registering hid driver: %d\n",
++		dev_err(&platform_dev->dev, "Error registering hid driver: %d\n",
+ 			ret);
+ 		return ret;
+ 	}
+ 
+-	acpi->driver_data = ib_dev;
++	platform_set_drvdata(platform_dev, ib_dev);
+ 
+ 	return 0;
+ }
+ 
+-static int appleib_remove(struct acpi_device *acpi)
++static int appleib_remove(struct platform_device *platform_dev)
+ {
+ 	hid_unregister_driver(&appleib_hid_driver);
+ 
+ 	return 0;
+ }
+ 
+-static int appleib_suspend(struct device *dev)
++static int appleib_suspend(struct platform_device *platform_dev, pm_message_t message)
+ {
+ 	struct appleib_device *ib_dev;
+ 	int rc;
+ 
+-	ib_dev = acpi_driver_data(to_acpi_device(dev));
++	ib_dev = platform_get_drvdata(platform_dev);
+ 
+ 	rc = acpi_execute_simple_method(ib_dev->asoc_socw, NULL, 0);
+ 	if (ACPI_FAILURE(rc))
+-		dev_warn(dev, "SOCW(0) failed: %s\n",
++		dev_warn(&platform_dev->dev, "SOCW(0) failed: %s\n",
+ 			 acpi_format_exception(rc));
+ 
+ 	return 0;
+ }
+ 
+-static int appleib_resume(struct device *dev)
++static int appleib_resume(struct platform_device *platform_dev)
+ {
+ 	struct appleib_device *ib_dev;
+ 	int rc;
+ 
+-	ib_dev = acpi_driver_data(to_acpi_device(dev));
++	ib_dev = platform_get_drvdata(platform_dev);
+ 
+ 	rc = acpi_execute_simple_method(ib_dev->asoc_socw, NULL, 1);
+ 	if (ACPI_FAILURE(rc))
+-		dev_warn(dev, "SOCW(1) failed: %s\n",
++		dev_warn(&platform_dev->dev, "SOCW(1) failed: %s\n",
+ 			 acpi_format_exception(rc));
+ 
+ 	return 0;
+ }
+ 
+-static const struct dev_pm_ops appleib_pm = {
+-	.suspend = appleib_suspend,
+-	.resume = appleib_resume,
+-	.restore = appleib_resume,
+-};
+-
+ static const struct acpi_device_id appleib_acpi_match[] = {
+ 	{ "APP7777", 0 },
+ 	{ },
+@@ -661,21 +651,18 @@ static const struct acpi_device_id appleib_acpi_match[] = {
+ 
+ MODULE_DEVICE_TABLE(acpi, appleib_acpi_match);
+ 
+-static struct acpi_driver appleib_driver = {
+-	.name		= "apple-ibridge",
+-	.class		= "apple_ibridge",
+-	.owner		= THIS_MODULE,
+-	.ids		= appleib_acpi_match,
+-	.ops		= {
+-		.add		= appleib_probe,
+-		.remove		= appleib_remove,
+-	},
+-	.drv		= {
+-		.pm		= &appleib_pm,
++static struct platform_driver appleib_driver = {
++	.probe		= appleib_probe,
++	.remove		= appleib_remove,
++	.suspend	= appleib_suspend,
++	.resume		= appleib_resume,
++	.driver 	= {
++		.name 		  = "apple-ibridge",
++		.acpi_match_table = appleib_acpi_match,
+ 	},
+ };
+ 
+-module_acpi_driver(appleib_driver)
++module_platform_driver(appleib_driver);
+ 
+ MODULE_AUTHOR("Ronald Tschalär");
+ MODULE_DESCRIPTION("Apple iBridge driver");
+-- 
+2.38.1
+

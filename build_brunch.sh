@@ -65,9 +65,8 @@ chown -R 1000:1000 ./chroot/home/chronos/initramfs || { echo "Failed to fix init
 
 mkdir ./chroot/home/chronos/rootc || { echo "Failed to create rootc directory"; exit 1; }
 ln -s kernel-6.1 ./chroot/home/chronos/rootc/kernel || { echo "Failed to make the default kernel symlink"; exit 1; }
-ln -s kernel-chromebook-5.10 ./chroot/home/chronos/rootc/kernel-macbook || { echo "Failed to make the macbook kernel symlink"; exit 1; }
-ln -s kernel-chromebook-5.10 ./chroot/home/chronos/rootc/kernel-macbook-t2 || { echo "Failed to make the macbook kernel symlink"; exit 1; }
-ln -s kernel-chromebook-5.10 ./chroot/home/chronos/rootc/kernel-chromebook || { echo "Failed to make the default chromebook kernel symlink"; exit 1; }
+ln -s kernel-chromebook-5.15 ./chroot/home/chronos/rootc/kernel-macbook || { echo "Failed to make the macbook kernel symlink"; exit 1; }
+ln -s kernel-chromebook-5.15 ./chroot/home/chronos/rootc/kernel-macbook-t2 || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 ln -s kernel-chromebook-5.15 ./chroot/home/chronos/rootc/kernel-steamdeck || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 cp -r ./packages ./chroot/home/chronos/rootc/ || { echo "Failed to copy brunch packages"; exit 1; }
 cp -r ./brunch-patches ./chroot/home/chronos/rootc/patches || { echo "Failed to copy brunch patches"; exit 1; }
@@ -344,6 +343,7 @@ rm -rf ./out/bnx2x
 rm -rf ./out/dpaa2
 rm -rf ./out/liquidio
 rm -rf ./out/mellanox
+rm -rf ./out/mrvl/prestera
 rm -rf ./out/netronome
 rm -rf ./out/qcom
 rm -rf ./out/qed

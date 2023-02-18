@@ -32,7 +32,7 @@ if [ ! -z $1 ] && [ "$1" != "skip" ] ; then
 else
 	git clone -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
 	cd rootfs
-	curl -L https://dl.google.com/chromeos/rammus/15236.66.0/stable-channel/chromeos_15236.66.0_rammus_stable-channel_full_mp-v2.bin-gyzweztdmqyto6stdjq5ptjxpkddeiq6.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
+	curl -L https://dl.google.com/chromeos/rammus/15278.64.0/stable-channel/chromeos_15278.64.0_rammus_stable-channel_full_mp-v2.bin-gyzwkyrumy2dtojpdutbiqlozwfdhfke.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
 	python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
 	cd ..
 	[ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }
@@ -64,7 +64,7 @@ chmod 0755 ./chroot/home/chronos/initramfs/init || { echo "Failed to change init
 chown -R 1000:1000 ./chroot/home/chronos/initramfs || { echo "Failed to fix initramfs directory ownership"; exit 1; }
 
 mkdir ./chroot/home/chronos/rootc || { echo "Failed to create rootc directory"; exit 1; }
-ln -s kernel-6.1 ./chroot/home/chronos/rootc/kernel || { echo "Failed to make the default kernel symlink"; exit 1; }
+ln -s kernel-5.15 ./chroot/home/chronos/rootc/kernel || { echo "Failed to make the default kernel symlink"; exit 1; }
 ln -s kernel-chromebook-5.15 ./chroot/home/chronos/rootc/kernel-macbook || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 ln -s kernel-chromebook-5.15 ./chroot/home/chronos/rootc/kernel-macbook-t2 || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 ln -s kernel-chromebook-5.15 ./chroot/home/chronos/rootc/kernel-steamdeck || { echo "Failed to make the macbook kernel symlink"; exit 1; }

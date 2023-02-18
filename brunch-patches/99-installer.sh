@@ -292,7 +292,7 @@ To boot directly from this image file, add the lines between stars to either:
 - A brunch usb flashdrive grub config file (then boot from usb and choose boot from disk image in the menu),
 - Or your hard disk grub install if you have one (refer to you distro's online resources).
 ********************************************************************************
-menuentry "ChromeOS" --class "brunch" {
+menuentry "Brunch" --class "brunch" {
 	img_path="\$img_path"
 	img_uuid="\$img_uuid"
 	search --no-floppy --set=root --file \\\$img_path
@@ -309,7 +309,7 @@ menuentry "ChromeOS" --class "brunch" {
 	initrd (loop,7)/lib/firmware/amd-ucode.img (loop,7)/lib/firmware/intel-ucode.img (loop,7)/initramfs.img
 }
 
-menuentry "ChromeOS (settings)" --class "brunch-settings" {
+menuentry "Brunch settings" --class "brunch-settings" {
 	img_path="\$img_path"
 	img_uuid="\$img_uuid"
 	search --no-floppy --set=root --file \\\$img_path

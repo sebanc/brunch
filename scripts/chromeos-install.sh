@@ -361,7 +361,7 @@ if [ "$type" == "Dualboot (create an image)" ]; then
 	fi
 	img_path=$(if [ $(findmnt -n -o TARGET -T "$fullpath") == "/" ]; then echo $(realpath "$fullpath"); else echo $(realpath "$fullpath") | sed "s#$(findmnt -n -o TARGET -T "$fullpath")##g"; fi)
 	if [ -z "$wsl" ] && ([ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "ubuntu" ] || [ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "linuxmint" ] || [ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "fedora" ] || [ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "zorin" ]); then remove_tpm="\n	rmmod tpm"; fi
-	config="menuentry \"ChromeOS\" --class \"brunch\" {$remove_tpm
+	config="menuentry \"Brunch\" --class \"brunch\" {$remove_tpm
 	img_path="$img_path"
 	img_uuid="$img_uuid"
 	search --no-floppy --set=root --file "\$img_path"
@@ -378,7 +378,7 @@ if [ "$type" == "Dualboot (create an image)" ]; then
 	initrd (loop,7)/lib/firmware/amd-ucode.img (loop,7)/lib/firmware/intel-ucode.img (loop,7)/initramfs.img
 }
 
-menuentry \"ChromeOS (settings)\" --class \"brunch-settings\" {$remove_tpm
+menuentry \"Brunch settings\" --class \"brunch-settings\" {$remove_tpm
 	img_path="$img_path"
 	img_uuid="$img_uuid"
 	search --no-floppy --set=root --file "\$img_path"

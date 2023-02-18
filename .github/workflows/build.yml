@@ -96,8 +96,8 @@ jobs:
           pip3 install --upgrade google-api-python-client
       - name: Free some disk space
         run: |
-	  sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-	  sudo apt clean
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo apt clean
       - name: Checkout Brunch source code
         uses: actions/checkout@v3
       - name: Download built kernels

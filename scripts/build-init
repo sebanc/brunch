@@ -269,8 +269,10 @@ rm -rf ./busybox || { echo "Failed to finalise initramfs"; exit 1; }
 
 cd ./image
 dd if=/dev/zero of=../brunch/rootc.img bs=1G seek=1 count=0 || { echo "Failed to create rootc image"; exit 1; }
-yes | sudo mkfs.ext4 -F -b 4096 -L "ROOT-C" ../brunch/rootc.img || { echo "Failed to format rootc image"; exit 1; }
-yes | sudo tune2fs -m 0  ../brunch/rootc.img || { echo "Failed to tune rootc image"; exit 1; }
+yes | sudo mkfs.ext4 -m 0 -F -b 4096 -L "ROOT-C" ../brunch/rootc.img || { echo "Failed to format rootc image"; exit 1; }
+if sudo tune2fs -l ../brunch/rootc.img | grep 'Filesystem features' | grep -q -w large_dir; then sudo tune2fs -O ^large_dir ../brunch/rootc.img || { echo "Failed to remove large_dir feature"; exit 1; }; fi
+if sudo tune2fs -l ../brunch/rootc.img | grep 'Filesystem features' | grep -q -w metadata_csum_seed; then sudo tune2fs -O ^metadata_csum_seed ../brunch/rootc.img || { echo "Failed to remove metadata_csum_seed feature"; exit 1; }; fi
+if sudo tune2fs -l ../brunch/rootc.img | grep 'Filesystem features' | grep -q -w orphan_file; then sudo tune2fs -O ^orphan_file ../brunch/rootc.img || { echo "Failed to remove orphan_file feature"; exit 1; }; fi
 sudo mount ../brunch/rootc.img ./tmp || { echo "Failed to mount rootc image"; exit 1; }
 sudo cp -r ../rootc/* ./tmp/ || { echo "Failed to copy files to rootc image"; exit 1; }
 sudo umount ./tmp || { echo "Failed to umount rootc image"; exit 1; }

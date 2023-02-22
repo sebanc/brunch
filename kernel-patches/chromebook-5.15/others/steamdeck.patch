@@ -505,3 +505,12 @@ diff -ruN a/sound/soc/amd/vangogh/pci-acp5x.c b/sound/soc/amd/vangogh/pci-acp5x.
  	.id_table = nau8821_i2c_ids,
  };
  module_i2c_driver(nau8821_driver);
+--- a/sound/pci/hda/cs35l41_hda_spi.c	2023-02-22 20:27:38.683000000 +0100
++++ b/sound/pci/hda/cs35l41_hda_spi.c	2023-02-22 20:29:56.558385302 +0100
+@@ -58,5 +58,6 @@
+ module_spi_driver(cs35l41_spi_driver);
+ 
+ MODULE_DESCRIPTION("HDA CS35L41 driver");
++MODULE_IMPORT_NS(SND_HDA_SCODEC_CS35L41);
+ MODULE_AUTHOR("Lucas Tanure <tanureal@opensource.cirrus.com>");
+ MODULE_LICENSE("GPL");

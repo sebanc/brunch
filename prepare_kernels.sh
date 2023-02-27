@@ -143,6 +143,6 @@ done
 rm -rf ./kernels
 mkdir ./kernels
 
-chromeos_version="R111"
+chromeos_version="R112"
 download_and_patch_kernels
 

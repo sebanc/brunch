@@ -55321,12 +55321,11 @@ diff -ruN a/kernel/power/wakeup_reason.c b/kernel/power/wakeup_reason.c
 diff -ruN a/kernel/sched/core.c b/kernel/sched/core.c
 --- a/kernel/sched/core.c	2019-12-04 22:31:09.000000000 +0100
 +++ b/kernel/sched/core.c	2021-04-02 07:03:31.000000000 +0200
-@@ -3861,11 +3861,7 @@
+@@ -3861,10 +3861,7 @@
  		print_ip_sym(preempt_disable_ip);
  		pr_cont("\n");
  	}
--	if (panic_on_warn)
--		panic("scheduling while atomic\n");
+-	check_panic_on_warn("scheduling while atomic");
 -
 -	dump_stack();
 -	add_taint(TAINT_WARN, LOCKDEP_STILL_OK);

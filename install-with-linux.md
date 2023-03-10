@@ -416,8 +416,8 @@ In case you run into issues while installing or using Brunch, below are the main
 [framework-options]: ./troubleshooting-and-faqs.md#framework-options
 [releases-tab]: https://github.com/sebanc/brunch/releases
 [latest-release]: https://github.com/sebanc/brunch/releases/latest
-[mbr-patch]: https://github.com/sebanc/brunch/raw/master/mbr_support.tar.gz
-[brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
+[mbr-patch]: https://github.com/sebanc/brunch/raw/main/mbr_support.tar.gz
+[brunch-der]: https://github.com/sebanc/brunch/raw/main/brunch.der
 [secure-boot]: ./install-with-linux.md#secure-boot
 [brunch-usb-guide-win]:  ./install-with-windows.md#usb-installations
 [brunch-usb-guide-lin]:  ./install-with-linux.md#usb-installations

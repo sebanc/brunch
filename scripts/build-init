@@ -5,7 +5,7 @@ export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/usr/local/lib64:/usr
 export C_INCLUDE_PATH=/home/chronos/ncurses-pkg/usr/include:/usr/local/include:/usr/include
 export GCONV_PATH=/usr/local/lib64/gconv
 export PERL5LIB=/usr/local/lib/perl5/5.32.0
-export PKG_CONFIG_PATH=/home/chronos/inih-pkg/usr/lib64/pkgconfig:/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig
+export PKG_CONFIG_PATH=/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig
 export PYTHON=/usr/local/bin/python3
 export PYTHONHOME=/usr/local
 export SGML_CATALOG_FILES="/usr/local/etc/sgml/catalog"
@@ -208,23 +208,23 @@ rm -rf ./swtpm-pkg || { echo "Failed to make swtpm package"; exit 1; }
 
 git clone --depth=1 -b master https://github.com/mirror/ncurses.git || { echo "Failed to make ncurses"; exit 1; }
 cd ./ncurses || { echo "Failed to make ncurses"; exit 1; }
-./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal --enable-widec || { echo "Failed to make ncurses"; exit 1; }
+./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal --enable-pc-files --with-pkg-config-libdir=/usr/lib64/pkgconfig --enable-widec || { echo "Failed to make ncurses"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make ncurses"; exit 1; }
 make DESTDIR=/home/chronos/ncurses-pkg install || { echo "Failed to make ncurses"; exit 1; }
-cd ../ncurses-pkg || { echo "Failed to make ncurses"; exit 1; }
-tar zcvf ../rootc/packages/ncurses.tar.gz * --owner=0 --group=0 || { echo "Failed to make ncurses"; exit 1; }
+sed -i 's@/usr@/home/chronos/ncurses-pkg/usr@g' ../ncurses-pkg/usr/lib64/pkgconfig/* || { echo "Failed to make ncurses"; exit 1; }
 cd .. || { echo "Failed to make ncurses"; exit 1; }
 rm -rf ./ncurses || { echo "Failed to make ncurses"; exit 1; }
 
 git clone --depth=1 -b master https://git.savannah.gnu.org/git/nano.git || { echo "Failed to make nano"; exit 1; }
 cd ./nano || { echo "Failed to make nano"; exit 1; }
 ./autogen.sh || { echo "Failed to make nano"; exit 1; }
-./configure --prefix=/usr --libdir=/usr/lib64 || { echo "Failed to make nano"; exit 1; }
+./configure --prefix=/usr --libdir=/usr/lib64 CFLAGS="-lncurses" || { echo "Failed to make nano"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make nano"; exit 1; }
 make DESTDIR=/home/chronos/nano-pkg install || { echo "Failed to make nano"; exit 1; }
 mkdir -p ../nano-pkg/usr/lib64 || { echo "Failed to make nano"; exit 1; }
 for i in $(ldd ../nano-pkg/usr/bin/nano | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../nano-pkg/usr/lib64/ || { echo "Failed to make nano"; exit 1; }; fi; done
 cd ../nano-pkg || { echo "Failed to make nano"; exit 1; }
+cp -r ../ncurses-pkg/usr/share/terminfo ./usr/share/ || { echo "Failed to make nano"; exit 1; }
 tar zcvf ../rootc/packages/nano.tar.gz * --owner=0 --group=0 || { echo "Failed to make nano"; exit 1; }
 cd .. || { echo "Failed to make nano"; exit 1; }
 rm -rf ./ncurses-pkg ./nano ./nano-pkg || { echo "Failed to make nano"; exit 1; }

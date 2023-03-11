@@ -206,6 +206,16 @@ tar zcvf ../rootc/packages/swtpm.tar.gz * --owner=0 --group=0 || { echo "Failed 
 cd .. || { echo "Failed to make swtpm package"; exit 1; }
 rm -rf ./swtpm-pkg || { echo "Failed to make swtpm package"; exit 1; }
 
+git clone --depth=1 -b master https://github.com/mirror/ncurses.git || { echo "Failed to make ncurses"; exit 1; }
+cd ./ncurses || { echo "Failed to make ncurses"; exit 1; }
+./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal || { echo "Failed to make ncurses"; exit 1; }
+make -j"$NTHREADS" || { echo "Failed to make ncurses"; exit 1; }
+make DESTDIR=/home/chronos/ncurses-pkg install || { echo "Failed to make ncurses"; exit 1; }
+cd ../ncurses-pkg || { echo "Failed to make ncurses"; exit 1; }
+tar zcvf ../rootc/packages/ncurses.tar.gz * --owner=0 --group=0 || { echo "Failed to make ncurses"; exit 1; }
+cd .. || { echo "Failed to make ncurses"; exit 1; }
+rm -rf ./ncurses || { echo "Failed to make ncurses"; exit 1; }
+
 git clone --depth=1 -b master https://git.savannah.gnu.org/git/nano.git || { echo "Failed to make nano"; exit 1; }
 cd ./nano || { echo "Failed to make nano"; exit 1; }
 ./autogen.sh || { echo "Failed to make nano"; exit 1; }

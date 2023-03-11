@@ -14,13 +14,13 @@ if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
 tar zxf /rootc/packages/efibootmgr.tar.gz -C /roota
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 
-tar zxf /rootc/packages/swtpm.tar.gz -C /roota
+tar zxf /rootc/packages/nano.tar.gz -C /roota
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 
-tar zxf /rootc/packages/version.tar.gz -C /roota
+tar zxf /rootc/packages/swtpm.tar.gz -C /roota
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
 
-tar zxf /rootc/packages/vim.tar.gz -C /roota
+tar zxf /rootc/packages/version.tar.gz -C /roota
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 4))); fi
 
 for i in $(echo "$1" | sed 's#,# #g')

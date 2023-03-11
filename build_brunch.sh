@@ -32,7 +32,7 @@ if [ ! -z $1 ] && [ "$1" != "skip" ] ; then
 else
 	git clone -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
 	cd rootfs
-	curl -L https://dl.google.com/chromeos/rammus/15278.64.0/stable-channel/chromeos_15278.64.0_rammus_stable-channel_full_mp-v2.bin-gyzwkyrumy2dtojpdutbiqlozwfdhfke.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
+	curl -L https://dl.google.com/chromeos/rammus/15329.44.0/stable-channel/chromeos_15329.44.0_rammus_stable-channel_full_mp-v2.bin-gy2daobvmyztkodtfdpibzury6pofvm5.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
 	python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
 	cd ..
 	[ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }

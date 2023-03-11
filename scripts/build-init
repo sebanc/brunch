@@ -2,7 +2,7 @@
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export HOME=/home/chronos
 export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib:/lib64:/lib
-export C_INCLUDE_PATH=/usr/local/include/ncurses:/usr/local/include:/usr/include
+export C_INCLUDE_PATH=/home/chronos/ncurses-pkg/usr/include:/usr/local/include:/usr/include
 export GCONV_PATH=/usr/local/lib64/gconv
 export PERL5LIB=/usr/local/lib/perl5/5.32.0
 export PKG_CONFIG_PATH=/home/chronos/inih-pkg/usr/lib64/pkgconfig:/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig
@@ -208,7 +208,7 @@ rm -rf ./swtpm-pkg || { echo "Failed to make swtpm package"; exit 1; }
 
 git clone --depth=1 -b master https://github.com/mirror/ncurses.git || { echo "Failed to make ncurses"; exit 1; }
 cd ./ncurses || { echo "Failed to make ncurses"; exit 1; }
-./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal || { echo "Failed to make ncurses"; exit 1; }
+./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal --enable-widec || { echo "Failed to make ncurses"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make ncurses"; exit 1; }
 make DESTDIR=/home/chronos/ncurses-pkg install || { echo "Failed to make ncurses"; exit 1; }
 cd ../ncurses-pkg || { echo "Failed to make ncurses"; exit 1; }

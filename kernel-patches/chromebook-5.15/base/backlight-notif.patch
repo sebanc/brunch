@@ -1,0 +1,20 @@
+diff --git a/drivers/video/backlight/backlight.c b/drivers/video/backlight/backlight.c
+index 537fe1b376ad73d3a304809a90ab835bd02fab4a..41cb34182d5629eab75abba5e6a2e0b4abd98032 100644
+--- a/drivers/video/backlight/backlight.c
++++ b/drivers/video/backlight/backlight.c
+@@ -160,6 +160,7 @@ static inline void backlight_unregister_fb(struct backlight_device *bd)
+ static void backlight_generate_event(struct backlight_device *bd,
+ 				     enum backlight_update_reason reason)
+ {
++#if 0 // We don't want to generate udev events for brightness changes on Steam Deck, as some games like Celeste will re-enumerate controller devices in response to this event.
+ 	char *envp[2];
+ 
+ 	switch (reason) {
+@@ -175,6 +176,7 @@ static void backlight_generate_event(struct backlight_device *bd,
+ 	}
+ 	envp[1] = NULL;
+ 	kobject_uevent_env(&bd->dev.kobj, KOBJ_CHANGE, envp);
++#endif // 0
+ 	sysfs_notify(&bd->dev.kobj, NULL, "actual_brightness");
+ }
+ 

@@ -1,0 +1,39 @@
+diff --git a/drivers/pinctrl/pinctrl-amd.c b/drivers/pinctrl/pinctrl-amd.c
+index cbae1d869ce94ac8529a6ab513e1b543ab167005..98fbbc978ff88806a5050c0d7126c89c7e3a1c8a 100644
+--- a/drivers/pinctrl/pinctrl-amd.c
++++ b/drivers/pinctrl/pinctrl-amd.c
+@@ -31,6 +31,7 @@
+ #include <linux/bitops.h>
+ #include <linux/pinctrl/pinconf.h>
+ #include <linux/pinctrl/pinconf-generic.h>
++#include <linux/delay.h>
+ 
+ #include "core.h"
+ #include "pinctrl-utils.h"
+@@ -491,6 +492,7 @@ static int amd_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ 	unsigned long flags;
+ 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+ 	struct amd_gpio *gpio_dev = gpiochip_get_data(gc);
++	int timeout = 100;
+ 
+ 	raw_spin_lock_irqsave(&gpio_dev->lock, flags);
+ 	pin_reg = readl(gpio_dev->base + (d->hwirq)*4);
+@@ -560,11 +562,16 @@ static int amd_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ 	pin_reg_irq_en |= mask;
+ 	pin_reg_irq_en &= ~BIT(INTERRUPT_MASK_OFF);
+ 	writel(pin_reg_irq_en, gpio_dev->base + (d->hwirq)*4);
+-	while ((readl(gpio_dev->base + (d->hwirq)*4) & mask) != mask)
+-		continue;
++	while (((readl(gpio_dev->base + (d->hwirq)*4) & mask) != mask) && timeout--)
++		udelay(100);
++
+ 	writel(pin_reg, gpio_dev->base + (d->hwirq)*4);
+ 	raw_spin_unlock_irqrestore(&gpio_dev->lock, flags);
+ 
++	if (timeout <= 0)
++		printk("%s: applying Cirrus quirk after timeout when setting irq pin\n",
++		       __func__);
++
+ 	return ret;
+ }
+ 

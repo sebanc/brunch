@@ -1,0 +1,34 @@
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index d96082dc3340dbc744b1cf83321ff5b68fdc5ad6..324137310658b2e583256f7ad901e6474a2f948b 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -3717,6 +3717,17 @@ static int __spi_validate(struct spi_device *spi, struct spi_message *message)
+ 			return -EINVAL;
+ 	}
+ 
++	if (ctlr->flags & SPI_CONTROLLER_NO_TX_RX_CS) {
++		bool read = false;
++
++		list_for_each_entry(xfer, &message->transfers, transfer_list) {
++			if (read && xfer->tx_buf)
++				return -EINVAL;
++			if (xfer->rx_buf && !xfer->cs_change)
++				read = true;
++		}
++	}
++
+ 	message->status = -EINPROGRESS;
+ 
+ 	return 0;
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index 7ab3fed7b8043e61a2b80050ff75ec5a623d6814..d51d88077f19b1211598091ba2ab691409886d20 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -510,6 +510,7 @@ struct spi_controller {
+ #define SPI_CONTROLLER_MUST_TX		BIT(4)	/* requires tx */
+ 
+ #define SPI_MASTER_GPIO_SS		BIT(5)	/* GPIO CS must select slave */
++#define SPI_CONTROLLER_NO_TX_RX_CS	BIT(6)	/* can't write after a read in the same CS */
+ 
+ 	/* flag indicating if the allocation of this struct is devres-managed */
+ 	bool			devm_allocated;

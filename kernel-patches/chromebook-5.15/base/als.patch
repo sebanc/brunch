@@ -37,7 +37,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..122126063cff3e8c5c620a0c1fee9dc4db6fe222
 --- /dev/null
 +++ b/drivers/iio/light/ltrf216a.c
-@@ -0,0 +1,521 @@
+@@ -0,0 +1,522 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * LTRF216A Ambient Light Sensor
@@ -528,8 +528,9 @@ index 0000000000000000000000000000000000000000..122126063cff3e8c5c620a0c1fee9dc4
 +	return ret;
 +}
 +
-+static DEFINE_RUNTIME_DEV_PM_OPS(ltrf216a_pm_ops, ltrf216a_runtime_suspend,
-+				 ltrf216a_runtime_resume, NULL);
++static const struct dev_pm_ops ltrf216a_pm_ops = {
++	SET_RUNTIME_PM_OPS(ltrf216a_runtime_suspend, ltrf216a_runtime_resume, NULL)
++};
 +
 +static const struct i2c_device_id ltrf216a_id[] = {
 +	{ "ltrf216a" },
@@ -547,7 +548,7 @@ index 0000000000000000000000000000000000000000..122126063cff3e8c5c620a0c1fee9dc4
 +static struct i2c_driver ltrf216a_driver = {
 +	.driver = {
 +		.name = "ltrf216a",
-+		.pm = pm_ptr(&ltrf216a_pm_ops),
++		.pm = &ltrf216a_pm_ops,
 +		.of_match_table = ltrf216a_of_match,
 +	},
 +	.probe_new = ltrf216a_probe,

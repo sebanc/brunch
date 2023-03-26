@@ -1,0 +1,30 @@
+From fbc71367288cf1902822618e00c7c1cf6f35348d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Andr=C3=A9=20Almeida?= <andrealmeid@collabora.com>
+Date: Fri, 11 Feb 2022 11:31:54 -0300
+Subject: [PATCH] spi: amd: Remove needless rom_addr variable
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+rom_addr is not used in the code, so we can just drop it from struct
+amd_spi.
+
+Signed-off-by: André Almeida <andrealmeid@collabora.com>
+Link: https://lore.kernel.org/r/20220211143155.75513-3-andrealmeid@collabora.com
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-amd.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/spi/spi-amd.c b/drivers/spi/spi-amd.c
+index 899b8d90ff61b7..417ce14a21c633 100644
+--- a/drivers/spi/spi-amd.c
++++ b/drivers/spi/spi-amd.c
+@@ -38,7 +38,6 @@
+ struct amd_spi {
+ 	void __iomem *io_remap_addr;
+ 	unsigned long io_base_addr;
+-	u32 rom_addr;
+ };
+ 
+ static inline u8 amd_spi_readreg8(struct amd_spi *amd_spi, int idx)

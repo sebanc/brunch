@@ -1,0 +1,52 @@
+From 777a2cbbaf1c6685ace7e2ce846796e9425ab320 Mon Sep 17 00:00:00 2001
+From: Lucas Tanure <tanureal@opensource.cirrus.com>
+Date: Fri, 10 Sep 2021 12:15:29 +0100
+Subject: [PATCH] spi: amd: Don't wait for a write-only transfer to finish
+
+Return from a write-only transfer without waiting for
+it to finish
+But wait before a new transfer as the previous may
+still happening and also wait before reading the data
+from the FIFO
+
+Signed-off-by: Lucas Tanure <tanureal@opensource.cirrus.com>
+Reviewed-by: Charles Keepax <ckeepax@opensource.cirrus.com>
+Link: https://lore.kernel.org/r/20210910111529.12539-4-tanureal@opensource.cirrus.com
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-amd.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi-amd.c b/drivers/spi/spi-amd.c
+index 97838b57871c3b..4b3ac7aceaf62e 100644
+--- a/drivers/spi/spi-amd.c
++++ b/drivers/spi/spi-amd.c
+@@ -115,11 +115,18 @@ static int amd_spi_busy_wait(struct amd_spi *amd_spi)
+ 	return 0;
+ }
+ 
+-static void amd_spi_execute_opcode(struct amd_spi *amd_spi)
++static int amd_spi_execute_opcode(struct amd_spi *amd_spi)
+ {
++	int ret;
++
++	ret = amd_spi_busy_wait(amd_spi);
++	if (ret)
++		return ret;
++
+ 	/* Set ExecuteOpCode bit in the CTRL0 register */
+ 	amd_spi_setclear_reg32(amd_spi, AMD_SPI_CTRL0_REG, AMD_SPI_EXEC_CMD, AMD_SPI_EXEC_CMD);
+-	amd_spi_busy_wait(amd_spi);
++
++	return 0;
+ }
+ 
+ static int amd_spi_master_setup(struct spi_device *spi)
+@@ -178,6 +185,7 @@ static inline int amd_spi_fifo_xfer(struct amd_spi *amd_spi,
+ 			amd_spi_clear_fifo_ptr(amd_spi);
+ 			/* Execute command */
+ 			amd_spi_execute_opcode(amd_spi);
++			amd_spi_busy_wait(amd_spi);
+ 			/* Read data from FIFO to receive buffer  */
+ 			for (i = 0; i < rx_len; i++)
+ 				buf[i] = amd_spi_readreg8(amd_spi, AMD_SPI_FIFO_BASE + tx_len + i);

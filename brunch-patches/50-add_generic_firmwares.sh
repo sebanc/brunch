@@ -29,7 +29,6 @@ tar zxf /rootc/packages/firmwares.tar.gz -C /roota/lib/firmware
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 tar zxf /rootc/packages/alsa-ucm-conf.tar.gz -C /roota/usr/share/alsa
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
-if [ ! "$(cat /proc/version | cut -d' ' -f3 | cut -c1-4 | sed 's@\.@@g')" -eq 515 ]; then rm -f /roota/lib/firmware/*.pnvm; fi
 
 if [ "$no_camera_config" -eq 1 ]; then
 cat >/roota/etc/init/camera.conf <<CAMERASCRIPT

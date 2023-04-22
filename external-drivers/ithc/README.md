@@ -29,15 +29,11 @@ setting the `poll` module parameter (e.g. by running
 and reloading the module or rebooting).
 
 The driver works in single-touch mode by default. Multitouch and pen data
-is made available to userspace through /dev/ithc. To enable multitouch
-functionality, you will need to install a version of iptsd with ithc support
-(eg. https://github.com/quo/iptsd).
-
-The driver can be made to function as a HID transport driver by setting
-the `hid` module parameter. This mode is currently not recommended.
+is made available to userspace through /dev/ithc and the HID subsystem.
+To enable multitouch functionality, you will need to install iptsd.
 
 To enable debug logging use the module parameter `dyndbg=+pflmt`.
 
 
-License: Public domain/CC0.
+License: Public domain/CC0 (or GPL2 or BSD-2-Clause if you prefer).
 

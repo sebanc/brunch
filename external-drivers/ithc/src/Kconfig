@@ -1,0 +1,12 @@
+config HID_ITHC
+	tristate "Intel Touch Host Controller"
+	depends on PCI
+	depends on HID
+	help
+	  Say Y here if your system has a touchscreen using Intels
+	  Touch Host Controller (ITHC / IPTS) technology.
+
+	  If unsure say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ithc.

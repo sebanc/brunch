@@ -3,56 +3,45 @@
 # Makefile for the IPTS touchscreen driver
 #
 
-obj-$(CONFIG_MISC_IPTS) += ipts.o
-ipts-objs := control.o
-ipts-objs += mei.o
-ipts-objs += receiver.o
-ipts-objs += resources.o
-ipts-objs += uapi.o
+sources := dkms.conf
+sources += Makefile
+sources += src/cmd.c
+sources += src/cmd.h
+sources += src/context.h
+sources += src/control.c
+sources += src/control.h
+sources += src/desc.h
+sources += src/hid.c
+sources += src/hid.h
+sources += src/Kconfig
+sources += src/Makefile
+sources += src/main.c
+sources += src/mei.c
+sources += src/mei.h
+sources += src/receiver.c
+sources += src/receiver.h
+sources += src/resources.c
+sources += src/resources.h
+sources += src/spec-data.h
+sources += src/spec-device.h
+sources += src/spec-hid.h
+sources += src/thread.c
+sources += src/thread.h
 
-MODULE_NAME    := ipts
-MODULE_VERSION := 2020-09-25
-
-sources := Makefile
-sources += Kconfig
-sources += dkms.conf
-sources += context.h
-sources += control.c
-sources += control.h
-sources += mei.c
-sources += protocol.h
-sources += receiver.c
-sources += receiver.h
-sources += resources.c
-sources += resources.h
-sources += uapi.c
-sources += uapi.h
-
-KVERSION := $(shell uname -r)
-KDIR := ../kernel
-MDIR := /usr/src/$(MODULE_NAME)-$(MODULE_VERSION)
+KVERSION ?= $(shell uname -r)
+KDIR := /lib/modules/$(KVERSION)/build
 
 all:
-	$(MAKE) -C $(KDIR) O=out M=$(PWD) CONFIG_MISC_IPTS=m modules
+	$(MAKE) -C ../kernel O=out M=$(PWD)/src CONFIG_HID_IPTS=m modules
 
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) CONFIG_MISC_IPTS=m clean
+	$(MAKE) -C $(KDIR) M=$(PWD)/src CONFIG_HID_IPTS=m clean
 
 check:
-	$(KDIR)/scripts/checkpatch.pl -f -q --no-tree --ignore EMBEDDED_FILENAME $(sources)
-
-check_strict:
 	$(KDIR)/scripts/checkpatch.pl -f -q --no-tree --strict --ignore EMBEDDED_FILENAME $(sources)
 
 dkms-install: $(sources)
-	mkdir -p $(MDIR)
-	cp -t $(MDIR) $(sources)
-	dkms add $(MODULE_NAME)/$(MODULE_VERSION)
-	dkms build $(MODULE_NAME)/$(MODULE_VERSION)
-	dkms install $(MODULE_NAME)/$(MODULE_VERSION)
+	./dkms.sh install
 
 dkms-uninstall:
-	modprobe -r $(MODULE_NAME) || true
-	dkms uninstall $(MODULE_NAME)/$(MODULE_VERSION) || true
-	dkms remove $(MODULE_NAME)/$(MODULE_VERSION) || true
-	rm -rf $(MDIR)
+	./dkms.sh uninstall

@@ -1,9 +1,9 @@
-# Add the option "ipts" to make use of the new ipts driver maintained by linux-surface team
+# Add the options "ipts_touchscreen" and "ithc_touchscreen" to enable the surface devices touchscreen drivers maintained by linux-surface team
 
 ipts=0
 for i in $(echo "$1" | sed 's#,# #g')
 do
-	if [ "$i" == "ipts_touchscreen" ]; then ipts=1; fi
+	if [ "$i" == "ipts_touchscreen" ] || [ "$i" == "ithc_touchscreen" ]; then ipts=1; fi
 done
 
 ret=0
@@ -14,7 +14,8 @@ start on stopped udev-trigger
 
 script
 	insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/ipts.ko
-	iptsd
+	insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/ithc.ko
+	iptsd \$(iptsd-find-hidraw)
 end script
 IPTS
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi

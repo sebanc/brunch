@@ -1,14 +1,14 @@
-KDIR ?= ../kernel
+KDIR ?= /lib/modules/`uname -r`/build
 DEST ?= build
 
 default:
 	mkdir -p $(DEST)
 	find $(DEST)/ -type l -exec rm {} +
 	ln -sr src/* $(DEST)/
-	$(MAKE) -C $(KDIR) O=out M=$(abspath $(DEST))
+	$(MAKE) -C ../kernel O=out M=$(abspath $(DEST)) CONFIG_HID_ITHC=m
 
 install:
-	$(MAKE) -C $(KDIR) M=$(abspath $(DEST)) modules_install
+	$(MAKE) -C $(KDIR) M=$(abspath $(DEST)) CONFIG_HID_ITHC=m modules_install
 	depmod -a
 	sync
 
@@ -18,6 +18,7 @@ DKMS_DIR = /usr/src/$(PKG_NAME)-$(PKG_VER)
 DKMS_PKG = $(PKG_NAME)/$(PKG_VER)
 
 dkms-install:
+	-test -e $(DKMS_DIR) && $(MAKE) dkms-uninstall
 	mkdir -p $(DKMS_DIR)
 	cp -r dkms.conf Makefile src $(DKMS_DIR)
 	dkms add $(DKMS_PKG)
@@ -27,8 +28,8 @@ dkms-install:
 
 dkms-uninstall:
 	-modprobe -r ithc
-	-dkms uninstall $(DKMS_PKG)
-	-dkms remove $(DKMS_PKG)
+	-dkms uninstall $(DKMS_PKG) --all
+	-dkms remove $(DKMS_PKG) --all
 	-rm -rf $(DKMS_DIR)
 	sync
 
@@ -51,9 +52,6 @@ run:
 	sudo $(MAKE) install
 	sudo modprobe ithc
 
-$(DEST)/%: src/%.c
-	mkdir -p $(DEST)
-	$(CC) $(CFLAGS) -W -Wall -Wextra -Werror -o $@ $<
-
-dump: $(DEST)/ithc-dump
+checkpatch:
+	$(KDIR)/scripts/checkpatch.pl -f -q --no-tree --show-types --ignore TABSTOP,BLOCK_COMMENT_STYLE,LINE_SPACING src/*
 

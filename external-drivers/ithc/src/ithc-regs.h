@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-2.0 OR BSD-2-Clause */
+
 #define CONTROL_QUIESCE                     BIT(1)
 #define CONTROL_IS_QUIESCED                 BIT(2)
 #define CONTROL_NRESET                      BIT(3)
@@ -67,6 +69,7 @@
 #define DMA_RX_STATUS_HAVE_DATA             BIT(5)
 #define DMA_RX_STATUS_ENABLED               BIT(8)
 
+// COUNTER_RESET can be written to counter registers to reset them to zero. However, in some cases this can mess up the THC.
 #define COUNTER_RESET                       BIT(31)
 
 struct ithc_registers {
@@ -128,7 +131,7 @@ struct ithc_registers {
 		/* 11b8/12b8 */ u32 _unknown_11b8[18];
 	} dma_rx[2];
 };
-_Static_assert(sizeof(struct ithc_registers) == 0x1300);
+static_assert(sizeof(struct ithc_registers) == 0x1300);
 
 #define DEVCFG_DMA_RX_SIZE(x)          ((((x) & 0x3fff) + 1) << 6)
 #define DEVCFG_DMA_TX_SIZE(x)          (((((x) >> 14) & 0x3ff) + 1) << 6)
@@ -147,15 +150,15 @@ _Static_assert(sizeof(struct ithc_registers) == 0x1300);
 #define DEVCFG_SPI_MAX_FREQ(x)         (((x) >> 1) & 0xf) // high bit = use high speed mode?
 #define DEVCFG_SPI_MODE(x)             (((x) >> 6) & 3)
 #define DEVCFG_SPI_UNKNOWN_8(x)        (((x) >> 8) & 0x3f)
-#define DEVCFG_SPI_NEEDS_HEARTBEAT     BIT(20)
-#define DEVCFG_SPI_HEARTBEAT_INTERVAL  (((x) >> 21) & 7)
+#define DEVCFG_SPI_NEEDS_HEARTBEAT     BIT(20) // TODO implement heartbeat
+#define DEVCFG_SPI_HEARTBEAT_INTERVAL(x) (((x) >> 21) & 7)
 #define DEVCFG_SPI_UNKNOWN_25          BIT(25)
 #define DEVCFG_SPI_UNKNOWN_26          BIT(26)
 #define DEVCFG_SPI_UNKNOWN_27          BIT(27)
-#define DEVCFG_SPI_DELAY               (((x) >> 28) & 7)
-#define DEVCFG_SPI_USE_EXT_READ_CFG    BIT(31)
+#define DEVCFG_SPI_DELAY(x)            (((x) >> 28) & 7) // TODO use this
+#define DEVCFG_SPI_USE_EXT_READ_CFG    BIT(31) // TODO use this?
 
-struct ithc_device_config {
+struct ithc_device_config { // (Example values are from an SP7+.)
 	u32 _unknown_00;      // 00 = 0xe0000402 (0xe0000401 after DMA_RX_CODE_RESET)
 	u32 _unknown_04;      // 04 = 0x00000000
 	u32 dma_buf_sizes;    // 08 = 0x000a00ff
@@ -166,21 +169,21 @@ struct ithc_device_config {
 	u16 vendor_id;        // 1c = 0x045e = Microsoft Corp.
 	u16 product_id;       // 1e = 0x0c1a
 	u32 revision;         // 20 = 0x00000001
-	u32 fw_version;       // 24 = 0x05008a8b = 5.0.138.139
+	u32 fw_version;       // 24 = 0x05008a8b = 5.0.138.139 (this value looks more random on newer devices)
 	u32 _unknown_28;      // 28 = 0x00000000
-	u32 fw_mode;          // 2c = 0x00000000
+	u32 fw_mode;          // 2c = 0x00000000 (for fw update?)
 	u32 _unknown_30;      // 30 = 0x00000000
 	u32 _unknown_34;      // 34 = 0x0404035e (u8,u8,u8,u8 = version?)
 	u32 _unknown_38;      // 38 = 0x000001c0 (0x000001c1 after DMA_RX_CODE_RESET)
 	u32 _unknown_3c;      // 3c = 0x00000002
 };
 
-void bitsl(u32 *reg, u32 mask, u32 val);
-void bitsb(u8 *reg, u8 mask, u8 val);
+void bitsl(__iomem u32 *reg, u32 mask, u32 val);
+void bitsb(__iomem u8 *reg, u8 mask, u8 val);
 #define bitsl_set(reg, x) bitsl(reg, x, x)
 #define bitsb_set(reg, x) bitsb(reg, x, x)
-int waitl(struct ithc *ithc, u32 *reg, u32 mask, u32 val);
-int waitb(struct ithc *ithc, u8 *reg, u8 mask, u8 val);
+int waitl(struct ithc *ithc, __iomem u32 *reg, u32 mask, u32 val);
+int waitb(struct ithc *ithc, __iomem u8 *reg, u8 mask, u8 val);
 int ithc_set_spi_config(struct ithc *ithc, u8 speed, u8 mode);
 int ithc_spi_command(struct ithc *ithc, u8 command, u32 offset, u32 size, void *data);
 

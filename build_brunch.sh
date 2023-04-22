@@ -295,7 +295,7 @@ rm -r ./chroot/tmp/goodix || { echo "Failed to build external goodix module for 
 
 fi
 
-if [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
+if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 
 cp -r ./external-drivers/ipts ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
@@ -306,7 +306,7 @@ rm -r ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kern
 
 fi
 
-if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
+if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 
 cp -r ./external-drivers/ithc ./chroot/tmp/ || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/ithc || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }

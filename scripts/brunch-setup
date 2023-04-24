@@ -181,7 +181,7 @@ reset
 
 returned_values=""
 
-available_kernels="5.15;6.1;5.10;5.4;4.19;chromebook-6.1;chromebook-5.15;chromebook-5.10;chromebook-5.4;chromebook-4.19;macbook-t2"
+available_kernels="6.1;5.15;5.10;5.4;4.19;chromebook-6.1;chromebook-5.15;chromebook-5.10;chromebook-5.4;chromebook-4.19;macbook-t2"
 echo "Select your kernel (press ENTER to validate your choice)"
 singleselect "$available_kernels"
 selected_kernel="$returned_values"
@@ -199,7 +199,7 @@ options_page2="ipts_touchscreen;ithc_touchscreen;no_camera_config;invert_camera_
 	;;
 	5.10)
 options_page1="enable_updates;pwa;android_init_fix;android_init_fix2;mount_internal_drives;disable_sdcard_storage;disable_usb_storage;chromebook_audio;native_chromebook_image;broadcom_wl;iwlwifi_backport;rtl8188eu;rtl8188fu;rtl8192eu;rtl8723bu;rtl8723de;rtl8723du;rtl8812au;rtl8814au;rtl8821ce;rtl8821cu;rtl88x2bu;rtl8852ae;rtbth"
-options_page2="goodix;no_camera_config;invert_camera_order;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
+options_page2="ipts_touchscreen;ithc_touchscreen;goodix;no_camera_config;invert_camera_order;acpi_power_button;alt_touchpad_config;alt_touchpad_config2;alt_touchpad_config3;touchpad_resume_fix;internal_mic_fix;internal_mic_fix2;sysfs_tablet_mode;force_tablet_mode;suspend_s3;advanced_als"
 	;;
 	5.4)
 options_page1="enable_updates;pwa;android_init_fix;android_init_fix2;mount_internal_drives;disable_sdcard_storage;disable_usb_storage;chromebook_audio;native_chromebook_image;broadcom_wl;iwlwifi_backport;rtl8188eu;rtl8188fu;rtl8192eu;rtl8723bu;rtl8723de;rtl8723du;rtl8812au;rtl8814au;rtl8821ce;rtl8821cu;rtl88x2bu;rtbth"

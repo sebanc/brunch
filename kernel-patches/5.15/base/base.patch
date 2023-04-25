@@ -48009,9 +48009,9 @@ diff -ruN a/drivers/pci/pci.h b/drivers/pci/pci.h
 --- a/drivers/pci/pci.h	2021-12-08 09:04:57.000000000 +0100
 +++ b/drivers/pci/pci.h	2021-12-23 08:35:43.000000000 +0100
 @@ -125,6 +125,7 @@
- bool pci_bridge_d3_possible(struct pci_dev *dev);
  void pci_bridge_d3_update(struct pci_dev *dev);
- void pci_bridge_wait_for_secondary_bus(struct pci_dev *dev);
+ int pci_bridge_wait_for_secondary_bus(struct pci_dev *dev, char *reset_type,
+ 				      int timeout);
 +void pci_bridge_reconfigure_ltr(struct pci_dev *dev);
  
  static inline void pci_wakeup_event(struct pci_dev *dev)

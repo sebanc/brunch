@@ -57263,10 +57263,10 @@ diff -ruN a/include/net/netns/ipv4.h b/include/net/netns/ipv4.h
 +++ b/include/net/netns/ipv4.h	2021-03-20 09:20:33.000000000 +0100
 @@ -118,6 +118,7 @@
  #ifdef CONFIG_NET_L3_MASTER_DEV
- 	int sysctl_tcp_l3mdev_accept;
+ 	u8 sysctl_tcp_l3mdev_accept;
  #endif
 +	int sysctl_tcp_default_init_rwnd;
- 	int sysctl_tcp_mtu_probing;
+ 	u8 sysctl_tcp_mtu_probing;
  	int sysctl_tcp_mtu_probe_floor;
  	int sysctl_tcp_base_mss;
 diff -ruN a/include/net/sock.h b/include/net/sock.h

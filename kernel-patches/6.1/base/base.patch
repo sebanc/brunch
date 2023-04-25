@@ -9206,7 +9206,7 @@ diff -ruN a/drivers/md/dm-verity.h b/drivers/md/dm-verity.h
 @@ -58,6 +59,7 @@
  	unsigned int ahash_reqsize;/* the size of temporary space for crypto */
  	enum verity_mode mode;	/* mode for handling verification errors */
- 	unsigned corrupted_errs;/* Number of errors for corrupted blocks */
+ 	unsigned int corrupted_errs;/* Number of errors for corrupted blocks */
 +	int error_behavior;	/* selects error behavior on io errors */
  
  	struct workqueue_struct *verify_wq;
@@ -21856,15 +21856,6 @@ diff -ruN a/drivers/power/supply/cros_usbpd-charger.c b/drivers/power/supply/cro
  static int cros_usbpd_charger_get_num_ports(struct charger_data *charger)
  {
  	struct ec_response_charge_port_count resp;
-@@ -276,7 +298,7 @@
- 		port->psy_current_max = 0;
- 		break;
- 	default:
--		dev_err(dev, "Port %d: default case!\n", port->port_number);
-+		dev_dbg(dev, "Port %d: default case!\n", port->port_number);
- 		port->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
- 	}
- 
 @@ -387,6 +409,7 @@
  	case POWER_SUPPLY_PROP_CURRENT_MAX:
  	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
@@ -26366,6 +26357,7 @@ diff -ruN a/drivers/usb/misc/onboard_usb_hub.h b/drivers/usb/misc/onboard_usb_hu
 +
  static const struct of_device_id onboard_hub_match[] = {
  	{ .compatible = "usb424,2514", .data = &microchip_usb424_data, },
+ 	{ .compatible = "usb424,2517", .data = &microchip_usb424_data, },
  	{ .compatible = "usb451,8140", .data = &ti_tusb8041_data, },
  	{ .compatible = "usb451,8142", .data = &ti_tusb8041_data, },
 +	{ .compatible = "usb5e3,608", .data = &genesys_gl850g_data, },
@@ -36774,8 +36766,8 @@ diff -ruN a/include/linux/pwm.h b/include/linux/pwm.h
  struct pwm_ops {
 @@ -278,6 +301,8 @@
  		     const struct pwm_state *state);
- 	void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
- 			  struct pwm_state *state);
+ 	int (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			 struct pwm_state *state);
 +	int (*get_output_type_supported)(struct pwm_chip *chip,
 +			struct pwm_device *pwm);
  	struct module *owner;

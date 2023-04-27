@@ -93,6 +93,20 @@ for i in $(ldd ./fbv | cut -d' ' -f3); do cp "$i" ../initramfs/lib64/ || { echo 
 cd .. || { echo "Failed to make fbv"; exit 1; }
 rm -rf ./fbv || { echo "Failed to make fbv"; exit 1; }
 
+git clone https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make old iptsd"; exit 1; }
+cd iptsd || { echo "Failed to make old iptsd"; exit 1; }
+git checkout 0aa62f3e4d7f3b2da4a3c726e0d7a0a9a89fa3fa || { echo "Failed to make old iptsd"; exit 1; }
+meson --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" -Dsample_config=false build/ || { echo "Failed to make old iptsd"; exit 1; }
+DESTDIR=/home/chronos/ipts-old-pkg ninja -j"$NTHREADS" -C build/ install || { echo "Failed to make old iptsd"; exit 1; }
+cd .. || { echo "Failed to make old iptsd"; exit 1; }
+rm -rf ./iptsd || { echo "Failed to make old iptsd"; exit 1; }
+cd ./ipts-old-pkg || { echo "Failed to make old iptsd"; exit 1; }
+mkdir -p ./usr/lib64 || { echo "Failed to make old iptsd"; exit 1; }
+cp /usr/local/lib64/libstdc++.so.6 ./usr/lib64/ || { echo "Failed to make old iptsd"; exit 1; }
+tar zcvf ../rootc/packages/ipts-old.tar.gz * --owner=0 --group=0 || { echo "Failed to make old iptsd"; exit 1; }
+cd .. || { echo "Failed to make old iptsd"; exit 1; }
+rm -rf ./ipts-old-pkg || { echo "Failed to make old iptsd"; exit 1; }
+
 git clone --depth=1 -b 9.1.0 https://github.com/fmtlib/fmt.git || { echo "Failed to make libfmt"; exit 1; }
 mkdir ./fmt/build || { echo "Failed to make libfmt"; exit 1; }
 cd ./fmt/build || { echo "Failed to make libfmt"; exit 1; }
@@ -102,18 +116,18 @@ make install || { echo "Failed to make libfmt"; exit 1; }
 cd ../.. || { echo "Failed to make libfmt"; exit 1; }
 rm -rf ./fmt || { echo "Failed to make libfmt"; exit 1; }
 
-git clone https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
-cd iptsd || { echo "Failed to make iptsd"; exit 1; }
-meson --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" -Dsample_config=false build/ || { echo "Failed to make iptsd"; exit 1; }
-DESTDIR=/home/chronos/ipts-pkg ninja -j"$NTHREADS" -C build/ install || { echo "Failed to make iptsd"; exit 1; }
-cd .. || { echo "Failed to make iptsd"; exit 1; }
-rm -rf ./iptsd || { echo "Failed to make iptsd"; exit 1; }
-cd ./ipts-pkg || { echo "Failed to make iptsd"; exit 1; }
-mkdir -p ./usr/lib64 || { echo "Failed to make iptsd"; exit 1; }
-for i in $(ldd ../ipts-pkg/usr/bin/iptsd | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../ipts-pkg/usr/lib64/ || { echo "Failed to make iptsd"; exit 1; }; fi; done
-tar zcvf ../rootc/packages/ipts.tar.gz * --owner=0 --group=0 || { echo "Failed to make iptsd"; exit 1; }
-cd .. || { echo "Failed to make iptsd"; exit 1; }
-rm -rf ./fmt-pkg ./ipts-pkg || { echo "Failed to make iptsd"; exit 1; }
+git clone -b v1.2.0 https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make new iptsd"; exit 1; }
+cd iptsd || { echo "Failed to make new iptsd"; exit 1; }
+meson --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" -Dsample_config=false build/ || { echo "Failed to make new iptsd"; exit 1; }
+DESTDIR=/home/chronos/ipts-new-pkg ninja -j"$NTHREADS" -C build/ install || { echo "Failed to make new iptsd"; exit 1; }
+cd .. || { echo "Failed to make new iptsd"; exit 1; }
+rm -rf ./iptsd || { echo "Failed to make new iptsd"; exit 1; }
+cd ./ipts-new-pkg || { echo "Failed to make new iptsd"; exit 1; }
+mkdir -p ./usr/lib64 || { echo "Failed to make new iptsd"; exit 1; }
+for i in $(ldd ../ipts-pkg/usr/bin/iptsd | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../ipts-pkg/usr/lib64/ || { echo "Failed to make new iptsd"; exit 1; }; fi; done
+tar zcvf ../rootc/packages/ipts-new.tar.gz * --owner=0 --group=0 || { echo "Failed to make new iptsd"; exit 1; }
+cd .. || { echo "Failed to make new iptsd"; exit 1; }
+rm -rf ./fmt-pkg ./ipts-new-pkg || { echo "Failed to make new iptsd"; exit 1; }
 
 git clone --depth=1 -b v1.9.18 https://github.com/jirka-h/haveged.git || { echo "Failed to make haveged"; exit 1; }
 cd haveged || { echo "Failed to make haveged"; exit 1; }

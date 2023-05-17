@@ -1,6 +1,7 @@
 # Add the options "ipts_touchscreen" and "ithc_touchscreen" to enable the surface devices touchscreen drivers maintained by linux-surface team
 
-ipts=0
+ipts_touchscreen=0
+ithc_touchscreen=0
 for i in $(echo "$1" | sed 's#,# #g')
 do
 	if [ "$i" == "ipts_touchscreen" ]; then

@@ -642,7 +642,7 @@ diff -ruN "a/drivers/hid/amd-sfh-hid/amd_sfh_pcie.c" "b/drivers/hid/amd-sfh-hid/
  	mp2_select_ops(privdata);
  
  	rc = amd_sfh_irq_init(privdata);
-@@ -346,62 +361,26 @@
+@@ -346,70 +361,34 @@
  		return rc;
  	}
  
@@ -651,6 +651,14 @@ diff -ruN "a/drivers/hid/amd-sfh-hid/amd_sfh_pcie.c" "b/drivers/hid/amd-sfh-hid/
  
 -	return devm_add_action_or_reset(&pdev->dev, amd_mp2_pci_remove, privdata);
 +	return devm_add_action_or_reset(&pdev->dev, privdata->mp2_ops->remove, privdata);
+ }
+ 
+ static void amd_sfh_shutdown(struct pci_dev *pdev)
+ {
+ 	struct amd_mp2_dev *mp2 = pci_get_drvdata(pdev);
+ 
+ 	if (mp2 && mp2->mp2_ops)
+ 		mp2->mp2_ops->stop_all(mp2);
  }
  
  static int __maybe_unused amd_mp2_pci_resume(struct device *dev)

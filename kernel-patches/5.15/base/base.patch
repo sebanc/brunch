@@ -71839,7 +71839,7 @@ diff -ruN a/kernel/power/process.c b/kernel/power/process.c
  		       todo - wq_busy, wq_busy);
  
  		if (wq_busy)
- 			show_workqueue_state();
+ 			show_all_workqueues();
  
 -		if (!wakeup || pm_debug_messages_on) {
 +		if (pm_debug_messages_on) {
@@ -72667,7 +72667,7 @@ diff -ruN a/kernel/sched/debug.c b/kernel/sched/debug.c
 diff -ruN a/kernel/sched/fair.c b/kernel/sched/fair.c
 --- a/kernel/sched/fair.c	2021-12-08 09:04:57.000000000 +0100
 +++ b/kernel/sched/fair.c	2021-12-23 08:35:57.000000000 +0100
-@@ -6783,12 +6783,17 @@
+@@ -6783,14 +6783,19 @@
   * other use-cases too. So, until someone finds a better way to solve this,
   * let's keep things simple by re-using the existing slow path.
   */
@@ -72675,6 +72675,8 @@ diff -ruN a/kernel/sched/fair.c b/kernel/sched/fair.c
 +static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu, int sync)
  {
  	unsigned long prev_delta = ULONG_MAX, best_delta = ULONG_MAX;
+ 	unsigned long p_util_min = uclamp_is_used() ? uclamp_eff_value(p, UCLAMP_MIN) : 0;
+ 	unsigned long p_util_max = uclamp_is_used() ? uclamp_eff_value(p, UCLAMP_MAX) : 1024;
  	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
 +	int max_spare_cap_cpu_ls = prev_cpu, best_idle_cpu = -1;
  	int cpu, best_energy_cpu = prev_cpu, target = -1;
@@ -72997,7 +72999,7 @@ diff -ruN a/kernel/sched/sched.h b/kernel/sched/sched.h
   * When uclamp is compiled in, the aggregation at rq level is 'turned off'
   * by default in the fast path and only gets turned on once userspace performs
 @@ -2900,12 +2912,36 @@
- 	return util;
+ {
  }
  
 +static inline bool uclamp_boosted(struct task_struct *p)
@@ -73005,7 +73007,7 @@ diff -ruN a/kernel/sched/sched.h b/kernel/sched/sched.h
 +	return false;
 +}
 +
- static inline bool uclamp_is_used(void)
+ static inline bool uclamp_rq_is_idle(struct rq *rq)
  {
  	return false;
  }

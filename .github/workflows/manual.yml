@@ -1,0 +1,163 @@
+name: Build Brunch using Github Actions
+on:
+  push:
+    branches:
+      - 'r113'
+    paths-ignore:
+      - 'README.md'
+concurrency:
+  group: environment-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  prepare-kernels:
+    name: Prepare Kernels
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.kernels.outputs.matrix }}
+    steps:
+      - name: Install dependencies
+        run: |
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
+          #yes | DEBIAN_FRONTEND=noninteractive sudo apt dist-upgrade
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12 git fakeroot build-essential ncurses-dev xz-utils libssl-dev bc flex libelf-dev bison sbsigntool
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
+      - name: Checkout Brunch source code
+        uses: actions/checkout@v3
+      - name: Download kernels and apply patches
+        run: ./prepare_kernels.sh
+      - name: Define kernels matrix
+        id: kernels
+        run: echo "matrix=$(echo [\"$(ls -d ./kernels/*  | cut -f3 -d'/' | sed -Ez '$ s/\n+$//' | sed -z 's#\n#","#g')\"])" >> $GITHUB_OUTPUT
+      - name: Compress kernels source files
+        run: tar zcf /tmp/kernels-source.tar.gz kernels
+      - name: Upload kernels source
+        uses: actions/upload-artifact@v3
+        with:
+          name: kernels-source
+          path: /tmp/kernels-source.tar.gz
+          if-no-files-found: error
+  build-kernels:
+    name: Build Kernels
+    needs: prepare-kernels
+    runs-on: ubuntu-22.04
+    strategy:
+        matrix:
+            kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
+    steps:
+      - name: Install dependencies
+        run: |
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
+          #yes | DEBIAN_FRONTEND=noninteractive sudo apt dist-upgrade
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12 git fakeroot build-essential ncurses-dev xz-utils libssl-dev bc flex libelf-dev bison sbsigntool
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
+      - name: Checkout Brunch source code
+        uses: actions/checkout@v3
+      - name: Download kernels source
+        uses: actions/download-artifact@v3
+        with:
+          name: kernels-source
+          path: /tmp
+      - name: Extract kernels source files
+        run: |
+          tar -zxf /tmp/kernels-source.tar.gz
+          rm -f /tmp/kernels-source.tar.gz
+      - name: Install Secure Boot certificate
+        env:
+          BRUNCH_PRIV: ${{ secrets.BRUNCH_PRIV }}
+          BRUNCH_PEM: ${{ secrets.BRUNCH_PEM }}
+        run: |
+          sudo ln -s $RUNNER_TEMP /persist
+          mkdir /persist/keys
+          echo "$BRUNCH_PRIV" | base64 -d > /persist/keys/brunch.priv
+          echo "$BRUNCH_PEM" | base64 -d > /persist/keys/brunch.pem
+      - name: Build kernels
+        run: ./build_kernels.sh ${{ matrix.kernel }}
+      - name: Clear keys
+        run: rm -r /persist/keys
+      - name: Compress built kernel
+        run: tar zcf /tmp/built-kernel-${{ matrix.kernel }}.tar.gz kernels/${{ matrix.kernel }}
+      - name: Upload kernels source
+        uses: actions/upload-artifact@v3
+        with:
+          name: built-kernel-${{ matrix.kernel }}
+          path: /tmp/built-kernel-${{ matrix.kernel }}.tar.gz
+          if-no-files-found: error
+  build-brunch:
+    name: Build Brunch
+    needs: build-kernels
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install dependencies
+        run: |
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt update
+          #yes | DEBIAN_FRONTEND=noninteractive sudo apt dist-upgrade
+          yes | DEBIAN_FRONTEND=noninteractive sudo apt install gcc-12 g++-12 git fakeroot build-essential ncurses-dev xz-utils libssl-dev bc flex libelf-dev bison sbsigntool python3-protobuf
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 110 --slave /usr/bin/g++ g++ /usr/bin/g++-12 --slave /usr/bin/gcov gcov /usr/bin/gcov-12
+          pip3 install --upgrade google-api-python-client
+      - name: Free some disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo apt clean
+      - name: Checkout Brunch source code
+        uses: actions/checkout@v3
+      - name: Download built kernels
+        uses: actions/download-artifact@v3
+        with:
+          path: /tmp
+      - name: Copy built kernels
+        run: |
+          for file in /tmp/built-kernel-*/built-kernel-*.tar.gz
+          do
+            tar zxf $file
+            rm -f $file
+          done
+          rm -r /tmp/kernels-source/kernels-source.tar.gz
+      - name: Build brunch
+        run: sudo bash build_brunch.sh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: brunch-build
+          path: out/brunch_r*.tar.gz
+          if-no-files-found: error
+  release:
+    name: Make a Brunch release
+    permissions:
+      contents: write
+    needs: build-brunch
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: brunch-build
+      - name: Identify custom version
+        if: ${{ (github.repository != 'sebanc/brunch') && (github.repository != 'sebanc/brunch-unstable') }}
+        run: echo "RELEASE_VERSION_TYPE=custom" >> $GITHUB_ENV
+      - name: Identify unstable version
+        if: ${{ (github.repository == 'sebanc/brunch-unstable') }}
+        run: echo "RELEASE_VERSION_TYPE=unstable" >> $GITHUB_ENV
+      - name: Identify stable version
+        if: ${{ (github.repository == 'sebanc/brunch') }}
+        run: echo "RELEASE_VERSION_TYPE=stable" >> $GITHUB_ENV
+      - name: Generate release details
+        run: |
+          RELEASE_FILE=$(ls brunch_r*.tar.gz)
+          RELEASE_VERSION=$(echo "$RELEASE_FILE" | cut -d'.' -f1 | cut -d'_' -f2)
+          RELEASE_DATE=$(echo "$RELEASE_FILE" | cut -d'.' -f1 | cut -d'_' -f3)
+          echo "Found brunch release: ${RELEASE_FILE} with version ${RELEASE_VERSION} and date ${RELEASE_DATE}"
+          mv "brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz" "brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
+          echo "Brunch release renamed from brunch_${RELEASE_VERSION}_${RELEASE_DATE}.tar.gz to brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz"
+          echo "RELEASE_FILE=brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz" >> $GITHUB_ENV
+          echo "RELEASE_TAG=${RELEASE_VERSION}-${RELEASE_VERSION_TYPE}-${RELEASE_DATE}" >> $GITHUB_ENV
+          echo "RELEASE_NAME=Brunch ${RELEASE_VERSION} ${RELEASE_VERSION_TYPE} ${RELEASE_DATE}" >> $GITHUB_ENV          
+      - name: Create a release and upload artifacts as assets
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "${{ env.RELEASE_FILE }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: false
+          tag: "${{ env.RELEASE_TAG }}"
+          name: "${{ env.RELEASE_NAME }}"
+          commit: "${{ github.ref_name }}"
+          body: "${{ github.event.head_commit.message }}"

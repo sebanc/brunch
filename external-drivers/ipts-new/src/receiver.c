@@ -66,7 +66,9 @@ static int ipts_receiver_event_loop(struct ipts_thread *thread)
 	dev_info(ipts->dev, "IPTS running in event mode\n");
 
 	while (!ipts_thread_should_stop(thread)) {
-		for (int i = 0; i < IPTS_BUFFERS; i++) {
+		int i = 0;
+
+		for (i = 0; i < IPTS_BUFFERS; i++) {
 			ret = ipts_control_wait_data(ipts, false);
 			if (ret == -EAGAIN)
 				break;

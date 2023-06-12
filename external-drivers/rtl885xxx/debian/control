@@ -1,0 +1,31 @@
+Source: rtw89
+Section: misc
+Priority: optional
+Maintainer: lwfinger <Larry.Finger@lwfinger.net>
+Build-Depends: debhelper (>= 13),
+               dh-sequence-dkms
+Standards-Version: 4.1.3
+Vcs-Browser: https://github.com/lwfinger/rtw89
+Vcs-Git: https://github.com/lwfinger/rtw89.git
+
+Package: rtw89-dkms
+Architecture: all
+Depends: ${misc:Depends}, bc
+Recommends: firmware-realtek (>=20230117-1) | linux-firmware (>=20220329.git681281e4-0ubuntu3.10)
+Conflicts: rtw8852be-dkms
+Description: dkms source for the Realtek rtw89 driver
+ rtw89 is a linux kernel module which supports the Realtek
+ 8852AE, 8852BE, and 8853CE 802.11ax wireless network cards. 
+ .
+ This package provides the rtw89 source and makes use of the
+ DKMS build utility to install them for the running kernel. It is 
+ intended for use with kernel versions 5.7 - 6.2, after which this 
+ package should be unnecessary as the driver will be included in the
+ upstream kernel source.
+ .
+ Kernel source or headers are required to build these modules. 
+ .
+ Firmware from userspace is required to use the driver; 
+ if your distro does not provide one of the packages in the Recommends 
+ field above, you can download it directly from
+ https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git.

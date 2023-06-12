@@ -90,10 +90,10 @@ cd ../../..
 
 if [ "$1" != "skip" ] && [ "$2" != "skip" ]; then
 
-if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ]; then
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 
 cp -r ./chroot/home/chronos/kernel/lib/modules ./chroot/home/chronos/kernel/lib/orig || { echo "Failed to build external iwlwifi module for kernel $kernel"; exit 1; }
-cp -r ./external-drivers/backport-iwlwifi-core76 ./chroot/tmp/backport-iwlwifi || { echo "Failed to build external iwlwifi module for kernel $kernel"; exit 1; }
+cp -r ./external-drivers/backport-iwlwifi-core79 ./chroot/tmp/backport-iwlwifi || { echo "Failed to build external iwlwifi module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/backport-iwlwifi || { echo "Failed to build external iwlwifi module for kernel $kernel"; exit 1; }
 make defconfig-iwlwifi-public || { echo "Failed to build external iwlwifi module for kernel $kernel"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to build external iwlwifi module for kernel $kernel"; exit 1; }
@@ -108,7 +108,7 @@ mv ./chroot/home/chronos/kernel/lib/orig ./chroot/home/chronos/kernel/lib/module
 
 fi
 
-if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ]; then
+if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 
 cp -r ./external-drivers/rtbth ./chroot/tmp/ || { echo "Failed to build external rtbth module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtbth || { echo "Failed to build external rtbth module for kernel $kernel"; exit 1; }
@@ -251,14 +251,22 @@ rm -r ./chroot/tmp/rtl88x2bu || { echo "Failed to build external rtl88x2bu modul
 
 fi
 
-if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
+if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 
-cp -r ./external-drivers/rtl8852ae ./chroot/tmp/ || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
-cd ./chroot/tmp/rtl8852ae || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cp -r ./external-drivers/rtl885xxx ./chroot/tmp/ || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cd ./chroot/tmp/rtl885xxx || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
-cp ./rtw_8852ae.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl8852ae.ko || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+mkdir -p ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl885xxx || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cp ./rtw89core.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl885xxx/rtw89core.ko || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cp ./rtw89pci.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl885xxx/rtw89pci.ko || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cp ./rtw_8852a.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl885xxx/rtw_8852a.ko || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cp ./rtw_8852ae.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl885xxx/rtw_8852ae.ko || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cp ./rtw_8852b.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl885xxx/rtw_8852b.ko || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cp ./rtw_8852be.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl885xxx/rtw_8852be.ko || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cp ./rtw_8852c.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl885xxx/rtw_8852c.ko || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+cp ./rtw_8852ce.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl885xxx/rtw_8852ce.ko || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
 cd ../../.. || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
-rm -r ./chroot/tmp/rtl8852ae || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
+rm -r ./chroot/tmp/rtl885xxx || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
 
 fi
 
@@ -295,27 +303,27 @@ rm -r ./chroot/tmp/goodix || { echo "Failed to build external goodix module for 
 
 fi
 
-if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
+#if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 
-cp -r ./external-drivers/ipts-old ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-cd ./chroot/tmp/ipts-old || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-make -j"$NTHREADS" || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-cp ./ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ipts.ko || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-cd ../../.. || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-rm -r ./chroot/tmp/ipts-old || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-
-fi
-
-#if [ "$kernel" == "6.1" ]; then
-
-#cp -r ./external-drivers/ipts-new ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-#cd ./chroot/tmp/ipts-new || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+#cp -r ./external-drivers/ipts-old ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+#cd ./chroot/tmp/ipts-old || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 #make -j"$NTHREADS" || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-#cp ./src/ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ipts.ko || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+#cp ./ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ipts.ko || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 #cd ../../.. || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-#rm -r ./chroot/tmp/ipts-new || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+#rm -r ./chroot/tmp/ipts-old || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 
 #fi
+
+if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
+
+cp -r ./external-drivers/ipts-new ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+cd ./chroot/tmp/ipts-new || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+make -j"$NTHREADS" || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+cp ./src/ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ipts.ko || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+cd ../../.. || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+rm -r ./chroot/tmp/ipts-new || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+
+fi
 
 if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 

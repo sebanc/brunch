@@ -89,6 +89,28 @@ static int ipts_probe(struct mei_cl_device *cldev, const struct mei_cl_device_id
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
+static int ipts_remove(struct mei_cl_device *cldev)
+{
+	int ret = 0;
+	struct ipts_context *ipts = NULL;
+
+	if (!cldev) {
+		pr_err("MEI device is NULL!");
+		return;
+	}
+
+	ipts = mei_cldev_get_drvdata(cldev);
+
+	ret = ipts_control_stop(ipts);
+	if (ret)
+		dev_err(&cldev->dev, "Failed to stop IPTS: %d\n", ret);
+
+	mei_cldev_disable(cldev);
+	
+	return ret;
+}
+#else
 static void ipts_remove(struct mei_cl_device *cldev)
 {
 	int ret = 0;
@@ -107,6 +129,7 @@ static void ipts_remove(struct mei_cl_device *cldev)
 
 	mei_cldev_disable(cldev);
 }
+#endif
 
 static struct mei_cl_device_id ipts_device_id_table[] = {
 	{ .uuid = IPTS_ID, .version = MEI_CL_VERSION_ANY },

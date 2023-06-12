@@ -403,9 +403,13 @@ int rtbt_dma_mem_alloc(
 	OUT void **virt_addr,
 	OUT	PHYSICAL_ADDRESS *phy_addr)
 {
-	*virt_addr = (PVOID)pci_alloc_consistent((struct pci_dev *)if_dev,
-												sizeof(char)*len,
-												(dma_addr_t *)phy_addr);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,18,0)
+	*virt_addr = (PVOID)dma_alloc_coherent(
+		&((struct pci_dev *)if_dev)->dev, sizeof(char)*len, (dma_addr_t *)phy_addr, GFP_KERNEL);
+#else
+	*virt_addr = (PVOID)pci_alloc_consistent(
+		(struct pci_dev *)if_dev, sizeof(char)*len, (dma_addr_t *)phy_addr);
+#endif
 
 	return TRUE;
 }
@@ -418,8 +422,13 @@ void rtbt_dma_mem_free(
 	IN void *virt_addr,
 	IN PHYSICAL_ADDRESS phy_addr)
 {
-	pci_free_consistent((struct pci_dev *)if_dev,
-						len, virt_addr, phy_addr);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,18,0)
+	dma_free_coherent(
+		&((struct pci_dev *)if_dev)->dev, len, virt_addr, phy_addr);
+#else
+	pci_free_consistent(
+		(struct pci_dev *)if_dev, len, virt_addr, phy_addr);
+#endif
 }
 
 

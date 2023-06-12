@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ "${1}" == "pre" ]; then
+  modprobe -rv rtw_8852ae
+elif [ "${1}" == "post" ]; then
+  modprobe -v rtw_8852ae
+fi

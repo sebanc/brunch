@@ -1,0 +1,29 @@
+Kconfig.kernel
+Kconfig.versions
+.kernel_config_md5
+.config
+.config.old
+*~
+*.o
+*.d
+.tmp_*
+*.ko
+*.cmd
+*.tmp
+*.ver
+*.mod
+modules.order
+backport-include/backport/autoconf.h
+modules
+.tmp_versions
+Module.symvers
+*.mod.c
+.cache.mk
+*.pyc
+__pycache__
+# cscope files
+cscope.*
+ncscope.*
+# gcc profile objects
+*.gcno
+*.dwo

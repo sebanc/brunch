@@ -1,0 +1,35 @@
+rtw89 (1.0.2-3) unstable; urgency=medium
+
+  * Updated debian packaging to 3.0 (quilt) format
+  * No longer packaging rtw89-firmware
+  * Enable builds on both debian and ubuntu
+
+ -- Jesse Rhodes <jesse@sney.ca>  Thu, 16 Mar 2023 15:14:59 -0400
+
+rtw89 (1.0.2-2) unstable; urgency=medium
+
+  * Upstream updates
+  * RTW8852C firmware
+  * Enable kernel 5.7
+
+ -- Greg Whiteley <greg.whiteley@gmail.com>  Sat, 15 Oct 2022 09:41:31 +1100
+
+rtw89 (1.0.2-1) unstable; urgency=medium
+
+  * Add RTW8852B/E, RTW8852C/E support
+  * conflict with separate rtw8852be-dkms package
+
+ -- Greg Whiteley <greg.whiteley@gmail.com>  Wed, 12 Oct 2022 17:12:28 +1100
+
+rtw89 (1.0.1-1) unstable; urgency=medium
+
+  * fix Remove unnecessary dependencies.
+
+ -- lichenggang <lichenggang@uniontech.com>  Wed, 23 Jun 2021 20:16:05 +0800
+
+rtw89 (1.0.0-1) unstable; urgency=medium
+
+  * Add driver package to build DEB package support in Debian DKMS format.
+
+ -- lichenggang <lichenggang@uniontech.com>  Thu, 17 Jun 2021 17:14:07 +0800
+

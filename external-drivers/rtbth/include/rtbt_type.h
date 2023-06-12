@@ -28,7 +28,15 @@
 #define __RTBT_TYPE_H
 
 #ifdef __GNUC__
+
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,15,0)
+#include <linux/stdarg.h>
+#else
 #include <stdarg.h>
+#endif
+
 #endif // __GNUC__ //
 
 typedef signed char		INT8;

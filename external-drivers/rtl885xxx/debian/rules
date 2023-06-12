@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+include /usr/share/dpkg/default.mk
+include /usr/share/dpkg/pkg-info.mk
+
+export DH_VERBOSE = 1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+VERSION ?= $(DEB_VERSION_UPSTREAM)
+
+%:
+	dh $@ --with dkms
+
+override_dh_auto_install:
+	dh_install -prtw89-dkms *.c *.h *.md 						usr/src/rtw89-$(VERSION)
+	dh_install -prtw89-dkms LICENSE 					        usr/src/rtw89-$(VERSION)
+	dh_install -prtw89-dkms Makefile 					        usr/src/rtw89-$(VERSION)
+
+override_dh_dkms:
+	dh_dkms -V $(VERSION)
+
+override_dh_auto_build:
+	:

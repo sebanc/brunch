@@ -107,10 +107,6 @@ err:
 
 int ipts_resources_free(struct ipts_resources *res)
 {
-	/*
-	 * Some compilers (AOSP clang) complain about a redefined
-	 * variable when this is declared inside of the for loop.
-	 */
 	int i = 0;
 
 	if (!res)
@@ -127,12 +123,9 @@ int ipts_resources_free(struct ipts_resources *res)
 	ipts_resources_free_buffer(&res->hid2me);
 	ipts_resources_free_buffer(&res->descriptor);
 
-	if (res->report.address) {
-		kfree(res->report.address);
-
-		res->report.address = NULL;
-		res->report.size = 0;
-	}
+	kfree(res->report.address);
+	res->report.address = NULL;
+	res->report.size = 0;
 
 	return 0;
 }

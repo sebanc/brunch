@@ -201,7 +201,10 @@ typedef struct _RTMP_OS_FS_INFO_
 	int				fsuid;
 	int				fsgid;
 #endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
 	mm_segment_t	fs;
+#endif
 }RTMP_OS_FS_INFO;
 
 #define IS_FILE_OPEN_ERR(_fd) 	IS_ERR((_fd))

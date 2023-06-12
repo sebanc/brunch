@@ -1,0 +1,2 @@
+- name: Run on architecture
+  uses: uraimo/run-on-arch-action@v2.5.0

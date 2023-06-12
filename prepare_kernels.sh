@@ -82,6 +82,7 @@ for kernel in $kernels; do
 			apply_patches "chromebook-5.15"
 			make_config "chromebook-5.15"
 			echo "Downloading Mainline kernel source for kernel $kernel version $kernel_version"
+			curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
 			curl -L "https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-$kernel_version.tar.gz" -o "./kernels/mainline-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
 			tar -C "./kernels/5.15" -zxf "./kernels/mainline-$kernel.tar.gz" --strip 1 || { echo "Kernel $kernel source extraction failed"; exit 1; }
 			rm -f "./kernels/mainline-$kernel.tar.gz"

@@ -27,6 +27,8 @@ elif [ "$board" == "VOLTEER" ]; then
 	hwid="VOXEL-GFMQ"
 elif [ "$board" == "ZORK" ]; then
 	hwid="GUMBOZ-JPUQ"
+elif [ "$board" == "GUYBRUSH" ]; then
+	hwid="NIPPERKIN"	
 else
 	hwid="$board"
 fi

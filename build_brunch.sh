@@ -90,7 +90,7 @@ cd ../../..
 
 if [ "$1" != "skip" ] && [ "$2" != "skip" ]; then
 
-if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
+if [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 
 cp -r ./chroot/home/chronos/kernel/lib/modules ./chroot/home/chronos/kernel/lib/orig || { echo "Failed to build external iwlwifi module for kernel $kernel"; exit 1; }
 cp -r ./external-drivers/backport-iwlwifi-core79 ./chroot/tmp/backport-iwlwifi || { echo "Failed to build external iwlwifi module for kernel $kernel"; exit 1; }

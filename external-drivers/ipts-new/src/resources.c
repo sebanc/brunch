@@ -7,6 +7,7 @@
  */
 
 #include <linux/dma-mapping.h>
+#include <linux/slab.h>
 #include <linux/types.h>
 
 #include "desc.h"

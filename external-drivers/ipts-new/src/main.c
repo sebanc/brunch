@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/stddef.h>
 #include <linux/types.h>
+#include <linux/version.h>
 
 #include "context.h"
 #include "control.h"
@@ -108,7 +109,7 @@ static int ipts_remove(struct mei_cl_device *cldev)
 
 	mei_cldev_disable(cldev);
 	
-	return ret;
+	return 0;
 }
 #else
 static void ipts_remove(struct mei_cl_device *cldev)

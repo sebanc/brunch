@@ -35,10 +35,11 @@ This guide is for installing Brunch to a USB (or other disk) using Windows. This
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["rammus" for 1st gen -> 9th gen.][recovery-rammus]
-* ["volteer" for 10th & 11th gen.][recovery-volteer]
+* ["shyvana" for 4th gen -> 9th gen.][recovery-shyvana]
+* ["jinlon" for 10th gen.][recovery-jinlon]
+* ["voxel" for 11th gen & above.][recovery-voxel]
 #### AMD
-* ["zork" for Ryzen.][recovery-zork]
+* ["gumboz" for Ryzen.][recovery-gumboz]
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 
@@ -79,13 +80,6 @@ Before continuing, you will need a linux distro installed from the Microsoft Sto
 ```unzip chromeos_filename.bin.zip```
 
 Once completed, you will have 4 new files from the brunch archive, and a recovery bin that we will use in the next step.
-
-### Special instructions for Legacy devices **only**
-This step is only needed for legacy boot devices that do not support UEFI. If your PC supports UEFI, _skip this step!_
-* If you need it, this is when you should download the [MBR patch][mbr-patch] from the main branch and extract it with `tar`.
-  * This file will overwrite some of the files you've already extracted, this is supposed to happen.
-
-```tar zxvf mbr_support.tar.gz```
 
 ### Install Brunch
 
@@ -203,10 +197,11 @@ This guide is for installing Brunch to a partition using Windows WSL2.
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["rammus" for 1st gen -> 9th gen.][recovery-rammus]
-* ["volteer" for 10th & 11th gen.][recovery-volteer]
+* ["shyvana" for 4th gen -> 9th gen.][recovery-shyvana]
+* ["jinlon" for 10th gen.][recovery-jinlon]
+* ["voxel" for 11th gen & above.][recovery-voxel]
 #### AMD
-* ["zork" for Ryzen.][recovery-zork]
+* ["gumboz" for Ryzen.][recovery-gumboz]
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 
@@ -304,7 +299,7 @@ It is normal for the first boot to take a very long time, please be patient.
 See the full [Troubleshooting and Support][troubleshooting-and-faqs] page if you're having issues.
 
 ### Additional Tips
-* If you're having trouble booting a Brunch USB, make sure that UEFI is enabled in the BIOS (Unless you are using the MBR patch)
+* If you're having trouble booting a Brunch USB, make sure that UEFI is enabled in the BIOS.
 * Some PCs require a key to be held when booting to boot from USB or that USB booting is enabled in the BIOS
 * The first boot can take up to an hour on some hardware. Brunch does not typically freeze on the Brunch logo. If you are seeing the Brunch logo, the system is _probably_ still booting.
 * If your PC is stuck on the ChromeOS logo (White background), it is likely that you've got an incompatible dedicated GPU.
@@ -352,10 +347,10 @@ In case you run into issues while installing or using Brunch, below are the main
 [atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
 [amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
 [amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
-[recovery-rammus]: https://cros.tech/device/rammus
-[recovery-volteer]: https://cros.tech/device/volteer
-[recovery-grunt]: https://cros.tech/device/grunt
-[recovery-zork]: https://cros.tech/device/zork
+[recovery-shyvana]: https://cros.tech/device/shyvana
+[recovery-jinlon]: https://cros.tech/device/jinlon
+[recovery-voxel]: https://cros.tech/device/voxel
+[recovery-gumboz]: https://cros.tech/device/gumboz
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils
@@ -382,7 +377,6 @@ In case you run into issues while installing or using Brunch, below are the main
 [framework-options]: ./troubleshooting-and-faqs.md#framework-options
 [releases-tab]: https://github.com/sebanc/brunch/releases
 [latest-release]: https://github.com/sebanc/brunch/releases/latest
-[mbr-patch]: https://github.com/sebanc/brunch/raw/main/mbr_support.tar.gz
 [brunch-der]: https://github.com/sebanc/brunch/raw/main/brunch.der
 [secure-boot]: ./install-with-linux.md#secure-boot
 [brunch-usb-guide-win]:  ./install-with-windows.md#usb-installations

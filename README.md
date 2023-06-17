@@ -105,10 +105,10 @@ Additional troubleshooting and support tips can be found at the following page:
 [atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
 [amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
 [amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
-[recovery-rammus]: https://cros.tech/device/rammus
-[recovery-volteer]: https://cros.tech/device/volteer
-[recovery-grunt]: https://cros.tech/device/grunt
-[recovery-zork]: https://cros.tech/device/zork
+[recovery-shyvana]: https://cros.tech/device/shyvana
+[recovery-jinlon]: https://cros.tech/device/jinlon
+[recovery-voxel]: https://cros.tech/device/voxel
+[recovery-gumboz]: https://cros.tech/device/gumboz
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils
@@ -135,7 +135,6 @@ Additional troubleshooting and support tips can be found at the following page:
 [framework-options]: ./troubleshooting-and-faqs.md#framework-options
 [releases-tab]: https://github.com/sebanc/brunch/releases
 [latest-release]: https://github.com/sebanc/brunch/releases/latest
-[mbr-patch]: https://github.com/sebanc/brunch/raw/master/mbr_support.tar.gz
 [brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
 [secure-boot]: ./install-with-linux.md#secure-boot
 [brunch-pwa-info]: https://github.com/sebanc/brunch/wiki/Brunch-PWA-Guide

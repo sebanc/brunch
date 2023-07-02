@@ -41,13 +41,13 @@ if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 	mkdir /mainroot
 	fstype=$(blkid -s TYPE -o value "$img_part")
 	if [ "$fstype" == "ntfs" ]; then
-		ntfsfix "$img_part"
-		# The new ntfs3 driver seems to cause some issues, let's disable it for now 
-		#if [ "$(cat /proc/version | cut -d' ' -f3 | cut -c1-4 | sed 's@\.@@g')" -eq 515 ]; then
-		#	mount -n -t ntfs3 "$img_part" /mainroot
-		#else
+		ntfsfix -d "$img_part"
+		# The new ntfs3 driver seems to cause some issues, let's disable it for now aside from kernel 6.1
+		if [ "$(cat /proc/version | cut -d' ' -f3 | cut -c1-4 | sed 's@\.@@g')" -eq 61 ]; then
+			mount -n -t ntfs3 "$img_part" /mainroot
+		else
 			ntfs-3g "$img_part" /mainroot
-		#fi
+		fi
 	else
 		mount -n "$img_part" /mainroot
 	fi
@@ -88,6 +88,9 @@ else
 			fi
 		fi
 	done
+	# Prevent the system from trying to use the specific /dev/sdz loop used for dualboot
+	echo '' > /fake_loop
+	losetup --direct-io=off -P /dev/sdz /fake_loop
 fi
 if [ -z "$bootdevice" ] || [ -z "$partpath" ]; then echo "brunch: ChromeOS was not found on any device, falling back to shell..." > /dev/kmsg; exec sh; fi
 

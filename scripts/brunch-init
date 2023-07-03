@@ -41,8 +41,8 @@ if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 	mkdir /mainroot
 	fstype=$(blkid -s TYPE -o value "$img_part")
 	if [ "$fstype" == "ntfs" ]; then
-		ntfsfix -d "$img_part"
-		# The new ntfs3 driver seems to cause some issues, let's disable it for now aside from kernel 6.1
+		ntfsfix "$img_part"
+		# Enable ntfs3 module only for kernel 6.1
 		if [ "$(cat /proc/version | cut -d' ' -f3 | cut -c1-4 | sed 's@\.@@g')" -eq 61 ]; then
 			mount -n -t ntfs3 "$img_part" /mainroot
 		else

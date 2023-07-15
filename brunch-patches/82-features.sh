@@ -24,35 +24,33 @@ ret=0
 if [ ! -f "/roota/etc/chrome_dev.conf" ]; then ret=$((ret + (2 ** 0))); fi
 echo '--ash-debug-shortcuts' > /roota/etc/chrome_dev.conf
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
-echo '--enable-features=ArcUsbStorageUI' >> /roota/etc/chrome_dev.conf
-if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 echo '--gpu-sandbox-failures-fatal=no' >> /roota/etc/chrome_dev.conf
-if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
+if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 echo '--enable-hardware-overlays="single-fullscreen,single-on-top"' >> /roota/etc/chrome_dev.conf
-if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 4))); fi
+if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
 
 if [ "$acpi_power_button" -eq 1 ]; then
 	echo '--aura-legacy-power-button' >> /roota/etc/chrome_dev.conf
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 5))); fi
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 4))); fi
 	echo 1 > /roota/usr/share/power_manager/board_specific/legacy_power_button
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 6))); fi
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 5))); fi
 elif [ "$acpi_power_button_sleep" -eq 1 ]; then
 	echo '--force-tablet-power-button' >> /roota/etc/chrome_dev.conf
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 7))); fi
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 6))); fi
 	echo 1 > /roota/usr/share/power_manager/board_specific/legacy_power_button
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 8))); fi
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 7))); fi
 else
 	echo '--force-tablet-power-button' >> /roota/etc/chrome_dev.conf
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 9))); fi
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 8))); fi
 fi
 
 if [ "$cros_debug" -eq 0 ]; then
 
 grep -q '\${CHROME_COMMAND_FLAG}' /roota/etc/init/ui.conf
-if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 10))); fi
+if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 9))); fi
 flags="$(echo $(cat /roota/etc/chrome_dev.conf))"
 sed -i "s#\${CHROME_COMMAND_FLAG}#--chrome-command=/opt/google/chrome/chrome $flags#g" /roota/etc/init/ui.conf
-if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 11))); fi
+if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 10))); fi
 
 fi
 

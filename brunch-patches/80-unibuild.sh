@@ -63,15 +63,15 @@ HWID
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
 
 if [ "$native_chromebook_image" -eq 1 ]; then
-	if [ "$board" == "NAMI" ]; then
-		sndcard="kblda7219max"
-		device="$(cat /sys/class/dmi/id/board_name | sed 's# ##g' | tr [A-Z] [a-z])"
-	fi
-	if [ ! -z "sndcard" ] && [ ! -z "device" ] && [ -d /roota/usr/share/alsa/ucm/"$sndcard"."$device" ] && [ -f /roota/usr/share/alsa/ucm/"$sndcard"."$device"/"$sndcard"."$device".conf ]; then
-		if [ -d /roota/usr/share/alsa/ucm/"$sndcard" ]; then rm -r /roota/usr/share/alsa/ucm/"$sndcard"; fi
-		cp -r /roota/usr/share/alsa/ucm/"$sndcard"."$device" /roota/usr/share/alsa/ucm/"$sndcard"
-		mv /roota/usr/share/alsa/ucm/"$sndcard"/"$sndcard"."$device".conf /roota/usr/share/alsa/ucm/"$sndcard"/"$sndcard".conf
-	fi
+	for ucm in $(ls /roota/usr/share/alsa/ucm/ | grep "\.$(cat /sys/class/dmi/id/board_name | sed 's# ##g' | tr [A-Z] [a-z])$"); do
+		sndcard=$(echo $ucm | cut -d'.' -f1)
+		device=$(echo $ucm | cut -d'.' -f2)
+		if [ ! -z "sndcard" ] && [ ! -z "device" ] && [ -f /roota/usr/share/alsa/ucm/"$sndcard"."$device"/"$sndcard"."$device".conf ]; then
+			if [ -d /roota/usr/share/alsa/ucm/"$sndcard" ]; then rm -r /roota/usr/share/alsa/ucm/"$sndcard"; fi
+			cp -r /roota/usr/share/alsa/ucm/"$sndcard"."$device" /roota/usr/share/alsa/ucm/"$sndcard"
+			mv /roota/usr/share/alsa/ucm/"$sndcard"/"$sndcard"."$device".conf /roota/usr/share/alsa/ucm/"$sndcard"/"$sndcard".conf
+		fi
+	done
 fi
 
 if [ -f /roota/usr/share/chromeos-config/config.json ]; then

@@ -1,6 +1,6 @@
---- a/drivers/block/loop.c	2021-12-23 08:31:57.000000000 +0100
-+++ b/drivers/block/loop.c	2021-12-28 12:22:27.849468253 +0100
-@@ -2002,6 +2002,10 @@
+--- a/drivers/block/loop.c	2021-12-23 08:32:21.000000000 +0100
++++ b/drivers/block/loop.c	2021-12-28 12:30:21.133537799 +0100
+@@ -1787,6 +1787,10 @@
  	}
  	if (err < 0)
  		goto out_free_dev;
@@ -11,8 +11,8 @@
  	i = err;
  
  	err = -ENOMEM;
-@@ -2035,7 +2039,10 @@
- 	blk_queue_flag_set(QUEUE_FLAG_NOMERGES, lo->lo_queue);
+@@ -1815,7 +1819,10 @@
+ 	queue_flag_set_unlocked(QUEUE_FLAG_NOMERGES, lo->lo_queue);
  
  	err = -ENOMEM;
 -	disk = lo->lo_disk = alloc_disk(1 << part_shift);
@@ -23,7 +23,7 @@
  	if (!disk)
  		goto out_free_queue;
  
-@@ -2057,7 +2064,7 @@
+@@ -1837,7 +1844,7 @@
  	 * complicated, are too static, inflexible and may surprise
  	 * userspace tools. Parameters like this in general should be avoided.
  	 */
@@ -31,8 +31,8 @@
 +	if (!part_shift && i != 4096)
  		disk->flags |= GENHD_FL_NO_PART_SCAN;
  	disk->flags |= GENHD_FL_EXT_DEVT;
- 	atomic_set(&lo->lo_refcnt, 0);
-@@ -2068,7 +2075,10 @@
+ 	mutex_init(&lo->lo_ctl_mutex);
+@@ -1849,7 +1856,10 @@
  	disk->fops		= &lo_fops;
  	disk->private_data	= lo;
  	disk->queue		= lo->lo_queue;
@@ -44,8 +44,8 @@
  	add_disk(disk);
  	*l = lo;
  	return lo->lo_number;
-@@ -2224,7 +2234,7 @@
- 	int err;
+@@ -2009,7 +2019,7 @@
+ 		return err;
  
  	part_shift = 0;
 -	if (max_part > 0) {
@@ -53,11 +53,11 @@
  		part_shift = fls(max_part);
  
  		/*
-@@ -2281,6 +2291,7 @@
- 	mutex_lock(&loop_ctl_mutex);
+@@ -2061,6 +2071,7 @@
+ 	mutex_lock(&loop_index_mutex);
  	for (i = 0; i < nr; i++)
  		loop_add(&lo, i);
 +	loop_add(&lo, 4096);
- 	mutex_unlock(&loop_ctl_mutex);
+ 	mutex_unlock(&loop_index_mutex);
  
  	printk(KERN_INFO "loop: module loaded\n");

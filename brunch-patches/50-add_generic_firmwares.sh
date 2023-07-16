@@ -1,5 +1,4 @@
 # Cleanup chromebooks specific config files / firmares and add generic ones instead
-# Keep the original chromebook configuration if "native_chromebook_image" option is used
 
 native_chromebook_image=0
 no_camera_config=0
@@ -120,10 +119,7 @@ end script
 CAMERASCRIPT
 fi
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
-#if [ -d /roota/etc/cras ]; then
-#	rm -r /roota/etc/cras/*
-#	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 4))); fi
-#fi
+
 if [ -d /roota/etc/dptf ]; then
 	rm -r /roota/etc/dptf/*
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 4))); fi

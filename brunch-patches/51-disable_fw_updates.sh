@@ -5,8 +5,6 @@ echo "exit 0" > /roota/usr/bin/nvramtool
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
 echo "exit 0" > /roota/usr/sbin/chromeos-firmwareupdate
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
-#echo "exit 0" > /roota/usr/sbin/ectool
-#if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 echo "exit 0" > /roota/usr/sbin/flashrom
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 echo "exit 0" > /roota/usr/sbin/gsctool

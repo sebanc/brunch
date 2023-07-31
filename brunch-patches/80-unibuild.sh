@@ -12,25 +12,25 @@ do
 done
 
 ret=0
-board=$(fgrep 'CHROMEOS_RELEASE_DESCRIPTION' /roota/etc/lsb-release | cut -d' ' -f5 | tr a-z A-Z)
-if [ "$board" == "CORAL" ]; then
+board=$(fgrep 'CHROMEOS_RELEASE_DESCRIPTION' /roota/etc/lsb-release | cut -d' ' -f5)
+if [ "$board" == "coral" ]; then
 	hwid="ASTRONAUT"
-elif [ "$board" == "HATCH" ]; then
+elif [ "$board" == "hatch" ]; then
 	hwid="JINLON-YTGY"
-elif [ "$board" == "NAMI" ]; then
+elif [ "$board" == "nami" ]; then
 	hwid="AKALI"
-elif [ "$board" == "OCTOPUS" ]; then
+elif [ "$board" == "octopus" ]; then
 	hwid="BOBBA"
-elif [ "$board" == "RAMMUS" ]; then
+elif [ "$board" == "rammus" ]; then
 	hwid="SHYVANA"
-elif [ "$board" == "VOLTEER" ]; then
+elif [ "$board" == "volteer" ]; then
 	hwid="VOXEL-GFMQ"
-elif [ "$board" == "ZORK" ]; then
+elif [ "$board" == "zork" ]; then
 	hwid="GUMBOZ-JPUQ"
-elif [ "$board" == "GUYBRUSH" ]; then
+elif [ "$board" == "guybrush" ]; then
 	hwid="NIPPERKIN"	
 else
-	hwid="$board"
+	hwid="$(echo $board | tr a-z A-Z)"
 fi
 
 if [ "$enable_updates" -eq 1 ]; then
@@ -106,7 +106,8 @@ if [ -f /roota/usr/share/chromeos-config/config.json ]; then
         },
         "identity": {
           "platform-name": "${board}",
-          "smbios-name-match": "Brunch"
+          "smbios-name-match": "Brunch",
+          "sku-id": "0"
         },
         "name": "brunch",
         "test-label": "brunch"

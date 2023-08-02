@@ -294,36 +294,14 @@ rm -r ./chroot/tmp/acpi_call || { echo "Failed to build external acpi_call modul
 
 fi
 
-if [ "$kernel" == "4.19" ] || [ "$kernel" == "5.4" ] || [ "$kernel" == "5.10" ]; then
-
-cp -r ./external-drivers/goodix ./chroot/tmp/ || { echo "Failed to build external goodix module for kernel $kernel"; exit 1; }
-cd ./chroot/tmp/goodix || { echo "Failed to build external goodix module for kernel $kernel"; exit 1; }
-make -j"$NTHREADS" modules || { echo "Failed to build external goodix module for kernel $kernel"; exit 1; }
-cp ./goodix.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/goodix.ko || { echo "Failed to build external goodix module for kernel $kernel"; exit 1; }
-cd ../../.. || { echo "Failed to build external goodix module for kernel $kernel"; exit 1; }
-rm -r ./chroot/tmp/goodix || { echo "Failed to build external goodix module for kernel $kernel"; exit 1; }
-
-fi
-
-#if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
-
-#cp -r ./external-drivers/ipts-old ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-#cd ./chroot/tmp/ipts-old || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-#make -j"$NTHREADS" || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-#cp ./ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ipts.ko || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-#cd ../../.. || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-#rm -r ./chroot/tmp/ipts-old || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-
-#fi
-
 if [ "$kernel" == "5.10" ] || [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ]; then
 
-cp -r ./external-drivers/ipts-new ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-cd ./chroot/tmp/ipts-new || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+cp -r ./external-drivers/ipts ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+cd ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 cp ./src/ipts.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/ipts.ko || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 cd ../../.. || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
-rm -r ./chroot/tmp/ipts-new || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
+rm -r ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 
 fi
 

@@ -10,6 +10,8 @@ do
 	if [ "$i" == "invert_camera_order" ]; then invert_camera_order=1; fi
 done
 
+ret=0
+
 if [ "$native_chromebook_image" -eq 1 ]; then
 rm -r /roota/lib/firmware/iwlwifi*
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
@@ -19,8 +21,6 @@ cp /tmp/iwlwifi* /roota/lib/firmware/
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 exit $ret
 fi
-
-ret=0
 
 rm -r /roota/lib/firmware/*
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi

@@ -15,7 +15,7 @@ done
 make_config()
 {
 sed -i -z 's@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool $(success,echo 0)\n\t#def_bool@g' ./kernels/$1/init/Kconfig
-if [ "x$1" == "x6.1" ] || [ "x$1" == "x5.15" ] || [ "x$1" == "x5.10" ] || [ "x$1" == "x5.4" ] || [ "x$1" == "xchromebook-6.1" ] || [ "x$1" == "xchromebook-5.15" ] || [ "x$1" == "xchromebook-5.10" ] || [ "x$1" == "xchromebook-5.4" ]; then config_subfolder="/chromeos"; fi 
+if [ "x$1" == "xchromebook-4.14" ] || [ "x$1" == "xchromebook-4.19" ]; then config_subfolder=""; else config_subfolder="/chromeos"; fi
 case "$1" in
 	6.1|5.15|5.10|5.4|4.19)
 		echo 'CONFIG_LOCALVERSION="-brunch-sebanc"' > "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel $1 configuration failed"; exit 1; }

@@ -11,6 +11,7 @@ if [ $# -eq 0 ]; then
 		mkdir -p /mnt/stateful_partition/encrypted/var
 		mount -n --bind /mnt/stateful_partition/encrypted/var /var || return 1
 		mkdir -p /mnt/stateful_partition/encrypted/chronos
+		chown chronos:chronos /mnt/stateful_partition/encrypted/chronos
 		mount -n --bind /mnt/stateful_partition/encrypted/chronos /home/chronos || return 1
 	fi
 elif [ "$1" == "umount" ]; then

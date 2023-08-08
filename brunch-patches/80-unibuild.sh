@@ -40,9 +40,11 @@ if [ "$enable_updates" -eq 1 ]; then
 	cat >/roota/bin/chroot <<CHROOT
 #!/bin/bash
 if [ "\$EUID" -eq 0 ] && [ "\$1" == "." ] && [ "\$2" == "/usr/bin/cros_installer" ]; then
-exit 0
+	rm -rf /var/lib/ureadahead
+	touch /.brunch_update_done
+	exit 0
 else
-chroot.orig "\$@"
+	chroot.orig "\$@"
 fi
 CHROOT
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi

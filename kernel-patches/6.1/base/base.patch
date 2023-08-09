@@ -8588,8 +8588,8 @@ diff -ruN a/drivers/md/dm-init.c b/drivers/md/dm-init.c
 +++ b/drivers/md/dm-init.c	2023-01-30 08:32:43.000000000 +0100
 @@ -301,3 +301,254 @@
  
- module_param(create, charp, 0);
- MODULE_PARM_DESC(create, "Create a mapped device in early boot");
+ module_param_array(waitfor, charp, NULL, 0);
+ MODULE_PARM_DESC(waitfor, "Devices to wait for before setting up tables");
 +
 +/* ---------------------------------------------------------------
 + * ChromeOS shim - convert dm= format to dm-mod.create= format
@@ -25624,9 +25624,9 @@ diff -ruN a/fs/ceph/xattr.c b/fs/ceph/xattr.c
  {
  	if (!ceph_is_valid_xattr(name))
  		return -EOPNOTSUPP;
-diff -ruN a/fs/cifs/xattr.c b/fs/cifs/xattr.c
---- a/fs/cifs/xattr.c	2023-01-24 07:24:44.000000000 +0100
-+++ b/fs/cifs/xattr.c	2023-01-30 08:33:08.000000000 +0100
+diff -ruN a/fs/smb/client/xattr.c b/fs/smb/client/xattr.c
+--- a/fs/smb/client/xattr.c	2023-01-24 07:24:44.000000000 +0100
++++ b/fs/smb/client/xattr.c	2023-01-30 08:33:08.000000000 +0100
 @@ -283,7 +283,7 @@
  
  static int cifs_xattr_get(const struct xattr_handler *handler,
@@ -33699,23 +33699,6 @@ diff -ruN a/include/linux/nmi.h b/include/linux/nmi.h
  
  extern int lockup_detector_online_cpu(unsigned int cpu);
  extern int lockup_detector_offline_cpu(unsigned int cpu);
-@@ -81,14 +83,14 @@
- #define NMI_WATCHDOG_ENABLED      (1 << NMI_WATCHDOG_ENABLED_BIT)
- #define SOFT_WATCHDOG_ENABLED     (1 << SOFT_WATCHDOG_ENABLED_BIT)
- 
--#if defined(CONFIG_HARDLOCKUP_DETECTOR)
-+#if defined(CONFIG_HARDLOCKUP_DETECTOR_CORE)
- extern void hardlockup_detector_disable(void);
- extern unsigned int hardlockup_panic;
- #else
- static inline void hardlockup_detector_disable(void) {}
- #endif
- 
--#if defined(CONFIG_HAVE_NMI_WATCHDOG) || defined(CONFIG_HARDLOCKUP_DETECTOR)
-+#if defined(CONFIG_HAVE_NMI_WATCHDOG) || defined(CONFIG_HARDLOCKUP_DETECTOR_CORE)
- # define NMI_WATCHDOG_SYSCTL_PERM	0644
- #else
- # define NMI_WATCHDOG_SYSCTL_PERM	0444
 @@ -124,6 +126,14 @@
  
  void lockup_detector_reconfigure(void);
@@ -33739,15 +33722,6 @@ diff -ruN a/include/linux/nmi.h b/include/linux/nmi.h
  	touch_softlockup_watchdog();
  }
  
-@@ -197,7 +208,7 @@
- #endif
- 
- #if defined(CONFIG_HARDLOCKUP_CHECK_TIMESTAMP) && \
--    defined(CONFIG_HARDLOCKUP_DETECTOR)
-+    defined(CONFIG_HARDLOCKUP_DETECTOR_PERF)
- void watchdog_update_hrtimer_threshold(u64 period);
- #else
- static inline void watchdog_update_hrtimer_threshold(u64 period) { }
 diff -ruN a/include/linux/path.h b/include/linux/path.h
 --- a/include/linux/path.h	2023-01-24 07:24:44.000000000 +0100
 +++ b/include/linux/path.h	2023-01-30 08:33:12.000000000 +0100

@@ -22,8 +22,7 @@ script
 end script
 IPTS
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
-	#tar zxf /rootc/packages/ipts-old.tar.gz -C /roota
-	tar zxf /rootc/packages/ipts-new.tar.gz -C /roota
+	tar zxf /rootc/packages/ipts.tar.gz -C /roota
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 fi
 
@@ -37,7 +36,7 @@ script
 end script
 ITHC
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
-	tar zxf /rootc/packages/ipts-new.tar.gz -C /roota
+	tar zxf /rootc/packages/ipts.tar.gz -C /roota
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
 fi
 

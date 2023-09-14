@@ -1,0 +1,73 @@
+--- a/drivers/platform/x86/intel/hid.c	2023-09-14 20:52:07.592853829 +0200
++++ b/drivers/platform/x86/intel/hid.c	2023-09-14 23:21:54.173639591 +0200
+@@ -60,6 +60,27 @@
+ 
+ static const struct dmi_system_id button_array_table[] = {
+ 	{
++		.ident = "HP ProBook x360 11 G5 EE",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "HP"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "HP ProBook x360 11 G5 EE"),
++		},
++	},
++	{
++		.ident = "HUAWEI MateBook HZ-W09",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "HUAWEI"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "MateBook HZ-W09"),
++		},
++	},
++	{
++		.ident = "HUAWEI MateBook HZ-W19",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "HUAWEI"),
++			DMI_MATCH(DMI_PRODUCT_NAME, "MateBook HZ-W19"),
++		},
++	},
++	{
+ 		.ident = "Wacom MobileStudio Pro 13",
+ 		.matches = {
+ 			DMI_MATCH(DMI_SYS_VENDOR, "Wacom Co.,Ltd"),
+@@ -152,6 +152,12 @@
+ 	},
+ 	{
+ 		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
++			DMI_MATCH(DMI_PRODUCT_NAME, "Latitude 5300 2-in-1"),
++		},
++	},
++	{
++		.matches = {
+ 			DMI_MATCH(DMI_SYS_VENDOR, "Microsoft Corporation"),
+ 			DMI_MATCH(DMI_PRODUCT_NAME, "Surface Go"),
+ 		},
+@@ -680,14 +686,6 @@
+ 		return err;
+ 	}
+ 
+-	/* Setup 5 button array */
+-	if (button_array_present(device)) {
+-		dev_info(&device->dev, "platform supports 5 button array\n");
+-		err = intel_button_array_input_setup(device);
+-		if (err)
+-			pr_err("Failed to setup Intel 5 button array hotkeys\n");
+-	}
+-
+ 	/* Setup switches for devices that we know VGBS return correctly */
+ 	if (dmi_check_system(dmi_vgbs_allow_list)) {
+ 		dev_info(&device->dev, "platform supports switches\n");
+@@ -698,6 +696,14 @@
+ 			report_tablet_mode_state(device);
+ 	}
+ 
++	/* Setup 5 button array */
++	if (button_array_present(device)) {
++		dev_info(&device->dev, "platform supports 5 button array\n");
++		err = intel_button_array_input_setup(device);
++		if (err)
++			pr_err("Failed to setup Intel 5 button array hotkeys\n");
++	}
++
+ 	status = acpi_install_notify_handler(handle,
+ 					     ACPI_DEVICE_NOTIFY,
+ 					     notify_handler,

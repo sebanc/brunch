@@ -50,7 +50,8 @@ kernel_remote_path="$(git ls-remote https://chromium.googlesource.com/chromiumos
 echo "kernel_remote_path=$kernel_remote_path"
 
 # Download kernels source
-kernels="4.14 4.19 5.4 5.10 5.15 6.1"
+#kernels="4.14 4.19 5.4 5.10 5.15 6.1"
+kernels="5.15"
 for kernel in $kernels; do
 	kernel_version=$(curl -Ls "https://chromium.googlesource.com/chromiumos/third_party/kernel/+/$kernel_remote_path$kernel/Makefile?format=TEXT" | base64 --decode | sed -n -e 1,4p | sed -e '/^#/d' | cut -d'=' -f 2 | sed -z 's#\n##g' | sed 's#^ *##g' | sed 's# #.#g')
 	echo "kernel_version=$kernel_version"

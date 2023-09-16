@@ -1,0 +1,175 @@
+From 327e6e1d0f6e8db68c124dff4d6a326b381ccedb Mon Sep 17 00:00:00 2001
+From: Aun-Ali Zaidi <admin@kodeit.net>
+Date: Wed, 23 Mar 2022 17:12:21 +0530
+Subject: [PATCH] Input: bcm5974 - Add support for the T2 Macs
+
+---
+ drivers/input/mouse/bcm5974.c | 138 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 138 insertions(+)
+
+diff --git a/drivers/input/mouse/bcm5974.c b/drivers/input/mouse/bcm5974.c
+index 59a14505b..88f17f21a 100644
+--- a/drivers/input/mouse/bcm5974.c
++++ b/drivers/input/mouse/bcm5974.c
+@@ -83,6 +83,24 @@
+ #define USB_DEVICE_ID_APPLE_WELLSPRING9_ISO	0x0273
+ #define USB_DEVICE_ID_APPLE_WELLSPRING9_JIS	0x0274
+ 
++/* T2-Attached Devices */
++/* MacbookAir8,1 (2018) */
++#define USB_DEVICE_ID_APPLE_WELLSPRINGT2_J140K	0x027a
++/* MacbookPro15,2 (2018) */
++#define USB_DEVICE_ID_APPLE_WELLSPRINGT2_J132	0x027b
++/* MacbookPro15,1 (2018) */
++#define USB_DEVICE_ID_APPLE_WELLSPRINGT2_J680	0x027c
++/* MacbookPro15,4 (2019) */
++#define USB_DEVICE_ID_APPLE_WELLSPRINGT2_J213	0x027d
++/* MacbookPro16,2 (2020) */
++#define USB_DEVICE_ID_APPLE_WELLSPRINGT2_J214K	0x027e
++/* MacbookPro16,3 (2020) */
++#define USB_DEVICE_ID_APPLE_WELLSPRINGT2_J223	0x027f
++/* MacbookAir9,1 (2020) */
++#define USB_DEVICE_ID_APPLE_WELLSPRINGT2_J230K	0x0280
++/* MacbookPro16,1 (2019)*/
++#define USB_DEVICE_ID_APPLE_WELLSPRINGT2_J152F	0x0340
++
+ #define BCM5974_DEVICE(prod) {					\
+ 	.match_flags = (USB_DEVICE_ID_MATCH_DEVICE |		\
+ 			USB_DEVICE_ID_MATCH_INT_CLASS |		\
+@@ -147,6 +165,22 @@ static const struct usb_device_id bcm5974_table[] = {
+ 	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRING9_ANSI),
+ 	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRING9_ISO),
+ 	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRING9_JIS),
++	/* MacbookAir8,1 */
++	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRINGT2_J140K),
++	/* MacbookPro15,2 */
++	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRINGT2_J132),
++	/* MacbookPro15,1 */
++	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRINGT2_J680),
++	/* MacbookPro15,4 */
++	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRINGT2_J213),
++	/* MacbookPro16,2 */
++	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRINGT2_J214K),
++	/* MacbookPro16,3 */
++	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRINGT2_J223),
++	/* MacbookAir9,1 */
++	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRINGT2_J230K),
++	/* MacbookPro16,1 */
++	BCM5974_DEVICE(USB_DEVICE_ID_APPLE_WELLSPRINGT2_J152F),
+ 	/* Terminating entry */
+ 	{}
+ };
+@@ -483,6 +517,110 @@ static const struct bcm5974_config bcm5974_config_table[] = {
+ 		{ SN_COORD, -203, 6803 },
+ 		{ SN_ORIENT, -MAX_FINGER_ORIENTATION, MAX_FINGER_ORIENTATION }
+ 	},
++	{
++		USB_DEVICE_ID_APPLE_WELLSPRINGT2_J140K,
++		0,
++		0,
++		HAS_INTEGRATED_BUTTON,
++		0, sizeof(struct bt_data),
++		0x83, DATAFORMAT(TYPE4),
++		{ SN_PRESSURE, 0, 300 },
++		{ SN_WIDTH, 0, 2048 },
++		{ SN_COORD, -6243, 6749 },
++		{ SN_COORD, -170, 7685 },
++		{ SN_ORIENT, -MAX_FINGER_ORIENTATION, MAX_FINGER_ORIENTATION }
++	},
++	{
++		USB_DEVICE_ID_APPLE_WELLSPRINGT2_J132,
++		0,
++		0,
++		HAS_INTEGRATED_BUTTON,
++		0, sizeof(struct bt_data),
++		0x83, DATAFORMAT(TYPE4),
++		{ SN_PRESSURE, 0, 300 },
++		{ SN_WIDTH, 0, 2048 },
++		{ SN_COORD, -6243, 6749 },
++		{ SN_COORD, -170, 7685 },
++		{ SN_ORIENT, -MAX_FINGER_ORIENTATION, MAX_FINGER_ORIENTATION }
++	},
++	{
++		USB_DEVICE_ID_APPLE_WELLSPRINGT2_J680,
++		0,
++		0,
++		HAS_INTEGRATED_BUTTON,
++		0, sizeof(struct bt_data),
++		0x83, DATAFORMAT(TYPE4),
++		{ SN_PRESSURE, 0, 300 },
++		{ SN_WIDTH, 0, 2048 },
++		{ SN_COORD, -7456, 7976 },
++		{ SN_COORD, -1768, 7685 },
++		{ SN_ORIENT, -MAX_FINGER_ORIENTATION, MAX_FINGER_ORIENTATION }
++	},
++	{
++		USB_DEVICE_ID_APPLE_WELLSPRINGT2_J213,
++		0,
++		0,
++		HAS_INTEGRATED_BUTTON,
++		0, sizeof(struct bt_data),
++		0x83, DATAFORMAT(TYPE4),
++		{ SN_PRESSURE, 0, 300 },
++		{ SN_WIDTH, 0, 2048 },
++		{ SN_COORD, -6243, 6749 },
++		{ SN_COORD, -170, 7685 },
++		{ SN_ORIENT, -MAX_FINGER_ORIENTATION, MAX_FINGER_ORIENTATION }
++	},
++	{
++		USB_DEVICE_ID_APPLE_WELLSPRINGT2_J214K,
++		0,
++		0,
++		HAS_INTEGRATED_BUTTON,
++		0, sizeof(struct bt_data),
++		0x83, DATAFORMAT(TYPE4),
++		{ SN_PRESSURE, 0, 300 },
++		{ SN_WIDTH, 0, 2048 },
++		{ SN_COORD, -6243, 6749 },
++		{ SN_COORD, -170, 7685 },
++		{ SN_ORIENT, -MAX_FINGER_ORIENTATION, MAX_FINGER_ORIENTATION }
++	},
++	{
++		USB_DEVICE_ID_APPLE_WELLSPRINGT2_J223,
++		0,
++		0,
++		HAS_INTEGRATED_BUTTON,
++		0, sizeof(struct bt_data),
++		0x83, DATAFORMAT(TYPE4),
++		{ SN_PRESSURE, 0, 300 },
++		{ SN_WIDTH, 0, 2048 },
++		{ SN_COORD, -6243, 6749 },
++		{ SN_COORD, -170, 7685 },
++		{ SN_ORIENT, -MAX_FINGER_ORIENTATION, MAX_FINGER_ORIENTATION }
++	},
++	{
++		USB_DEVICE_ID_APPLE_WELLSPRINGT2_J230K,
++		0,
++		0,
++		HAS_INTEGRATED_BUTTON,
++		0, sizeof(struct bt_data),
++		0x83, DATAFORMAT(TYPE4),
++		{ SN_PRESSURE, 0, 300 },
++		{ SN_WIDTH, 0, 2048 },
++		{ SN_COORD, -6243, 6749 },
++		{ SN_COORD, -170, 7685 },
++		{ SN_ORIENT, -MAX_FINGER_ORIENTATION, MAX_FINGER_ORIENTATION }
++	},
++	{
++		USB_DEVICE_ID_APPLE_WELLSPRINGT2_J152F,
++		0,
++		0,
++		HAS_INTEGRATED_BUTTON,
++		0, sizeof(struct bt_data),
++		0x83, DATAFORMAT(TYPE4),
++		{ SN_PRESSURE, 0, 300 },
++		{ SN_WIDTH, 0, 2048 },
++		{ SN_COORD, -8916, 9918 },
++		{ SN_COORD, -1934, 9835 },
++		{ SN_ORIENT, -MAX_FINGER_ORIENTATION, MAX_FINGER_ORIENTATION }
++	},
+ 	{}
+ };
+ 
+-- 
+2.25.1
+

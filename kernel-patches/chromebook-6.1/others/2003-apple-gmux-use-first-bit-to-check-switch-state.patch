@@ -1,0 +1,41 @@
+From aca5f8b9f935191aa38d9f68ee18109a4bc8dd34 Mon Sep 17 00:00:00 2001
+From: Orlando Chamberlain <orlandoch.dev@gmail.com>
+Date: Wed, 25 Jan 2023 18:16:29 +1100
+Subject: [PATCH 3/9] apple-gmux: use first bit to check switch state
+
+On T2 Macs with MMIO gmux, when GMUX_PORT_SWITCH_DISPLAY is read, it can
+have values of 2, 3, 4, and 5. Odd values correspond to the discrete gpu,
+and even values correspond to the integrated gpu. The current logic is
+that only 2 corresponds to IGD, but this doesn't work for T2 Macs.
+Instead, check the first bit to determine the connected gpu.
+
+As T2 Macs with gmux only can switch the internal display, it is
+untested if this change (or a similar change) would be applicable
+to GMUX_PORT_SWITCH_DDC and GMUX_PORT_SWITCH_EXTERNAL.
+
+Signed-off-by: Orlando Chamberlain <orlandoch.dev@gmail.com>
+---
+ drivers/platform/x86/apple-gmux.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/platform/x86/apple-gmux.c b/drivers/platform/x86/apple-gmux.c
+index 9333f82cfa8a..ec99e05e532c 100644
+--- a/drivers/platform/x86/apple-gmux.c
++++ b/drivers/platform/x86/apple-gmux.c
+@@ -346,10 +346,10 @@ static void gmux_read_switch_state(struct apple_gmux_data *gmux_data)
+ 	else
+ 		gmux_data->switch_state_ddc = VGA_SWITCHEROO_DIS;
+ 
+-	if (gmux_read8(gmux_data, GMUX_PORT_SWITCH_DISPLAY) == 2)
+-		gmux_data->switch_state_display = VGA_SWITCHEROO_IGD;
+-	else
++	if (gmux_read8(gmux_data, GMUX_PORT_SWITCH_DISPLAY) & 1)
+ 		gmux_data->switch_state_display = VGA_SWITCHEROO_DIS;
++	else
++		gmux_data->switch_state_display = VGA_SWITCHEROO_IGD;
+ 
+ 	if (gmux_read8(gmux_data, GMUX_PORT_SWITCH_EXTERNAL) == 2)
+ 		gmux_data->switch_state_external = VGA_SWITCHEROO_IGD;
+-- 
+2.39.1
+

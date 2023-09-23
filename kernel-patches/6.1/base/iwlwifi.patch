@@ -1,0 +1,96 @@
+From 9e26f098a2a5a4c4cd327ad911ed2eb9a067a7b8 Mon Sep 17 00:00:00 2001
+From: Gregory Greenman <gregory.greenman@intel.com>
+Date: Sun, 30 Apr 2023 20:18:30 +0300
+Subject: wifi: iwlwifi: mvm: rfi: disable RFI feature
+
+This feature depends on a platform bugfix. Until we have a
+mechanism that can verify a platform has the required bugfix,
+disable RFI.
+
+Fixes: ef3ed33dfc8f ("wifi: iwlwifi: bump FW API to 77 for AX devices")
+Reported-by: Jeff Chua <jeff.chua.linux@gmail.com>
+Link: https://lore.kernel.org/linux-wireless/CAAJw_ZvZdFpw9W2Hisc9c2BAFbYAnQuaFFaFG6N7qPUP2fOL_w@mail.gmail.com/
+Signed-off-by: Gregory Greenman <gregory.greenman@intel.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+---
+ drivers/net/wireless/intel/iwlwifi/mvm/fw.c  |  3 +--
+ drivers/net/wireless/intel/iwlwifi/mvm/mvm.h |  1 +
+ drivers/net/wireless/intel/iwlwifi/mvm/rfi.c | 16 +++++++++++++---
+ 3 files changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/wireless/intel/iwlwifi/mvm/fw.c b/drivers/net/wireless/intel/iwlwifi/mvm/fw.c
+index b35c96cf7ad24..e2573a9d6f27c 100644
+--- a/drivers/net/wireless/intel/iwlwifi/mvm/fw.c
++++ b/drivers/net/wireless/intel/iwlwifi/mvm/fw.c
+@@ -1727,8 +1727,7 @@ int iwl_mvm_up(struct iwl_mvm *mvm)
+ 	iwl_mvm_tas_init(mvm);
+ 	iwl_mvm_leds_sync(mvm);
+ 
+-	if (fw_has_capa(&mvm->fw->ucode_capa,
+-			IWL_UCODE_TLV_CAPA_RFIM_SUPPORT)) {
++	if (iwl_rfi_supported(mvm)) {
+ 		if (iwl_mvm_eval_dsm_rfi(mvm) == DSM_VALUE_RFI_ENABLE)
+ 			iwl_rfi_send_config_cmd(mvm, NULL);
+ 	}
+diff --git a/drivers/net/wireless/intel/iwlwifi/mvm/mvm.h b/drivers/net/wireless/intel/iwlwifi/mvm/mvm.h
+index 6e7470d3a826d..9e5008e0e47f5 100644
+--- a/drivers/net/wireless/intel/iwlwifi/mvm/mvm.h
++++ b/drivers/net/wireless/intel/iwlwifi/mvm/mvm.h
+@@ -2347,6 +2347,7 @@ int iwl_mvm_mld_update_sta_keys(struct iwl_mvm *mvm,
+ 				u32 old_sta_mask,
+ 				u32 new_sta_mask);
+ 
++bool iwl_rfi_supported(struct iwl_mvm *mvm);
+ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm,
+ 			    struct iwl_rfi_lut_entry *rfi_table);
+ struct iwl_rfi_freq_table_resp_cmd *iwl_rfi_get_freq_table(struct iwl_mvm *mvm);
+diff --git a/drivers/net/wireless/intel/iwlwifi/mvm/rfi.c b/drivers/net/wireless/intel/iwlwifi/mvm/rfi.c
+index bb77bc9aa8218..2ecd32bed752f 100644
+--- a/drivers/net/wireless/intel/iwlwifi/mvm/rfi.c
++++ b/drivers/net/wireless/intel/iwlwifi/mvm/rfi.c
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
+ /*
+- * Copyright (C) 2020 - 2021 Intel Corporation
++ * Copyright (C) 2020 - 2022 Intel Corporation
+  */
+ 
+ #include "mvm.h"
+@@ -70,6 +70,16 @@ static const struct iwl_rfi_lut_entry iwl_rfi_table[IWL_RFI_LUT_SIZE] = {
+ 		PHY_BAND_6, PHY_BAND_6,}},
+ };
+ 
++bool iwl_rfi_supported(struct iwl_mvm *mvm)
++{
++	/* The feature depends on a platform bugfix, so for now
++	 * it's always disabled.
++	 * When the platform support detection is implemented we should
++	 * check FW TLV and platform support instead.
++	 */
++	return false;
++}
++
+ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm, struct iwl_rfi_lut_entry *rfi_table)
+ {
+ 	int ret;
+@@ -81,7 +91,7 @@ int iwl_rfi_send_config_cmd(struct iwl_mvm *mvm, struct iwl_rfi_lut_entry *rfi_t
+ 		.len[0] = sizeof(cmd),
+ 	};
+ 
+-	if (!fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_RFIM_SUPPORT))
++	if (!iwl_rfi_supported(mvm))
+ 		return -EOPNOTSUPP;
+ 
+ 	lockdep_assert_held(&mvm->mutex);
+@@ -113,7 +123,7 @@ struct iwl_rfi_freq_table_resp_cmd *iwl_rfi_get_freq_table(struct iwl_mvm *mvm)
+ 		.flags = CMD_WANT_SKB,
+ 	};
+ 
+-	if (!fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_RFIM_SUPPORT))
++	if (!iwl_rfi_supported(mvm))
+ 		return ERR_PTR(-EOPNOTSUPP);
+ 
+ 	mutex_lock(&mvm->mutex);
+-- 
+cgit 
+

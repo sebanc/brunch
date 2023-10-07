@@ -74,8 +74,8 @@ The Brunch Configuration menu is a new feature avaliable in Brunch 93 and higher
 
 ***
 
-The Brunch Configuration Menu can be accessed directly from Grub using the "ChromeOS (settings)" boot option or while logged into ChromeOS using the `sudo edit-brunch-config` command in the crosh shell.
-  * To access the crosh shell, press **Ctrl + Alt + T** and type `shell` at the invite.
+The Brunch Configuration Menu can be accessed directly from Grub using the "ChromeOS (settings)" boot option or while logged into a TTY using the `sudo edit-brunch-config` command.
+  * To access TTY2, press **Ctrl + Alt + F2** and login as `chronos`.
 ![Crosh][bcm-crosh]
   
  Once you've entered the Brunch Configuration Menu you will be greeted by several pages of options.
@@ -315,7 +315,7 @@ It is currently recommended to only update ChromeOS when the matching version of
  To manually update Brunch and ChromeOS together: 
  * Download the [latest Brunch release][latest-release]
  * Download the [latest recovery][cros-tech] matching your install and extract the bin.
- * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Open a TTY with **Crtl + Alt + F2** and login as `chronos`.
  * Run the built in command to update Brunch.
    * Replace `brunch_archive.tar.gz` with the file's actual filename.
    * Replace `recovery.bin` with the file's actual filename.
@@ -338,7 +338,7 @@ It is currently recommended to only update ChromeOS when the matching version of
  The easiest way to update ChromeOS is to enable the `enable_updates` framework option, then update directly from the Settings page.
  
  To enable the framework option: 
- * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Open a TTY with **Crtl + Alt + F2** and login as `chronos`.
  * Enter `sudo edit-brunch-config` to open the Brunch Configuration Menu described above.
  * Select `enable_updates` with the spacebar, then continue through the menu with the enter key.
  * When finished, the Brunch Configuration Menu will prompt to restart ChromeOS.
@@ -359,7 +359,7 @@ It is currently recommended to only update ChromeOS when the matching version of
  
  To manually update Brunch: 
  * Download the [latest Brunch release][latest-release]
- * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Open a TTY with **Crtl + Alt + F2** and login as `chronos`.
  * Run the built in command to update Brunch.
    * Replace `brunch_archive.tar.gz` with the file's actual filename.
 

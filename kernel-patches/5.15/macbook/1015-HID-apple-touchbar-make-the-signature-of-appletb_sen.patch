@@ -1,0 +1,116 @@
+From a7d71c39ee7a705b7c26714f82ba14cb6d45b084 Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Wed, 9 Nov 2022 21:54:56 +0300
+Subject: [PATCH 11/13] HID: apple-touchbar: make the signature of
+ appletb_send_usb_ctrl more similar to the signature of hid_hw_raw_request
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/apple-touchbar.c | 53 +++++++++++++++++++++---------------
+ 1 file changed, 31 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/hid/apple-touchbar.c b/drivers/hid/apple-touchbar.c
+index 69e03173db3a..5e41e62b1a6c 100644
+--- a/drivers/hid/apple-touchbar.c
++++ b/drivers/hid/apple-touchbar.c
+@@ -199,20 +199,31 @@ static const struct appletb_key_translation appletb_fn_codes[] = {
+ 
+ static struct appletb_device *appletb_dev;
+ 
+-static int appletb_send_usb_ctrl(struct appletb_iface_info *iface_info,
+-				 __u8 requesttype, struct hid_report *report,
+-				 void *data, __u16 size)
++static int appletb_hw_raw_request(struct appletb_iface_info *iface_info,
++				  unsigned char reportnum, __u8 *buf,
++				  size_t len, unsigned char rtype,
++				  int reqtype, __u8 usbtype)
+ {
+ 	struct usb_device *dev = interface_to_usbdev(iface_info->usb_iface);
+ 	u8 ifnum = iface_info->usb_iface->cur_altsetting->desc.bInterfaceNumber;
++	int direction;
+ 	int tries = 0;
++	int pipe;
+ 	int rc;
+ 
++	if (reqtype == HID_REQ_SET_REPORT) {
++		direction = USB_DIR_OUT;
++		pipe = usb_sndctrlpipe(dev, 0);
++	} else {
++		direction = USB_DIR_IN;
++		pipe = usb_rcvctrlpipe(dev, 0);
++	}
++
+ 	do {
+-		rc = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+-				     HID_REQ_SET_REPORT, requesttype,
+-				     (report->type + 1) << 8 | report->id,
+-				     ifnum, data, size, 2000);
++		rc = usb_control_msg(dev, pipe, reqtype,
++				     direction | USB_RECIP_INTERFACE | usbtype,
++				     (rtype + 1) << 8 | reportnum,
++				     ifnum, buf, len, 2000);
+ 		if (rc != -EPIPE)
+ 			break;
+ 
+@@ -268,15 +279,14 @@ static int appletb_set_tb_mode(struct appletb_device *tb_dev,
+ 	autopm_off = appletb_disable_autopm(tb_dev->mode_iface.hdev);
+ 
+ 	if (tb_dev->is_t1)
+-		rc = appletb_send_usb_ctrl(&tb_dev->mode_iface,
+-					   USB_DIR_OUT | USB_TYPE_VENDOR |
+-					   USB_RECIP_DEVICE,
+-					   report, buf, 1);
++		rc = appletb_hw_raw_request(&tb_dev->mode_iface, report->id,
++					   (__u8 *) buf, 1, report->type,
++					   HID_REQ_SET_REPORT, USB_TYPE_VENDOR);
+ 	else
+-		rc = appletb_send_usb_ctrl(&tb_dev->mode_iface,
+-					   USB_DIR_OUT | USB_TYPE_CLASS |
+-					   USB_RECIP_INTERFACE,
+-					   report, buf, 2);
++		rc = appletb_hw_raw_request(&tb_dev->mode_iface, report->id,
++					   (__u8 *) buf, 2, report->type,
++					   HID_REQ_SET_REPORT, USB_TYPE_CLASS);
++
+ 	if (rc < 0)
+ 		dev_err(tb_dev->log_dev,
+ 			"Failed to set touch bar mode to %u (%d)\n", mode, rc);
+@@ -293,10 +303,10 @@ static int appletb_set_tb_mode(struct appletb_device *tb_dev,
+  * We don't use hid_hw_request() because that doesn't allow us to get the
+  * returned status from the usb-control request; we also don't use
+  * hid_hw_raw_request() because would mean duplicating the retry-on-EPIPE
+- * in our appletb_send_usb_ctrl().
++ * in our appletb_hw_raw_request().
+  */
+ static int appletb_send_hid_report(struct appletb_iface_info *iface_info,
+-				   struct hid_report *report)
++				   struct hid_report *report, int reqtype)
+ {
+ 	unsigned char *buf;
+ 	int rc;
+@@ -307,10 +317,9 @@ static int appletb_send_hid_report(struct appletb_iface_info *iface_info,
+ 
+ 	hid_output_report(report, buf);
+ 
+-	rc = appletb_send_usb_ctrl(iface_info,
+-				   USB_DIR_OUT | USB_TYPE_CLASS |
+-							USB_RECIP_INTERFACE,
+-				   report, buf, hid_report_len(report));
++	rc = appletb_hw_raw_request(iface_info, report->id, (__u8 *) buf,
++				    hid_report_len(report), report->type,
++				    reqtype, USB_TYPE_CLASS);
+ 
+ 	kfree(buf);
+ 
+@@ -350,7 +359,7 @@ static int appletb_set_tb_disp(struct appletb_device *tb_dev,
+ 		tb_dev->tb_autopm_off =
+ 			appletb_disable_autopm(report->device);
+ 
+-	rc = appletb_send_hid_report(&tb_dev->disp_iface, report);
++	rc = appletb_send_hid_report(&tb_dev->disp_iface, report, HID_REQ_SET_REPORT);
+ 	if (rc < 0)
+ 		dev_err(tb_dev->log_dev,
+ 			"Failed to set touch bar display to %u (%d)\n", disp,
+-- 
+2.38.1
+

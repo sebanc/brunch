@@ -1,0 +1,135 @@
+From 1076dfa2cb823cf51f3843583957fbcb20c2678c Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Tue, 8 Nov 2022 20:48:46 +0300
+Subject: [PATCH 08/13] HID: apple-ibridge: rely on hid-core's parsing
+
+This commit addresses the issues raised in
+https://lore.kernel.org/lkml/CAO-hwJLXAHvjYKxu8pyqMPCNgMrN-H8bGWudVqCaRFnWODHPVQ@mail.gmail.com/.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/apple-ibridge.c | 69 ++++---------------------------------
+ 1 file changed, 6 insertions(+), 63 deletions(-)
+
+diff --git a/drivers/hid/apple-ibridge.c b/drivers/hid/apple-ibridge.c
+index 4caa7820fcf6..bc070ab034dd 100644
+--- a/drivers/hid/apple-ibridge.c
++++ b/drivers/hid/apple-ibridge.c
+@@ -328,43 +328,6 @@ static struct hid_ll_driver appleib_ll_driver = {
+ 	.output_report = appleib_ll_output_report,
+ };
+ 
+-static __u8 *appleib_find_collection(__u8 *start, __u8 *end,
+-				     unsigned int *usage)
+-{
+-	struct hid_item item;
+-	int depth = 0;
+-
+-	*usage = 0;
+-
+-	while ((start = hid_fetch_item(start, end, &item)) != NULL) {
+-		if (item.type == HID_ITEM_TYPE_MAIN) {
+-			switch (item.tag) {
+-			case HID_MAIN_ITEM_TAG_BEGIN_COLLECTION:
+-				depth++;
+-				break;
+-
+-			case HID_MAIN_ITEM_TAG_END_COLLECTION:
+-				depth--;
+-				if (depth <= 0)
+-					return start;
+-				break;
+-			}
+-		} else if (item.type == HID_ITEM_TYPE_GLOBAL &&
+-			   item.tag == HID_GLOBAL_ITEM_TAG_USAGE_PAGE &&
+-			   depth == 0) {
+-			*usage = (*usage & 0x0000FFFF) |
+-				 ((hid_item_udata(&item) & 0xFFFF) << 16);
+-		} else if (item.type == HID_ITEM_TYPE_LOCAL &&
+-			   item.tag == HID_LOCAL_ITEM_TAG_USAGE &&
+-			   depth == 0) {
+-			*usage = (*usage & 0xFFFF0000) |
+-				 (hid_item_udata(&item) & 0xFFFF);
+-		}
+-	}
+-
+-	return end;
+-}
+-
+ static struct hid_device_id *appleib_find_dev_id_for_usage(unsigned int usage)
+ {
+ 	int i;
+@@ -379,7 +342,7 @@ static struct hid_device_id *appleib_find_dev_id_for_usage(unsigned int usage)
+ 
+ static struct hid_device *
+ appleib_add_sub_dev(struct appleib_hid_dev_info *hdev_info,
+-		    struct hid_device_id *dev_id, u8 *rdesc, size_t rsize)
++		    struct hid_device_id *dev_id)
+ {
+ 	struct hid_device *sub_hdev;
+ 	int rc;
+@@ -404,12 +367,6 @@ appleib_add_sub_dev(struct appleib_hid_dev_info *hdev_info,
+ 
+ 	sub_hdev->driver_data = hdev_info;
+ 
+-	rc = hid_parse_report(sub_hdev, rdesc, rsize);
+-	if (rc) {
+-		hid_destroy_device(sub_hdev);
+-		return ERR_PTR(rc);
+-	}
+-
+ 	rc = hid_add_device(sub_hdev);
+ 	if (rc) {
+ 		hid_destroy_device(sub_hdev);
+@@ -422,9 +379,6 @@ appleib_add_sub_dev(struct appleib_hid_dev_info *hdev_info,
+ static struct appleib_hid_dev_info *appleib_add_device(struct hid_device *hdev)
+ {
+ 	struct appleib_hid_dev_info *hdev_info;
+-	__u8 *start = hdev->dev_rdesc;
+-	__u8 *end = start + hdev->dev_rsize;
+-	__u8 *pos;
+ 	struct hid_device_id *dev_id;
+ 	unsigned int usage;
+ 	int i;
+@@ -435,33 +389,22 @@ static struct appleib_hid_dev_info *appleib_add_device(struct hid_device *hdev)
+ 
+ 	hdev_info->hdev = hdev;
+ 
+-	for (i = 0; ; ) {
+-		pos = appleib_find_collection(start, end, &usage);
+-
++	for (i = 0; i < hdev->maxcollection; i++) {
++		usage = hdev->collection[i].usage;
+ 		dev_id = appleib_find_dev_id_for_usage(usage);
++
+ 		if (!dev_id) {
+ 			hid_warn(hdev, "Unknown collection encountered with usage %x\n",
+ 				 usage);
+-
+-		} else if (i >= ARRAY_SIZE(hdev_info->sub_hdevs)) {
+-			hid_warn(hdev, "Too many collections encountered - ignoring for usage %x\n",
+-				 usage);
+ 		} else {
+-			hdev_info->sub_hdevs[i] =
+-				appleib_add_sub_dev(hdev_info, dev_id, start,
+-						    pos - start);
++			hdev_info->sub_hdevs[i] = appleib_add_sub_dev(hdev_info, dev_id);
++
+ 			if (IS_ERR(hdev_info->sub_hdevs[i])) {
+ 				while (i-- > 0)
+ 					hid_destroy_device(hdev_info->sub_hdevs[i]);
+ 				return (void *)hdev_info->sub_hdevs[i];
+ 			}
+-
+-			i++;
+ 		}
+-
+-		start = pos;
+-		if (start >= end)
+-			break;
+ 	}
+ 
+ 	return hdev_info;
+-- 
+2.38.1
+

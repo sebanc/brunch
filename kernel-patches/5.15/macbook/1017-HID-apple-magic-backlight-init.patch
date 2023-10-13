@@ -1,0 +1,315 @@
+From a116af7291a8c69e2f5eff1505eb500ac79f290b Mon Sep 17 00:00:00 2001
+From: Orlando Chamberlain <redecorating@protonmail.com>
+Date: Mon, 14 Nov 2022 17:29:52 +0300
+Subject: [PATCH 13/13] HID: apple-magic-backlight: init
+
+This driver is based on the work of Orlando Chamberlain
+<redecorating@protonmail.com> at
+https://github.com/Redecorating/apple-ib-drv/commit/467df9b11cb55456f0365f40dd11c9e666623bf3.
+
+Co-authored-by: Kerem Karabay <kekrby@gmail.com>
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+NOTE: This commit hasn't been signed off yet by Orlando Chamberlain
+---
+ drivers/hid/Kconfig                 |  10 ++
+ drivers/hid/Makefile                |   1 +
+ drivers/hid/apple-magic-backlight.c | 171 ++++++++++++++++++++++++++++
+ drivers/hid/apple-touchbar.c        |   4 +
+ drivers/hid/apple-touchbar.h        |  51 +++++++++
+ 5 files changed, 237 insertions(+)
+ create mode 100644 drivers/hid/apple-magic-backlight.c
+ create mode 100644 drivers/hid/apple-touchbar.h
+
+diff --git a/drivers/hid/Kconfig b/drivers/hid/Kconfig
+index 476c1fd50520..a382578b1dd7 100644
+--- a/drivers/hid/Kconfig
++++ b/drivers/hid/Kconfig
+@@ -163,6 +163,16 @@ config HID_APPLE_TOUCHBAR
+ 	To compile this driver as a module, choose M here: the
+ 	module will be called apple-touchbar.
+ 
++config HID_APPLE_MAGIC_BACKLIGHT
++	tristate "Apple Touch Bar"
++	help
++	Say Y here if you want support for the keyboard backlight on Macs with
++	the magic keyboard (MacBookPro16,x and MacBookAir9,1). Note that this
++	driver is not for external magic keyboards.
++
++	To compile this driver as a module, choose M here: the
++	module will be called apple-magic-backlight.
++
+ config HID_APPLEIR
+ 	tristate "Apple infrared receiver"
+ 	depends on (USB_HID)
+diff --git a/drivers/hid/Makefile b/drivers/hid/Makefile
+index 3f0706a459ee..dd65c49c9d17 100644
+--- a/drivers/hid/Makefile
++++ b/drivers/hid/Makefile
+@@ -28,6 +28,7 @@ obj-$(CONFIG_HID_ACRUX)		+= hid-axff.o
+ obj-$(CONFIG_HID_APPLE)		+= hid-apple.o
+ obj-$(CONFIG_HID_APPLE_IBRIDGE)	+= apple-ibridge.o
+ obj-$(CONFIG_HID_APPLE_TOUCHBAR)	+= apple-touchbar.o
++obj-$(CONFIG_HID_APPLE_MAGIC_BACKLIGHT)	+= apple-magic-backlight.o
+ obj-$(CONFIG_HID_APPLEIR)	+= hid-appleir.o
+ obj-$(CONFIG_HID_CREATIVE_SB0540)	+= hid-creative-sb0540.o
+ obj-$(CONFIG_HID_ASUS)		+= hid-asus.o
+diff --git a/drivers/hid/apple-magic-backlight.c b/drivers/hid/apple-magic-backlight.c
+new file mode 100644
+index 000000000000..03ff31acf32e
+--- /dev/null
++++ b/drivers/hid/apple-magic-backlight.c
+@@ -0,0 +1,171 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Apple Magic Backlight Driver
++ *
++ * Copyright (c) 2022 Orlando Chamberlain <redecorating@protonmail.com>
++ * Copyright (c) 2022 Kerem Karabay <kekrby@gmail.com>
++ */
++
++#include <linux/module.h>
++#include <linux/hid.h>
++#include <linux/usb.h>
++
++#include "apple-touchbar.h"
++#include "hid-ids.h"
++
++#define APPLE_MAGIC_BL_MAX 60
++
++struct apple_magic_backlight {
++	struct led_classdev cdev;
++	struct hid_device *hdev;
++	bool powered;
++};
++
++struct apple_magic_backlight_brightness_report {
++	u8 id;		/* 0x01 */
++	u8 mode;	/* If 0x00, brightness can turn off backlight */
++	u8 brightness;
++	u8 override_1;	/* If these are non-zero, backlight is overridden to max brightness */
++	u8 override_2;
++	u8 max;		/* Lower is brighter, only takes effect when turning backlight
++			 * on from off, can be unreliable
++			 */
++	u8 rate;
++	u8 magic_1;	/* If these are non-zero, we are ignored. */
++	u8 magic_2;
++};
++
++struct apple_magic_backlight_power_report {
++	u8 id;		/* 0x03 */
++	u8 power;
++	u8 max;		/* Lower is brighter, only takes effect when turning backlight
++			 * on from off, can be unreliable
++			 */
++	u8 rate;
++	u8 magic_1;	/* If these are non-zero, we are ignored. */
++	u8 magic_2;
++};
++
++static int apple_magic_backlight_power_set(struct apple_magic_backlight *backlight,
++					   char power, char rate)
++{
++	struct apple_magic_backlight_power_report *rep;
++	int ret;
++
++	rep = kmalloc(sizeof(*rep), GFP_KERNEL);
++	if (rep == NULL)
++		return -ENOMEM;
++
++	backlight->powered = power ? true : false;
++
++	rep->id = 0x03;
++	rep->power = power;
++	rep->max = 0x5e; /* Windows uses 0x5e when turning on, and 0xf4 when
++			  * turning off. When it's off it doesn't matter, so
++			  * use 0x5e
++			  */
++	rep->rate = rate;
++
++	ret = hid_hw_raw_request(backlight->hdev, 0x03, (__u8 *) rep, sizeof(*rep),
++				 HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
++	kfree(rep);
++	return (ret > 0) ? 0 : ret;
++}
++
++static int apple_magic_backlight_brightness_set(struct apple_magic_backlight *backlight,
++						char brightness, char rate)
++{
++	struct apple_magic_backlight_brightness_report *rep;
++	int ret;
++
++	rep = kmalloc(sizeof(*rep), GFP_KERNEL);
++	if (rep == NULL)
++		return -ENOMEM;
++
++	rep->id = 0x01;
++	rep->mode = brightness;
++	rep->brightness = brightness;
++	rep->max = 0x5e;
++	rep->rate = rate;
++
++	ret = hid_hw_raw_request(backlight->hdev, 0x01, (__u8 *) rep, sizeof(*rep),
++				 HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
++
++	return (ret > 0) ? 0 : ret;
++}
++
++static int apple_magic_backlight_set(struct apple_magic_backlight *backlight,
++				     char brightness, char rate)
++{
++	int ret;
++
++	if (!brightness)
++		return apple_magic_backlight_power_set(backlight, 0, rate);
++
++	ret = apple_magic_backlight_brightness_set(backlight, brightness, rate);
++	if (ret)
++		return ret;
++
++	if (!backlight->powered && brightness)
++		ret = apple_magic_backlight_power_set(backlight, 1, rate);
++
++	return ret;
++}
++
++static int apple_magic_backlight_led_set(struct led_classdev *led_cdev,
++					 enum led_brightness brightness)
++{
++	struct apple_magic_backlight *backlight = container_of(led_cdev,
++			struct apple_magic_backlight, cdev);
++
++	return apple_magic_backlight_set(backlight, brightness, 1);
++}
++
++static int apple_magic_backlight_probe(struct hid_device *hdev,
++				       const struct hid_device_id *id)
++{
++	struct apple_magic_backlight *backlight;
++	int ret;
++
++	if (!appletb_is_hdev_for_magic_backlight(hdev))
++		return -ENODEV;
++
++	backlight = devm_kzalloc(&hdev->dev, sizeof(*backlight), GFP_KERNEL);
++
++	if (!backlight) {
++		hid_err(hdev, "Failed to allocate backlight structure");
++		return -ENOMEM;
++	}
++
++	backlight->hdev = hdev;
++	backlight->cdev.name = "apple::kbd_backlight";
++	backlight->cdev.max_brightness = APPLE_MAGIC_BL_MAX;
++	backlight->cdev.brightness_set_blocking = apple_magic_backlight_led_set;
++
++	ret = apple_magic_backlight_set(backlight, 0, 0);
++
++	if (ret) {
++		hid_err(hdev, "Failed to initialise Magic Keyboard Backlight (%d)\n", ret);
++		return ret;
++	}
++
++	return devm_led_classdev_register(&hdev->dev, &backlight->cdev);
++}
++
++static const struct hid_device_id apple_magic_backlight_hid_ids[] = {
++	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_TOUCHBAR_BACKLIGHT) },
++	{ }
++};
++
++static struct hid_driver apple_magic_backlight_hid_driver = {
++	.name = "apple-magic-backlight",
++	.id_table = apple_magic_backlight_hid_ids,
++	.probe = apple_magic_backlight_probe,
++};
++
++module_hid_driver(apple_magic_backlight_hid_driver);
++
++MODULE_DESCRIPTION("MacBook Magic Keyboard Backlight");
++MODULE_AUTHOR("Orlando Chamberlain <redecorating@protonmail.com>");
++MODULE_LICENSE("GPL");
++MODULE_DEVICE_TABLE(hid, apple_magic_backlight_hid_ids);
+diff --git a/drivers/hid/apple-touchbar.c b/drivers/hid/apple-touchbar.c
+index 40c12886e651..89b401944b28 100644
+--- a/drivers/hid/apple-touchbar.c
++++ b/drivers/hid/apple-touchbar.c
+@@ -42,6 +42,7 @@
+ 
+ #include "hid-ids.h"
+ #include "apple-ibridge.h"
++#include "apple-touchbar.h"
+ 
+ #define HID_UP_APPLE		0xff120000
+ #define HID_USAGE_MODE		(HID_UP_CUSTOM | 0x0004)
+@@ -1222,6 +1223,9 @@ static int appletb_probe(struct hid_device *hdev,
+ 	unsigned long flags;
+ 	int rc;
+ 
++	if (appletb_is_hdev_for_magic_backlight(hdev))
++		return -ENODEV;
++
+ 	spin_lock_irqsave(&tb_dev->tb_lock, flags);
+ 
+ 	if (!tb_dev->log_dev)
+diff --git a/drivers/hid/apple-touchbar.h b/drivers/hid/apple-touchbar.h
+new file mode 100644
+index 000000000000..b172361dabf1
+--- /dev/null
++++ b/drivers/hid/apple-touchbar.h
+@@ -0,0 +1,51 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Helpers for apple-touchbar and apple-magic-keyboard
++ *
++ * Copyright (c) 2022 Kerem Karabay <kekrby@gmail.com>
++ */
++#ifndef __HID_APPLE_TOUCHBAR_H
++#define __HID_APPLE_TOUCHBAR_H
++
++#include <linux/usb.h>
++#include <linux/hid.h>
++
++#include "hid-ids.h"
++
++static int __appletb_match_display(struct device *dev, const void *data)
++{
++	struct usb_device_descriptor *desc;
++
++	if (strcmp(dev->type->name, "usb_interface") != 0)
++		return 0;
++
++	desc = &interface_to_usbdev(to_usb_interface(dev))->descriptor;
++
++	return desc->idVendor == USB_VENDOR_ID_APPLE && desc->idProduct == USB_DEVICE_ID_APPLE_TOUCHBAR_DISPLAY;
++}
++
++static inline bool appletb_is_hdev_for_magic_backlight(struct hid_device *hdev)
++{
++	__u8 bInterfaceNumber;
++	struct device *tb_disp;
++	struct device *parent = hdev->dev.parent;
++	struct usb_interface *iface = to_usb_interface(parent);
++	struct usb_device_descriptor *desc = &interface_to_usbdev(iface)->descriptor;
++
++	if (!(desc->idVendor == USB_VENDOR_ID_APPLE && desc->idProduct == USB_DEVICE_ID_APPLE_TOUCHBAR_BACKLIGHT))
++		return false;
++
++	tb_disp = bus_find_device(parent->bus, NULL, NULL, __appletb_match_display);
++	bInterfaceNumber = iface->cur_altsetting->desc.bInterfaceNumber;
++
++	put_device(tb_disp);
++
++	/*
++         * The backlight of a magic keyboard is managed using the 1st interface
++         * of the "Touch Bar Backlight" device if a touchbar is present. If
++         * not, the 0th interface should be used.
++	 */
++	return (tb_disp && bInterfaceNumber == 1) || (!tb_disp && bInterfaceNumber == 0);
++}
++
++#endif // __HID_APPLE_TOUCHBAR_H
+-- 
+2.38.1
+

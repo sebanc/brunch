@@ -1,0 +1,219 @@
+From dcb2fa1b2c8df683b6b86264eb1514eec496e2a0 Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Tue, 8 Nov 2022 20:52:08 +0300
+Subject: [PATCH 09/13] Revert "HID: core: Export some report item parsing
+ functions."
+
+This reverts commit 360637979541fa2f3a64ed54af818f07e4e95a8d as it is no
+longer needed as the driver now relies on hid-core for parsing.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/hid-core.c | 54 +++++++++++++++++-------------------------
+ include/linux/hid.h    |  4 ----
+ 2 files changed, 22 insertions(+), 36 deletions(-)
+
+diff --git a/drivers/hid/hid-core.c b/drivers/hid/hid-core.c
+index f0d914238e55..8fcd663b10e2 100644
+--- a/drivers/hid/hid-core.c
++++ b/drivers/hid/hid-core.c
+@@ -343,7 +343,7 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
+  * Read data value from item.
+  */
+ 
+-u32 hid_item_udata(struct hid_item *item)
++static u32 item_udata(struct hid_item *item)
+ {
+ 	switch (item->size) {
+ 	case 1: return item->data.u8;
+@@ -352,9 +352,8 @@ u32 hid_item_udata(struct hid_item *item)
+ 	}
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(hid_item_udata);
+ 
+-s32 hid_item_sdata(struct hid_item *item)
++static s32 item_sdata(struct hid_item *item)
+ {
+ 	switch (item->size) {
+ 	case 1: return item->data.s8;
+@@ -363,7 +362,6 @@ s32 hid_item_sdata(struct hid_item *item)
+ 	}
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(hid_item_sdata);
+ 
+ /*
+  * Process a global item.
+@@ -396,29 +394,29 @@ static int hid_parser_global(struct hid_parser *parser, struct hid_item *item)
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_USAGE_PAGE:
+-		parser->global.usage_page = hid_item_udata(item);
++		parser->global.usage_page = item_udata(item);
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_LOGICAL_MINIMUM:
+-		parser->global.logical_minimum = hid_item_sdata(item);
++		parser->global.logical_minimum = item_sdata(item);
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_LOGICAL_MAXIMUM:
+ 		if (parser->global.logical_minimum < 0)
+-			parser->global.logical_maximum = hid_item_sdata(item);
++			parser->global.logical_maximum = item_sdata(item);
+ 		else
+-			parser->global.logical_maximum = hid_item_udata(item);
++			parser->global.logical_maximum = item_udata(item);
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_PHYSICAL_MINIMUM:
+-		parser->global.physical_minimum = hid_item_sdata(item);
++		parser->global.physical_minimum = item_sdata(item);
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_PHYSICAL_MAXIMUM:
+ 		if (parser->global.physical_minimum < 0)
+-			parser->global.physical_maximum = hid_item_sdata(item);
++			parser->global.physical_maximum = item_sdata(item);
+ 		else
+-			parser->global.physical_maximum = hid_item_udata(item);
++			parser->global.physical_maximum = item_udata(item);
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_UNIT_EXPONENT:
+@@ -426,7 +424,7 @@ static int hid_parser_global(struct hid_parser *parser, struct hid_item *item)
+ 		 * nibble due to the common misunderstanding of HID
+ 		 * specification 1.11, 6.2.2.7 Global Items. Attempt to handle
+ 		 * both this and the standard encoding. */
+-		raw_value = hid_item_sdata(item);
++		raw_value = item_sdata(item);
+ 		if (!(raw_value & 0xfffffff0))
+ 			parser->global.unit_exponent = hid_snto32(raw_value, 4);
+ 		else
+@@ -434,11 +432,11 @@ static int hid_parser_global(struct hid_parser *parser, struct hid_item *item)
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_UNIT:
+-		parser->global.unit = hid_item_udata(item);
++		parser->global.unit = item_udata(item);
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_REPORT_SIZE:
+-		parser->global.report_size = hid_item_udata(item);
++		parser->global.report_size = item_udata(item);
+ 		if (parser->global.report_size > 256) {
+ 			hid_err(parser->device, "invalid report_size %d\n",
+ 					parser->global.report_size);
+@@ -447,7 +445,7 @@ static int hid_parser_global(struct hid_parser *parser, struct hid_item *item)
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_REPORT_COUNT:
+-		parser->global.report_count = hid_item_udata(item);
++		parser->global.report_count = item_udata(item);
+ 		if (parser->global.report_count > HID_MAX_USAGES) {
+ 			hid_err(parser->device, "invalid report_count %d\n",
+ 					parser->global.report_count);
+@@ -456,7 +454,7 @@ static int hid_parser_global(struct hid_parser *parser, struct hid_item *item)
+ 		return 0;
+ 
+ 	case HID_GLOBAL_ITEM_TAG_REPORT_ID:
+-		parser->global.report_id = hid_item_udata(item);
++		parser->global.report_id = item_udata(item);
+ 		if (parser->global.report_id == 0 ||
+ 		    parser->global.report_id >= HID_MAX_IDS) {
+ 			hid_err(parser->device, "report_id %u is invalid\n",
+@@ -481,7 +479,7 @@ static int hid_parser_local(struct hid_parser *parser, struct hid_item *item)
+ 	unsigned n;
+ 	__u32 count;
+ 
+-	data = hid_item_udata(item);
++	data = item_udata(item);
+ 
+ 	switch (item->tag) {
+ 	case HID_LOCAL_ITEM_TAG_DELIMITER:
+@@ -613,7 +611,7 @@ static int hid_parser_main(struct hid_parser *parser, struct hid_item *item)
+ 
+ 	hid_concatenate_last_usage_page(parser);
+ 
+-	data = hid_item_udata(item);
++	data = item_udata(item);
+ 
+ 	switch (item->tag) {
+ 	case HID_MAIN_ITEM_TAG_BEGIN_COLLECTION:
+@@ -714,19 +712,12 @@ static void hid_device_release(struct device *dev)
+ 	kfree(hid);
+ }
+ 
+-/**
+- * hid_fetch_item - fetch an item from a report
+- *
+- * @start: the current position in the report buffer to read the next item from
+- * @end: the end of the report buffer
+- * @item: the item struct to fill in
+- *
++/*
+  * Fetch a report description item from the data stream. We support long
+  * items, though there are not yet any defined uses for them.
+- *
+- * Return: the position of the next item in the report
+  */
+-u8 *hid_fetch_item(__u8 *start, __u8 *end, struct hid_item *item)
++
++static u8 *fetch_item(__u8 *start, __u8 *end, struct hid_item *item)
+ {
+ 	u8 b;
+ 
+@@ -787,7 +778,6 @@ u8 *hid_fetch_item(__u8 *start, __u8 *end, struct hid_item *item)
+ 
+ 	return NULL;
+ }
+-EXPORT_SYMBOL_GPL(hid_fetch_item);
+ 
+ static void hid_scan_input_usage(struct hid_parser *parser, u32 usage)
+ {
+@@ -846,7 +836,7 @@ static int hid_scan_main(struct hid_parser *parser, struct hid_item *item)
+ 
+ 	hid_concatenate_last_usage_page(parser);
+ 
+-	data = hid_item_udata(item);
++	data = item_udata(item);
+ 
+ 	switch (item->tag) {
+ 	case HID_MAIN_ITEM_TAG_BEGIN_COLLECTION:
+@@ -906,7 +896,7 @@ static int hid_scan_report(struct hid_device *hid)
+ 	 * be robust against hid errors. Those errors will be raised by
+ 	 * hid_open_report() anyway.
+ 	 */
+-	while ((start = hid_fetch_item(start, end, &item)) != NULL)
++	while ((start = fetch_item(start, end, &item)) != NULL)
+ 		dispatch_type[item.type](parser, &item);
+ 
+ 	/*
+@@ -1265,7 +1255,7 @@ int hid_open_report(struct hid_device *device)
+ 	device->collection_size = HID_DEFAULT_NUM_COLLECTIONS;
+ 
+ 	ret = -EINVAL;
+-	while ((next = hid_fetch_item(start, end, &item)) != NULL) {
++	while ((next = fetch_item(start, end, &item)) != NULL) {
+ 		start = next;
+ 
+ 		if (item.format != HID_ITEM_FORMAT_SHORT) {
+diff --git a/include/linux/hid.h b/include/linux/hid.h
+index b39f97d565e2..4363a63b9775 100644
+--- a/include/linux/hid.h
++++ b/include/linux/hid.h
+@@ -941,10 +941,6 @@ struct hid_report *hid_validate_values(struct hid_device *hid,
+ 				       unsigned int field_index,
+ 				       unsigned int report_counts);
+ 
+-u32 hid_item_udata(struct hid_item *item);
+-s32 hid_item_sdata(struct hid_item *item);
+-u8 *hid_fetch_item(__u8 *start, __u8 *end, struct hid_item *item);
+-
+ void hid_setup_resolution_multiplier(struct hid_device *hid);
+ int hid_open_report(struct hid_device *device);
+ int hid_check_keys_pressed(struct hid_device *hid);
+-- 
+2.38.1
+

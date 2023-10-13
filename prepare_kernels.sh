@@ -2,7 +2,7 @@
 
 apply_patches()
 {
-for patch_type in "base" "others" "chromeos" "all_devices" "surface_devices" "surface_go_devices" "surface_mwifiex_pcie_devices" "surface_np3_devices"; do
+for patch_type in "base" "others" "chromeos" "all_devices" "surface_devices" "surface_go_devices" "surface_mwifiex_pcie_devices" "surface_np3_devices" "macbook"; do
 	if [ -d "./kernel-patches/$1/$patch_type" ]; then
 		for patch in ./kernel-patches/"$1/$patch_type"/*.patch; do
 			echo "Applying patch: $patch"

@@ -1,0 +1,29 @@
+From f362b5d6841a7f8208f7caf6c57dc6d3e89cb0ef Mon Sep 17 00:00:00 2001
+From: Aditya Garg <gargaditya08@live.com>
+Date: Thu, 26 Jan 2023 18:29:56 +0530
+Subject: [PATCH] fix suspend
+
+Signed-off-by: Aditya Garg <gargaditya08@live.com>
+---
+ drivers/hid/apple-touchbar.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/hid/apple-touchbar.c b/drivers/hid/apple-touchbar.c
+index 7de495b1c..18f975fc7 100644
+--- a/drivers/hid/apple-touchbar.c
++++ b/drivers/hid/apple-touchbar.c
+@@ -1378,6 +1378,11 @@ static int appletb_suspend(struct hid_device *hdev, pm_message_t message)
+ 	    message.event != PM_EVENT_FREEZE)
+ 		return 0;
+ 
++	if (!tb_dev->is_t1) {
++		dev_info(tb_dev->log_dev, "T2 Mac detected. Touchbar suspend to be handled by Apple BCE.\n");
++		return 0;
++		}
++
+ 	/*
+ 	 * Wait for both interfaces to be suspended and no more async work
+ 	 * in progress.
+-- 
+2.37.2
+

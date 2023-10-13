@@ -1,0 +1,31 @@
+From 4df962ed303d55664fd4a3e92118d8030d5000d2 Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Wed, 9 Nov 2022 18:21:50 +0300
+Subject: [PATCH 10/13] HID: apple-touchbar: use product IDs from hid-ids.h
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/apple-touchbar.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/hid/apple-touchbar.c b/drivers/hid/apple-touchbar.c
+index 87cb9ebafb61..69e03173db3a 100644
+--- a/drivers/hid/apple-touchbar.c
++++ b/drivers/hid/apple-touchbar.c
+@@ -1466,9 +1466,11 @@ static const struct hid_device_id appletb_hid_ids[] = {
+ 			 USB_DEVICE_ID_IBRIDGE_TB),
+ 	  .driver_data = APPLETB_FEATURE_IS_T1 },
+ 	/* MacBook Pro's 2018, 2019, with T2 chip: iBridge DFR brightness */
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, 0x8102) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE,
++			USB_DEVICE_ID_APPLE_TOUCHBAR_BACKLIGHT) },
+ 	/* MacBook Pro's 2018, 2019, with T2 chip: iBridge Display */
+-	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, 0x8302) },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE,
++			USB_DEVICE_ID_APPLE_TOUCHBAR_DISPLAY) },
+ 	{ },
+ };
+ 
+-- 
+2.38.1
+

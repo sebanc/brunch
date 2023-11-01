@@ -5516,9 +5516,9 @@ diff -ruN a/drivers/hid/hid-input.c b/drivers/hid/hid-input.c
  		if (dev->battery_status != HID_BATTERY_REPORTED &&
  		    !dev->battery_avoid_query) {
 @@ -550,6 +578,9 @@
- 	dev->battery_max = max;
  	dev->battery_report_type = report_type;
  	dev->battery_report_id = field->report->id;
+ 	dev->battery_charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
 +	dev->battery_state_changed = false;
 +	dev->battery_reported = false;
 +	dev->battery_sn_64bit = false;
@@ -5669,12 +5669,13 @@ diff -ruN a/drivers/hid/hid-input.c b/drivers/hid/hid-input.c
  			break;
  
  		default:  goto unknown;
-@@ -1458,9 +1574,17 @@
- 		return;
+@@ -1458,10 +1574,18 @@
+ 		bool handled = hidinput_set_battery_charge_status(hid, usage->hid, value);
  
- 	if (usage->type == EV_PWR) {
--		hidinput_update_battery(hid, value);
-+		hidinput_update_battery_capacity(hid, value);
+ 		if (!handled)
+-			hidinput_update_battery(hid, value);
++			hidinput_update_battery_capacity(hid, value);
+ 
  		return;
  	}
 +	if (usage->type == EV_MSC && usage->hid == (HID_UP_DIGITIZER | 0x006e)) { /* TransducerSerialNumberSecond32Bits */
@@ -23543,45 +23544,6 @@ diff -ruN a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
  config USB_CONFIGFS_F_UAC1
  	bool "Audio Class 1.0"
  	depends on USB_CONFIGFS
-diff -ruN a/drivers/usb/misc/onboard_usb_hub.c b/drivers/usb/misc/onboard_usb_hub.c
---- a/drivers/usb/misc/onboard_usb_hub.c	2023-01-24 07:24:44.000000000 +0100
-+++ b/drivers/usb/misc/onboard_usb_hub.c	2023-01-30 08:33:06.000000000 +0100
-@@ -329,6 +329,7 @@
- 
- /************************** USB driver **************************/
- 
-+#define VENDOR_ID_GENESYS	0x05e3
- #define VENDOR_ID_MICROCHIP	0x0424
- #define VENDOR_ID_REALTEK	0x0bda
- #define VENDOR_ID_TI		0x0451
-@@ -405,6 +406,7 @@
- }
- 
- static const struct usb_device_id onboard_hub_id_table[] = {
-+	{ USB_DEVICE(VENDOR_ID_GENESYS, 0x0608) }, /* Genesys Logic GL850G USB 2.0 */
- 	{ USB_DEVICE(VENDOR_ID_MICROCHIP, 0x2514) }, /* USB2514B USB 2.0 */
- 	{ USB_DEVICE(VENDOR_ID_REALTEK, 0x0411) }, /* RTS5411 USB 3.1 */
- 	{ USB_DEVICE(VENDOR_ID_REALTEK, 0x5411) }, /* RTS5411 USB 2.1 */
-diff -ruN a/drivers/usb/misc/onboard_usb_hub.h b/drivers/usb/misc/onboard_usb_hub.h
---- a/drivers/usb/misc/onboard_usb_hub.h	2023-01-24 07:24:44.000000000 +0100
-+++ b/drivers/usb/misc/onboard_usb_hub.h	2023-01-30 08:33:06.000000000 +0100
-@@ -22,10 +22,15 @@
- 	.reset_us = 3000,
- };
- 
-+static const struct onboard_hub_pdata genesys_gl850g_data = {
-+	.reset_us = 3,
-+};
-+
- static const struct of_device_id onboard_hub_match[] = {
- 	{ .compatible = "usb424,2514", .data = &microchip_usb424_data, },
- 	{ .compatible = "usb424,2517", .data = &microchip_usb424_data, },
- 	{ .compatible = "usb451,8140", .data = &ti_tusb8041_data, },
- 	{ .compatible = "usb451,8142", .data = &ti_tusb8041_data, },
-+	{ .compatible = "usb5e3,608", .data = &genesys_gl850g_data, },
- 	{ .compatible = "usbbda,411", .data = &realtek_rts5411_data, },
- 	{ .compatible = "usbbda,5411", .data = &realtek_rts5411_data, },
- 	{ .compatible = "usbbda,414", .data = &realtek_rts5411_data, },
 diff -ruN a/drivers/usb/typec/class.c b/drivers/usb/typec/class.c
 --- a/drivers/usb/typec/class.c	2023-01-24 07:24:44.000000000 +0100
 +++ b/drivers/usb/typec/class.c	2023-01-30 08:33:06.000000000 +0100
@@ -31893,13 +31855,13 @@ diff -ruN a/fs/proc/internal.h b/fs/proc/internal.h
  void proc_init_kmemcache(void);
  void proc_invalidate_siblings_dcache(struct hlist_head *inodes, spinlock_t *lock);
 @@ -291,6 +296,7 @@
+ 	struct task_struct *task;
  	struct mm_struct *mm;
- #ifdef CONFIG_MMU
  	struct vma_iterator iter;
 +	struct mem_size_stats *mss;
- #endif
  #ifdef CONFIG_NUMA
  	struct mempolicy *task_mempolicy;
+ #endif
 diff -ruN a/fs/proc/Kconfig b/fs/proc/Kconfig
 --- a/fs/proc/Kconfig	2023-01-24 07:24:44.000000000 +0100
 +++ b/fs/proc/Kconfig	2023-01-30 08:33:10.000000000 +0100
@@ -33157,9 +33119,9 @@ diff -ruN a/include/linux/hid.h b/include/linux/hid.h
  	unsigned  report_type;		/* (input,output,feature) */
  	__s32    *value;		/* last known value(s) */
 @@ -611,8 +613,14 @@
- 	__s32 battery_max;
  	__s32 battery_report_type;
  	__s32 battery_report_id;
+ 	__s32 battery_charge_status;
 +	__u64 battery_serial_number;
 +	__u64 battery_new_serial_number;				/* gather entire updated 64-bit SN here for end of report */
 +	char battery_serial_number_str[17];				/* Space for max 16 hex digits */
@@ -49677,471 +49639,6 @@ diff -ruN a/sound/soc/sof/topology.c b/sound/soc/sof/topology.c
  	default:
  		break;
  	}
-diff -ruN a/tools/mm/low-mem-test.c b/tools/mm/low-mem-test.c
---- a/tools/mm/low-mem-test.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/tools/mm/low-mem-test.c	2023-01-30 08:33:22.000000000 +0100
-@@ -0,0 +1,178 @@
-+/* Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
-+ * This program is free software, released under the GPL.
-+ * Based on code by Minchan Kim
-+ *
-+ * User program that tests low-memory notifications.
-+ *
-+ * Compile with -lpthread
-+ * for instance
-+ * i686-pc-linux-gnu-gcc low-mem-test.c -o low-mem-test -lpthread
-+ *
-+ * Run as: low-mem-test <allocation size> <allocation interval (microseconds)>
-+ *
-+ * This program runs in two threads.  One thread continuously allocates memory
-+ * in the given chunk size, waiting for the specified microsecond interval
-+ * between allocations.  The other runs in a loop that waits for a low-memory
-+ * notification, then frees some of the memory that the first thread has
-+ * allocated.
-+ */
-+
-+#include <poll.h>
-+#include <sys/types.h>
-+#include <sys/stat.h>
-+#include <fcntl.h>
-+#include <stdio.h>
-+#include <pthread.h>
-+#include <stdlib.h>
-+#include <string.h>
-+
-+int memory_chunk_size = 10000000;
-+int wait_time_us = 10000;
-+int autotesting;
-+
-+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-+
-+struct node {
-+	void *memory;
-+	struct node *prev;
-+	struct node *next;
-+};
-+
-+struct node head, tail;
-+
-+void work(void)
-+{
-+	int i;
-+
-+	while (1) {
-+		struct node *new = malloc(sizeof(struct node));
-+		if (new == NULL) {
-+			perror("allocating node");
-+			exit(1);
-+		}
-+		new->memory = malloc(memory_chunk_size);
-+		if (new->memory == NULL) {
-+			perror("allocating chunk");
-+			exit(1);
-+		}
-+
-+		pthread_mutex_lock(&mutex);
-+		new->next = &head;
-+		new->prev = head.prev;
-+		new->prev->next = new;
-+		new->next->prev = new;
-+		for (i = 0; i < memory_chunk_size / 4096; i++) {
-+			/* touch page */
-+			((unsigned char *) new->memory)[i * 4096] = 1;
-+		}
-+
-+		pthread_mutex_unlock(&mutex);
-+
-+		if (!autotesting) {
-+			printf("+");
-+			fflush(stdout);
-+		}
-+
-+		usleep(wait_time_us);
-+	}
-+}
-+
-+void free_memory(void)
-+{
-+	struct node *old;
-+	pthread_mutex_lock(&mutex);
-+	old = tail.next;
-+	if (old == &head) {
-+		fprintf(stderr, "no memory left to free\n");
-+		exit(1);
-+	}
-+	old->prev->next = old->next;
-+	old->next->prev = old->prev;
-+	free(old->memory);
-+	free(old);
-+	pthread_mutex_unlock(&mutex);
-+	if (!autotesting) {
-+		printf("-");
-+		fflush(stdout);
-+	}
-+}
-+
-+void *poll_thread(void *dummy)
-+{
-+	struct pollfd pfd;
-+	int fd = open("/dev/chromeos-low-mem", O_RDONLY);
-+	if (fd == -1) {
-+		perror("/dev/chromeos-low-mem");
-+		exit(1);
-+	}
-+
-+	pfd.fd = fd;
-+	pfd.events = POLLIN;
-+
-+	if (autotesting) {
-+		/* Check that there is no memory shortage yet. */
-+		poll(&pfd, 1, 0);
-+		if (pfd.revents != 0) {
-+			exit(0);
-+		} else {
-+			fprintf(stderr, "expected no events but "
-+				"poll() returned 0x%x\n", pfd.revents);
-+			exit(1);
-+		}
-+	}
-+
-+	while (1) {
-+		poll(&pfd, 1, -1);
-+		if (autotesting) {
-+			/* Free several chunks and check that the notification
-+			 * is gone. */
-+			free_memory();
-+			free_memory();
-+			free_memory();
-+			free_memory();
-+			free_memory();
-+			poll(&pfd, 1, 0);
-+			if (pfd.revents == 0) {
-+				exit(0);
-+			} else {
-+				fprintf(stderr, "expected no events but "
-+					"poll() returned 0x%x\n", pfd.revents);
-+				exit(1);
-+			}
-+		}
-+		free_memory();
-+	}
-+}
-+
-+int main(int argc, char **argv)
-+{
-+	pthread_t threadid;
-+
-+	head.next = NULL;
-+	head.prev = &tail;
-+	tail.next = &head;
-+	tail.prev = NULL;
-+
-+	if (argc != 3 && (argc != 2 || strcmp(argv[1], "autotesting"))) {
-+		fprintf(stderr,
-+			"usage: low-mem-test <alloc size in bytes> "
-+			"<alloc interval in microseconds>\n"
-+			"or:    low-mem-test autotesting\n");
-+		exit(1);
-+	}
-+
-+	if (argc == 2) {
-+		autotesting = 1;
-+	} else {
-+		memory_chunk_size = atoi(argv[1]);
-+		wait_time_us = atoi(argv[2]);
-+	}
-+
-+	if (pthread_create(&threadid, NULL, poll_thread, NULL)) {
-+		perror("pthread");
-+		return 1;
-+	}
-+
-+	work();
-+	return 0;
-+}
-diff -ruN a/tools/testing/selftests/futex/functional/futex_swap.c b/tools/testing/selftests/futex/functional/futex_swap.c
---- a/tools/testing/selftests/futex/functional/futex_swap.c	1970-01-01 01:00:00.000000000 +0100
-+++ b/tools/testing/selftests/futex/functional/futex_swap.c	2023-01-30 08:33:24.000000000 +0100
-@@ -0,0 +1,209 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
-+
-+#include <errno.h>
-+#include <getopt.h>
-+#include <pthread.h>
-+#include <stdint.h>
-+#include <stdio.h>
-+#include <stdlib.h>
-+#include <string.h>
-+#include <time.h>
-+#include "atomic.h"
-+#include "futextest.h"
-+
-+/* The futex the main thread waits on. */
-+futex_t futex_main = FUTEX_INITIALIZER;
-+/* The futex the other thread wats on. */
-+futex_t futex_other = FUTEX_INITIALIZER;
-+
-+/* The number of iterations to run (>1 => run benchmarks. */
-+static int cfg_iterations = 1;
-+
-+/* If != 0, print diagnostic messages. */
-+static int cfg_verbose;
-+
-+/* If == 0, do not use validation_counter. Useful for benchmarking. */
-+static int cfg_validate = 1;
-+
-+/* How to swap threads. */
-+#define SWAP_WAKE_WAIT 1
-+#define SWAP_SWAP 2
-+
-+/* Futex values. */
-+#define FUTEX_WAITING 0
-+#define FUTEX_WAKEUP 1
-+
-+/* An atomic counter used to validate proper swapping. */
-+static atomic_t validation_counter;
-+
-+void futex_swap_op(int mode, futex_t *futex_this, futex_t *futex_that)
-+{
-+	int ret;
-+
-+	switch (mode) {
-+	case SWAP_WAKE_WAIT:
-+		futex_set(futex_this, FUTEX_WAITING);
-+		futex_set(futex_that, FUTEX_WAKEUP);
-+		futex_wake(futex_that, 1, FUTEX_PRIVATE_FLAG);
-+		futex_wait(futex_this, FUTEX_WAITING, NULL, FUTEX_PRIVATE_FLAG);
-+		if (*futex_this != FUTEX_WAKEUP) {
-+			fprintf(stderr, "unexpected futex_this value on wakeup\n");
-+			exit(1);
-+		}
-+		break;
-+
-+	case SWAP_SWAP:
-+		futex_set(futex_this, FUTEX_WAITING);
-+		futex_set(futex_that, FUTEX_WAKEUP);
-+		ret = futex_swap(futex_this, FUTEX_WAITING, NULL,
-+				 futex_that, FUTEX_PRIVATE_FLAG);
-+		if (ret < 0 && errno == ENOSYS) {
-+			/* futex_swap not implemented */
-+			perror("futex_swap");
-+			exit(1);
-+		}
-+		if (*futex_this != FUTEX_WAKEUP) {
-+			fprintf(stderr, "unexpected futex_this value on wakeup\n");
-+			exit(1);
-+		}
-+		break;
-+
-+	default:
-+		fprintf(stderr, "unknown mode in %s\n", __func__);
-+		exit(1);
-+	}
-+}
-+
-+void *other_thread(void *arg)
-+{
-+	int mode = *((int *)arg);
-+	int counter;
-+
-+	if (cfg_verbose)
-+		printf("%s started\n", __func__);
-+
-+	futex_wait(&futex_other, 0, NULL, FUTEX_PRIVATE_FLAG);
-+
-+	for (counter = 0; counter < cfg_iterations; ++counter) {
-+		if (cfg_validate) {
-+			int prev = 2 * counter + 1;
-+
-+			if (prev != atomic_cmpxchg(&validation_counter, prev,
-+						   prev + 1)) {
-+				fprintf(stderr, "swap validation failed\n");
-+				exit(1);
-+			}
-+		}
-+		futex_swap_op(mode, &futex_other, &futex_main);
-+	}
-+
-+	if (cfg_verbose)
-+		printf("%s finished: %d iteration(s)\n", __func__, counter);
-+
-+	return NULL;
-+}
-+
-+void run_test(int mode)
-+{
-+	struct timespec start, stop;
-+	int ret, counter;
-+	pthread_t thread;
-+	uint64_t duration;
-+
-+	futex_set(&futex_other, FUTEX_WAITING);
-+	atomic_set(&validation_counter, 0);
-+	ret = pthread_create(&thread, NULL, &other_thread, &mode);
-+	if (ret) {
-+		perror("pthread_create");
-+		exit(1);
-+	}
-+
-+	ret = clock_gettime(CLOCK_MONOTONIC, &start);
-+	if (ret) {
-+		perror("clock_gettime");
-+		exit(1);
-+	}
-+
-+	for (counter = 0; counter < cfg_iterations; ++counter) {
-+		if (cfg_validate) {
-+			int prev = 2 * counter;
-+
-+			if (prev != atomic_cmpxchg(&validation_counter, prev,
-+						   prev + 1)) {
-+				fprintf(stderr, "swap validation failed\n");
-+				exit(1);
-+			}
-+		}
-+		futex_swap_op(mode, &futex_main, &futex_other);
-+	}
-+	if (cfg_validate && validation_counter.val != 2 * cfg_iterations) {
-+		fprintf(stderr, "final swap validation failed\n");
-+		exit(1);
-+	}
-+
-+	ret = clock_gettime(CLOCK_MONOTONIC, &stop);
-+	if (ret) {
-+		perror("clock_gettime");
-+		exit(1);
-+	}
-+
-+	duration = (stop.tv_sec - start.tv_sec) * 1000000000LL +
-+	stop.tv_nsec - start.tv_nsec;
-+	if (cfg_verbose || cfg_iterations > 1) {
-+		printf("completed %d swap and back iterations in %lu ns: %lu ns per swap\n",
-+			cfg_iterations, duration,
-+			duration / (cfg_iterations * 2));
-+	}
-+
-+	/* The remote thread is blocked; send it the final wake. */
-+	futex_set(&futex_other, FUTEX_WAKEUP);
-+	futex_wake(&futex_other, 1, FUTEX_PRIVATE_FLAG);
-+	if (pthread_join(thread, NULL)) {
-+		perror("pthread_join");
-+		exit(1);
-+	}
-+}
-+
-+void usage(char *prog)
-+{
-+	printf("Usage: %s\n", prog);
-+	printf("  -h    Display this help message\n");
-+	printf("  -i N  Use N iterations to benchmark\n");
-+	printf("  -n    Do not validate swapping correctness\n");
-+	printf("  -v    Print diagnostic messages\n");
-+}
-+
-+int main(int argc, char *argv[])
-+{
-+	int c;
-+
-+	while ((c = getopt(argc, argv, "hi:nv")) != -1) {
-+		switch (c) {
-+		case 'h':
-+			usage(basename(argv[0]));
-+			exit(0);
-+		case 'i':
-+			cfg_iterations = atoi(optarg);
-+			break;
-+		case 'n':
-+			cfg_validate = 0;
-+			break;
-+		case 'v':
-+			cfg_verbose = 1;
-+			break;
-+		default:
-+			usage(basename(argv[0]));
-+			exit(1);
-+		}
-+	}
-+
-+	printf("\n\n------- running SWAP_WAKE_WAIT -----------\n\n");
-+	run_test(SWAP_WAKE_WAIT);
-+	printf("PASS\n");
-+
-+	printf("\n\n------- running SWAP_SWAP -----------\n\n");
-+	run_test(SWAP_SWAP);
-+	printf("PASS\n");
-+
-+	return 0;
-+}
-diff -ruN a/tools/testing/selftests/futex/functional/.gitignore b/tools/testing/selftests/futex/functional/.gitignore
---- a/tools/testing/selftests/futex/functional/.gitignore	2023-01-24 07:24:44.000000000 +0100
-+++ b/tools/testing/selftests/futex/functional/.gitignore	2023-01-30 08:33:24.000000000 +0100
-@@ -2,6 +2,7 @@
- futex_requeue_pi
- futex_requeue_pi_mismatched_ops
- futex_requeue_pi_signal_restart
-+futex_swap
- futex_wait_private_mapped_file
- futex_wait_timeout
- futex_wait_uninitialized_heap
-diff -ruN a/tools/testing/selftests/futex/functional/Makefile b/tools/testing/selftests/futex/functional/Makefile
---- a/tools/testing/selftests/futex/functional/Makefile	2023-01-24 07:24:44.000000000 +0100
-+++ b/tools/testing/selftests/futex/functional/Makefile	2023-01-30 08:33:24.000000000 +0100
-@@ -13,6 +13,7 @@
- 	futex_requeue_pi \
- 	futex_requeue_pi_signal_restart \
- 	futex_requeue_pi_mismatched_ops \
-+	futex_swap \
- 	futex_wait_uninitialized_heap \
- 	futex_wait_private_mapped_file \
- 	futex_wait \
-diff -ruN a/tools/testing/selftests/futex/include/futextest.h b/tools/testing/selftests/futex/include/futextest.h
---- a/tools/testing/selftests/futex/include/futextest.h	2023-01-24 07:24:44.000000000 +0100
-+++ b/tools/testing/selftests/futex/include/futextest.h	2023-01-30 08:33:24.000000000 +0100
-@@ -38,6 +38,9 @@
- #ifndef FUTEX_CMP_REQUEUE_PI
- #define FUTEX_CMP_REQUEUE_PI		12
- #endif
-+#ifndef FUTEX_SWAP
-+#define FUTEX_SWAP			13
-+#endif
- #ifndef FUTEX_WAIT_REQUEUE_PI_PRIVATE
- #define FUTEX_WAIT_REQUEUE_PI_PRIVATE	(FUTEX_WAIT_REQUEUE_PI | \
- 					 FUTEX_PRIVATE_FLAG)
-@@ -46,6 +49,9 @@
- #define FUTEX_CMP_REQUEUE_PI_PRIVATE	(FUTEX_CMP_REQUEUE_PI | \
- 					 FUTEX_PRIVATE_FLAG)
- #endif
-+#ifndef FUTEX_SWAP_PRIVATE
-+#define FUTEX_SWAP_PRIVATE		(FUTEX_WAIT_WAKE | FUTEX_PRIVATE_FLAG)
-+#endif
- 
- /**
-  * futex() - SYS_futex syscall wrapper
-@@ -205,6 +211,19 @@
- }
- 
- /**
-+ * futex_swap() - block on uaddr and wake one task blocked on uaddr2.
-+ * @uaddr:	futex to block the current task on
-+ * @timeout:	relative timeout for the current task block
-+ * @uaddr2:	futex to wake tasks at (can be the same as uaddr)
-+ */
-+static inline int
-+futex_swap(futex_t *uaddr, futex_t val, struct timespec *timeout,
-+	   futex_t *uaddr2, int opflags)
-+{
-+	return futex(uaddr, FUTEX_SWAP, val, timeout, uaddr2, 0, opflags);
-+}
-+
-+/**
-  * futex_cmpxchg() - atomic compare and exchange
-  * @uaddr:	The address of the futex to be modified
-  * @oldval:	The expected value of the futex
-diff -ruN a/unblocked_terms.txt b/unblocked_terms.txt
---- a/unblocked_terms.txt	1970-01-01 01:00:00.000000000 +0100
-+++ b/unblocked_terms.txt	2023-01-30 08:33:25.000000000 +0100
-@@ -0,0 +1 @@
-+.*
 diff -ruN a/virt/kvm/Kconfig b/virt/kvm/Kconfig
 --- a/virt/kvm/Kconfig	2023-01-24 07:24:44.000000000 +0100
 +++ b/virt/kvm/Kconfig	2023-01-30 08:33:25.000000000 +0100

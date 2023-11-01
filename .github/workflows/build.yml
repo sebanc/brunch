@@ -2,7 +2,7 @@ name: Build Brunch using Github Actions
 on:
   push:
     branches:
-      - 'continuous-integration'
+      - 'r118'
     paths-ignore:
       - 'README.md'
 concurrency:

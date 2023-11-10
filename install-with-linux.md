@@ -33,7 +33,7 @@ This guide is for installing Brunch to a USB (or other disk) using Linux. This g
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["shyvana" for 4th gen -> 9th gen.][recovery-shyvana]
+* ["shyvana" for 6th gen -> 9th gen.][recovery-shyvana]
 * ["jinlon" for 10th gen.][recovery-jinlon]
 * ["voxel" for 11th gen & above.][recovery-voxel]
 #### AMD
@@ -198,7 +198,7 @@ This guide is for installing Brunch to a partition using Linux. This guide is *n
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["shyvana" for 4th gen -> 9th gen.][recovery-shyvana]
+* ["shyvana" for 6th gen -> 9th gen.][recovery-shyvana]
 * ["jinlon" for 10th gen.][recovery-jinlon]
 * ["voxel" for 11th gen & above.][recovery-voxel]
 #### AMD

@@ -47,7 +47,7 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
   * Some Playstore apps are not compatible with genuine Chromebooks so this is probably normal. ChromeOS is not Android, so some apps and games are not optimized or avaliable.
   
   ### A new update is avaliable, is it safe to update?
-  * ChromeOS updates can be unpredictable, especially on Brunch devices. Even if it's declaired safe by other users, you should *always* have backups ready in case there is an issue while updating or if the update has serious bugs on your hardware. 
+  * ChromeOS updates can be unpredictable, especially on Brunch devices. Even if it's declared safe by other users, you should *always* have backups ready in case there is an issue while updating or if the update has serious bugs on your hardware. 
   
   ### My Touchpad, Touchscreen, Wifi or other hardware is not working properly!
   * ChromeOS is not optimized for every device. Brunch has several avaliable framework options and multiple customized kernels avaliable further down on this page to help with these issues. If you're still having issues, you can reach out to other users on one of our communities for help.

@@ -229,7 +229,7 @@ for (( i=1; i<=12; i++ )); do
 		7)
 			source_start=0
 			image="$(dirname $0)/rootc.img"
-			size=$(du -B 512 $image | sed 's/\t.*//g')
+			size=$(du --apparent-size -B 512 $image | sed 's/\t.*//g')
 		;;
 		6|9|10|11)
 			continue
@@ -237,7 +237,7 @@ for (( i=1; i<=12; i++ )); do
 		12)
 			source_start=0
 			if [ -z legacy_boot ]; then image="$(dirname $0)/efi_secure.img"; else image="$(dirname $0)/efi_legacy.img"; fi
-			size=$(du -B 512 $image | sed 's/\t.*//g')
+			size=$(du --apparent-size -B 512 $image | sed 's/\t.*//g')
 		;;
 		*)
 			source_start=$(cgpt show -i $i -b "$source")

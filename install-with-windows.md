@@ -264,14 +264,13 @@ When the installer asks you for the type of install, type "dualboot" in the term
 The installation will report that ChromeOS was installed when it is finished. Before continuing, make sure that there are no additional errors in the terminal. If there are no errors, then you are good to continue!
   
 ### Set up Grub2Win
-10. Install [Grub2win][grub2win] if you have not already, then launch the program.
+10. Install [Grub2win][grub2win] if you have not already, then launch the program. (Windows Defender sometimes will flag Grub2Win as a virus and remove it)
   
-11. Click on the `Manage Boot Menu` button, then `Add A New Entry`.
+11. Click on the `Manage Boot Menu` button, then click `Chrome` under 'Import Configuration File'.
   
-  * Select `Create user section` from the 'Type' section. This will open a text file. Open the chromeos.grub.txt file we saved earlier, it's in the same directory as your chromeos.img. Copy the grub boot entries saved in that file and copy them into Grub2win.
-  
-  * Click `Ok` and `Apply` to save your entries into Grub2win.
-    * Your entry will not be saved unless you click *both* `Ok` *and* `Apply`.
+  * Select your chromeos.img.grub.txt file that we created earlier.
+  * Click `Import Selected Items`
+    * Your entry will not be saved unless you click `Apply`.
 
 ### Prevent Windows from locking the NTFS partition
 12. Disable encryption / hibernation

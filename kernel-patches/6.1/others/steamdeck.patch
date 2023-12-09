@@ -719,14 +719,6 @@ diff -ruN a/drivers/input/joystick/xpad.c b/drivers/input/joystick/xpad.c
  	{ 0x31e3, 0x1100, "Wooting One", 0, XTYPE_XBOX360 },
  	{ 0x31e3, 0x1200, "Wooting Two", 0, XTYPE_XBOX360 },
  	{ 0x31e3, 0x1210, "Wooting Lekker", 0, XTYPE_XBOX360 },
-@@ -474,6 +475,7 @@
- 	XPAD_XBOX360_VENDOR(0x0f0d),		/* Hori Controllers */
- 	XPAD_XBOXONE_VENDOR(0x0f0d),		/* Hori Controllers */
- 	XPAD_XBOX360_VENDOR(0x1038),		/* SteelSeries Controllers */
-+	XPAD_XBOXONE_VENDOR(0x10f5),		/* Turtle Beach Controllers */
- 	XPAD_XBOX360_VENDOR(0x11c9),		/* Nacon GC100XF */
- 	XPAD_XBOX360_VENDOR(0x1209),		/* Ardwiino Controllers */
- 	XPAD_XBOX360_VENDOR(0x12ab),		/* X-Box 360 dance pads */
 @@ -492,7 +494,9 @@
  	XPAD_XBOXONE_VENDOR(0x24c6),		/* PowerA Controllers */
  	XPAD_XBOX360_VENDOR(0x2563),		/* OneXPlayer Gamepad */

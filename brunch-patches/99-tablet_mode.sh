@@ -20,7 +20,6 @@ start on starting boot-services
 
 script
 	modprobe tablet_mode_switch
-	bash /usr/bin/tmod
 end script
 MODULEPROBE
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
@@ -35,6 +34,8 @@ ACTION=="add", SUBSYSTEMS=="hid", KERNEL=="*:045E:07A9.*" , RUN+="/bin/bash -c '
 ACTION=="remove", SUBSYSTEMS=="hid", KERNEL=="*:045E:07A9.*" , RUN+="/bin/bash -c 'echo 1 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
 ACTION=="add", SUBSYSTEMS=="hid", KERNEL=="*:0B05:183B.*" , RUN+="/bin/bash -c 'echo 0 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
 ACTION=="remove", SUBSYSTEMS=="hid", KERNEL=="*:0B05:183B.*" , RUN+="/bin/bash -c 'echo 1 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
+ACTION=="add", SUBSYSTEMS=="hid", KERNEL=="*:04F3:0C79.*" , RUN+="/bin/bash -c 'echo 0 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
+ACTION=="remove", SUBSYSTEMS=="hid", KERNEL=="*:04F3:0C79.*" , RUN+="/bin/bash -c 'echo 1 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
 UDEVRULE
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 fi
@@ -60,6 +61,8 @@ ACTION=="add", SUBSYSTEMS=="hid", KERNEL=="*:045E:07A9.*" , RUN+="/bin/bash -c '
 ACTION=="remove", SUBSYSTEMS=="hid", KERNEL=="*:045E:07A9.*" , RUN+="/bin/bash -c 'echo 1 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
 ACTION=="add", SUBSYSTEMS=="hid", KERNEL=="*:0B05:183B.*" , RUN+="/bin/bash -c 'echo 0 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
 ACTION=="remove", SUBSYSTEMS=="hid", KERNEL=="*:0B05:183B.*" , RUN+="/bin/bash -c 'echo 1 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
+ACTION=="add", SUBSYSTEMS=="hid", KERNEL=="*:04F3:0C79.*" , RUN+="/bin/bash -c 'echo 0 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
+ACTION=="remove", SUBSYSTEMS=="hid", KERNEL=="*:04F3:0C79.*" , RUN+="/bin/bash -c 'echo 1 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
 UDEVRULE
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
 fi

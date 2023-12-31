@@ -4,8 +4,6 @@
 [![License][license-shield]][license-url]
 [![Issues][issues-shield]][issues-url]
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 <!-- Project Logo -->
 <p align="center">
   <a href="https://github.com/sebanc/brunch" title="Brunch">
@@ -33,11 +31,11 @@ This guide is for installing Brunch to a USB (or other disk) using Linux. This g
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["shyvana" for 6th gen -> 9th gen.][recovery-shyvana]
-* ["jinlon" for 10th gen.][recovery-jinlon]
-* ["voxel" for 11th gen & above.][recovery-voxel]
+* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.
+* 10th gen: "[jinlon][recovery-jinlon]".
+* 11th gen & above: "[voxel][recovery-voxel]".
 #### AMD
-* ["gumboz" for Ryzen.][recovery-gumboz]
+* Ryzen: "[gumboz][recovery-gumboz]".
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 
@@ -198,11 +196,11 @@ This guide is for installing Brunch to a partition using Linux. This guide is *n
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["shyvana" for 6th gen -> 9th gen.][recovery-shyvana]
-* ["jinlon" for 10th gen.][recovery-jinlon]
-* ["voxel" for 11th gen & above.][recovery-voxel]
+* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.
+* 10th gen: "[jinlon][recovery-jinlon]".
+* 11th gen & above: "[voxel][recovery-voxel]".
 #### AMD
-* ["gumboz" for Ryzen.][recovery-gumboz]
+* Ryzen: "[gumboz][recovery-gumboz]".
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 
@@ -339,11 +337,9 @@ See the full [Troubleshooting and Support][troubleshooting-and-faqs] page if you
   * To enroll the key directly from a USB, select OK -> Enroll key from disk -> EFI-SYSTEM -> brunch.der -> Continue and reboot.
 * If the system reboots _itself_ when booting normally, then Brunch has run into an error and you may need to do some advanced troubleshooting.
 
-In case you run into issues while installing or using Brunch, below are the main places where you can find support:
+In case you run into issues while installing or using Brunch, you can find support on Discord:
 
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 <!-- Alternate Guide -->
 ## Looking for the Windows guide?
@@ -363,10 +359,6 @@ In case you run into issues while installing or using Brunch, below are the main
 [pulls-url]: https://github.com/sebanc/brunch/pulls
 [discord-shield]: https://img.shields.io/badge/Discord-Join-7289da?style=flat-square&logo=discord&logoColor=%23FFFFFF
 [discord-url]: https://discord.gg/x2EgK2M
-[telegram-shield]: https://img.shields.io/badge/Telegram-Join-0088cc?style=flat-square&logo=telegram&logoColor=%23FFFFFF
-[telegram-url]: https://t.me/chromeosforpc
-[reddit-shield]: https://img.shields.io/badge/Reddit-Join-FF5700?style=flat-square&logo=reddit&logoColor=%23FFFFFF
-[reddit-url]: https://www.reddit.com/r/Brunchbook
 
 <!-- Outbound Links -->
 [croissant]: https://github.com/imperador/chromefy
@@ -379,6 +371,7 @@ In case you run into issues while installing or using Brunch, below are the main
 [atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
 [amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
 [amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
+[recovery-bobba]: https://cros.tech/device/bobba
 [recovery-shyvana]: https://cros.tech/device/shyvana
 [recovery-jinlon]: https://cros.tech/device/jinlon
 [recovery-voxel]: https://cros.tech/device/voxel

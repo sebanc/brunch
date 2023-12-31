@@ -4,8 +4,6 @@
 [![License][license-shield]][license-url]
 [![Issues][issues-shield]][issues-url]
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 <!-- Project Logo -->
 <p align="center">
@@ -62,11 +60,9 @@ This guide has been split into seperate sections, please follow one of the links
 
 ## Troubleshooting and Support
 
-In case you run into issues while installing or using Brunch, below are the main places where you can find support:
+In case you run into issues while installing or using Brunch, you can find support on Discord:
 
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 Additional troubleshooting and support tips can be found at the following page:
 
@@ -88,10 +84,6 @@ Additional troubleshooting and support tips can be found at the following page:
 [pulls-url]: https://github.com/sebanc/brunch/pulls
 [discord-shield]: https://img.shields.io/badge/Discord-Join-7289da?style=flat-square&logo=discord&logoColor=%23FFFFFF
 [discord-url]: https://discord.gg/x2EgK2M
-[telegram-shield]: https://img.shields.io/badge/Telegram-Join-0088cc?style=flat-square&logo=telegram&logoColor=%23FFFFFF
-[telegram-url]: https://t.me/chromeosforpc
-[reddit-shield]: https://img.shields.io/badge/Reddit-Join-FF5700?style=flat-square&logo=reddit&logoColor=%23FFFFFF
-[reddit-url]: https://www.reddit.com/r/Brunchbook
 
 <!-- Outbound Links -->
 [croissant]: https://github.com/imperador/chromefy

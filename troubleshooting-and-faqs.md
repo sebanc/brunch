@@ -4,8 +4,6 @@
 [![License][license-shield]][license-url]
 [![Issues][issues-shield]][issues-url]
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 <!-- Project Logo -->
 <p align="center">
@@ -22,11 +20,9 @@
 Empty lines between everything in <angle breackets> is intentional due to markdown issues -->
   
   ### The instructions are too difficult to follow!
-* ChromeOS is based on linux, most troubleshooting will require some familiarity with basic linux commands. It is strongly suggested that users are comfortable with linux before attempting an installation. If you are strugging with a specific step or would like to suggest changes to the guide, please reach out to our communities for assistance.
+* ChromeOS is based on linux, most troubleshooting will require some familiarity with basic linux commands. It is strongly suggested that users are comfortable with linux before attempting an installation. If you are strugging with a specific step or would like to suggest changes to the guide, please reach out to our community for assistance.
 
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
   
   ### I followed a video tutorial, now I'm having issues.
   * Video guides are very frequently out of date or use potentially dangerous scripts. For the most up to date information and guides, be sure to read over this github page thouroughly *before* asking for help. 
@@ -56,8 +52,6 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
   * Some older devices (usually Acer, Asus and Samsung) can't detect Brunch's Grub. To solve this, you can manually assign grub on the BIOS but if your bios doesn't have this option you can use `efibootmgr` to create a boot entry for grub.
 
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 ***
 
@@ -382,10 +376,6 @@ It is currently recommended to only update ChromeOS when the matching version of
 [pulls-url]: https://github.com/sebanc/brunch/pulls
 [discord-shield]: https://img.shields.io/badge/Discord-Join-7289da?style=flat-square&logo=discord&logoColor=%23FFFFFF
 [discord-url]: https://discord.gg/x2EgK2M
-[telegram-shield]: https://img.shields.io/badge/Telegram-Join-0088cc?style=flat-square&logo=telegram&logoColor=%23FFFFFF
-[telegram-url]: https://t.me/chromeosforpc
-[reddit-shield]: https://img.shields.io/badge/Reddit-Join-FF5700?style=flat-square&logo=reddit&logoColor=%23FFFFFF
-[reddit-url]: https://www.reddit.com/r/Brunchbook
 
 <!-- Outbound Links -->
 [croissant]: https://github.com/imperador/chromefy
@@ -398,6 +388,7 @@ It is currently recommended to only update ChromeOS when the matching version of
 [atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
 [amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
 [amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
+[recovery-bobba]: https://cros.tech/device/bobba
 [recovery-shyvana]: https://cros.tech/device/shyvana
 [recovery-jinlon]: https://cros.tech/device/jinlon
 [recovery-voxel]: https://cros.tech/device/voxel

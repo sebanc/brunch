@@ -21,6 +21,8 @@ First of all, thanks goes to [Project Croissant][croissant], the [swtpm][swtpm] 
 
 <!-- About This Project -->
 ## About This Project
+This is what happens when you forget you switched to Nvidia, and try to boot  Brunch. 
+
 Semi-private repository for me to restore ChromeOS after I nuke my install yet again. Note: works for most of my outdated ChromeOS machines.
 
 The purpose of the Brunch framework is to create a generic x86_64 ChromeOS image from an official recovery image. To do so, it uses a 1GB ROOTC partition (containing a custom kernel, an initramfs, the swtpm binaries, userspace patches and config files) and a specific EFI partition to boot from it.
@@ -48,7 +50,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 
 ❌ Unsupported Hardware:
 - Older Intel/AMD CPUs are not supported.
-- dGPUs are not supported.
+- dGPUs are not supported.   (yet)
 - Virtual Machines are not supported.
 - ARM CPUs are not supported.
 

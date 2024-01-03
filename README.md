@@ -4,8 +4,6 @@
 [![License][license-shield]][license-url]
 [![Issues][issues-shield]][issues-url]
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 <!-- Project Logo -->
 <p align="center">
@@ -44,7 +42,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 
 
 ✔ CPU Compatibility:
-- [Intel CPUs][intel-cpus] from Haswell (4th Gen) / [Celeron CPUs][celeron-cpus] from Braswell
+- [Intel CPUs][intel-cpus] from Skylake (6th Gen) / [Celeron CPUs][celeron-cpus] from Goldmont
 - [AMD Ryzen][amd-ry-list]
 
 
@@ -63,11 +61,9 @@ This guide has been split into seperate sections, please follow one of the links
 
 ## Troubleshooting and Support
 
-In case you run into issues while installing or using Brunch, below are the main places where you can find support:
+In case you run into issues while installing or using Brunch, you can find support on Discord:
 
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 Additional troubleshooting and support tips can be found at the following page:
 
@@ -89,10 +85,6 @@ Additional troubleshooting and support tips can be found at the following page:
 [pulls-url]: https://github.com/sebanc/brunch/pulls
 [discord-shield]: https://img.shields.io/badge/Discord-Join-7289da?style=flat-square&logo=discord&logoColor=%23FFFFFF
 [discord-url]: https://discord.gg/x2EgK2M
-[telegram-shield]: https://img.shields.io/badge/Telegram-Join-0088cc?style=flat-square&logo=telegram&logoColor=%23FFFFFF
-[telegram-url]: https://t.me/chromeosforpc
-[reddit-shield]: https://img.shields.io/badge/Reddit-Join-FF5700?style=flat-square&logo=reddit&logoColor=%23FFFFFF
-[reddit-url]: https://www.reddit.com/r/Brunchbook
 
 <!-- Outbound Links -->
 [croissant]: https://github.com/imperador/chromefy
@@ -106,10 +98,10 @@ Additional troubleshooting and support tips can be found at the following page:
 [atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
 [amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
 [amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
-[recovery-rammus]: https://cros.tech/device/rammus
-[recovery-volteer]: https://cros.tech/device/volteer
-[recovery-grunt]: https://cros.tech/device/grunt
-[recovery-zork]: https://cros.tech/device/zork
+[recovery-shyvana]: https://cros.tech/device/shyvana
+[recovery-jinlon]: https://cros.tech/device/jinlon
+[recovery-voxel]: https://cros.tech/device/voxel
+[recovery-gumboz]: https://cros.tech/device/gumboz
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils
@@ -136,7 +128,6 @@ Additional troubleshooting and support tips can be found at the following page:
 [framework-options]: ./troubleshooting-and-faqs.md#framework-options
 [releases-tab]: https://github.com/sebanc/brunch/releases
 [latest-release]: https://github.com/sebanc/brunch/releases/latest
-[mbr-patch]: https://github.com/sebanc/brunch/raw/master/mbr_support.tar.gz
 [brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
 [secure-boot]: ./install-with-linux.md#secure-boot
 [brunch-pwa-info]: https://github.com/sebanc/brunch/wiki/Brunch-PWA-Guide

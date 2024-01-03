@@ -4,8 +4,6 @@
 [![License][license-shield]][license-url]
 [![Issues][issues-shield]][issues-url]
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 <!-- Project Logo -->
 <p align="center">
   <a href="https://github.com/sebanc/brunch" title="Brunch">
@@ -33,10 +31,11 @@ This guide is for installing Brunch to a USB (or other disk) using Linux. This g
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["rammus" for 1st gen -> 9th gen.][recovery-rammus]
-* ["volteer" for 10th & 11th gen.][recovery-volteer]
+* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.
+* 10th gen: "[jinlon][recovery-jinlon]".
+* 11th gen & above: "[voxel][recovery-voxel]".
 #### AMD
-* ["zork" for Ryzen.][recovery-zork]
+* Ryzen: "[gumboz][recovery-gumboz]".
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 
@@ -74,15 +73,6 @@ When downloading a release, select the brunch...tar.gz file from the assets at t
 ```unzip chromeos_filename.bin.zip```
 
 Once completed, you will have 4 new files from the brunch archive, and a recovery bin that we will use in the next step.
-
-
-### Special instructions for Legacy devices **only**
-This step is only needed for legacy boot devices that do not support UEFI. If your PC supports UEFI, _skip this step!_
-* If you need it, this is when you should download the [MBR patch][mbr-patch] from the main branch and extract it with `tar`.
-  * This file will overwrite some of the files you've already extracted, this is supposed to happen.
-
-```tar zxvf mbr_support.tar.gz```
-
 
 ### Selecting a Target Disk
 8. Before continuing, you will need to know what disk you want to install to. Be absolutely sure **before** you continue, this installation will erase **everything** on that disk, including other partitions. The disk must be at least 16 GB, or the installation will fail. There are several ways to determine which disk is your target, in my example I'll be using `lsblk`.
@@ -142,7 +132,7 @@ This guide is for installing Brunch to a disk using a Brunch USB. This guide req
 
 ### Selecting a Target Disk
   
-1. Log into ChromeOS, and open a Crosh Shell with **Ctrl + Alt + T**, then enter `shell` at the prompt.
+1. Log into ChromeOS, and switch to the TTY2 terminal with **Ctrl + Alt + F2**, then login as `chronos`.
   
 2. Before continuing, you will need to know what disk you want to install to. Be absolutely sure **before** you continue, this installation will erase **everything** on that disk, including other partitions. The disk must be at least 16 GB, or the installation will fail. There are several ways to determine which disk is your target, in my example I'll be using `lsblk`.
   
@@ -206,10 +196,11 @@ This guide is for installing Brunch to a partition using Linux. This guide is *n
 1. Download a recovery suitable for your CPU. The list below can help you select one. You do *not* need to select a recovery that matches the latest Brunch release number, the most recent avaliable is typically fine.
   
 #### Intel
-* ["rammus" for 1st gen -> 9th gen.][recovery-rammus]
-* ["volteer" for 10th & 11th gen.][recovery-volteer]
+* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.
+* 10th gen: "[jinlon][recovery-jinlon]".
+* 11th gen & above: "[voxel][recovery-voxel]".
 #### AMD
-* ["zork" for Ryzen.][recovery-zork]
+* Ryzen: "[gumboz][recovery-gumboz]".
 
 Recoveries can be found by clicking the above links. They can also be found by going to [cros.tech][cros-tech] and searching for the recovery you want.
 
@@ -338,7 +329,7 @@ It is normal for the first boot to take a very long time, please be patient.
 See the full [Troubleshooting and Support][troubleshooting-and-faqs] page if you're having issues.
 
 ### Additional Tips
-* If you're having trouble booting a Brunch USB, make sure that UEFI is enabled in the BIOS (Unless you are using the MBR patch)
+* If you're having trouble booting a Brunch USB, make sure that UEFI is enabled in the BIOS.
 * Some PCs require a key to be held when booting to boot from USB or that USB booting is enabled in the BIOS
 * The first boot can take up to an hour on some hardware. Brunch does not typically freeze on the Brunch logo. If you are seeing the Brunch logo, the system is _probably_ still booting.
 * If your PC is stuck on the ChromeOS logo (White background), it is likely that you've got an incompatible dedicated GPU.
@@ -346,11 +337,9 @@ See the full [Troubleshooting and Support][troubleshooting-and-faqs] page if you
   * To enroll the key directly from a USB, select OK -> Enroll key from disk -> EFI-SYSTEM -> brunch.der -> Continue and reboot.
 * If the system reboots _itself_ when booting normally, then Brunch has run into an error and you may need to do some advanced troubleshooting.
 
-In case you run into issues while installing or using Brunch, below are the main places where you can find support:
+In case you run into issues while installing or using Brunch, you can find support on Discord:
 
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 <!-- Alternate Guide -->
 ## Looking for the Windows guide?
@@ -370,10 +359,6 @@ In case you run into issues while installing or using Brunch, below are the main
 [pulls-url]: https://github.com/sebanc/brunch/pulls
 [discord-shield]: https://img.shields.io/badge/Discord-Join-7289da?style=flat-square&logo=discord&logoColor=%23FFFFFF
 [discord-url]: https://discord.gg/x2EgK2M
-[telegram-shield]: https://img.shields.io/badge/Telegram-Join-0088cc?style=flat-square&logo=telegram&logoColor=%23FFFFFF
-[telegram-url]: https://t.me/chromeosforpc
-[reddit-shield]: https://img.shields.io/badge/Reddit-Join-FF5700?style=flat-square&logo=reddit&logoColor=%23FFFFFF
-[reddit-url]: https://www.reddit.com/r/Brunchbook
 
 <!-- Outbound Links -->
 [croissant]: https://github.com/imperador/chromefy
@@ -386,10 +371,11 @@ In case you run into issues while installing or using Brunch, below are the main
 [atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
 [amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
 [amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
-[recovery-rammus]: https://cros.tech/device/rammus
-[recovery-volteer]: https://cros.tech/device/volteer
-[recovery-grunt]: https://cros.tech/device/grunt
-[recovery-zork]: https://cros.tech/device/zork
+[recovery-bobba]: https://cros.tech/device/bobba
+[recovery-shyvana]: https://cros.tech/device/shyvana
+[recovery-jinlon]: https://cros.tech/device/jinlon
+[recovery-voxel]: https://cros.tech/device/voxel
+[recovery-gumboz]: https://cros.tech/device/gumboz
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils
@@ -416,8 +402,7 @@ In case you run into issues while installing or using Brunch, below are the main
 [framework-options]: ./troubleshooting-and-faqs.md#framework-options
 [releases-tab]: https://github.com/sebanc/brunch/releases
 [latest-release]: https://github.com/sebanc/brunch/releases/latest
-[mbr-patch]: https://github.com/sebanc/brunch/raw/master/mbr_support.tar.gz
-[brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
+[brunch-der]: https://github.com/sebanc/brunch/raw/main/brunch.der
 [secure-boot]: ./install-with-linux.md#secure-boot
 [brunch-usb-guide-win]:  ./install-with-windows.md#usb-installations
 [brunch-usb-guide-lin]:  ./install-with-linux.md#usb-installations

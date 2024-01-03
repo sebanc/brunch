@@ -4,8 +4,6 @@
 [![License][license-shield]][license-url]
 [![Issues][issues-shield]][issues-url]
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 <!-- Project Logo -->
 <p align="center">
@@ -22,17 +20,15 @@
 Empty lines between everything in <angle breackets> is intentional due to markdown issues -->
   
   ### The instructions are too difficult to follow!
-* ChromeOS is based on linux, most troubleshooting will require some familiarity with basic linux commands. It is strongly suggested that users are comfortable with linux before attempting an installation. If you are strugging with a specific step or would like to suggest changes to the guide, please reach out to our communities for assistance.
+* ChromeOS is based on linux, most troubleshooting will require some familiarity with basic linux commands. It is strongly suggested that users are comfortable with linux before attempting an installation. If you are strugging with a specific step or would like to suggest changes to the guide, please reach out to our community for assistance.
 
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
   
   ### I followed a video tutorial, now I'm having issues.
   * Video guides are very frequently out of date or use potentially dangerous scripts. For the most up to date information and guides, be sure to read over this github page thouroughly *before* asking for help. 
   
   ### My computer will not boot a Brunch USB, and I've followed all of the instructions correctly!
-  * Some devices (notably Surface Go) will not boot a valid USB flash drive / SD card with secure boot on even if the shim binary is signed. For those devices, you will need to disable secure boot in your bios settings and use the legacy EFI bootloader by adding the `-l` parameter when running the chromeos-install.sh script. Other devices require using the MBR script (linked in the install instructions) Check your device to see if one of these may be needed.
+  * Some devices (notably Surface Go) will not boot a valid USB flash drive / SD card with secure boot on even if the shim binary is signed. For those devices, you will need to disable secure boot in your bios settings and use the legacy EFI bootloader by adding the `-l` parameter when running the chromeos-install.sh script.
   
   ###  The first boot and the ones after a framework change or an update are incredibly long! 
   * Unfortunately, the Brunch framework has to rebuild itself by copying the original rootfs, modules and firmware files after each significant change. The time this process takes depends mostly on your USB flash drive / SD card write speed. You may try with one that has better write speed or use the dual boot method to install it on your HDD.
@@ -47,14 +43,15 @@ Empty lines between everything in <angle breackets> is intentional due to markdo
   * Some Playstore apps are not compatible with genuine Chromebooks so this is probably normal. ChromeOS is not Android, so some apps and games are not optimized or avaliable.
   
   ### A new update is avaliable, is it safe to update?
-  * ChromeOS updates can be unpredictable, especially on Brunch devices. Even if it's declaired safe by other users, you should *always* have backups ready in case there is an issue while updating or if the update has serious bugs on your hardware. 
+  * ChromeOS updates can be unpredictable, especially on Brunch devices. Even if it's declared safe by other users, you should *always* have backups ready in case there is an issue while updating or if the update has serious bugs on your hardware. 
   
   ### My Touchpad, Touchscreen, Wifi or other hardware is not working properly!
   * ChromeOS is not optimized for every device. Brunch has several avaliable framework options and multiple customized kernels avaliable further down on this page to help with these issues. If you're still having issues, you can reach out to other users on one of our communities for help.
 
+  ### Grub doens't appears on the boot options
+  * Some older devices (usually Acer, Asus and Samsung) can't detect Brunch's Grub. To solve this, you can manually assign grub on the BIOS but if your bios doesn't have this option you can use `efibootmgr` to create a boot entry for grub.
+
 [![Discord][discord-shield]][discord-url]
-[![Reddit][reddit-shield]][reddit-url]
-[![Telegram][telegram-shield]][telegram-url]
 
 ***
 
@@ -71,8 +68,8 @@ The Brunch Configuration menu is a new feature avaliable in Brunch 93 and higher
 
 ***
 
-The Brunch Configuration Menu can be accessed directly from Grub using the "ChromeOS (settings)" boot option or while logged into ChromeOS using the `sudo edit-brunch-config` command in the crosh shell.
-  * To access the crosh shell, press **Ctrl + Alt + T** and type `shell` at the invite.
+The Brunch Configuration Menu can be accessed directly from Grub using the "ChromeOS (settings)" boot option or while logged into a TTY using the `sudo edit-brunch-config` command.
+  * To access TTY2, press **Ctrl + Alt + F2** and login as `chronos`.
 ![Crosh][bcm-crosh]
   
  Once you've entered the Brunch Configuration Menu you will be greeted by several pages of options.
@@ -102,10 +99,10 @@ Some device specific options can be enabled through brunch configuration menu:
   - You can install the original one from https://sebanc.github.io/brunch-pwa/ (see a preview [on the wiki][brunch-pwa-info]) or the ITESaurabh version available at: https://itesaurabh.github.io/brunch-pwa,
 - "android_init_fix": alternative init to support devices on which the android container fails to start with the standard init,
 - "mount_internal_drives": allows automatic mounting of HDD partitions in ChromeOS 
-  - Android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data),
+  - Android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data,
   - Partition label will be used if it exists,
 - "chromebook_audio": enable audio on EOL chromebook devices using the brunch recommended recovery image,
-- "native_chromebook_image": enable it to use brunch on a non-EOL chromebook using its official recovery image,
+- "native_chromebook_image": enable it to use brunch on a non-EOL chromebook using its official recovery image, make sure to also select the chromebook kernel version used by your device in ChromeOS.
 - "broadcom_wl": enable this option if you need the broadcom_wl module,
 - "iwlwifi_backport": enable this option if your intel wireless card is not supported natively in the kernel,
 - "rtl8188eu": enable this option if you have a rtl8188eu wireless card/adapter,
@@ -120,8 +117,8 @@ Some device specific options can be enabled through brunch configuration menu:
 - "rtl8821cu": enable this option if you have a rtl8821cu wireless card/adapter,
 - "rtl88x2bu": enable this option if you have a rtl88x2bu wireless card/adapter,
 - "rtbth": enable this option if you have a RT3290/RT3298LE bluetooth device,
-- "ipts": enable support for Surface devices touchscreen with kernel 5.4 / 5.10 
-  - Thanks go to the linux-surface team, especially StollD,
+- "ipts_touchscreen": enable support for ipts touchscreen (SP4/5/6,SB1/2),
+- "ithc_touchscreen": enable support for ithc touchscreen (SP7+,SB3+),
 - "goodix": improve goodix touchscreens support,
 - "invert_camera_order": use this option if your camera order is inverted,
 - "no_camera_config": if your camera does not work you can try this option which disables the camera config,
@@ -153,12 +150,8 @@ WARNING: Changing kernel can prevent you from logging into your ChromeOS account
 ![Kernels][bcm-kernel]
   
 Several kernels can be enabled throught the configuration menu:
-- kernel 5.4: Default kernel which is considered to be the most stable.
-- kernel 5.10: Most recent kernel, needed for Intel Gen 10+ and AMD Ryzen Gen 4+ devices.
-- kernel 4.19: Previous brunch kernel.
-- kernel chromebook-5.4: Kernel with the best support for chromebooks.
-- kernel chromebook-4.4: Kernel compatible with some older chromebooks models.
-- kernel macbook: 5.10 kernel with specific patches for different generations of macbooks
+- LTS kernels (6.1, 5.15, 5.10, 5.4, 4.19): use those kernels for non-chromebook devices, 6.1 is the default.
+- Chromebook kernels (6.1, 5.15, 5.10, 5.4, 4.19): For Chromebook devices, select the same kernel version used by your device in ChromeOS.
 
  </details>
  
@@ -316,7 +309,7 @@ It is currently recommended to only update ChromeOS when the matching version of
  To manually update Brunch and ChromeOS together: 
  * Download the [latest Brunch release][latest-release]
  * Download the [latest recovery][cros-tech] matching your install and extract the bin.
- * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Open a TTY with **Crtl + Alt + F2** and login as `chronos`.
  * Run the built in command to update Brunch.
    * Replace `brunch_archive.tar.gz` with the file's actual filename.
    * Replace `recovery.bin` with the file's actual filename.
@@ -339,7 +332,7 @@ It is currently recommended to only update ChromeOS when the matching version of
  The easiest way to update ChromeOS is to enable the `enable_updates` framework option, then update directly from the Settings page.
  
  To enable the framework option: 
- * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Open a TTY with **Crtl + Alt + F2** and login as `chronos`.
  * Enter `sudo edit-brunch-config` to open the Brunch Configuration Menu described above.
  * Select `enable_updates` with the spacebar, then continue through the menu with the enter key.
  * When finished, the Brunch Configuration Menu will prompt to restart ChromeOS.
@@ -360,7 +353,7 @@ It is currently recommended to only update ChromeOS when the matching version of
  
  To manually update Brunch: 
  * Download the [latest Brunch release][latest-release]
- * Open the Crosh Shell with **Crtl + Alt + T** and enter `shell` at the prompt.
+ * Open a TTY with **Crtl + Alt + F2** and login as `chronos`.
  * Run the built in command to update Brunch.
    * Replace `brunch_archive.tar.gz` with the file's actual filename.
 
@@ -383,10 +376,6 @@ It is currently recommended to only update ChromeOS when the matching version of
 [pulls-url]: https://github.com/sebanc/brunch/pulls
 [discord-shield]: https://img.shields.io/badge/Discord-Join-7289da?style=flat-square&logo=discord&logoColor=%23FFFFFF
 [discord-url]: https://discord.gg/x2EgK2M
-[telegram-shield]: https://img.shields.io/badge/Telegram-Join-0088cc?style=flat-square&logo=telegram&logoColor=%23FFFFFF
-[telegram-url]: https://t.me/chromeosforpc
-[reddit-shield]: https://img.shields.io/badge/Reddit-Join-FF5700?style=flat-square&logo=reddit&logoColor=%23FFFFFF
-[reddit-url]: https://www.reddit.com/r/Brunchbook
 
 <!-- Outbound Links -->
 [croissant]: https://github.com/imperador/chromefy
@@ -399,10 +388,11 @@ It is currently recommended to only update ChromeOS when the matching version of
 [atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
 [amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
 [amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
-[recovery-rammus]: https://cros.tech/device/rammus
-[recovery-volteer]: https://cros.tech/device/volteer
-[recovery-grunt]: https://cros.tech/device/grunt
-[recovery-zork]: https://cros.tech/device/zork
+[recovery-bobba]: https://cros.tech/device/bobba
+[recovery-shyvana]: https://cros.tech/device/shyvana
+[recovery-jinlon]: https://cros.tech/device/jinlon
+[recovery-voxel]: https://cros.tech/device/voxel
+[recovery-gumboz]: https://cros.tech/device/gumboz
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils
@@ -459,7 +449,6 @@ It is currently recommended to only update ChromeOS when the matching version of
 [framework-options]: ./troubleshooting-and-faqs.md#framework-options
 [releases-tab]: https://github.com/sebanc/brunch/releases
 [latest-release]: https://github.com/sebanc/brunch/releases/latest
-[mbr-patch]: https://github.com/sebanc/brunch/raw/master/mbr_support.tar.gz
 [brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
 [secure-boot]: ./install-with-linux.md#secure-boot
 [brunch-pwa-info]: https://github.com/sebanc/brunch/wiki/Brunch-PWA-Guide

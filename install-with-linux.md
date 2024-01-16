@@ -302,6 +302,9 @@ menuentry "Brunch" --class "brunch" {
         <b>rmmod tpm</b>
         img_path=/chromeos.img
         img_uuid=9113c3b2-...
+        search --no-floppy --set=root --file $img_path
+        <b><i>loopback loop $img_path</i></b>
+        ...
 </pre>
 
 17. Save and close this file. In `nano` you'll exit by pressing **Ctrl + X** then **Y** to save. Then press **Enter** to confirm.

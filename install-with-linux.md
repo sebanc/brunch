@@ -295,11 +295,18 @@ The installation will report that ChromeOS was installed when it is finished. Be
 
 ```sudo nano /etc/grub.d/99_brunch```
   
-15. Paste the Grub Boot Entries that you copied at the *end* of this file. These boot entries must be *after* the code that is already in this file, *do not remove the existing lines of code*.
+15. Paste the Grub Boot Entries that you copied at the *end* of this file. These boot entries must be *after* the code that is already in this file, *do not remove the existing lines of code*. 
+  * NOTE: On devices with hardware TPM module it may be necessary to remove the 'tpm' grub module, otherwise the loopback mounting fails (a known grub2 bug - see [grub2-bug-1851311]). Insert the line ```rmmod tpm``` before every  ```loopback loop ...``` instance in the ```/etc/grub.d/99_brunch``` file.  E.g.:
+<pre>
+menuentry "Brunch" --class "brunch" {
+        <b>rmmod tpm</b>
+        img_path=/chromeos.img
+        img_uuid=9113c3b2-...
+</pre>
 
-16. Save and close this file. In `nano` you'll exit by pressing **Ctrl + X** then **Y** to save. Then press **Enter** to confirm.
+17. Save and close this file. In `nano` you'll exit by pressing **Ctrl + X** then **Y** to save. Then press **Enter** to confirm.
 
-17. After saving, commit the new entries to Grub.
+18. After saving, commit the new entries to Grub.
 
 ```sudo update-grub```
   
@@ -382,6 +389,7 @@ In case you run into issues while installing or using Brunch, you can find suppo
 [rufus-link]: https://rufus.ie/
 [etcher-link]: https://www.balena.io/etcher/
 [grub2win]: https://sourceforge.net/projects/grub2win/
+[grub2-bug-1851311]: https://bugs.launchpad.net/ubuntu/+source/grub2/+bug/1851311/comments/51
 
 <!-- Images -->
 [decon-icon-24]: ./images/decon_icon-24.png

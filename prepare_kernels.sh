@@ -15,9 +15,9 @@ done
 make_config()
 {
 sed -i -z 's@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool $(success,echo 0)\n\t#def_bool@g' ./kernels/$1/init/Kconfig
-if [ "x$1" == "xchromebook-4.14" ] || [ "x$1" == "xchromebook-4.19" ]; then config_subfolder=""; else config_subfolder="/chromeos"; fi
+if [ "x$1" == "xchromebook-4.19" ]; then config_subfolder=""; else config_subfolder="/chromeos"; fi
 case "$1" in
-	6.1|5.15|5.10|5.4|4.19)
+	6.6|6.1|5.15|5.10|5.4|4.19)
 		echo 'CONFIG_LOCALVERSION="-brunch-sebanc"' > "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel $1 configuration failed"; exit 1; }
 		make -C "./kernels/$1" O=out allmodconfig || { echo "Kernel $1 configuration failed"; exit 1; }
 		sed '/CONFIG_ACPI\|CONFIG_AMD\|CONFIG_ATH\|CONFIG_AXP\|CONFIG_B4\|CONFIG_BACKLIGHT\|CONFIG_BATTERY\|CONFIG_BCM\|CONFIG_BN\|CONFIG_BRCM\|CONFIG_BRIDGE\|CONFIG_BT\|CONFIG_CEC\|CONFIG_CFG\|CONFIG_CHARGER\|CONFIG_CRYPTO\|CONFIG_DRM_AMD\|CONFIG_DRM_GMA\|CONFIG_DRM_NOUVEAU\|CONFIG_DRM_RADEON\|CONFIG_DW_DMAC\|CONFIG_EXTCON\|CONFIG_FIREWIRE\|CONFIG_FRAMEBUFFER_CONSOLE\|CONFIG_GENERIC\|CONFIG_GPIO\|CONFIG_HID\|CONFIG_HOSTAP\|CONFIG_I2C\|CONFIG_I4\|CONFIG_IC\|CONFIG_IG\|CONFIG_INET\|CONFIG_INPUT\|CONFIG_INTEL\|CONFIG_IP\|CONFIG_IWL\|CONFIG_IX\|CONFIG_JOYSTICK\|CONFIG_KEYBOARD\|CONFIG_LEDS\|CONFIG_LIB\|CONFIG_MAC\|CONFIG_MANAGER\|CONFIG_MEDIA_CONTROLLER\|CONFIG_MFD\|CONFIG_ML\|CONFIG_MMC\|CONFIG_MOUSE\|CONFIG_MT7\|CONFIG_MW\|CONFIG_NET\|CONFIG_NFC\|CONFIG_NL\|CONFIG_NVME\|CONFIG_PATA\|CONFIG_POWER\|CONFIG_PWM\|CONFIG_REGULATOR\|CONFIG_RMI\|CONFIG_RT\|CONFIG_SATA\|CONFIG_SCSI\|CONFIG_SENSORS\|CONFIG_SND\|CONFIG_SPI\|CONFIG_SQUASHFS\|CONFIG_SSB\|CONFIG_TABLET\|CONFIG_TCP\|CONFIG_THUNDERBOLT\|CONFIG_TOUCHSCREEN\|CONFIG_TPS68470\|CONFIG_TYPEC\|CONFIG_USB\|CONFIG_VHOST\|CONFIG_VIDEO\|CONFIG_W1\|CONFIG_WL\|CONFIG_XDP\|CONFIG_XFRM/!d' "./kernels/$1/out/.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel $1 configuration failed"; exit 1; }
@@ -50,12 +50,28 @@ kernel_remote_path="$(git ls-remote https://chromium.googlesource.com/chromiumos
 echo "kernel_remote_path=$kernel_remote_path"
 
 # Download kernels source
-kernels="4.14 4.19 5.4 5.10 5.15 6.1"
+kernels="4.19 5.4 5.10 5.15 6.1 6.6"
 for kernel in $kernels; do
 	kernel_version=$(curl -Ls "https://chromium.googlesource.com/chromiumos/third_party/kernel/+/$kernel_remote_path$kernel/Makefile?format=TEXT" | base64 --decode | sed -n -e 1,4p | sed -e '/^#/d' | cut -d'=' -f 2 | sed -z 's#\n##g' | sed 's#^ *##g' | sed 's# #.#g')
 	echo "kernel_version=$kernel_version"
 	[ ! "x$kernel_version" == "x" ] || { echo "Kernel version not found"; exit 1; }
 	case "$kernel" in
+		6.6)
+			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"
+			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
+			mkdir "./kernels/chromebook-6.6" "./kernels/6.6"
+			tar -C "./kernels/chromebook-6.6" -zxf "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel $kernel source extraction failed"; exit 1; }
+			tar -C "./kernels/6.6" -zxf "./kernels/chromiumos-$kernel.tar.gz" chromeos || { echo "Kernel $kernel source extraction failed"; exit 1; }
+			rm -f "./kernels/chromiumos-$kernel.tar.gz"
+			apply_patches "chromebook-6.6"
+			make_config "chromebook-6.6"
+			echo "Downloading Mainline kernel source for kernel $kernel version $kernel_version"
+			curl -L "https://mirrors.edge.kernel.org/pub/linux/kernel/v6.x/linux-$kernel_version.tar.gz" -o "./kernels/mainline-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
+			tar -C "./kernels/6.6" -zxf "./kernels/mainline-$kernel.tar.gz" --strip 1 || { echo "Kernel $kernel source extraction failed"; exit 1; }
+			rm -f "./kernels/mainline-$kernel.tar.gz"
+			apply_patches "6.6"
+			make_config "6.6"
+		;;
 		6.1)
 			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"
 			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
@@ -88,22 +104,6 @@ for kernel in $kernels; do
 			apply_patches "5.15"
 			make_config "5.15"
 		;;
-		5.10)
-			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"
-			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
-			mkdir "./kernels/chromebook-5.10" "./kernels/5.10"
-			tar -C "./kernels/chromebook-5.10" -zxf "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel $kernel source extraction failed"; exit 1; }
-			tar -C "./kernels/5.10" -zxf "./kernels/chromiumos-$kernel.tar.gz" chromeos || { echo "Kernel $kernel source extraction failed"; exit 1; }
-			rm -f "./kernels/chromiumos-$kernel.tar.gz"
-			apply_patches "chromebook-5.10"
-			make_config "chromebook-5.10"
-			echo "Downloading Mainline kernel source for kernel $kernel version $kernel_version"
-			curl -L "https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-$kernel_version.tar.gz" -o "./kernels/mainline-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
-			tar -C "./kernels/5.10" -zxf "./kernels/mainline-$kernel.tar.gz" --strip 1 || { echo "Kernel $kernel source extraction failed"; exit 1; }
-			rm -f "./kernels/mainline-$kernel.tar.gz"
-			apply_patches "5.10"
-			make_config "5.10"
-		;;
 		*)
 			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"
 			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
@@ -120,6 +120,6 @@ done
 rm -rf ./kernels
 mkdir ./kernels
 
-chromeos_version="R121"
+chromeos_version="R122"
 download_and_patch_kernels
 

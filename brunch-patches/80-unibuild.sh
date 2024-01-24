@@ -13,8 +13,12 @@ done
 
 ret=0
 board=$(fgrep 'CHROMEOS_RELEASE_DESCRIPTION' /roota/etc/lsb-release | cut -d' ' -f5)
-if [ "$board" == "coral" ]; then
+if [ "$board" == "brya" ]; then
+	hwid="OMNIGUL-FUQB"
+elif [ "$board" == "coral" ]; then
 	hwid="ASTRONAUT"
+elif [ "$board" == "guybrush" ]; then
+	hwid="NIPPERKIN"
 elif [ "$board" == "hatch" ]; then
 	hwid="JINLON-YTGY"
 elif [ "$board" == "nami" ]; then
@@ -23,12 +27,12 @@ elif [ "$board" == "octopus" ]; then
 	hwid="BOBBA"
 elif [ "$board" == "rammus" ]; then
 	hwid="SHYVANA"
+elif [ "$board" == "skyrim" ]; then
+	hwid="MARKARTH-VVBN"
 elif [ "$board" == "volteer" ]; then
 	hwid="VOXEL-GFMQ"
 elif [ "$board" == "zork" ]; then
 	hwid="GUMBOZ-JPUQ"
-elif [ "$board" == "guybrush" ]; then
-	hwid="NIPPERKIN"	
 else
 	hwid="$(echo $board | tr a-z A-Z)"
 fi

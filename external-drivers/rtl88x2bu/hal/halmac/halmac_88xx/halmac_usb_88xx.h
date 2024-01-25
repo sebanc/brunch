@@ -85,6 +85,9 @@ usbphy_read_88xx(struct halmac_adapter *adapter, u8 addr, u8 speed);
 enum halmac_ret_status
 en_ref_autok_usb_88xx(struct halmac_adapter *adapter, u8 en);
 
+enum halmac_ret_status
+usb_page_switch_88xx(struct halmac_adapter *adapter, u8 speed, u8 page);
+
 #endif /* HALMAC_88XX_SUPPORT */
 
 #endif/* _HALMAC_API_88XX_USB_H_ */

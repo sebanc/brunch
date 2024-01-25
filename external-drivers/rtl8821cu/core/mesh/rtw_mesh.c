@@ -248,7 +248,7 @@ int rtw_bss_is_candidate_mesh_peer(_adapter *adapter, WLAN_BSSID_EX *target, u8 
 		rsn_ie = rtw_get_wpa2_ie(BSS_EX_TLV_IES(target), &rsn_ie_len, BSS_EX_TLV_IES_LEN(target));
 		if (!rsn_ie || rsn_ie_len == 0)
 			goto exit;
-		if (rtw_parse_wpa2_ie(rsn_ie, rsn_ie_len + 2, &group_cipher, &pairwise_cipher, &gmcs, NULL, &mfp_opt) != _SUCCESS)
+		if (rtw_parse_wpa2_ie(rsn_ie, rsn_ie_len + 2, &group_cipher, &pairwise_cipher, &gmcs, NULL, &mfp_opt, NULL) != _SUCCESS)
 			goto exit;
 		if ((sec->mfp_opt == MFP_REQUIRED && mfp_opt < MFP_OPTIONAL)
 			|| (mfp_opt == MFP_REQUIRED && sec->mfp_opt < MFP_OPTIONAL))
@@ -1171,7 +1171,7 @@ void dump_mesh_networks(void *sel, _adapter *adapter)
 				rsn_ie = rtw_get_wpa2_ie(BSS_EX_TLV_IES(&network->network)
 							, &rsn_ie_len, BSS_EX_TLV_IES_LEN(&network->network));
 				if (rsn_ie && rsn_ie_len)
-					rtw_parse_wpa2_ie(rsn_ie, rsn_ie_len + 2, &gcs, &pcs, &gmcs, NULL, &mfp_opt);
+					rtw_parse_wpa2_ie(rsn_ie, rsn_ie_len + 2, &gcs, &pcs, &gmcs, NULL, &mfp_opt, NULL);
 			}
 			RTW_PRINT_SEL(sel, "* "MAC_FMT" %3d            %-32s %2x%2x%2x%2x%2x"
 				" %03x %03x %c%03x"
@@ -1213,7 +1213,7 @@ void dump_mesh_networks(void *sel, _adapter *adapter)
 		if (auth_pid && auth_pid <= 2) {
 			rsn_ie = rtw_get_wpa2_ie(BSS_EX_TLV_IES(&network->network), &rsn_ie_len, BSS_EX_TLV_IES_LEN(&network->network));
 			if (rsn_ie && rsn_ie_len)
-				rtw_parse_wpa2_ie(rsn_ie, rsn_ie_len + 2, &gcs, &pcs, &gmcs, NULL, &mfp_opt);
+				rtw_parse_wpa2_ie(rsn_ie, rsn_ie_len + 2, &gcs, &pcs, &gmcs, NULL, &mfp_opt, NULL);
 		}
 		age_ms = rtw_get_passing_time_ms(network->last_scanned);
 		#if CONFIG_RTW_MESH_ACNODE_PREVENT
@@ -3377,7 +3377,7 @@ void rtw_mesh_init_mesh_info(_adapter *adapter)
 
 	_rtw_init_queue(&minfo->mpath_tx_queue);
 	tasklet_init(&minfo->mpath_tx_tasklet
-		, (void(*))mpath_tx_tasklet_hdl
+		, (void(*)(unsigned long))mpath_tx_tasklet_hdl
 		, (unsigned long)adapter);
 
 	rtw_mrc_init(adapter);
@@ -3694,7 +3694,7 @@ int rtw_mesh_addr_resolve(_adapter *adapter, u16 os_qid, struct xmit_frame *xfra
 				, etherhdr.h_dest, adapter_mac_addr(adapter), ae_need, NULL, 0
 				, os_qid, b2u_list, &b2u_num, &b2u_mseq);
 			if (bmc_need == _FALSE) {
-				res = RTW_BMC_NO_NEED;
+				res = RTW_ORI_NO_NEED;
 				goto exit;
 			}
 		}
@@ -4086,7 +4086,7 @@ int rtw_mesh_rx_msdu_act_check(union recv_frame *rframe
 	int act = 0;
 	u8 ae_need;
 #if CONFIG_RTW_MESH_DATA_BMC_TO_UC
-	bool bmc_need = _TRUE;
+	bool ori_need = _TRUE;
 	u8 b2u_num = 0;
 #endif
 
@@ -4318,12 +4318,12 @@ fwd_chk:
 	if (is_mda_bmc
 		&& rtw_mfwd_b2u_policy_chk(mcfg->b2u_flags_mfwd, mda, rattrib->to_fr_ds == 3)
 	) {
-		bmc_need = rtw_mesh_data_bmc_to_uc(adapter
+		ori_need = rtw_mesh_data_bmc_to_uc(adapter
 			, da, sa, mda, msa, ae_need, rframe->u.hdr.psta->cmn.mac_addr, mctrl->ttl - 1
 			, os_qid, b2u_list, &b2u_num, &fwd_mseq);
 	}
 
-	if (bmc_need == _TRUE)
+	if (ori_need == _TRUE)
 #endif
 	{
 		xframe = rtw_alloc_xmitframe(&adapter->xmitpriv, os_qid);
@@ -4362,12 +4362,17 @@ fwd_chk:
 		*fwd_frame = xframe;
 	}
 
-	act |= RTW_RX_MSDU_ACT_FORWARD;
-	if (is_mda_bmc)
-		minfo->mshstats.fwded_mcast++;
-	else
-		minfo->mshstats.fwded_unicast++;
-	minfo->mshstats.fwded_frames++;
+#if CONFIG_RTW_MESH_DATA_BMC_TO_UC
+	if (ori_need || b2u_num)
+#endif
+	{
+		act |= RTW_RX_MSDU_ACT_FORWARD;
+		if (is_mda_bmc)
+			minfo->mshstats.fwded_mcast++;
+		else
+			minfo->mshstats.fwded_unicast++;
+		minfo->mshstats.fwded_frames++;
+	}
 
 exit:
 	return act;

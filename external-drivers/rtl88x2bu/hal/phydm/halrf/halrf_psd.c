@@ -125,7 +125,7 @@ void halrf_psd(
 	psd->buf_size = 256;
 
 	mode = average >> 16;
-
+	
 	if (mode == 2)
 		average_tmp = 1;
 	else
@@ -257,21 +257,95 @@ void _halrf_psd_iqk_init(struct dm_struct *dm)
 	odm_set_bb_reg(dm, 0x1b1c, 0xfff, 0xd21);
 	odm_set_bb_reg(dm, 0x1b1c, 0xfff00000, 0x821);
 	odm_set_bb_reg(dm, 0x1b28, MASKDWORD, 0x0);
-	odm_set_bb_reg(dm, 0x1bcc, 0x3f, 0x3f);
+	odm_set_bb_reg(dm, 0x1bcc, 0x3f, 0x3f);	
 }
 
-
-u32 halrf_get_iqk_psd_data(
-	struct dm_struct *dm,
-	u32 point)
+void _halrf_iqk_psd_init_8723f(void *dm_void,	 boolean onoff)
 {
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
+	u8 s;
+
+	s = (u8)odm_get_bb_reg(dm, 0x1884, BIT(20));
+
+	if (onoff) {
+		/*01_8723F_AFE_ON_BB_settings.txt*/
+		odm_set_bb_reg(dm, 0x1c38, MASKDWORD, 0x0);
+		odm_set_bb_reg(dm, R_0x1830, BIT(30), 0x0);
+		odm_set_bb_reg(dm, R_0x1860, 0xF0000000, 0xf);
+		odm_set_bb_reg(dm, R_0x1860, 0x0FFFF000, 0x0041);
+		odm_set_bb_reg(dm, 0x09f0, 0x0000FFFF, 0xbbbb);
+		odm_set_bb_reg(dm, 0x1d40, BIT(3), 0x1);
+		odm_set_bb_reg(dm, 0x1d40, 0x00000007, 0x3);
+		odm_set_bb_reg(dm, 0x09b4, 0x00000700, 0x3);
+		odm_set_bb_reg(dm, 0x09b4, 0x00003800, 0x3);
+		odm_set_bb_reg(dm, 0x09b4, 0x0001C000, 0x3);
+		odm_set_bb_reg(dm, 0x09b4, 0x000E0000, 0x3);
+		odm_set_bb_reg(dm, R_0x1c20, BIT(5), 0x1);
+		odm_set_bb_reg(dm, R_0x1e24, BIT(31), 0x0);
+		odm_set_bb_reg(dm, R_0x1e28, 0x0000000F, 0x1);
+		odm_set_bb_reg(dm, R_0x824, 0x000F0000, 0x1);
+		odm_set_bb_reg(dm, R_0x1cd0, 0xF0000000, 0x7);
+		odm_set_bb_reg(dm, R_0x2a24, BIT(13), 0x1);
+		odm_set_bb_reg(dm, R_0x1c68, BIT(24), 0x1);
+		odm_set_bb_reg(dm, R_0x1864, BIT(31), 0x1);
+		odm_set_bb_reg(dm, R_0x180c, BIT(27), 0x1);
+		odm_set_bb_reg(dm, R_0x180c, BIT(30), 0x1);
+		odm_set_bb_reg(dm, R_0x1e24, BIT(17), 0x1);
+		odm_set_bb_reg(dm, R_0x1880, BIT(21), 0x0);
+		odm_set_bb_reg(dm, R_0x1c38, MASKDWORD, 0xffffffff);
+		/*02_IQK_Preset.txt*/
+		//odm_set_rf_reg(dm, RF_PATH_A, 0x05, BIT(0), 0x0);
+		//odm_set_rf_reg(dm, RF_PATH_B, 0x05, BIT(0), 0x0);
+		odm_set_bb_reg(dm, R_0x1b08, MASKDWORD, 0x00000080);
+		//odm_set_bb_reg(dm, R_0x1bd8, MASKDWORD, 0x00000002);
+		//switch path  10 od 0x1b38 0x1/0x3 [1:0]
+		if (s == 0)
+			odm_set_bb_reg(dm, R_0x1b00, MASKDWORD, 0x00000008);
+		else
+			odm_set_bb_reg(dm, R_0x1b00, MASKDWORD, 0x0000000a);
+
+		odm_set_bb_reg(dm, R_0x1b18, MASKDWORD, 0x40010101);
+		odm_set_bb_reg(dm, R_0x1b14, MASKDWORD, 0x40010100);
+		//odm_set_bb_reg(dm, R_0x1b1c, MASKDWORD, 0xA2103C00);
+		odm_set_bb_reg(dm, R_0x1b0c, 0x00000C00, 0x2);
+		odm_set_bb_reg(dm, R_0x1bcc, 0x0000003F, 0x3f);	
+		//DbgPrint("[PSD][8723F]iqkpsd init!\n");
+	} else {
+		/*10_IQK_Reg_PSD_Restore.txt*/
+		//odm_set_bb_reg(dm, R_0x1b1c, MASKDWORD, 0xA2103C00);
+		odm_set_bb_reg(dm, R_0x1b08, MASKDWORD, 0x00000000);
+		odm_set_bb_reg(dm, R_0x1b38, BIT(0), 0x0);
+		odm_set_bb_reg(dm, R_0x1bcc, 0x0000003F, 0x0);	
+		//odm_set_rf_reg(dm, RF_PATH_A, 0x05, BIT(0), 0x1);
+		//odm_set_rf_reg(dm, RF_PATH_B, 0x05, BIT(0), 0x1);
+		/*11_8723F_restore_AFE_BB_settings.txt*/
+		odm_set_bb_reg(dm, 0x1c38, MASKDWORD, 0x0);
+		odm_set_bb_reg(dm, R_0x1830, BIT(30), 0x1);
+		odm_set_bb_reg(dm, R_0x1e24, BIT(31), 0x1);
+		odm_set_bb_reg(dm, R_0x2a24, BIT(13), 0x0);
+		odm_set_bb_reg(dm, R_0x1c68, BIT(24), 0x0);
+		odm_set_bb_reg(dm, R_0x1864, BIT(31), 0x0);
+		odm_set_bb_reg(dm, R_0x180c, BIT(27), 0x0);
+		odm_set_bb_reg(dm, R_0x180c, BIT(30), 0x0);
+		odm_set_bb_reg(dm, R_0x1880, BIT(21), 0x0);
+		odm_set_bb_reg(dm, R_0x1c38, MASKDWORD, 0xffa1005e);
+		//DbgPrint("[PSD][8723F]iqkpsd resotre!\n");
+	}
+}
+
+u64 halrf_get_iqk_psd_data(void *dm_void, u32 point)
+{
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	struct _hal_rf_ *rf = &(dm->rf_table);
 	struct _halrf_psd_data *psd = &(rf->halrf_psd_data);
-	u32 psd_val, psd_val1, psd_val2, psd_point, i, delay_time = 0;
+	u64 psd_val, psd_val1, psd_val2;
+	u32 psd_point, i, delay_time = 0;
 
 #if (DEV_BUS_TYPE == RT_USB_INTERFACE) || (DEV_BUS_TYPE == RT_SDIO_INTERFACE)
 	if (dm->support_interface == ODM_ITRF_USB || dm->support_interface == ODM_ITRF_SDIO) {
 		if (dm->support_ic_type & ODM_RTL8822C)
+			delay_time = 1000;
+		else if (dm->support_ic_type & ODM_RTL8723F)
 			delay_time = 1000;
 		else
 			delay_time = 0;
@@ -320,6 +394,14 @@ u32 halrf_get_iqk_psd_data(
 		psd_val2 = odm_get_bb_reg(dm, R_0x1bfc, MASKDWORD);
 
 		psd_val = (psd_val1 << 27) + (psd_val2 >> 5);
+	} else if (dm->support_ic_type & ODM_RTL8723F) {
+		odm_set_bb_reg(dm, R_0x1bd4, MASKDWORD, 0x00210001);
+		psd_val1 = odm_get_bb_reg(dm, R_0x1bfc, MASKDWORD);
+		psd_val1 = (psd_val1 & 0x00FF0000) >> 16;
+		odm_set_bb_reg(dm, R_0x1bd4, MASKDWORD, 0x00220001);
+		psd_val2 = odm_get_bb_reg(dm, R_0x1bfc, MASKDWORD);
+		//psd_val = (psd_val1 << 27) + (psd_val2 >> 5);
+		psd_val = (psd_val1 << 32) + psd_val2;
 	} else {
 		odm_set_bb_reg(dm, R_0x1bd4, MASKDWORD, 0x00250001);
 
@@ -357,8 +439,8 @@ void halrf_iqk_psd(
 	mode = average >> 16;
 
 	if (mode == 2) {
-		if (dm->support_ic_type & ODM_RTL8822C)
-			average_tmp = 1;
+		if (dm->support_ic_type & (ODM_RTL8822C | ODM_RTL8723F))
+			average_tmp = 1; //HW average
 		else {
 			reg_tmp = odm_get_bb_reg(dm, R_0x1b1c, 0x000e0000);
 			if (reg_tmp == 0)
@@ -381,18 +463,22 @@ void halrf_iqk_psd(
 			average_tmp = 16;
 		else if (reg_tmp == 5)
 			average_tmp = 32;
+#ifndef RTL8723F_SUPPORT
 		odm_set_bb_reg(dm, R_0x1b1c, 0x000e0000, 0x0);
+#endif
 	}
 
 #if 0
 	DbgPrint("[PSD]point=%d, start_point=%d, stop_point=%d, average=0x%x, average_tmp=%d, buf_size=%d, mode=%d\n",
-		point, start_point, stop_point, average, average_tmp, psd->buf_size, mode);
+				point, start_point, stop_point, average, average_tmp, psd->buf_size, mode);
 #endif
 
 	for (i = 0; i < psd->buf_size; i++)
 		psd->psd_data[i] = 0;
 
 	i = start_point;
+
+#ifndef RTL8723F_SUPPORT
 	while (i < stop_point) {
 		data_tatal = 0;
 
@@ -431,13 +517,32 @@ void halrf_iqk_psd(
 
 	if (dm->support_ic_type & (ODM_RTL8814B | ODM_RTL8198F | ODM_RTL8197G))
 		odm_set_bb_reg(dm, R_0x1b1c, 0x000e0000, reg_tmp);
+#else
+	while (i < stop_point) {
+		data_tatal = 0;
 
+		if (i >= point)
+			point_temp = i - point;
+		else
+			point_temp = i + 0xB00;
+		//-640:0xD80,640:0x280,0x280+0xB00 =0xD80
+			//point_temp = i + 0xC00;
+		//-512:0xE00,512:0x200,0x200+0xC00 = 0xE00
+
+		data_temp[k] = halrf_get_iqk_psd_data(dm, point_temp);
+		data_tatal = data_temp[k];
+		psd->psd_data[j] = (u32)data_tatal;
+		i++;
+		j++;
+	}
+
+#endif
 #if 0
 	DbgPrint("\n [iqk psd]psd result:\n");
 
 	for (i = 0; i < psd->buf_size; i++) {
 		if ((i % 20) == 0)
-			DbgPrint("\n ");
+		DbgPrint("\n ");
 
 		DbgPrint("0x%x ", psd->psd_data[i]);
 	}
@@ -454,19 +559,30 @@ halrf_psd_init(
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	struct _hal_rf_ *rf = &(dm->rf_table);
 	struct _halrf_psd_data *psd = &(rf->halrf_psd_data);
-
+#ifndef RTL8723F_SUPPORT
 #if 0
 	u32 bb_backup[12];
 	u32 backup_bb_reg[12] = {0x1b04, 0x1b08, 0x1b0c, 0x1b14, 0x1b18,
 				0x1b1c, 0x1b28, 0x1bcc, 0x1b2c, 0x1b34,
 				0x1bd4, 0x1bfc};
 #endif
-
+#else
+	u32 bb_backup[11];
+	u32 backup_bb_reg[11] = {0x09f0, 0x09b4, 0x1c38, 0x1860, 0x1cd0,
+				 0x824, 0x2a24, 0x1d40, 0x1c20, 0x1880, 0x180c};
+#endif
 	if (psd->psd_progress) {
 		ret_status = RT_STATUS_PENDING;
 	} else {
 		psd->psd_progress = 1;
-		if (dm->support_ic_type & (ODM_RTL8822C | ODM_RTL8814B | ODM_RTL8198F | ODM_RTL8197G)) {
+		if (dm->support_ic_type & ODM_RTL8723F) {
+			backup_bb_register(dm, bb_backup, backup_bb_reg, 11);
+			_halrf_iqk_psd_init_8723f(dm, true);
+			halrf_iqk_psd(dm, psd->point, psd->start_point, psd->stop_point, psd->average);
+			_halrf_iqk_psd_init_8723f(dm, false);
+			restore_bb_register(dm, bb_backup, backup_bb_reg, 11);
+		} else if (dm->support_ic_type & 
+		(ODM_RTL8822C | ODM_RTL8814B | ODM_RTL8198F | ODM_RTL8197G)) {
 			/*backup_bb_register(dm, bb_backup, backup_bb_reg, 12);*/
 			_halrf_psd_iqk_init(dm);
 			halrf_iqk_psd(dm, psd->point, psd->start_point, psd->stop_point, psd->average);

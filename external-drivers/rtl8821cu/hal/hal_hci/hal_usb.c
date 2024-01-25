@@ -26,7 +26,11 @@ int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 
 #ifdef PLATFORM_LINUX
 	tasklet_init(&precvpriv->recv_tasklet,
-		     (void(*))usb_recv_tasklet,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
+		     (void(*)(unsigned long))usb_recv_tasklet,
+#else
+		     (void *)usb_recv_tasklet,
+#endif
 		     (unsigned long)padapter);
 #endif /* PLATFORM_LINUX */
 
@@ -99,6 +103,9 @@ int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 #if defined(PLATFORM_LINUX) || defined(PLATFORM_FREEBSD)
 
 	skb_queue_head_init(&precvpriv->rx_skb_queue);
+#ifdef CONFIG_USB_PROTECT_RX_CLONED_SKB
+	skb_queue_head_init(&precvpriv->rx_cloned_skb_queue);
+#endif
 
 #ifdef CONFIG_RX_INDICATE_QUEUE
 	memset(&precvpriv->rx_indicate_queue, 0, sizeof(struct ifqueue));

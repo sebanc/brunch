@@ -930,6 +930,7 @@ u8 *rtw_tdls_set_ch_sw(u8 *pframe, struct pkt_attrib *pattrib, struct sta_info *
 void rtw_tdls_set_ch_sw_oper_control(_adapter *padapter, u8 enable)
 {
 	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(padapter);
+	u8 bcn_early_case;
 
 	if (enable == _TRUE) {
 #ifdef CONFIG_TDLS_CH_SW_V2
@@ -939,14 +940,18 @@ void rtw_tdls_set_ch_sw_oper_control(_adapter *padapter, u8 enable)
 #ifdef CONFIG_TDLS_CH_SW_BY_DRV
 		pHalData->ch_switch_offload = _FALSE;
 #endif
+		bcn_early_case = TDLS_BCN_ERLY_ON;
 	}
-	else
+	else {
 		pHalData->ch_switch_offload = _FALSE;
+		bcn_early_case = TDLS_BCN_ERLY_OFF;
+	}
 
 	if (ATOMIC_READ(&padapter->tdlsinfo.chsw_info.chsw_on) != enable)
 		ATOMIC_SET(&padapter->tdlsinfo.chsw_info.chsw_on, enable);
 
-	rtw_hal_set_hwreg(padapter, HW_VAR_TDLS_BCN_EARLY_C2H_RPT, &enable);
+	rtw_hal_set_hwreg(padapter, HW_VAR_BCN_EARLY_C2H_RPT, &enable);
+	rtw_hal_set_hwreg(padapter, HW_VAR_SET_DRV_ERLY_INT, &bcn_early_case);
 	RTW_INFO("[TDLS] %s Bcn Early C2H Report\n", (enable == _TRUE) ? "Start" : "Stop");
 }
 
@@ -962,6 +967,7 @@ void rtw_tdls_ch_sw_back_to_base_chnl(_adapter *padapter)
 		rtw_tdls_cmd(padapter, pchsw_info->addr, TDLS_CH_SW_TO_BASE_CHNL_UNSOLICITED);
 }
 
+#ifndef CONFIG_TDLS_CH_SW_V2
 static void rtw_tdls_chsw_oper_init(_adapter *padapter, u32 timeout_ms)
 {
 	struct submit_ctx	*chsw_sctx = &padapter->tdlsinfo.chsw_info.chsw_sctx;
@@ -982,6 +988,7 @@ void rtw_tdls_chsw_oper_done(_adapter *padapter)
 
 	rtw_sctx_done(&chsw_sctx);
 }
+#endif
 
 s32 rtw_tdls_do_ch_sw(_adapter *padapter, struct sta_info *ptdls_sta, u8 chnl_type, u8 channel, u8 channel_offset, u16 bwmode, u16 ch_switch_time)
 {
@@ -1814,9 +1821,9 @@ int On_TDLS_Dis_Rsp(_adapter *padapter, union recv_frame *precv_frame)
 			issue_tdls_setup_req(padapter, &txmgmt, _FALSE);
 		}
 	}
+exit:
 #endif /* CONFIG_TDLS_AUTOSETUP */
 
-exit:
 	return ret;
 
 }
@@ -1871,7 +1878,7 @@ sint On_TDLS_Setup_Req(_adapter *padapter, union recv_frame *precv_frame, struct
 		ptdls_sta = rtw_alloc_stainfo(pstapriv, psa);
 		if (ptdls_sta == NULL)
 			goto exit;
-
+		
 		ptdlsinfo->sta_cnt++;
 	}
 	else {
@@ -2199,7 +2206,7 @@ int On_TDLS_Setup_Rsp(_adapter *padapter, union recv_frame *precv_frame, struct 
 
 			if (ptdls_sta->tdls_sta_state & TDLS_RESPONDER_STATE) {
 				ptdls_sta->tdls_sta_state |= TDLS_LINKED_STATE;
-				ptdls_sta->state |= _FW_LINKED;
+				ptdls_sta->state |= WIFI_ASOC_STATE;
 				_cancel_timer_ex(&ptdls_sta->handshake_timer);
 			}
 
@@ -2316,7 +2323,7 @@ int On_TDLS_Setup_Cfm(_adapter *padapter, union recv_frame *precv_frame, struct 
 
 		if (ptdls_sta->tdls_sta_state & TDLS_INITIATOR_STATE) {
 			ptdls_sta->tdls_sta_state |= TDLS_LINKED_STATE;
-			ptdls_sta->state |= _FW_LINKED;
+			ptdls_sta->state |= WIFI_ASOC_STATE;
 			_cancel_timer_ex(&ptdls_sta->handshake_timer);
 		}
 
@@ -2590,6 +2597,7 @@ sint On_TDLS_Ch_Switch_Req(_adapter *padapter, union recv_frame *precv_frame, st
 		j += (pIE->Length + 2);
 	}
 
+#ifndef CONFIG_TDLS_CH_SW_V2
 	rtw_hal_get_hwreg(padapter, HW_VAR_CH_SW_NEED_TO_TAKE_CARE_IQK_INFO, &take_care_iqk);
 	if (take_care_iqk == _TRUE) {
 		u8 central_chnl;
@@ -2604,6 +2612,7 @@ sint On_TDLS_Ch_Switch_Req(_adapter *padapter, union recv_frame *precv_frame, st
 			return _FAIL;
 		}
 	}
+#endif
 
 	/* cancel ch sw monitor timer for responder */
 	if (!(pchsw_info->ch_sw_state & TDLS_CH_SW_INITIATOR_STATE))
@@ -2768,7 +2777,7 @@ void wfd_ie_tdls(_adapter *padapter, u8 *pframe, u32 *pktlen)
 
 	/* Value: */
 	/* Associated BSSID */
-	if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
+	if (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _TRUE)
 		_rtw_memcpy(wfdie + wfdielen, &pmlmepriv->assoc_bssid[0], ETH_ALEN);
 	else
 		_rtw_memset(wfdie + wfdielen, 0x00, ETH_ALEN);

@@ -159,9 +159,19 @@ exit:
 
 u32 rtl8821cu_inirp_deinit(PADAPTER padapter)
 {
+	struct recv_priv	*precvpriv = &padapter->recvpriv;
+	_pkt			*pskb;
 
 	rtw_read_port_cancel(padapter);
 
+	while (NULL != (pskb = skb_dequeue(&precvpriv->rx_skb_queue))) {
+		skb_reset_tail_pointer(pskb);
+		pskb->len = 0;
+		skb_queue_tail(&precvpriv->free_recv_skb_queue, pskb);
+	}
+
+	/* Clean pending recv buf */
+	while (rtw_dequeue_recvbuf(&precvpriv->recv_buf_pending_queue));
 
 	return _SUCCESS;
 }

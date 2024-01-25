@@ -266,27 +266,27 @@ BOOLEAN HalDetectPwrDownMode8192E(PADAPTER Adapter);
 
 /***********************************************************/
 /* RTL8192E-MAC Setting */
-VOID _InitQueueReservedPage_8192E(IN  PADAPTER Adapter);
-VOID _InitQueuePriority_8192E(IN	PADAPTER Adapter);
-VOID _InitTxBufferBoundary_8192E(IN PADAPTER Adapter, IN u8 txpktbuf_bndy);
-VOID _InitPageBoundary_8192E(IN PADAPTER Adapter);
-/* VOID _InitTransferPageSize_8192E(IN PADAPTER Adapter); */
-VOID _InitDriverInfoSize_8192E(IN PADAPTER Adapter, IN u8 drvInfoSize);
-VOID _InitRDGSetting_8192E(PADAPTER Adapter);
-void _InitID_8192E(IN  PADAPTER Adapter);
-VOID _InitNetworkType_8192E(IN  PADAPTER Adapter);
-VOID _InitWMACSetting_8192E(IN PADAPTER Adapter);
-VOID _InitAdaptiveCtrl_8192E(IN  PADAPTER Adapter);
-VOID _InitEDCA_8192E(IN  PADAPTER Adapter);
-VOID _InitRetryFunction_8192E(IN  PADAPTER Adapter);
-VOID _BBTurnOnBlock_8192E(IN	PADAPTER Adapter);
-VOID _InitBeaconParameters_8192E(IN  PADAPTER Adapter);
-VOID _InitBeaconMaxError_8192E(
-	IN  PADAPTER	Adapter,
-	IN	BOOLEAN		InfraMode
+void _InitQueueReservedPage_8192E(PADAPTER Adapter);
+void _InitQueuePriority_8192E(PADAPTER Adapter);
+void _InitTxBufferBoundary_8192E(PADAPTER Adapter, u8 txpktbuf_bndy);
+void _InitPageBoundary_8192E(PADAPTER Adapter);
+/* void _InitTransferPageSize_8192E(PADAPTER Adapter); */
+void _InitDriverInfoSize_8192E(PADAPTER Adapter, u8 drvInfoSize);
+void _InitRDGSetting_8192E(PADAPTER Adapter);
+void _InitID_8192E(PADAPTER Adapter);
+void _InitNetworkType_8192E(PADAPTER Adapter);
+void _InitWMACSetting_8192E(PADAPTER Adapter);
+void _InitAdaptiveCtrl_8192E(PADAPTER Adapter);
+void _InitEDCA_8192E(PADAPTER Adapter);
+void _InitRetryFunction_8192E(PADAPTER Adapter);
+void _BBTurnOnBlock_8192E(PADAPTER Adapter);
+void _InitBeaconParameters_8192E(PADAPTER Adapter);
+void _InitBeaconMaxError_8192E(
+		PADAPTER	Adapter,
+		BOOLEAN		InfraMode
 );
 void SetBeaconRelatedRegisters8192E(PADAPTER padapter);
-VOID hal_ReadRFType_8192E(PADAPTER	Adapter);
+void hal_ReadRFType_8192E(PADAPTER	Adapter);
 /* RTL8192E-MAC Setting
  ***********************************************************/
 
@@ -294,15 +294,15 @@ u8 SetHwReg8192E(PADAPTER Adapter, u8 variable, u8 *val);
 void GetHwReg8192E(PADAPTER Adapter, u8 variable, u8 *val);
 u8
 SetHalDefVar8192E(
-	IN	PADAPTER				Adapter,
-	IN	HAL_DEF_VARIABLE		eVariable,
-	IN	PVOID					pValue
+		PADAPTER				Adapter,
+		HAL_DEF_VARIABLE		eVariable,
+		void						*pValue
 );
 u8
 GetHalDefVar8192E(
-	IN	PADAPTER				Adapter,
-	IN	HAL_DEF_VARIABLE		eVariable,
-	IN	PVOID					pValue
+		PADAPTER				Adapter,
+		HAL_DEF_VARIABLE		eVariable,
+		void						*pValue
 );
 
 void rtl8192e_set_hal_ops(struct hal_ops *pHalFunc);

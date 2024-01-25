@@ -2,6 +2,7 @@
 /* Copyright(c) 2019-2020  Realtek Corporation
  */
 
+#include "chan.h"
 #include "coex.h"
 #include "core.h"
 #include "debug.h"
@@ -114,7 +115,8 @@ void rtw89_leave_ps_mode(struct rtw89_dev *rtwdev)
 	__rtw89_leave_ps_mode(rtwdev);
 }
 
-void rtw89_enter_lps(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif)
+void rtw89_enter_lps(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif,
+		     bool ps_mode)
 {
 	lockdep_assert_held(&rtwdev->mutex);
 
@@ -122,7 +124,8 @@ void rtw89_enter_lps(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif)
 		return;
 
 	__rtw89_enter_lps(rtwdev, rtwvif->mac_id);
-	__rtw89_enter_ps_mode(rtwdev, rtwvif);
+	if (ps_mode)
+		__rtw89_enter_ps_mode(rtwdev, rtwvif);
 }
 
 static void rtw89_leave_lps_vif(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif)
@@ -155,6 +158,9 @@ void rtw89_enter_ips(struct rtw89_dev *rtwdev)
 
 	set_bit(RTW89_FLAG_INACTIVE_PS, rtwdev->flags);
 
+	if (!test_bit(RTW89_FLAG_POWERON, rtwdev->flags))
+		return;
+
 	rtw89_for_each_rtwvif(rtwdev, rtwvif)
 		rtw89_mac_vif_deinit(rtwdev, rtwvif);
 
@@ -165,6 +171,9 @@ void rtw89_leave_ips(struct rtw89_dev *rtwdev)
 {
 	struct rtw89_vif *rtwvif;
 	int ret;
+
+	if (test_bit(RTW89_FLAG_POWERON, rtwdev->flags))
+		return;
 
 	ret = rtw89_core_start(rtwdev);
 	if (ret)
@@ -243,4 +252,102 @@ void rtw89_process_p2p_ps(struct rtw89_dev *rtwdev, struct ieee80211_vif *vif)
 {
 	rtw89_p2p_disable_all_noa(rtwdev, vif);
 	rtw89_p2p_update_noa(rtwdev, vif);
+}
+
+void rtw89_recalc_lps(struct rtw89_dev *rtwdev)
+{
+	struct ieee80211_vif *vif, *found_vif = NULL;
+	struct rtw89_vif *rtwvif;
+	enum rtw89_entity_mode mode;
+	int count = 0;
+
+	mode = rtw89_get_entity_mode(rtwdev);
+	if (mode == RTW89_ENTITY_MODE_MCC)
+		goto disable_lps;
+
+	rtw89_for_each_rtwvif(rtwdev, rtwvif) {
+		vif = rtwvif_to_vif(rtwvif);
+
+		if (vif->type != NL80211_IFTYPE_STATION) {
+			count = 0;
+			break;
+		}
+
+		count++;
+		found_vif = vif;
+	}
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0) || (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(9, 0)))
+	if (count == 1 && found_vif->cfg.ps) {
+#else
+	if (count == 1 && found_vif->bss_conf.ps) {
+#endif
+		rtwdev->lps_enabled = true;
+		return;
+	}
+
+disable_lps:
+	rtw89_leave_lps(rtwdev);
+	rtwdev->lps_enabled = false;
+}
+
+void rtw89_p2p_noa_renew(struct rtw89_vif *rtwvif)
+{
+	struct rtw89_p2p_noa_setter *setter = &rtwvif->p2p_noa;
+	struct rtw89_p2p_noa_ie *ie = &setter->ie;
+	struct rtw89_p2p_ie_head *p2p_head = &ie->p2p_head;
+	struct rtw89_noa_attr_head *noa_head = &ie->noa_head;
+
+	if (setter->noa_count) {
+		setter->noa_index++;
+		setter->noa_count = 0;
+	}
+
+	memset(ie, 0, sizeof(*ie));
+
+	p2p_head->eid = WLAN_EID_VENDOR_SPECIFIC;
+	p2p_head->ie_len = 4 + sizeof(*noa_head);
+	p2p_head->oui[0] = (WLAN_OUI_WFA >> 16) & 0xff;
+	p2p_head->oui[1] = (WLAN_OUI_WFA >> 8) & 0xff;
+	p2p_head->oui[2] = (WLAN_OUI_WFA >> 0) & 0xff;
+	p2p_head->oui_type = WLAN_OUI_TYPE_WFA_P2P;
+
+	noa_head->attr_type = IEEE80211_P2P_ATTR_ABSENCE_NOTICE;
+	noa_head->attr_len = cpu_to_le16(2);
+	noa_head->index = setter->noa_index;
+	noa_head->oppps_ctwindow = 0;
+}
+
+void rtw89_p2p_noa_append(struct rtw89_vif *rtwvif,
+			  const struct ieee80211_p2p_noa_desc *desc)
+{
+	struct rtw89_p2p_noa_setter *setter = &rtwvif->p2p_noa;
+	struct rtw89_p2p_noa_ie *ie = &setter->ie;
+	struct rtw89_p2p_ie_head *p2p_head = &ie->p2p_head;
+	struct rtw89_noa_attr_head *noa_head = &ie->noa_head;
+
+	if (!desc->count || !desc->duration)
+		return;
+
+	if (setter->noa_count >= RTW89_P2P_MAX_NOA_NUM)
+		return;
+
+	p2p_head->ie_len += sizeof(*desc);
+	le16_add_cpu(&noa_head->attr_len, sizeof(*desc));
+
+	ie->noa_desc[setter->noa_count++] = *desc;
+}
+
+u8 rtw89_p2p_noa_fetch(struct rtw89_vif *rtwvif, void **data)
+{
+	struct rtw89_p2p_noa_setter *setter = &rtwvif->p2p_noa;
+	struct rtw89_p2p_noa_ie *ie = &setter->ie;
+	void *tail;
+
+	if (!setter->noa_count)
+		return 0;
+
+	*data = ie;
+	tail = ie->noa_desc + setter->noa_count;
+	return tail - *data;
 }

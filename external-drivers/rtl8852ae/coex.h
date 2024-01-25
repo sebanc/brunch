@@ -66,6 +66,11 @@ enum btc_rssi_st {
 	BTC_RSSI_ST_MAX
 };
 
+enum btc_fddt_en {
+	BTC_FDDT_DISABLE,
+	BTC_FDDT_ENABLE,
+};
+
 #define	BTC_RSSI_HIGH(_rssi_) \
 	({typeof(_rssi_) __rssi = (_rssi_); \
 	  ((__rssi == BTC_RSSI_ST_HIGH || \
@@ -126,6 +131,7 @@ enum btc_role_state {
 enum btc_rfctrl {
 	BTC_RFCTRL_WL_OFF,
 	BTC_RFCTRL_WL_ON,
+	BTC_RFCTRL_LPS_WL_ON,
 	BTC_RFCTRL_FW_CTRL,
 	BTC_RFCTRL_MAX
 };
@@ -134,6 +140,44 @@ enum btc_lps_state {
 	BTC_LPS_OFF = 0,
 	BTC_LPS_RF_OFF = 1,
 	BTC_LPS_RF_ON = 2
+};
+
+#define R_BTC_BB_BTG_RX 0x980
+#define R_BTC_BB_PRE_AGC_S1 0x476C
+#define R_BTC_BB_PRE_AGC_S0 0x4688
+
+#define B_BTC_BB_GNT_MUX GENMASK(20, 17)
+#define B_BTC_BB_PRE_AGC_MASK GENMASK(31, 24)
+#define B_BTC_BB_PRE_AGC_VAL BIT(31)
+
+#define BTC_REG_NOTFOUND 0xff
+
+enum btc_ant_div_pos {
+	BTC_ANT_DIV_MAIN = 0,
+	BTC_ANT_DIV_AUX = 1,
+};
+
+enum btc_get_reg_status {
+	BTC_CSTATUS_TXDIV_POS = 0,
+	BTC_CSTATUS_RXDIV_POS = 1,
+	BTC_CSTATUS_BB_GNT_MUX = 2,
+	BTC_CSTATUS_BB_GNT_MUX_MON = 3,
+	BTC_CSTATUS_BB_PRE_AGC = 4,
+	BTC_CSTATUS_BB_PRE_AGC_MON = 5,
+};
+
+enum btc_preagc_type {
+	BTC_PREAGC_DISABLE,
+	BTC_PREAGC_ENABLE,
+	BTC_PREAGC_BB_FWCTRL,
+	BTC_PREAGC_NOTFOUND,
+};
+
+enum btc_btgctrl_type {
+	BTC_BTGCTRL_DISABLE,
+	BTC_BTGCTRL_ENABLE,
+	BTC_BTGCTRL_BB_GNT_FWCTRL,
+	BTC_BTGCTRL_BB_GNT_NOTFOUND,
 };
 
 void rtw89_btc_ntfy_poweron(struct rtw89_dev *rtwdev);
@@ -185,6 +229,15 @@ static inline u8 rtw89_btc_path_phymap(struct rtw89_dev *rtwdev,
 				       enum rtw89_rf_path path)
 {
 	return rtw89_btc_phymap(rtwdev, phy_idx, BIT(path));
+}
+
+/* return bt req len in TU */
+static inline u16 rtw89_coex_query_bt_req_len(struct rtw89_dev *rtwdev,
+					      enum rtw89_phy_idx phy_idx)
+{
+	struct rtw89_btc *btc = &rtwdev->btc;
+
+	return btc->bt_req_len;
 }
 
 #endif

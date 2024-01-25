@@ -28,9 +28,9 @@
 /*Define Different SW team support*/
 #define	ODM_AP		0x01	/*BIT(0)*/
 #define	ODM_CE		0x04	/*BIT(2)*/
-#define	ODM_WIN	0x08	/*BIT(3)*/
+#define	ODM_WIN		0x08	/*BIT(3)*/
 #define	ODM_ADSL	0x10	/*BIT(4)*/	/*already combine with ODM_AP, and is nouse now*/
-#define	ODM_IOT	0x20	/*BIT(5)*/
+#define	ODM_IOT		0x20	/*BIT(5)*/
 
 /*For FW API*/
 #define	__iram_odm_func__

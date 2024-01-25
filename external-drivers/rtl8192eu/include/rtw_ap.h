@@ -30,8 +30,10 @@ u8 rtw_set_tim_ie(u8 dtim_cnt, u8 dtim_period
 /* void update_BCNTIM(_adapter *padapter); */
 void rtw_add_bcn_ie(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 index, u8 *data, u8 len);
 void rtw_remove_bcn_ie(_adapter *padapter, WLAN_BSSID_EX *pnetwork, u8 index);
-void _update_beacon(_adapter *padapter, u8 ie_id, u8 *oui, u8 tx, const char *tag);
-#define update_beacon(adapter, ie_id, oui, tx) _update_beacon((adapter), (ie_id), (oui), (tx), __func__)
+void _update_beacon(_adapter *padapter, u8 ie_id, u8 *oui, u8 tx, u8 flags, const char *tag);
+#define update_beacon(adapter, ie_id, oui, tx, flags) _update_beacon((adapter), (ie_id), (oui), (tx), (flags), __func__)
+/*update_beacon - (flags) can set to normal enqueue (0) and RTW_CMDF_WAIT_ACK enqueue. 
+ (flags) = RTW_CMDF_DIRECTLY  is not currently implemented, it will do normal enqueue.*/
 
 void rtw_ap_update_sta_ra_info(_adapter *padapter, struct sta_info *psta);
 
@@ -84,6 +86,35 @@ u16 rtw_ap_parse_sta_security_ie(_adapter *adapter, struct sta_info *sta, struct
 void rtw_ap_parse_sta_wmm_ie(_adapter *adapter, struct sta_info *sta, u8 *tlv_ies, u16 tlv_ies_len);
 void rtw_ap_parse_sta_ht_ie(_adapter *adapter, struct sta_info *sta, struct rtw_ieee802_11_elems *elems);
 void rtw_ap_parse_sta_vht_ie(_adapter *adapter, struct sta_info *sta, struct rtw_ieee802_11_elems *elems);
+void rtw_ap_parse_sta_multi_ap_ie(_adapter *adapter, struct sta_info *sta, u8 *ies, int ies_len);
+
+/* b2u flags */
+#define RTW_AP_B2U_ALL		BIT0
+#define RTW_AP_B2U_GA_UCAST	BIT1 /* WDS group addressed unicast frame, forward only */
+#define RTW_AP_B2U_BCAST	BIT2
+#define RTW_AP_B2U_IP_MCAST	BIT3
+
+#define rtw_ap_src_b2u_policy_chk(flags, da) ( \
+	(flags & RTW_AP_B2U_ALL) \
+	|| ((flags & RTW_AP_B2U_BCAST) && is_broadcast_mac_addr(da)) \
+	|| ((flags & RTW_AP_B2U_IP_MCAST) && (IP_MCAST_MAC(da) || ICMPV6_MCAST_MAC(da))) \
+	)
+
+#define rtw_ap_fwd_b2u_policy_chk(flags, da, gaucst) ( \
+	(flags & RTW_AP_B2U_ALL) \
+	|| ((flags & RTW_AP_B2U_GA_UCAST) && gaucst) \
+	|| ((flags & RTW_AP_B2U_BCAST) && is_broadcast_mac_addr(da)) \
+	|| ((flags & RTW_AP_B2U_IP_MCAST) && (IP_MCAST_MAC(da) || ICMPV6_MCAST_MAC(da))) \
+	)
+
+void dump_ap_b2u_flags(void *sel, _adapter *adapter);
+
+int rtw_ap_addr_resolve(_adapter *adapter, u16 os_qid, struct xmit_frame *xframe, _pkt *pkt, _list *b2u_list);
+int rtw_ap_rx_data_validate_hdr(_adapter *adapter, union recv_frame *rframe, struct sta_info **sta);
+int rtw_ap_rx_msdu_act_check(union recv_frame *rframe
+	, const u8 *da, const u8 *sa
+	, u8 *msdu, enum rtw_rx_llc_hdl llc_hdl
+	, struct xmit_frame **fwd_frame, _list *b2u_list);
 
 void update_bmc_sta(_adapter *padapter);
 

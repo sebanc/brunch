@@ -20,7 +20,6 @@
 #define RECV_BLK_TH RECV_BLK_CNT
 
 #if defined(CONFIG_USB_HCI)
-
 	#ifndef MAX_RECVBUF_SZ
 		#ifndef CONFIG_MINIMAL_MEMORY_USAGE
 			/* #define MAX_RECVBUF_SZ (32768) */ /* 32k */

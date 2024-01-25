@@ -4068,9 +4068,8 @@ int recv_frame_monitor(_adapter *padapter, union recv_frame *rframe)
 
 	/* read skb information from recv frame */
 	pskb = rframe->u.hdr.pkt;
-	pskb->head = rframe->u.hdr.rx_head;
-	pskb->data = rframe->u.hdr.rx_data;
 	pskb->len = rframe->u.hdr.len;
+	pskb->data = rframe->u.hdr.rx_data;
 	skb_set_tail_pointer(pskb, rframe->u.hdr.len);
 
 	if (ndev->type == ARPHRD_IEEE80211_RADIOTAP) {

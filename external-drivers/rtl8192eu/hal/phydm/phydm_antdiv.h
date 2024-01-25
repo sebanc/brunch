@@ -87,17 +87,22 @@
 			ODM_RTL8197F | ODM_RTL8721D)
 #define ODM_AC_ANTDIV_SUPPORT (ODM_RTL8821 | ODM_RTL8881A | ODM_RTL8812 |\
 			ODM_RTL8821C | ODM_RTL8822B | ODM_RTL8814B)
-#define ODM_ANTDIV_SUPPORT	(ODM_N_ANTDIV_SUPPORT | ODM_AC_ANTDIV_SUPPORT)
+#define ODM_JGR3_ANTDIV_SUPPORT ODM_RTL8197G
+#define ODM_ANTDIV_SUPPORT	(ODM_N_ANTDIV_SUPPORT | ODM_AC_ANTDIV_SUPPORT |\
+			ODM_JGR3_ANTDIV_SUPPORT)
 #define ODM_SMART_ANT_SUPPORT	(ODM_RTL8188E | ODM_RTL8192E)
 #define ODM_HL_SMART_ANT_TYPE1_SUPPORT		(ODM_RTL8821 | ODM_RTL8822B)
 
 #define ODM_ANTDIV_2G_SUPPORT_IC (ODM_RTL8188E | ODM_RTL8192E | ODM_RTL8723B |\
 			ODM_RTL8881A | ODM_RTL8188F | ODM_RTL8723D |\
-			ODM_RTL8197F)
+			ODM_RTL8197F | ODM_RTL8197G)
 #define ODM_ANTDIV_5G_SUPPORT_IC (ODM_RTL8821 | ODM_RTL8881A | ODM_RTL8812 |\
 			ODM_RTL8821C | ODM_RTL8822B)
 
-#define ODM_EVM_ANTDIV_IC (ODM_RTL8192E | ODM_RTL8197F | ODM_RTL8822B)
+#define ODM_ANTDIV_SUPPORT_IC (ODM_ANTDIV_2G_SUPPORT_IC | ODM_ANTDIV_5G_SUPPORT_IC)
+
+#define ODM_EVM_ANTDIV_IC (ODM_RTL8192E | ODM_RTL8197F | ODM_RTL8822B |\
+			ODM_RTL8197G)
 
 #define ODM_ANTDIV_2G	BIT(0)
 #define ODM_ANTDIV_5G	BIT(1)
@@ -135,6 +140,9 @@
 #define TRAINING_STATE		3
 
 #define FORCE_RSSI_DIFF 10
+
+#define HT_IDX 16
+#define VHT_IDX 20
 
 #define CSI_ON	1
 #define CSI_OFF	0
@@ -260,6 +268,10 @@ struct phydm_fat_struct {
 	u8	antsel_a[ODM_ASSOCIATE_ENTRY_NUM];
 	u8	antsel_b[ODM_ASSOCIATE_ENTRY_NUM];
 	u8	antsel_c[ODM_ASSOCIATE_ENTRY_NUM];
+	u16	main_ht_cnt[HT_IDX];
+	u16	aux_ht_cnt[HT_IDX];
+	u16	main_vht_cnt[VHT_IDX];
+	u16	aux_vht_cnt[VHT_IDX];
 	u16	main_sum[ODM_ASSOCIATE_ENTRY_NUM];
 	u16	aux_sum[ODM_ASSOCIATE_ENTRY_NUM];
 	u16	main_cnt[ODM_ASSOCIATE_ENTRY_NUM];
@@ -270,10 +282,11 @@ struct phydm_fat_struct {
 	u16	aux_cnt_cck[ODM_ASSOCIATE_ENTRY_NUM];
 	u8	rx_idle_ant;
 	u8	rx_idle_ant2;
-	u8	rvrt_val;
+	u32	rvrt_val; /*all rvrt_val for pause API must set to u32*/
 	u8	ant_div_on_off;
 	u8	div_path_type;
 	boolean	is_become_linked;
+	boolean get_stats;
 	u32	min_max_rssi;
 	u8	idx_ant_div_counter_2g;
 	u8	idx_ant_div_counter_5g;
@@ -446,6 +459,10 @@ void odm_s0s1_sw_ant_div_by_ctrl_frame_process_rssi(void *dm_void,
 
 #ifdef ODM_EVM_ENHANCE_ANTDIV
 void phydm_evm_sw_antdiv_init(void *dm_void);
+
+void phydm_rx_rate_for_antdiv(void *dm_void, void *pkt_info_void);
+
+void phydm_antdiv_reset_rx_rate(void *dm_void);
 
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
 void phydm_evm_antdiv_callback(struct phydm_timer_list *timer);

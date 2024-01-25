@@ -38,6 +38,7 @@
 #ifdef CONFIG_BT_COEXIST
 #define BTCOEX_ALIVE	BIT(4)
 #endif /* CONFIG_BT_COEXIST */
+#define LPS_ALIVE	BIT(5)
 
 #ifdef CONFIG_WOWLAN
 	#ifdef CONFIG_PLATFORM_ANDROID_INTEL_X86
@@ -56,6 +57,17 @@
 
 #define MAX_WKFM_SIZE	16 /* (16 bytes for WKFM bit mask, 16*8 = 128 bits) */
 #define MAX_WKFM_PATTERN_SIZE	128
+
+/*
+ * MAX_WKFM_PATTERN_STR_LEN : the max. length of wow pattern string
+ *	e.g. echo 00:01:02:...:7f > /proc/net/rtl88x2bu/wlan0/wow_pattern_info
+ *	- each byte of pattern is represented as 2-bytes ascii : MAX_WKFM_PATTERN_SIZE * 2
+ *	- the number of common ':' in pattern string : MAX_WKFM_PATTERN_SIZE - 1
+ *	- 1 byte '\n'(0x0a) is generated at the end when we use echo command
+ *	so total max. length is (MAX_WKFM_PATTERN_SIZE * 3)
+ */
+#define MAX_WKFM_PATTERN_STR_LEN (MAX_WKFM_PATTERN_SIZE * 3)
+
 #define WKFMCAM_ADDR_NUM 6
 #define WKFMCAM_SIZE 24 /* each entry need 6*4 bytes */
 enum pattern_type {
@@ -156,6 +168,7 @@ __inline static void _init_pwrlock(_pwrlock *plock)
 
 __inline static void _free_pwrlock(_pwrlock *plock)
 {
+	_rtw_free_sema(plock);
 }
 
 
@@ -184,21 +197,6 @@ typedef enum _rt_rf_power_state {
 	/* =====Add the new RF state above this line===== */
 	rf_max
 } rt_rf_power_state;
-
-/* RF Off Level for IPS or HW/SW radio off */
-#define	RT_RF_OFF_LEVL_ASPM			BIT(0)	/* PCI ASPM */
-#define	RT_RF_OFF_LEVL_CLK_REQ		BIT(1)	/* PCI clock request */
-#define	RT_RF_OFF_LEVL_PCI_D3			BIT(2)	/* PCI D3 mode */
-#define	RT_RF_OFF_LEVL_HALT_NIC		BIT(3)	/* NIC halt, re-initialize hw parameters */
-#define	RT_RF_OFF_LEVL_FREE_FW		BIT(4)	/* FW free, re-download the FW */
-#define	RT_RF_OFF_LEVL_FW_32K		BIT(5)	/* FW in 32k */
-#define	RT_RF_PS_LEVEL_ALWAYS_ASPM	BIT(6)	/* Always enable ASPM and Clock Req in initialization. */
-#define	RT_RF_LPS_DISALBE_2R			BIT(30)	/* When LPS is on, disable 2R if no packet is received or transmittd. */
-#define	RT_RF_LPS_LEVEL_ASPM			BIT(31)	/* LPS with ASPM */
-
-#define	RT_IN_PS_LEVEL(ppsc, _PS_FLAG)		((ppsc->cur_ps_level & _PS_FLAG) ? _TRUE : _FALSE)
-#define	RT_CLEAR_PS_LEVEL(ppsc, _PS_FLAG)	(ppsc->cur_ps_level &= (~(_PS_FLAG)))
-#define	RT_SET_PS_LEVEL(ppsc, _PS_FLAG)		(ppsc->cur_ps_level |= _PS_FLAG)
 
 /* ASPM OSC Control bit, added by Roger, 2013.03.29. */
 #define	RT_PCI_ASPM_OSC_IGNORE		0	 /* PCI ASPM ignore OSC control in default */
@@ -290,9 +288,9 @@ typedef struct lps_poff_info {
 	u32	tx_bndy_dynamic;
 	u16	ConfLenForPTK;
 	u16	ConfLenForGTK;
-	atomic_t bEnterPOFF;
-	atomic_t bTxBoundInProgress;
-	atomic_t bSetPOFFParm;
+	ATOMIC_T bEnterPOFF;
+	ATOMIC_T bTxBoundInProgress;
+	ATOMIC_T bSetPOFFParm;
 } lps_poff_info_t;
 #endif /*CONFIG_LPS_POFF*/
 
@@ -310,6 +308,8 @@ struct aoac_report {
 	u8 rxptk_iv[8];
 	u8 rxgtk_iv[4][8];
 };
+
+struct rsvd_page_cache_t;
 
 struct pwrctrl_priv {
 	_pwrlock	lock;
@@ -355,10 +355,6 @@ struct pwrctrl_priv {
 	u8	reg_pdnmode; /* powerdown mode */
 	u32	rfoff_reason;
 
-	/* RF OFF Level */
-	u32	cur_ps_level;
-	u32	reg_rfps_level;
-
 	uint	ips_enter_cnts;
 	uint	ips_leave_cnts;
 	uint	lps_enter_cnts;
@@ -388,11 +384,6 @@ struct pwrctrl_priv {
 	systime	lps_deny_time; /* will deny LPS when system time is smaller than this */
 	s32		pnp_current_pwr_state;
 	u8		pnp_bstop_trx;
-
-	#ifdef CONFIG_AUTOSUSPEND
-	int		ps_flag; /* used by autosuspend */
-	u8		bInternalAutoSuspend;
-	#endif
 	u8		bInSuspend;
 #ifdef CONFIG_BT_COEXIST
 	u8		bAutoResume;
@@ -409,6 +400,8 @@ struct pwrctrl_priv {
 
 #ifdef CONFIG_GPIO_WAKEUP
 	u8		is_high_active;
+	u8		wowlan_gpio_index;
+	u8		wowlan_gpio_output_state;
 #endif /* CONFIG_GPIO_WAKEUP */
 	u8		hst2dev_high_active;
 #ifdef CONFIG_WOWLAN
@@ -431,7 +424,11 @@ struct pwrctrl_priv {
 #endif
 	u8		wowlan_aoac_rpt_loc;
 	struct aoac_report wowlan_aoac_rpt;
-	u8		wowlan_dis_lps;/*for debug purpose*/
+	u8		wowlan_power_mgmt;
+	u8		wowlan_lps_level;
+	#ifdef CONFIG_LPS_1T1R
+	u8		wowlan_lps_1t1r;
+	#endif
 #endif /* CONFIG_WOWLAN */
 	_timer	pwr_state_check_timer;
 	int		pwr_state_check_interval;
@@ -463,30 +460,38 @@ struct pwrctrl_priv {
 	u8 do_late_resume;
 #endif
 
-#ifdef CONFIG_INTEL_PROXIM
-	u8	stored_power_mgnt;
-#endif
-
 #ifdef CONFIG_LPS_POFF
 	lps_poff_info_t	*plps_poff_info;
 #endif
 	u8 lps_level_bk;
 	u8 lps_level; /*LPS_NORMAL,LPA_CG,LPS_PG*/
+#ifdef CONFIG_LPS_1T1R
+	u8 lps_1t1r_bk;
+	u8 lps_1t1r;
+#endif
 #ifdef CONFIG_LPS_PG
-	u8 lpspg_rsvd_page_locate;
-	u8 blpspg_info_up;
+	struct rsvd_page_cache_t lpspg_info;
+#ifdef CONFIG_RTL8822C
+	struct rsvd_page_cache_t lpspg_dpk_info;
+	struct rsvd_page_cache_t lpspg_iqk_info;
+#endif
 #endif
 	u8 current_lps_hw_port_id;
 
-#ifdef CONFIG_RTW_CFGVEDNOR_LLSTATS
+#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS
 	systime radio_on_start_time;
 	systime pwr_saving_start_time;
 	u32 pwr_saving_time;
 	u32 on_time;
 	u32 tx_time;
 	u32 rx_time;
-#endif /* CONFIG_RTW_CFGVEDNOR_LLSTATS */
+#endif /* CONFIG_RTW_CFGVENDOR_LLSTATS */
 
+#ifdef CONFIG_LPS_ACK
+	struct submit_ctx lps_ack_sctx;
+	s8 lps_ack_status;
+	_mutex lps_ack_mutex;
+#endif /* CONFIG_LPS_ACK */
 };
 
 #define rtw_get_ips_mode_req(pwrctl) \
@@ -535,11 +540,8 @@ int ips_leave(_adapter *padapter);
 
 void rtw_ps_processor(_adapter *padapter);
 
-#ifdef CONFIG_AUTOSUSPEND
-int autoresume_enter(_adapter *padapter);
-#endif
 #ifdef SUPPORT_HW_RFOFF_DETECTED
-rt_rf_power_state RfOnOffDetect(IN	PADAPTER pAdapter);
+rt_rf_power_state RfOnOffDetect(PADAPTER pAdapter);
 #endif
 
 
@@ -548,8 +550,11 @@ int rtw_fw_ps_state(PADAPTER padapter);
 #endif
 
 #ifdef CONFIG_LPS
+extern const char * const LPS_CTRL_PHYDM;
 void LPS_Enter(PADAPTER padapter, const char *msg);
 void LPS_Leave(PADAPTER padapter, const char *msg);
+void rtw_exec_lps(_adapter *padapter, u8 ps_mode);
+void rtw_lps_rfon_ctrl(_adapter *padapter, u8 rfon_ctrl);
 #ifdef CONFIG_CHECK_LEAVE_LPS
 #ifdef CONFIG_LPS_CHK_BY_TP
 void traffic_check_for_leave_lps_by_tp(PADAPTER padapter, u8 tx, struct sta_info *sta);
@@ -559,8 +564,10 @@ void traffic_check_for_leave_lps(PADAPTER padapter, u8 tx, u32 tx_packets);
 void rtw_set_ps_mode(PADAPTER padapter, u8 ps_mode, u8 smart_ps, u8 bcn_ant_mode, const char *msg);
 void rtw_set_fw_in_ips_mode(PADAPTER padapter, u8 enable);
 u8 rtw_set_rpwm(_adapter *padapter, u8 val8);
+#ifdef CONFIG_WOWLAN
 void rtw_wow_lps_level_decide(_adapter *adapter, u8 wow_en);
-#endif
+#endif /* CONFIG_WOWLAN */
+#endif /* CONFIG_LPS */
 
 #ifdef CONFIG_RESUME_IN_WORKQUEUE
 void rtw_resume_in_workqueue(struct pwrctrl_priv *pwrpriv);
@@ -588,7 +595,17 @@ int _rtw_pwr_wakeup(_adapter *padapter, u32 ips_deffer_ms, const char *caller);
 int rtw_pm_set_ips(_adapter *padapter, u8 mode);
 int rtw_pm_set_lps(_adapter *padapter, u8 mode);
 int rtw_pm_set_lps_level(_adapter *padapter, u8 level);
+#ifdef CONFIG_LPS_1T1R
+int rtw_pm_set_lps_1t1r(_adapter *padapter, u8 en);
+#endif
 void rtw_set_lps_deny(_adapter *adapter, u32 ms);
+#ifdef CONFIG_WOWLAN
+int rtw_pm_set_wow_lps(_adapter *padapter, u8 mode);
+int rtw_pm_set_wow_lps_level(_adapter *padapter, u8 level);
+#ifdef CONFIG_LPS_1T1R
+int rtw_pm_set_wow_lps_1t1r(_adapter *padapter, u8 en);
+#endif
+#endif /* CONFIG_WOWLAN */
 
 void rtw_ps_deny(PADAPTER padapter, PS_DENY_REASON reason);
 void rtw_ps_deny_cancel(PADAPTER padapter, PS_DENY_REASON reason);
@@ -597,7 +614,6 @@ u32 rtw_ps_deny_get(PADAPTER padapter);
 #if defined(CONFIG_WOWLAN)
 void rtw_get_current_ip_address(PADAPTER padapter, u8 *pcurrentip);
 void rtw_get_sec_iv(PADAPTER padapter, u8 *pcur_dot11txpn, u8 *StaAddr);
-bool rtw_check_pattern_valid(u8 *input, u8 len);
 bool rtw_wowlan_parser_pattern_cmd(u8 *input, char *pattern,
 				int *pattern_len, char *bit_mask);
 void rtw_wow_pattern_sw_reset(_adapter *adapter);

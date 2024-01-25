@@ -32,13 +32,13 @@ static void _rtw_bss_nums_count(_adapter *adapter, u8 *pbss_nums)
 		RTW_ERR("%s pbss_nums is null pointer\n", __func__);
 		return;
 	}
-	memset(pbss_nums, 0, MAX_CHANNEL_NUM);
+	_rtw_memset(pbss_nums, 0, MAX_CHANNEL_NUM);
 
 	_enter_critical_bh(&(pmlmepriv->scanned_queue.lock), &irqL);
 	phead = get_list_head(queue);
 	plist = get_next(phead);
 	while (1) {
-		if (phead == plist)
+		if (rtw_end_of_queue_search(phead, plist) == _TRUE)
 			break;
 
 		pnetwork = LIST_CONTAINOR(plist, struct wlan_network, list);
@@ -89,12 +89,20 @@ u8 rtw_phydm_nhm_ratio(_adapter *adapter)
 
 	return phydm_cmn_info_query(phydm, (enum phydm_info_query) PHYDM_INFO_NHM_RATIO);
 }
+
+u8 rtw_phydm_nhm_noise_pwr(_adapter *adapter)
+{
+	struct dm_struct *phydm = adapter_to_phydm(adapter);
+
+	return phydm_cmn_info_query(phydm, (enum phydm_info_query) PHYDM_INFO_NHM_PWR);
+}
+
 void rtw_acs_reset(_adapter *adapter)
 {
 	HAL_DATA_TYPE *hal_data = GET_HAL_DATA(adapter);
 	struct auto_chan_sel *pacs = &hal_data->acs;
 
-	memset(pacs, 0, sizeof(struct auto_chan_sel));
+	_rtw_memset(pacs, 0, sizeof(struct auto_chan_sel));
 	#ifdef CONFIG_RTW_ACS_DBG
 	rtw_acs_adv_reset(adapter);
 	#endif /*CONFIG_RTW_ACS_DBG*/
@@ -204,7 +212,8 @@ void rtw_acs_get_rst(_adapter *adapter)
 			(rpt.nhm_rpt_stamp == hal_data->acs.trig_rpt.nhm_rpt_stamp)){
 			hal_data->acs.clm_ratio[chan_idx] = rpt.clm_ratio;
 			hal_data->acs.nhm_ratio[chan_idx] = rpt.nhm_ratio;
-			memcpy(&hal_data->acs.nhm[chan_idx][0], rpt.nhm_result, NHM_RPT_NUM);
+			hal_data->acs.env_mntr_rpt[chan_idx] = (rpt.nhm_noise_pwr -100);
+			_rtw_memcpy(&hal_data->acs.nhm[chan_idx][0], rpt.nhm_result, NHM_RPT_NUM);
 
 			/*RTW_INFO("[ACS] get_rst success (rst = 0x%02x, clm_stamp:%d:%d, nhm_stamp:%d:%d)\n",
 			rst,
@@ -228,6 +237,8 @@ void rtw_acs_get_rst(_adapter *adapter)
 	#ifdef CONFIG_RTW_ACS_DBG
 	RTW_INFO("[ACS] Result CH:%d, CLM:%d NHM:%d\n",
 		cur_chan, hal_data->acs.clm_ratio[chan_idx], hal_data->acs.nhm_ratio[chan_idx]);
+	RTW_INFO("[ACS] Result NHM(dBm):%d\n",
+		hal_data->acs.env_mntr_rpt[chan_idx] );
 	#endif
 }
 
@@ -246,9 +257,9 @@ void _rtw_phydm_acs_select_best_chan(_adapter *adapter)
 
 	for (ch_idx = 0; ch_idx < max_chan_nums; ch_idx++) {
 		if (pbss_nums[ch_idx])
-			pinterference_time[ch_idx] = (pclm_ratio[ch_idx] / 2) + pnhm_ratio[ch_idx];
+			pinterference_time[ch_idx] = (pclm_ratio[ch_idx] / 2) + (pnhm_ratio[ch_idx] / 2);
 		else
-			pinterference_time[ch_idx] = pclm_ratio[ch_idx] + pnhm_ratio[ch_idx];
+			pinterference_time[ch_idx] = (pclm_ratio[ch_idx] / 3) + ((pnhm_ratio[ch_idx] * 2) / 3);
 
 		if (rtw_get_ch_num_by_idx(adapter, ch_idx) < 14) {
 			if (pinterference_time[ch_idx] < min_itf_24g) {
@@ -358,6 +369,18 @@ u8 rtw_acs_get_nhm_ratio_by_ch_num(_adapter *adapter, u8 chan)
 
 	return hal_data->acs.nhm_ratio[chan_idx];
 }
+u8 rtw_acs_get_nhm_noise_pwr_by_ch_idx(_adapter *adapter, u8 ch_idx)
+{
+	HAL_DATA_TYPE *hal_data = GET_HAL_DATA(adapter);
+
+	if (ch_idx >= MAX_CHANNEL_NUM) {
+		RTW_ERR("%s [ACS] ch_idx(%d) is invalid\n", __func__, ch_idx);
+		return 0;
+	}
+
+	return hal_data->acs.env_mntr_rpt[ch_idx];
+}
+
 u8 rtw_acs_get_num_ratio_by_ch_idx(_adapter *adapter, u8 ch_idx)
 {
 	HAL_DATA_TYPE *hal_data = GET_HAL_DATA(adapter);

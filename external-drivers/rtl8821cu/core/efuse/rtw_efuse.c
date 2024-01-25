@@ -3383,7 +3383,7 @@ u8 rtw_efuse_file_read(PADAPTER padapter, u8 *filepath, u8 *buf, u32 len)
 	return _TRUE;
 }
 
-
+#if !defined(CONFIG_RTW_ANDROID_GKI)
 u8 rtw_efuse_file_store(PADAPTER padapter, u8 *filepath, u8 *buf, u32 len)
 {
 	int err = 0, i = 0, j = 0, mapLen = 0 ;
@@ -3419,6 +3419,7 @@ u8 rtw_efuse_file_store(PADAPTER padapter, u8 *filepath, u8 *buf, u32 len)
 
 	return err;
 }
+#endif /* !defined(CONFIG_RTW_ANDROID_GKI) */
 
 #ifdef CONFIG_EFUSE_CONFIG_FILE
 u32 rtw_read_efuse_from_file(const char *path, u8 *buf, int map_size)
@@ -3431,10 +3432,10 @@ u32 rtw_read_efuse_from_file(const char *path, u8 *buf, int map_size)
 	u32 ret = _FAIL;
 
 	u8 *file_data = NULL;
-	u32 file_size, read_size, pos = 0;
+	u32 file_size = 16384, read_size, pos = 0;
 	u8 *map = NULL;
 
-	if (rtw_is_file_readable_with_size(path, &file_size) != _TRUE) {
+	if (rtw_readable_file_sz_chk(path, file_size) != _TRUE) {
 		RTW_PRINT("%s %s is not readable\n", __func__, path);
 		goto exit;
 	}

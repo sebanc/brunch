@@ -47,6 +47,14 @@
 	void rtl8822be_set_hal_ops(PADAPTER padapter);
 #endif
 
+#ifdef CONFIG_RTL8822C
+	void rtl8822ce_set_hal_ops(PADAPTER padapter);
+#endif
+
+#ifdef CONFIG_RTL8814B
+	void rtl8814be_set_hal_ops(PADAPTER padapter);
+#endif
+
 u8 rtw_set_hal_ops(_adapter *padapter);
 
 #endif /* __PCIE_HAL_H__ */

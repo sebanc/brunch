@@ -5169,6 +5169,62 @@ int proc_get_cur_beacon_keys(struct seq_file *m, void *v)
 	return 0;
 }
 
+static int proc_get_amsdu_mode(struct seq_file *m, void *v)
+{
+	struct net_device *dev = m->private;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+
+	if (pregpriv) {
+		if (pregpriv->amsdu_mode == RTW_AMSDU_MODE_NON_SPP)
+			RTW_PRINT_SEL(m, "amsdu mode: NON-SPP\n");
+		else if (pregpriv->amsdu_mode == RTW_AMSDU_MODE_SPP)
+			RTW_PRINT_SEL(m, "amsdu mode: SPP\n");
+		else if (pregpriv->amsdu_mode == RTW_AMSDU_MODE_ALL_DROP)
+			RTW_PRINT_SEL(m, "amsdu mode: ALL DROP\n");
+		else
+			RTW_PRINT_SEL(m, "unexpected amsdu mode\n");
+	}
+
+	return 0;
+}
+
+static ssize_t proc_set_amsdu_mode(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
+{
+	struct net_device *dev = data;
+	_adapter *padapter = (_adapter *)rtw_netdev_priv(dev);
+	struct registry_priv	*pregpriv = &padapter->registrypriv;
+	char tmp[32];
+	u32 mode;
+	u8 bw_2g;
+	u8 bw_5g;
+
+	if (count < 1)
+		return -EFAULT;
+
+	if (count > sizeof(tmp)) {
+		rtw_warn_on(1);
+		return -EFAULT;
+	}
+
+	if (buffer && !copy_from_user(tmp, buffer, count)) {
+
+		int num = sscanf(tmp, "%d", &mode);
+
+		if (mode == RTW_AMSDU_MODE_NON_SPP
+			|| mode == RTW_AMSDU_MODE_SPP
+			|| mode == RTW_AMSDU_MODE_ALL_DROP) {
+			pregpriv->amsdu_mode = mode;
+			RTW_INFO("amsdu mode=%u\n", mode);
+		} else {
+			RTW_INFO("set unexpected mode = %d, won't apply\n", mode);
+		}
+	}
+
+	return count;
+
+}
+
 /*
 * rtw_adapter_proc:
 * init/deinit when register/unregister net_device
@@ -5626,6 +5682,7 @@ const struct rtw_proc_hdl adapter_proc_hdls[] = {
 	RTW_PROC_HDL_SSEQ("war_offload_mdns_service_info_txt_rsp", proc_get_war_offload_mdns_txt_rsp, proc_set_war_offload_mdns_txt_rsp),
 #endif /* CONFIG_OFFLOAD_MDNS_V4 || CONFIG_OFFLOAD_MDNS_V6 */
 #endif /* CONFIG_WAR_OFFLOAD */
+	RTW_PROC_HDL_SSEQ("rtw_amsdu_mode", proc_get_amsdu_mode, proc_set_amsdu_mode),
 
 };
 

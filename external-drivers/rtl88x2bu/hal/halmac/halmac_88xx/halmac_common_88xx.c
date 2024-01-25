@@ -500,7 +500,9 @@ set_hw_value_88xx(struct halmac_adapter *adapter, enum halmac_hw_id hw_id,
 		  void *value)
 {
 	enum halmac_ret_status status = HALMAC_RET_SUCCESS;
-	struct halmac_tx_page_threshold_info *th_info = NULL;
+#if HALMAC_SDIO_SUPPORT
+	struct halmac_tx_page_threshold_info *th_info;
+#endif
 	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
 
 	PLTFM_MSG_TRACE("[TRACE]%s ===>\n", __func__);
@@ -761,6 +763,9 @@ parse_c2h_pkt_88xx(struct halmac_adapter *adapter, u8 *buf, u32 size)
 	case C2H_SUB_CMD_ID_SCAN_CH_NOTIFY:
 		status = get_scan_ch_notify_88xx(adapter, c2h_pkt, c2h_size);
 		break;
+	case C2H_SUB_CMD_ID_DPK_DATA:
+		status = get_dpk_data_88xx(adapter, c2h_pkt, c2h_size);
+		break;
 	default:
 		PLTFM_MSG_WARN("[WARN]Sub cmd id!!\n");
 		status = HALMAC_RET_C2H_NOT_HANDLED;
@@ -892,6 +897,9 @@ get_h2c_ack_88xx(struct halmac_adapter *adapter, u8 *buf, u32 size)
 		break;
 	case H2C_SUB_CMD_ID_FW_SNDING_ACK:
 		status = get_h2c_ack_fw_snding_88xx(adapter, buf, size);
+		break;
+	case H2C_SUB_CMD_ID_DPK_ACK:
+		status = get_h2c_ack_dpk_88xx(adapter, buf, size);
 		break;
 	default:
 		status = HALMAC_RET_C2H_NOT_HANDLED;
@@ -2853,6 +2861,9 @@ query_status_88xx(struct halmac_adapter *adapter,
 	case HALMAC_FEATURE_FW_SNDING:
 		status = get_fw_snding_status_88xx(adapter, proc_status);
 		break;
+	case HALMAC_FEATURE_DPK:
+		status = get_dpk_status_88xx(adapter, proc_status, data, size);
+		break;
 	default:
 		return HALMAC_RET_INVALID_FEATURE_ID;
 	}
@@ -2998,7 +3009,7 @@ pwr_seq_parser_88xx(struct halmac_adapter *adapter,
 		cut = HALMAC_PWR_CUT_TESTCHIP_MSK;
 		break;
 	default:
-		PLTFM_MSG_ERR("[ERR]cut version!!\n");
+		PLTFM_MSG_ERR("[ERR]chip info!!\n");
 		return HALMAC_RET_SWITCH_CASE_ERROR;
 	}
 
@@ -3165,7 +3176,7 @@ parse_intf_phy_88xx(struct halmac_adapter *adapter,
 	u16 ip_sel;
 	struct halmac_intf_phy_para *cur_param;
 	struct halmac_api *api = (struct halmac_api *)adapter->halmac_api;
-	u8 result = HALMAC_RET_SUCCESS;
+	enum halmac_ret_status result = HALMAC_RET_SUCCESS;
 
 	switch (adapter->chip_ver) {
 	case HALMAC_CHIP_VER_A_CUT:
@@ -3210,6 +3221,15 @@ parse_intf_phy_88xx(struct halmac_adapter *adapter,
 			} else if (intf_phy == HAL_INTF_PHY_USB2 ||
 				   intf_phy == HAL_INTF_PHY_USB3) {
 #if HALMAC_USB_SUPPORT
+				if (offset > 0x100)
+					usb_page_switch_88xx(adapter,
+							     intf_phy,
+							     1);
+				else
+					usb_page_switch_88xx(adapter,
+							     intf_phy,
+							     0);
+				offset = offset & 0xFF;
 				result = usbphy_write_88xx(adapter, (u8)offset,
 							   value, intf_phy);
 				if (result != HALMAC_RET_SUCCESS)
@@ -3236,7 +3256,7 @@ parse_intf_phy_88xx(struct halmac_adapter *adapter,
 		cur_param++;
 	} while (1);
 
-	return HALMAC_RET_SUCCESS;
+	return result;
 }
 
 /**

@@ -137,8 +137,8 @@ void phydm_8822b_type18_rfe(struct dm_struct *dm, u8 channel)
 			if (dm->rx_ant_status == BB_PATH_AB ||
 			    dm->tx_ant_status == BB_PATH_AB) {
 				/* 2TX or 2RX */
-				odm_set_bb_reg(dm, R_0xca0, MASKLWORD, 0xa501);
-				odm_set_bb_reg(dm, R_0xea0, MASKLWORD, 0xa501);
+				odm_set_bb_reg(dm, R_0xca0, MASKLWORD, 0x0501);
+				odm_set_bb_reg(dm, R_0xea0, MASKLWORD, 0x0501);
 			} else if (dm->rx_ant_status == dm->tx_ant_status) {
 				/* TXA+RXA or TXB+RXB */
 				odm_set_bb_reg(dm, R_0xca0, MASKLWORD, 0xa500);
@@ -775,7 +775,7 @@ void phydm_ccapar_by_rfe_8822b(struct dm_struct *dm)
 	} else {
 		odm_move_memory(dm, cca_ifem, cca_ifem_ccut, 12 * 4);
 	}
-	PHYDM_DBG(dm, ODM_PHY_CONFIG, "Update CCA para for Ccut\n");
+	PHYDM_DBG(dm, ODM_PHY_CONFIG, "Update CCA para for C-cart\n");
 
 	if (central_ch_8822b <= 14) {
 		if (dm->rx_ant_status == BB_PATH_A ||
@@ -835,7 +835,7 @@ void phydm_ccapar_by_rfe_8822b(struct dm_struct *dm)
 	if ((*dm->band_width == CHANNEL_WIDTH_20) &&
 	    (((*dm->channel >= 52) && (*dm->channel <= 64)) ||
 	     ((*dm->channel >= 100) && (*dm->channel <= 144))))
-		odm_set_bb_reg(dm, 0x838, 0xf0, 0x4);
+		odm_set_bb_reg(dm, 0x838, 0xf0, 0x5);
 	PHYDM_DBG(dm, ODM_PHY_CONFIG, "(Pkt%d, Intf%d, RFE%d), col=%d\n",
 		  dm->package_type, dm->support_interface, dm->rfe_type, col);
 }
@@ -1659,7 +1659,7 @@ config_phydm_switch_band_8822b(struct dm_struct *dm,
 			/*@CCA mask = 13.6us*/
 			odm_set_bb_reg(dm, R_0x814, 0x0000FC00, 34);
 		else
-			/*@default value*/
+			/*@default value = 6us*/
 			odm_set_bb_reg(dm, R_0x814, 0x0000FC00, 15);
 #endif
 
@@ -1829,7 +1829,9 @@ config_phydm_switch_channel_8822b(struct dm_struct *dm,
 	}
 #if (DM_ODM_SUPPORT_TYPE & ODM_AP)
 	/*@Make protection*/
-	if (central_ch == 165 && bw_8822b != CHANNEL_WIDTH_20)
+	if (central_ch == 165 &&
+	    bw_8822b != CHANNEL_WIDTH_20 &&
+	    !(*dm->mp_mode))
 		config_phydm_switch_bandwidth_8822b(dm, 0, CHANNEL_WIDTH_20);
 #endif
 	central_ch_8822b = central_ch;
@@ -2017,6 +2019,7 @@ config_phydm_switch_bandwidth_8822b(struct dm_struct *dm,
 				    u8 primary_ch_idx,
 				    enum channel_width bw)
 {
+	struct phydm_api_stuc *api = &dm->api_table;
 	u32 rf_reg18, val32;
 	boolean rf_reg_status = true;
 	u8 rfe_type = dm->rfe_type;
@@ -2043,6 +2046,7 @@ config_phydm_switch_bandwidth_8822b(struct dm_struct *dm,
 		bandwidth = CHANNEL_WIDTH_20;
 #endif
 	bw_8822b = bandwidth;
+	api->pri_ch_idx = primary_ch_idx;
 	rf_reg18 = config_phydm_read_rf_reg_8822b(dm, RF_PATH_A, 0x18,
 						  RFREG_MASK);
 	rf_reg_status = rf_reg_status &
@@ -2261,6 +2265,12 @@ config_phydm_switch_bandwidth_8822b(struct dm_struct *dm,
 	/* Normal mode */
 		phydm_spur_calibration_8822b(dm);
 	}
+
+	/*fix bw setting*/
+	#ifdef CONFIG_BW_INDICATION
+	if (!(*dm->mp_mode))
+		phydm_bw_fixed_setting(dm);
+	#endif
 
 	/* Toggle RX path to avoid RX dead zone issue */
 	odm_set_bb_reg(dm, R_0x808, MASKBYTE0, 0x0);

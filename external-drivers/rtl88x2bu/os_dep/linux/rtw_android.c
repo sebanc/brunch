@@ -371,7 +371,7 @@ int rtw_android_get_rssi(struct net_device *net, char *command, int total_len)
 	struct	wlan_network	*pcur_network = &pmlmepriv->cur_network;
 	int bytes_written = 0;
 
-	if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) {
+	if (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _TRUE) {
 		bytes_written += snprintf(&command[bytes_written], total_len, "%s rssi %d",
 			pcur_network->network.Ssid.Ssid, padapter->recvpriv.rssi);
 	}
@@ -656,7 +656,7 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		ret = -EFAULT;
 		goto exit;
 	}
-
+	
 	command = rtw_zmalloc(priv_cmd.total_len+1);
 	if (!command) {
 		RTW_INFO("%s: failed to allocate memory\n", __FUNCTION__);
@@ -828,11 +828,13 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		break;
 
 #ifdef CONFIG_IOCTL_CFG80211
+	#ifdef CONFIG_AP_MODE
 	case ANDROID_WIFI_CMD_SET_AP_WPS_P2P_IE: {
 		int skip = strlen(android_wifi_cmd_str[ANDROID_WIFI_CMD_SET_AP_WPS_P2P_IE]) + 3;
 		bytes_written = rtw_cfg80211_set_mgnt_wpsp2pie(net, command + skip, priv_cmd.total_len - skip, *(command + skip - 2) - '0');
 		break;
 	}
+	#endif
 #endif /* CONFIG_IOCTL_CFG80211 */
 
 #ifdef CONFIG_WFD
@@ -935,7 +937,7 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		bytes_written = rtw_android_set_aek(net, command, priv_cmd.total_len);
 		break;
 #endif
-
+	
 	case ANDROID_WIFI_CMD_EXT_AUTH_STATUS: {
 		rtw_set_external_auth_status(padapter,
 			command + strlen("EXT_AUTH_STATUS "),
@@ -1148,6 +1150,7 @@ extern PADAPTER g_test_adapter;
 
 static void shutdown_card(void)
 {
+	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(g_test_adapter);
 	u32 addr;
 	u8 tmp8, cnt = 0;
 
@@ -1164,7 +1167,7 @@ static void shutdown_card(void)
 #ifdef CONFIG_GPIO_WAKEUP
 	/*default wake up pin change to BT*/
 	RTW_INFO("%s:default wake up pin change to BT\n", __FUNCTION__);
-	rtw_hal_switch_gpio_wl_ctrl(g_test_adapter, WAKEUP_GPIO_IDX, _FALSE);
+	rtw_hal_switch_gpio_wl_ctrl(g_test_adapter, pwrpriv->wowlan_gpio_index, _FALSE);
 #endif /* CONFIG_GPIO_WAKEUP */
 #endif /* CONFIG_WOWLAN */
 

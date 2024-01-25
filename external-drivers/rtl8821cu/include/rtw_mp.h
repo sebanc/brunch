@@ -908,9 +908,11 @@ int rtw_bt_efuse_mask_file(struct net_device *dev,
 int rtw_efuse_file_map(struct net_device *dev,
 		struct iw_request_info *info,
 		union iwreq_data *wrqu, char *extra);
+#if !defined(CONFIG_RTW_ANDROID_GKI)
 int rtw_efuse_file_map_store(struct net_device *dev,
 		struct iw_request_info *info,
 		union iwreq_data *wrqu, char *extra);
+#endif /* !defined(CONFIG_RTW_ANDROID_GKI) */
 int rtw_bt_efuse_file_map(struct net_device *dev,
 		struct iw_request_info *info,
 		union iwreq_data *wrqu, char *extra);

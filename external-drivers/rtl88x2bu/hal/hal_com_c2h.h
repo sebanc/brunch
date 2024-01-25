@@ -18,7 +18,7 @@
 #define C2H_TYPE_REG 0
 #define C2H_TYPE_PKT 1
 
-/*
+/* 
 * C2H event format:
 * Fields    TRIGGER    PAYLOAD    SEQ    PLEN    ID
 * BITS     [127:120]    [119:16]   [15:8]  [7:4]  [3:0]
@@ -32,7 +32,7 @@
 #define SET_C2H_PLEN(_c2h, _val)	SET_BITS_TO_LE_1BYTE(((u8*)(_c2h)), 4, 4, _val)
 #define SET_C2H_SEQ(_c2h, _val)		SET_BITS_TO_LE_1BYTE(((u8*)(_c2h)) + 1 , 0, 8, _val)
 
-/*
+/* 
 * C2H event format:
 * Fields    TRIGGER     PLEN      PAYLOAD    SEQ      ID
 * BITS    [127:120]  [119:112]  [111:16]   [15:8]   [7:0]
@@ -75,6 +75,7 @@ typedef enum _C2H_EVT {
 	C2H_PER_RATE_RPT = 0x2c,
 #endif
 	C2H_LPS_STATUS_RPT = 0x32,
+	C2H_SET_TXPWR_FINISH = 0x70,
 	C2H_DEFEATURE_RSVD = 0xFD,
 	C2H_EXTEND = 0xff,
 } C2H_EVT;
@@ -128,4 +129,14 @@ int c2h_per_rate_rpt_hdl(_adapter *adapter, u8 *data, u8 len);
 #define LPS_STATUS_RPT_LEN 2
 int c2h_lps_status_rpt(PADAPTER adapter, u8 *data, u8 len);
 #endif /* CONFIG_LPS_ACK */
+
+#ifdef CONFIG_FW_OFFLOAD_SET_TXPWR_IDX
+/* C2H_SET_TXPWR_FINISH, 0x70 */
+#define SET_TXPWR_FINISH_LEN 1
+void c2h_txpwr_idx_offload_done(_adapter *adapter, u8 *data, u8 len);
+int c2h_txpwr_idx_offload_wait(_adapter *adapter);
+#endif
+
+void rtw_hal_bcn_early_rpt_c2h_handler(_adapter *adapter);
+
 #endif /* __COMMON_C2H_H__ */

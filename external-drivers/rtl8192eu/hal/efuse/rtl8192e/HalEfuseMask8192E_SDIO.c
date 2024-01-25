@@ -26,20 +26,20 @@
 *                           MSDIO.TXT
 ******************************************************************************/
 
-u1Byte Array_MP_8192E_MSDIO[] = {
+u8 Array_MP_8192E_MSDIO[] = {
 	0xFF,
+	0xF7,
+	0x00,
+	0x0E,
+	0xF0,
+	0x00,
+	0x00,
+	0x00,
+	0x00,
+	0x00,
+	0x00,
+	0x07,
 	0xF3,
-	0x00,
-	0x00,
-	0x00,
-	0x00,
-	0x00,
-	0x00,
-	0x00,
-	0x00,
-	0x00,
-	0x0F,
-	0xF1,
 	0xFF,
 	0xFF,
 	0xFF,
@@ -59,23 +59,22 @@ u1Byte Array_MP_8192E_MSDIO[] = {
 	0x00,
 	0x00,
 	0x00,
-
 };
 
-u2Byte EFUSE_GetArrayLen_MP_8192E_MSDIO(VOID)
+u16 EFUSE_GetArrayLen_MP_8192E_MSDIO(void)
 {
-	return sizeof(Array_MP_8192E_MSDIO) / sizeof(u1Byte);
+	return sizeof(Array_MP_8192E_MSDIO) / sizeof(u8);
 }
 
-VOID EFUSE_GetMaskArray_MP_8192E_MSDIO(pu1Byte Array)
+void EFUSE_GetMaskArray_MP_8192E_MSDIO(u8 *Array)
 {
-	u2Byte len = EFUSE_GetArrayLen_MP_8192E_MSDIO(), i = 0;
+	u16 len = EFUSE_GetArrayLen_MP_8192E_MSDIO(), i = 0;
 
 	for (i = 0; i < len; ++i)
 		Array[i] = Array_MP_8192E_MSDIO[i];
 }
 
-BOOLEAN EFUSE_IsAddressMasked_MP_8192E_MSDIO(u2Byte Offset)
+BOOLEAN EFUSE_IsAddressMasked_MP_8192E_MSDIO(u16 Offset)
 {
 	int r = Offset / 16;
 	int c = (Offset % 16) / 2;

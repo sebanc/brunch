@@ -13,43 +13,31 @@
  *
  *****************************************************************************/
 #define _RTL8192E_PHYCFG_C_
+
+/* #include <drv_types.h> */
+
 #include <rtl8192e_hal.h>
 
-/* Manual Transmit Power Control 
-   The following options take values from 0 to 63, where:
-   0 - disable
-   1 - lowest transmit power the device can do
-   63 - highest transmit power the device can do
-   Note that these options may override your country's regulations about transmit power.
-   Setting the device to work at higher transmit powers most of the time may cause premature 
-   failure or damage by overheating. Make sure the device has enough airflow before you increase this.
-   It is currently unknown what these values translate to in dBm.
-*/
+/*---------------------Define local function prototype-----------------------*/
 
-// Transmit Power Boost
-// This value is added to the device's calculation of transmit power index.
-// Useful if you want to keep power usage low while still boosting/decreasing transmit power.
-// Can take a negative value as well to reduce power.
-// Zero disables it. Default: 2, for a tiny boost.
-int transmit_power_boost = 2;
-// (ADVANCED) To know what transmit powers this device decides to use dynamically, see:
-// https://github.com/lwfinger/rtl8192ee/blob/42ad92dcc71cb15a62f8c39e50debe3a28566b5f/hal/phydm/rtl8192e/halhwimg8192e_rf.c#L1310
+/*----------------------------Function Body----------------------------------*/
 
-// Transmit Power Override
-// This value completely overrides the driver's calculations and uses only one value for all transmissions.
-// Zero disables it. Default: 0
-int transmit_power_override = 0;
-
-/* Manual Transmit Power Control */
+/*
+ * 1. BB register R/W API
+ *   */
 
 u32
 PHY_QueryBBReg8192E(
-	IN	PADAPTER	Adapter,
-	IN	u32			RegAddr,
-	IN	u32			BitMask
+		PADAPTER	Adapter,
+		u32			RegAddr,
+		u32			BitMask
 )
 {
 	u32	ReturnValue = 0, OriginalValue, BitShift;
+
+#if (DISABLE_BB_RF == 1)
+	return 0;
+#endif
 
 	/* RTW_INFO("--->PHY_QueryBBReg8812(): RegAddr(%#x), BitMask(%#x)\n", RegAddr, BitMask); */
 
@@ -63,15 +51,19 @@ PHY_QueryBBReg8192E(
 }
 
 
-VOID
+void
 PHY_SetBBReg8192E(
-	IN	PADAPTER	Adapter,
-	IN	u4Byte		RegAddr,
-	IN	u4Byte		BitMask,
-	IN	u4Byte		Data
+		PADAPTER	Adapter,
+		u32		RegAddr,
+		u32		BitMask,
+		u32		Data
 )
 {
-	u4Byte			OriginalValue, BitShift;
+	u32			OriginalValue, BitShift;
+
+#if (DISABLE_BB_RF == 1)
+	return;
+#endif
 
 	if (BitMask != bMaskDWord) {
 		/* if not "double word" write */
@@ -91,20 +83,20 @@ PHY_SetBBReg8192E(
 
 static	u32
 phy_RFSerialRead(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				Offset
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				Offset
 )
 {
 
-	u4Byte						retValue = 0;
+	u32						retValue = 0;
 	HAL_DATA_TYPE				*pHalData = GET_HAL_DATA(Adapter);
 	BB_REGISTER_DEFINITION_T	*pPhyReg = &pHalData->PHYRegDef[eRFPath];
-	u4Byte						NewOffset;
-	u4Byte						tmplong2;
-	u1Byte						RfPiEnable = 0;
-	u1Byte						i;
-	u4Byte						MaskforPhySet = 0;
+	u32						NewOffset;
+	u32						tmplong2;
+	u8						RfPiEnable = 0;
+	u8						i;
+	u32						MaskforPhySet = 0;
 
 	_enter_critical_mutex(&(adapter_to_dvobj(Adapter)->rf_read_reg_mutex) , NULL);
 	Offset &= 0xff;
@@ -132,16 +124,16 @@ phy_RFSerialRead(
 	phy_set_bb_reg(Adapter, rFPGA0_XA_HSSIParameter2 | MaskforPhySet, bMaskDWord, tmplong2 & (~bLSSIReadEdge));
 	phy_set_bb_reg(Adapter, rFPGA0_XA_HSSIParameter2 | MaskforPhySet, bMaskDWord, tmplong2 | bLSSIReadEdge);
 
-	udelay(10);/* PlatformStallExecution(10); */
+	rtw_udelay_os(10);/* PlatformStallExecution(10); */
 
 	/* for(i=0;i<2;i++) */
 	/*	PlatformStallExecution(MAX_STALL_TIME);	 */
-	udelay(10);/* PlatformStallExecution(10); */
+	rtw_udelay_os(10);/* PlatformStallExecution(10); */
 
 	if (eRFPath == RF_PATH_A)
-		RfPiEnable = (u1Byte)phy_query_bb_reg(Adapter, rFPGA0_XA_HSSIParameter1 | MaskforPhySet, BIT8);
+		RfPiEnable = (u8)phy_query_bb_reg(Adapter, rFPGA0_XA_HSSIParameter1 | MaskforPhySet, BIT8);
 	else if (eRFPath == RF_PATH_B)
-		RfPiEnable = (u1Byte)phy_query_bb_reg(Adapter, rFPGA0_XB_HSSIParameter1 | MaskforPhySet, BIT8);
+		RfPiEnable = (u8)phy_query_bb_reg(Adapter, rFPGA0_XB_HSSIParameter1 | MaskforPhySet, BIT8);
 
 	if (RfPiEnable) {
 		/* Read from BBreg8b8, 12 bits for 8190, 20bits for T65 RF */
@@ -162,12 +154,12 @@ phy_RFSerialRead(
 
 
 
-static	VOID
+static	void
 phy_RFSerialWrite(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				Offset,
-	IN	u32				Data
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				Offset,
+		u32				Data
 )
 {
 	u32							DataAndAddr = 0;
@@ -214,13 +206,17 @@ phy_RFSerialWrite(
 
 u32
 PHY_QueryRFReg8192E(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				RegAddr,
-	IN	u32				BitMask
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				RegAddr,
+		u32				BitMask
 )
 {
 	u32				Original_Value, Readback_Value, BitShift;
+
+#if (DISABLE_BB_RF == 1)
+	return 0;
+#endif
 
 	Original_Value = phy_RFSerialRead(Adapter, eRFPath, RegAddr);
 
@@ -230,16 +226,19 @@ PHY_QueryRFReg8192E(
 	return Readback_Value;
 }
 
-VOID
+void
 PHY_SetRFReg8192E(
-	IN	PADAPTER		Adapter,
-	IN	enum rf_path		eRFPath,
-	IN	u32				RegAddr,
-	IN	u32				BitMask,
-	IN	u32				Data
+		PADAPTER		Adapter,
+		enum rf_path		eRFPath,
+		u32				RegAddr,
+		u32				BitMask,
+		u32				Data
 )
 {
 	u32			Original_Value, BitShift;
+#if (DISABLE_BB_RF == 1)
+	return;
+#endif
 
 	if (BitMask == 0)
 		return;
@@ -283,9 +282,9 @@ s32 PHY_MACConfig8192E(PADAPTER Adapter)
 }
 
 
-static	VOID
+static	void
 phy_InitBBRFRegisterDefinition(
-	IN	PADAPTER		Adapter
+		PADAPTER		Adapter
 )
 {
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
@@ -319,7 +318,7 @@ phy_InitBBRFRegisterDefinition(
 
 static	int
 phy_BB8192E_Config_ParaFile(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
@@ -382,7 +381,7 @@ phy_BB_Config_ParaFile_Fail:
 
 int
 PHY_BBConfig8192E(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
 	int	rtStatus = _SUCCESS;
@@ -416,7 +415,11 @@ PHY_BBConfig8192E(
 	/*  */
 	rtStatus = phy_BB8192E_Config_ParaFile(Adapter);
 
-	hal_set_crystal_cap(Adapter, pHalData->crystal_cap);
+	if (rtw_phydm_set_crystal_cap(Adapter, pHalData->crystal_cap) == _FALSE) {
+		RTW_ERR("Init crystal_cap failed\n");
+		rtw_warn_on(1);
+		rtStatus = _FAIL;
+	}
 
 #if 1
 	/* write 0x24= 000f81fb ,suggest by Ed		 */
@@ -429,7 +432,7 @@ PHY_BBConfig8192E(
 
 int
 PHY_RFConfig8192E(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
@@ -456,30 +459,12 @@ PHY_RFConfig8192E(
 	return rtStatus;
 }
 
-VOID
-PHY_GetTxPowerLevel8192E(
-	IN	PADAPTER		Adapter,
-	OUT s32		*powerlevel
-)
-{
-#if 0
-	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
-	PMGNT_INFO		pMgntInfo = &(Adapter->MgntInfo);
-	s4Byte			TxPwrDbm = 13;
-
-	if (pMgntInfo->ClientConfigPwrInDbm != UNSPECIFIED_PWR_DBM)
-		*powerlevel = pMgntInfo->ClientConfigPwrInDbm;
-	else
-		*powerlevel = TxPwrDbm;
-#endif
-}
-
-VOID
+void
 PHY_SetTxPowerIndex_8192E(
-	IN	PADAPTER			Adapter,
-	IN	u32					PowerIndex,
-	IN	enum rf_path			RFPath,
-	IN	u8					Rate
+		PADAPTER			Adapter,
+		u32					PowerIndex,
+		enum rf_path			RFPath,
+		u8					Rate
 )
 {
 	if (RFPath == RF_PATH_A) {
@@ -680,78 +665,23 @@ PHY_SetTxPowerIndex_8192E(
 		RTW_INFO("Invalid RFPath!!\n");
 }
 
-
-u8
-PHY_GetTxPowerIndex_8192E(
-	IN	PADAPTER			pAdapter,
-	IN	enum rf_path			RFPath,
-	IN	u8					Rate,
-	IN	u8					BandWidth,
-	IN	u8					Channel,
-	struct txpwr_idx_comp *tic
-)
-{
-	PHAL_DATA_TYPE pHalData = GET_HAL_DATA(pAdapter);
-	struct hal_spec_t *hal_spec = GET_HAL_SPEC(pAdapter);
-	s16 power_idx;
-	u8 base_idx = 0;
-	s8 by_rate_diff = 0, limit = 0, tpt_offset = 0, extra_bias = 0;
-	u8 ntx_idx = phy_get_current_tx_num(pAdapter, Rate);
-	BOOLEAN bIn24G = _FALSE;
-
-	base_idx = PHY_GetTxPowerIndexBase(pAdapter, RFPath, Rate, ntx_idx, BandWidth, Channel, &bIn24G);
-
-	by_rate_diff = PHY_GetTxPowerByRate(pAdapter, BAND_ON_2_4G, RFPath, Rate);
-	limit = PHY_GetTxPowerLimit(pAdapter, NULL, (u8)(!bIn24G), pHalData->current_channel_bw, RFPath, Rate, ntx_idx, pHalData->current_channel);
-
-	tpt_offset =  PHY_GetTxPowerTrackingOffset(pAdapter, RFPath, Rate);
-
-	if (tic) {
-		tic->ntx_idx = ntx_idx;
-		tic->base = base_idx;
-		tic->by_rate = by_rate_diff;
-		tic->limit = limit;
-		tic->tpt = tpt_offset;
-		tic->ebias = extra_bias;
-	}
-
-	by_rate_diff = by_rate_diff > limit ? limit : by_rate_diff;
-	power_idx = base_idx + by_rate_diff + tpt_offset + extra_bias + transmit_power_boost;
-
-	if (power_idx < 0)
-		power_idx = 0;
-
-        if (transmit_power_override != 0)
-		power_idx = transmit_power_override;
-
-	if (power_idx > hal_spec->txgi_max)
-		power_idx = hal_spec->txgi_max;
-	
-	
-	return power_idx;
-}
-
-VOID
+void
 PHY_SetTxPowerLevel8192E(
-	IN	PADAPTER		Adapter,
-	IN	u8				Channel
+		PADAPTER		Adapter,
+		u8				Channel
 )
 {
-
-	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(Adapter);
 	u8			path = 0;
 
-	/* RTW_INFO("==>PHY_SetTxPowerLevel8192E()\n"); */
-
-	for (path = RF_PATH_A; path < pHalData->NumTotalRFPath; ++path)
-		phy_set_tx_power_level_by_path(Adapter, Channel, path);
-
-	/* RTW_INFO("<==PHY_SetTxPowerLevel8192E()\n"); */
+	for (path = RF_PATH_A; path < hal_spec->rf_reg_path_num; ++path)
+		if (GET_HAL_TX_PATH_BMP(Adapter) & BIT(path))
+			phy_set_tx_power_level_by_path(Adapter, Channel, path);
 }
 
 u8
 phy_GetSecondaryChnl_8192E(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
 	u8					SCSettingOf40 = 0, SCSettingOf20 = 0;
@@ -793,9 +723,9 @@ phy_GetSecondaryChnl_8192E(
 	return (SCSettingOf40 << 4) | SCSettingOf20;
 }
 
-VOID
+void
 phy_SetRegBW_8192E(
-	IN	PADAPTER		Adapter,
+		PADAPTER		Adapter,
 	enum channel_width	CurrentBW
 )
 {
@@ -825,12 +755,12 @@ phy_SetRegBW_8192E(
 }
 
 
-VOID
+void
 phy_PostSetBwMode8192E(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
-	u1Byte			SubChnlNum = 0;
+	u8			SubChnlNum = 0;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
 
@@ -878,8 +808,8 @@ phy_PostSetBwMode8192E(
 /* <20130320, VincentLan> A workaround to eliminate the 2480MHz spur for 92E */
 void
 phy_SpurCalibration_8192E(
-	IN	PADAPTER			Adapter,
-	IN	enum spur_cal_method	Method
+		PADAPTER			Adapter,
+		enum spur_cal_method	Method
 )
 {
 	u32			reg0x18 = 0;
@@ -915,8 +845,8 @@ phy_SpurCalibration_8192E(
 		phy_set_bb_reg(Adapter, rFPGA0_TxInfo, bMaskByte0, 0x3);
 		phy_set_bb_reg(Adapter, rFPGA0_PSDFunction, bMaskDWord, 0xfccd);
 		phy_set_bb_reg(Adapter, rFPGA0_PSDFunction, bMaskDWord, 0x40fccd);
-		/* msleep(30); */
-		mdelay(30);
+		/* rtw_msleep_os(30); */
+		rtw_mdelay_os(30);
 		PSDReport = phy_query_bb_reg(Adapter, rFPGA0_PSDReport, bMaskDWord);
 		/* RTW_INFO(" Path A== PSDReport = 0x%x (%d)\n",PSDReport,PSDReport); */
 		if (PSDReport < 0x16)
@@ -930,8 +860,8 @@ phy_SpurCalibration_8192E(
 		phy_set_bb_reg(Adapter, rFPGA0_TxInfo, bMaskByte0, 0x13);
 		phy_set_bb_reg(Adapter, rFPGA0_PSDFunction, bMaskDWord, 0xfccd);
 		phy_set_bb_reg(Adapter, rFPGA0_PSDFunction, bMaskDWord, 0x40fccd);
-		/* msleep(30); */
-		mdelay(30);
+		/* rtw_msleep_os(30); */
+		rtw_mdelay_os(30);
 		PSDReport = phy_query_bb_reg(Adapter, rFPGA0_PSDReport, bMaskDWord);
 		/* RTW_INFO(" Path B== PSDReport = 0x%x (%d)\n",PSDReport,PSDReport); */
 		if (PSDReport < 0x16)
@@ -996,7 +926,7 @@ phy_SpurCalibration_8192E(
 
 }
 
-void PHY_SpurCalibration_8192E(IN PADAPTER Adapter)
+void PHY_SpurCalibration_8192E(PADAPTER Adapter)
 {
 	if (rtw_read32(Adapter, REG_SYS_CFG1_8192E) & BIT_SPSLDO_SEL) {
 		/* LDO */
@@ -1029,9 +959,9 @@ phy_SpurCalibration_8192E_NBI(PADAPTER Adapter)
 	}
 }
 #endif
-VOID
+void
 phy_SwChnl8192E(
-	IN	PADAPTER	pAdapter
+		PADAPTER	pAdapter
 )
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(pAdapter);
@@ -1046,9 +976,9 @@ phy_SwChnl8192E(
 
 }
 
-VOID
+void
 phy_SwChnlAndSetBwMode8192E(
-	IN  PADAPTER		Adapter
+		PADAPTER		Adapter
 )
 {
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
@@ -1099,22 +1029,22 @@ phy_SwChnlAndSetBwMode8192E(
 #ifdef CONFIG_TDLS
 #ifdef CONFIG_TDLS_CH_SW
 	/* It takes too much time of setting tx power, influence channel switch */
-	if ((atomic_read(&Adapter->tdlsinfo.chsw_info.chsw_on) == _FALSE))
+	if ((ATOMIC_READ(&Adapter->tdlsinfo.chsw_info.chsw_on) == _FALSE))
 #endif
 #endif /* CONFIG_TDLS */
-		PHY_SetTxPowerLevel8192E(Adapter, pHalData->current_channel);
+		rtw_hal_set_tx_power_level(Adapter, pHalData->current_channel);
 }
 
-VOID
+void
 PHY_HandleSwChnlAndSetBW8192E(
-	IN	PADAPTER			Adapter,
-	IN	BOOLEAN				bSwitchChannel,
-	IN	BOOLEAN				bSetBandWidth,
-	IN	u8					ChannelNum,
-	IN	enum channel_width	ChnlWidth,
-	IN	EXTCHNL_OFFSET	ExtChnlOffsetOf40MHz,
-	IN	EXTCHNL_OFFSET	ExtChnlOffsetOf80MHz,
-	IN	u8					CenterFrequencyIndex1
+		PADAPTER			Adapter,
+		BOOLEAN				bSwitchChannel,
+		BOOLEAN				bSetBandWidth,
+		u8					ChannelNum,
+		enum channel_width	ChnlWidth,
+		EXTCHNL_OFFSET	ExtChnlOffsetOf40MHz,
+		EXTCHNL_OFFSET	ExtChnlOffsetOf80MHz,
+		u8					CenterFrequencyIndex1
 )
 {
 	/* static BOOLEAN		bInitialzed = _FALSE; */
@@ -1215,13 +1145,13 @@ PHY_HandleSwChnlAndSetBW8192E(
 
 }
 
-VOID
+void
 PHY_SetSwChnlBWMode8192E(
-	IN	PADAPTER			Adapter,
-	IN	u8					channel,
-	IN	enum channel_width	Bandwidth,
-	IN	u8					Offset40,
-	IN	u8					Offset80
+		PADAPTER			Adapter,
+		u8					channel,
+		enum channel_width	Bandwidth,
+		u8					Offset40,
+		u8					Offset80
 )
 {
 	/* RTW_INFO("%s()===>\n",__FUNCTION__); */
@@ -1230,9 +1160,9 @@ PHY_SetSwChnlBWMode8192E(
 
 	/* RTW_INFO("<==%s()\n",__FUNCTION__); */
 }
-VOID
+void
 PHY_SetRFEReg_8192E(
-	IN PADAPTER		Adapter
+		PADAPTER		Adapter
 )
 {
 	u8			u1tmp = 0;

@@ -187,6 +187,7 @@ static u8 _init_rf_reg(PADAPTER adapter)
 	u8 path;
 	enum rf_path phydm_path;
 	PHAL_DATA_TYPE hal = GET_HAL_DATA(adapter);
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(adapter);
 #ifdef CONFIG_LOAD_PHY_PARA_FROM_FILE
 	u8 *regfile;
 #endif
@@ -198,7 +199,7 @@ static u8 _init_rf_reg(PADAPTER adapter)
 	/*
 	 * Initialize RF
 	 */
-	for (path = 0; path < hal->NumTotalRFPath; path++) {
+	for (path = 0; path < hal_spec->rf_reg_path_num; path++) {
 		/* Initialize RF from configuration file */
 		switch (path) {
 		case 0:
@@ -387,7 +388,7 @@ void dm_InterruptMigration(PADAPTER adapter)
 	 * when interrupt migration is set before. 2010.03.05.
 	 */
 	if (!adapter->registrypriv.wifi_spec
-	    && (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE)
+	    && (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _TRUE)
 	    && pmlmepriv->LinkDetectInfo.bHigherBusyTraffic) {
 		IntMtToSet = _TRUE;
 
@@ -426,8 +427,6 @@ static void init_phydm_cominfo(PADAPTER adapter)
 	PHAL_DATA_TYPE hal;
 	struct dm_struct *p_dm_odm;
 	u32 support_ability = 0;
-	u8 cut_ver = ODM_CUT_A, fab_ver = ODM_TSMC;
-
 
 	hal = GET_HAL_DATA(adapter);
 	p_dm_odm = &hal->odmpriv;
@@ -437,41 +436,9 @@ static void init_phydm_cominfo(PADAPTER adapter)
 	odm_cmn_info_init(p_dm_odm, ODM_CMNINFO_PACKAGE_TYPE, hal->PackageType);
 	odm_cmn_info_init(p_dm_odm, ODM_CMNINFO_IC_TYPE, ODM_RTL8822B);
 
-	if (IS_CHIP_VENDOR_TSMC(hal->version_id))
-		fab_ver = ODM_TSMC;
-	else if (IS_CHIP_VENDOR_UMC(hal->version_id))
-		fab_ver = ODM_UMC;
-	else if (IS_CHIP_VENDOR_SMIC(hal->version_id))
-		fab_ver = ODM_UMC + 1;
-	else
-		RTW_INFO("%s: unknown Fv=%d !!\n",
-			 __FUNCTION__, GET_CVID_MANUFACTUER(hal->version_id));
-
-	if (IS_A_CUT(hal->version_id))
-		cut_ver = ODM_CUT_A;
-	else if (IS_B_CUT(hal->version_id))
-		cut_ver = ODM_CUT_B;
-	else if (IS_C_CUT(hal->version_id))
-		cut_ver = ODM_CUT_C;
-	else if (IS_D_CUT(hal->version_id))
-		cut_ver = ODM_CUT_D;
-	else if (IS_E_CUT(hal->version_id))
-		cut_ver = ODM_CUT_E;
-	else if (IS_F_CUT(hal->version_id))
-		cut_ver = ODM_CUT_F;
-	else if (IS_I_CUT(hal->version_id))
-		cut_ver = ODM_CUT_I;
-	else if (IS_J_CUT(hal->version_id))
-		cut_ver = ODM_CUT_J;
-	else if (IS_K_CUT(hal->version_id))
-		cut_ver = ODM_CUT_K;
-	else
-		RTW_INFO("%s: unknown Cv=%d !!\n",
-			 __FUNCTION__, GET_CVID_CUT_VERSION(hal->version_id));
-
-	RTW_INFO("%s: Fv=%d Cv=%d\n", __FUNCTION__, fab_ver, cut_ver);
-	odm_cmn_info_init(p_dm_odm, ODM_CMNINFO_FAB_VER, fab_ver);
-	odm_cmn_info_init(p_dm_odm, ODM_CMNINFO_CUT_VER, cut_ver);
+	RTW_INFO("%s: Fv=%d Cv=%d\n", __FUNCTION__, hal->version_id.VendorType, hal->version_id.CUTVersion);
+	odm_cmn_info_init(p_dm_odm, ODM_CMNINFO_FAB_VER, hal->version_id.VendorType);
+	odm_cmn_info_init(p_dm_odm, ODM_CMNINFO_CUT_VER, hal->version_id.CUTVersion);
 
 }
 
@@ -520,7 +487,6 @@ void rtl8822b_phy_haldm_watchdog(PADAPTER adapter)
 	BOOLEAN bFwCurrentInPSMode = _FALSE;
 	u8 bFwPSAwake = _TRUE;
 	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(adapter);
-	u8 lps_changed = _FALSE;
 	u8 in_lps = _FALSE;
 	PADAPTER current_lps_iface = NULL, iface = NULL;
 	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
@@ -560,28 +526,29 @@ void rtl8822b_phy_haldm_watchdog(PADAPTER adapter)
 	}
 
 #ifdef CONFIG_LPS
-	if (pwrpriv->bLeisurePs && bFwCurrentInPSMode && pwrpriv->pwr_mode != PS_MODE_ACTIVE
-#ifdef CONFIG_WMMPS_STA
-		&& !rtw_is_wmmps_mode(adapter)
-#endif /* CONFIG_WMMPS_STA */
-	) {
+	if (pwrpriv->bLeisurePs && bFwCurrentInPSMode && pwrpriv->pwr_mode != PS_MODE_ACTIVE) {
+		in_lps = _TRUE;
 
 		for (i = 0; i < dvobj->iface_nums; i++) {
 			iface = dvobj->padapters[i];
-			if (pwrpriv->current_lps_hw_port_id == rtw_hal_get_port(iface))
+			if (pwrpriv->current_lps_hw_port_id == rtw_hal_get_port(iface)) {
 				current_lps_iface = iface;
+				rtw_lps_rfon_ctrl(current_lps_iface, rf_on);
+				break;
+			}
 		}
 
-		lps_changed = _TRUE;
-		in_lps = _TRUE;
-		LPS_Leave(current_lps_iface, LPS_CTRL_PHYDM);
+		if (!current_lps_iface) {
+			RTW_WARN("Can't find a adapter with LPS to enable RFON function !\n");
+			goto skip_dm;
+		}
 	}
 #endif
 
 #ifdef CONFIG_BEAMFORMING
 #ifdef RTW_BEAMFORMING_VERSION_2
 	if (check_fwstate(&adapter->mlmepriv, WIFI_STATION_STATE) &&
-			check_fwstate(&adapter->mlmepriv, _FW_LINKED))
+			check_fwstate(&adapter->mlmepriv, WIFI_ASOC_STATE))
 		rtw_hal_beamforming_config_csirate(adapter);
 #endif
 #endif
@@ -596,8 +563,8 @@ void rtl8822b_phy_haldm_watchdog(PADAPTER adapter)
 skip_dm:
 
 #ifdef CONFIG_LPS
-	if (lps_changed)
-		LPS_Enter(current_lps_iface, LPS_CTRL_PHYDM);
+	if (current_lps_iface)
+		rtw_lps_rfon_ctrl(current_lps_iface, rf_off);
 #endif
 
 	/*
@@ -703,31 +670,12 @@ static void set_tx_power_level_by_path(PADAPTER adapter, u8 channel, u8 path)
 
 void rtl8822b_set_tx_power_level(PADAPTER adapter, u8 channel)
 {
-	PHAL_DATA_TYPE hal = GET_HAL_DATA(adapter);
-	struct dm_struct *phydm;
-	#ifdef CONFIG_ANTENNA_DIVERSITY
-	struct phydm_fat_struct *p_dm_fat_table;
-	#endif
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(adapter);
 	u8 path = RF_PATH_A;
 
-
-	hal = GET_HAL_DATA(adapter);
-	phydm = &hal->odmpriv;
-
-	#ifdef CONFIG_ANTENNA_DIVERSITY
-	p_dm_fat_table = &phydm->dm_fat_table;
-
-	if (hal->AntDivCfg) {
-		/* antenna diversity Enable */
-		path = (p_dm_fat_table->rx_idle_ant == MAIN_ANT) ? RF_PATH_A : RF_PATH_B;
-		set_tx_power_level_by_path(adapter, channel, path);
-	} else
-	#endif
-	{
-		/* antenna diversity disable */
-		for (path = RF_PATH_A; path < hal->NumTotalRFPath; ++path)
+	for (path = RF_PATH_A; path < hal_spec->rf_reg_path_num; ++path)
+		if (GET_HAL_TX_PATH_BMP(adapter) & BIT(path))
 			set_tx_power_level_by_path(adapter, channel, path);
-	}
 }
 
 /*
@@ -1356,13 +1304,13 @@ static void _sounding_config_su(PADAPTER adapter, struct beamformee_entry *bfee,
 				new_ctrl |= BIT_R_TXBF0_80M_8822B;
 			else if (1 == bfee->su_reg_index)
 				new_ctrl |= BIT_R_TXBF1_80M_8822B;
-			__attribute__((__fallthrough__));
+			/* fall through */
 		case CHANNEL_WIDTH_40:
 			if (0 == bfee->su_reg_index)
 				new_ctrl |= BIT_R_TXBF0_40M_8822B;
 			else if (1 == bfee->su_reg_index)
 				new_ctrl |= BIT_R_TXBF1_40M_8822B;
-			__attribute__((__fallthrough__));
+			/* fall through */
 		case CHANNEL_WIDTH_20:
 			if (0 == bfee->su_reg_index)
 				new_ctrl |= BIT_R_TXBF0_20M_8822B;

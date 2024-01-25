@@ -1,3 +1,4 @@
+$(info echo "WARNING: This driver is obsolete. Use http://github.com/lwfinger/rtw88.git instead")
 EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
 EXTRA_CFLAGS += -O1
 

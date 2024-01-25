@@ -83,7 +83,7 @@ void rtw_btcoex_ScanNotify(PADAPTER padapter, u8 type)
 
 	if (_FALSE == type) {
 		#ifdef CONFIG_CONCURRENT_MODE
-		if (rtw_mi_buddy_check_fwstate(padapter, WIFI_SITE_MONITOR))
+		if (rtw_mi_buddy_check_fwstate(padapter, WIFI_UNDER_SURVEY))
 			return;
 		#endif
 
@@ -176,6 +176,17 @@ void rtw_btcoex_IQKNotify(PADAPTER padapter, u8 state)
 		return;
 
 	hal_btcoex_IQKNotify(padapter, state);
+}
+
+void rtw_btcoex_WLRFKNotify(PADAPTER padapter, u8 path, u8 type, u8 state)
+{
+	PHAL_DATA_TYPE	pHalData;
+
+	pHalData = GET_HAL_DATA(padapter);
+	if (_FALSE == pHalData->EEPROMBluetoothCoexist)
+		return;
+
+	hal_btcoex_WLRFKNotify(padapter, path, type, state);
 }
 
 void rtw_btcoex_BtInfoNotify(PADAPTER padapter, u8 length, u8 *tmpBuf)
@@ -313,6 +324,11 @@ void rtw_btcoex_SetManualControl(PADAPTER padapter, u8 manual)
 		hal_btcoex_SetManualControl(padapter, _TRUE);
 	else
 		hal_btcoex_SetManualControl(padapter, _FALSE);
+}
+
+void rtw_btcoex_set_policy_control(PADAPTER padapter, u8 btc_policy)
+{
+	hal_btcoex_set_policy_control(padapter, btc_policy);
 }
 
 u8 rtw_btcoex_1Ant(PADAPTER padapter)
@@ -531,7 +547,7 @@ u8 rtw_btcoex_get_ant_div_cfg(PADAPTER padapter)
 	PHAL_DATA_TYPE pHalData;
 
 	pHalData = GET_HAL_DATA(padapter);
-
+	
 	return (pHalData->AntDivCfg == 0) ? _FALSE : _TRUE;
 }
 
@@ -577,7 +593,7 @@ u8 rtw_btcoex_btinfo_cmd(_adapter *adapter, u8 *buf, u16 len)
 
 	_rtw_memcpy(btinfo, buf, len);
 
-	init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
+	init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, CMD_SET_DRV_EXTRA);
 
 	res = rtw_enqueue_cmd(pcmdpriv, ph2c);
 
@@ -1468,9 +1484,7 @@ u8 rtw_btcoex_sendmsgbysocket(_adapter *padapter, u8 *msg, u8 msg_size, bool for
 {
 	u8 error;
 	struct msghdr	udpmsg;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
 	mm_segment_t	oldfs;
-#endif
 	struct iovec	iov;
 	struct bt_coex_info *pcoex_info = &padapter->coex_info;
 
@@ -1500,19 +1514,15 @@ u8 rtw_btcoex_sendmsgbysocket(_adapter *padapter, u8 *msg, u8 msg_size, bool for
 	udpmsg.msg_control	= NULL;
 	udpmsg.msg_controllen = 0;
 	udpmsg.msg_flags	= MSG_DONTWAIT | MSG_NOSIGNAL;
-    #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
-        oldfs = get_fs();
-        set_fs(KERNEL_DS);
-    #endif
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0))
 	error = sock_sendmsg(pcoex_info->udpsock, &udpmsg);
 #else
 	error = sock_sendmsg(pcoex_info->udpsock, &udpmsg, msg_size);
 #endif
-    #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
-        set_fs(oldfs);
-    #endif
+	set_fs(oldfs);
 	if (error < 0) {
 		RTW_INFO("Error when sendimg msg, error:%d\n", error);
 		return _FAIL;

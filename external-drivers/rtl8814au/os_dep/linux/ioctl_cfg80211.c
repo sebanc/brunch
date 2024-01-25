@@ -433,7 +433,11 @@ u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter, u8 ch, u8 bw, u8 offset,
 		 */
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0))
+		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, 0, false, 0);
+#else
 		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, 0, false);
+#endif
 #else
 		cfg80211_ch_switch_started_notify(adapter->pnetdev, &chdef, 0, false);
 #endif
@@ -443,9 +447,16 @@ u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter, u8 ch, u8 bw, u8 offset,
 		goto exit;
 	}
 #endif
+//
+//	if (!rtw_cfg80211_allow_ch_switch_notify(adapter))
+//		goto exit;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 2))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0))
+	cfg80211_ch_switch_notify(adapter->pnetdev, &chdef, 0, 0);
+#else
 	cfg80211_ch_switch_notify(adapter->pnetdev, &chdef, 0);
+#endif
 #else
 	cfg80211_ch_switch_notify(adapter->pnetdev, &chdef);
 #endif
@@ -5026,7 +5037,11 @@ static int cfg80211_rtw_add_beacon(struct wiphy *wiphy, struct net_device *ndev,
 	}
 	rtw_mi_scan_abort(adapter, _TRUE);
 	rtw_mi_buddy_set_scan_deny(adapter, 300);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
+	ret = rtw_add_beacon(adapter, info->beacon.head, info->beacon.head_len, info->beacon.tail, info->beacon.tail_len);
+#else
 	ret = rtw_add_beacon(adapter, info->head, info->head_len, info->tail, info->tail_len);
+#endif
 
 exit:
 	return ret;
@@ -5122,24 +5137,40 @@ exit:
 }
 
 static int cfg80211_rtw_change_beacon(struct wiphy *wiphy, struct net_device *ndev,
-		struct cfg80211_beacon_data *info)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
+	struct cfg80211_ap_update *info)
+#else
+	struct cfg80211_beacon_data *info)
+#endif
 {
 	int ret = 0;
 	_adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
 
 	RTW_INFO(FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(ndev));
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
+	ret = rtw_add_beacon(adapter, info->beacon.head, info->beacon.head_len, info->beacon.tail, info->beacon.tail_len);
+#else
 	ret = rtw_add_beacon(adapter, info->head, info->head_len, info->tail, info->tail_len);
+#endif
 
 	// In cases like WPS, the proberesp and assocresp IEs vary from the beacon, and need to be explicitly set
 	if(ret == 0) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
+		if(info->beacon.proberesp_ies && info->beacon.proberesp_ies_len > 0) {
+			rtw_cfg80211_set_mgnt_wpsp2pie(ndev, (char *)info->beacon.proberesp_ies, info->beacon.proberesp_ies_len, 0x2/*PROBE_RESP*/);
+#else
 		if(info->proberesp_ies && info->proberesp_ies_len > 0) {
-			rtw_cfg80211_set_mgnt_wpsp2pie(ndev, (char *)info->proberesp_ies,
-				info->proberesp_ies_len, 0x2/*PROBE_RESP*/);
+			rtw_cfg80211_set_mgnt_wpsp2pie(ndev, (char *)info->proberesp_ies, info->proberesp_ies_len, 0x2/*PROBE_RESP*/);
+#endif
 		}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
+		if(info->beacon.assocresp_ies && info->beacon.assocresp_ies_len > 0) {
+			rtw_cfg80211_set_mgnt_wpsp2pie(ndev, (char *)info->beacon.assocresp_ies, info->beacon.assocresp_ies_len, 0x4/*ASSOC_RESP*/);
+#else
 		if(info->assocresp_ies && info->assocresp_ies_len > 0) {
-			rtw_cfg80211_set_mgnt_wpsp2pie(ndev, (char *)info->assocresp_ies,
-				info->assocresp_ies_len, 0x4/*ASSOC_RESP*/);
+			rtw_cfg80211_set_mgnt_wpsp2pie(ndev, (char *)info->assocresp_ies, info->assocresp_ies_len, 0x4/*ASSOC_RESP*/);
+#endif
 		}
 	}
 
@@ -7607,6 +7638,9 @@ static int cfg80211_rtw_tdls_mgmt(struct wiphy *wiphy,
 	const u8 *peer,
 #else
 	u8 *peer,
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0))
+	int link_id,
 #endif
 	u8 action_code,
 	u8 dialog_token,

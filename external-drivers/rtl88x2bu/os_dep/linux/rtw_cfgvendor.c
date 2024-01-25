@@ -37,6 +37,10 @@
 
 #include <net/rtnetlink.h>
 
+#ifndef MIN
+#define MIN(x,y) (((x) < (y)) ? (x) : (y))
+#endif
+
 #ifdef DBG_MEM_ALLOC
 extern bool match_mstat_sniff_rules(const enum mstat_f flags, const size_t size);
 struct sk_buff *dbg_rtw_cfg80211_vendor_event_alloc(struct wiphy *wiphy, struct wireless_dev *wdev, int len, int event_id, gfp_t gfp
@@ -171,7 +175,7 @@ struct sk_buff *rtw_cfg80211_vendor_event_alloc(
 int rtw_cfgvendor_send_async_event(struct wiphy *wiphy,
 	   struct net_device *dev, int event_id, const void  *data, int len)
 {
-	u16 kflags;
+	gfp_t kflags;
 	struct sk_buff *skb;
 
 	kflags = in_atomic() ? GFP_ATOMIC : GFP_KERNEL;
@@ -236,6 +240,10 @@ static int rtw_cfgvendor_send_cmd_reply(struct wiphy *wiphy,
 #define WIFI_FEATURE_CONTROL_ROAMING    0x800000    // Enable/Disable firmware roaming
 #define WIFI_FEATURE_IE_WHITELIST       0x1000000   // Support Probe IE white listing
 #define WIFI_FEATURE_SCAN_RAND          0x2000000   // Support MAC & Probe Sequence Number randomization
+#define WIFI_FEATURE_SET_TX_POWER_LIMIT 0x4000000   // Support Tx Power Limit setting
+#define WIFI_FEATURE_USE_BODY_HEAD_SAR  0x8000000   // Support Using Body/Head Proximity for SAR
+#define WIFI_FEATURE_SET_LATENCY_MODE   0x40000000  // Support Latency mode setting
+#define WIFI_FEATURE_P2P_RAND_MAC       0x80000000  // Support Support P2P MAC randomization
 // Add more features here
 
 #define MAX_FEATURE_SET_CONCURRRENT_GROUPS  3
@@ -258,11 +266,11 @@ int rtw_dev_get_feature_set(struct net_device *dev)
 	feature_set |= WIFI_FEATURE_SOFT_AP;
 
 	feature_set |= WIFI_FEATURE_ADDITIONAL_STA;
-#ifdef CONFIG_RTW_CFGVEDNOR_LLSTATS
+#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS
 	feature_set |= WIFI_FEATURE_LINK_LAYER_STATS;
-#endif /* CONFIG_RTW_CFGVEDNOR_LLSTATS */
+#endif /* CONFIG_RTW_CFGVENDOR_LLSTATS */
 
-#ifdef CONFIG_RTW_CFGVEDNOR_RSSIMONITOR
+#ifdef CONFIG_RTW_CFGVENDOR_RSSIMONITOR
         feature_set |= WIFI_FEATURE_RSSI_MONITOR;
 #endif
 
@@ -272,7 +280,9 @@ int rtw_dev_get_feature_set(struct net_device *dev)
 
 #ifdef CONFIG_RTW_WIFI_HAL
 	feature_set |= WIFI_FEATURE_CONFIG_NDO;
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
 	feature_set |= WIFI_FEATURE_SCAN_RAND;
+#endif
 #endif
 
 	return feature_set;
@@ -1135,7 +1145,7 @@ exit:
 
 #endif /* RTT_SUPPORT */
 
-#ifdef CONFIG_RTW_CFGVEDNOR_LLSTATS
+#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS
 enum {
     LSTATS_SUBCMD_GET_INFO = ANDROID_NL80211_SUBCMD_LSTATS_RANGE_START,
 	LSTATS_SUBCMD_SET_INFO,
@@ -1150,7 +1160,7 @@ static void LinkLayerStats(_adapter *padapter)
 	u32 ps_time, trx_total_time;
 	u64 tx_bytes, rx_bytes, trx_total_bytes = 0;
 	u64 tmp = 0;
-
+	
 	RTW_DBG("%s adapter type : %u\n", __func__, padapter->adapter_type);
 
 	tx_bytes = 0;
@@ -1162,12 +1172,12 @@ static void LinkLayerStats(_adapter *padapter)
 
 		pwrpriv->on_time = rtw_get_passing_time_ms(pwrpriv->radio_on_start_time);
 
-		if (rtw_mi_check_fwstate(padapter, _FW_LINKED)) {
+		if (rtw_mi_check_fwstate(padapter, WIFI_ASOC_STATE)) {
 			if ( pwrpriv->bpower_saving == _TRUE ) {
 				pwrpriv->pwr_saving_time += rtw_get_passing_time_ms(pwrpriv->pwr_saving_start_time);
 				pwrpriv->pwr_saving_start_time = rtw_get_current_time();
 			}
-		} else {
+		} else {		
 #ifdef CONFIG_IPS
 			if ( pwrpriv->bpower_saving == _TRUE ) {
 				pwrpriv->pwr_saving_time += rtw_get_passing_time_ms(pwrpriv->pwr_saving_start_time);
@@ -1185,7 +1195,7 @@ static void LinkLayerStats(_adapter *padapter)
 			ps_time = pwrpriv->on_time;
 
 		tx_bytes = pdvobjpriv->traffic_stat.last_tx_bytes;
-		rx_bytes = pdvobjpriv->traffic_stat.last_rx_bytes;
+		rx_bytes = pdvobjpriv->traffic_stat.last_rx_bytes;		
 		trx_total_bytes = tx_bytes + rx_bytes;
 
 		trx_total_time = pwrpriv->on_time - ps_time;
@@ -1204,30 +1214,30 @@ static void LinkLayerStats(_adapter *padapter)
 
 			tmp = (rx_bytes * trx_total_time);
 			tmp = rtw_division64(tmp, trx_total_bytes);
-			pwrpriv->rx_time = tmp;
+			pwrpriv->rx_time = tmp;		
 
 		}
-
+	
 	}
 	else {
 			pwrpriv->on_time = 0;
 			pwrpriv->tx_time = 0;
-			pwrpriv->rx_time = 0;
+			pwrpriv->rx_time = 0;	
 	}
 
 #ifdef CONFIG_RTW_WIFI_HAL_DEBUG
 	RTW_INFO("- tx_bytes : %llu rx_bytes : %llu total bytes : %llu\n", tx_bytes, rx_bytes, trx_total_bytes);
 	RTW_INFO("- netif_up = %s, on_time : %u ms\n", padapter->netif_up ? "1":"0", pwrpriv->on_time);
 	RTW_INFO("- pwr_saving_time : %u (%u) ms\n", pwrpriv->pwr_saving_time, ps_time);
-	RTW_INFO("- trx_total_time : %u ms\n", trx_total_time);
+	RTW_INFO("- trx_total_time : %u ms\n", trx_total_time);		
 	RTW_INFO("- tx_time : %u ms\n", pwrpriv->tx_time);
-	RTW_INFO("- rx_time : %u ms\n", pwrpriv->rx_time);
+	RTW_INFO("- rx_time : %u ms\n", pwrpriv->rx_time);	
 #endif /* CONFIG_RTW_WIFI_HAL_DEBUG */
 
 }
 
 #define DUMMY_TIME_STATICS 99
-static int rtw_cfgvendor_lstats_get_info(struct wiphy *wiphy,
+static int rtw_cfgvendor_lstats_get_info(struct wiphy *wiphy,	
 	struct wireless_dev *wdev, const void  *data, int len)
 {
 	int err = 0;
@@ -1248,8 +1258,8 @@ static int rtw_cfgvendor_lstats_get_info(struct wiphy *wiphy,
 	radio->radio = 1;
 
 	/* to get on_time, tx_time, rx_time */
-	LinkLayerStats(padapter);
-
+	LinkLayerStats(padapter); 
+	
 	radio->on_time = pwrpriv->on_time;
 	radio->tx_time = pwrpriv->tx_time;
 	radio->rx_time = pwrpriv->rx_time;
@@ -1268,9 +1278,9 @@ static int rtw_cfgvendor_lstats_get_info(struct wiphy *wiphy,
 	RTW_INFO("radio->tx_time :  %u ms\n", (radio->tx_time));
 	RTW_INFO("radio->rx_time :  %u ms\n", (radio->rx_time));
 	#endif /* CONFIG_RTW_WIFI_HAL_DEBUG */
-
+	
 	RTW_DBG(FUNC_NDEV_FMT" %s\n", FUNC_NDEV_ARG(wdev_to_ndev(wdev)), (char*)data);
-	err =  rtw_cfgvendor_send_cmd_reply(wiphy, wdev_to_ndev(wdev),
+	err =  rtw_cfgvendor_send_cmd_reply(wiphy, wdev_to_ndev(wdev), 
 		output, sizeof(wifi_iface_stat) + sizeof(wifi_radio_stat_internal));
 	if (unlikely(err))
 		RTW_ERR(FUNC_NDEV_FMT"Vendor Command reply failed ret:%d \n"
@@ -1278,22 +1288,22 @@ static int rtw_cfgvendor_lstats_get_info(struct wiphy *wiphy,
 	rtw_mfree(output, sizeof(wifi_iface_stat) + sizeof(wifi_radio_stat_internal));
 	return err;
 }
-static int rtw_cfgvendor_lstats_set_info(struct wiphy *wiphy,
+static int rtw_cfgvendor_lstats_set_info(struct wiphy *wiphy,	
 	struct wireless_dev *wdev, const void  *data, int len)
 {
 	int err = 0;
 	RTW_INFO("%s\n", __func__);
 	return err;
 }
-static int rtw_cfgvendor_lstats_clear_info(struct wiphy *wiphy,
+static int rtw_cfgvendor_lstats_clear_info(struct wiphy *wiphy,	
 	struct wireless_dev *wdev, const void  *data, int len)
 {
 	int err = 0;
 	RTW_INFO("%s\n", __func__);
 	return err;
 }
-#endif /* CONFIG_RTW_CFGVEDNOR_LLSTATS */
-#ifdef CONFIG_RTW_CFGVEDNOR_RSSIMONITOR
+#endif /* CONFIG_RTW_CFGVENDOR_LLSTATS */
+#ifdef CONFIG_RTW_CFGVENDOR_RSSIMONITOR
 static int rtw_cfgvendor_set_rssi_monitor(struct wiphy *wiphy,
 	struct wireless_dev *wdev, const void  *data, int len)
 {
@@ -1338,7 +1348,7 @@ void rtw_cfgvendor_rssi_monitor_evt(_adapter *padapter) {
         rssi_monitor_evt data ;
         s8 rssi = precvpriv->rssi;
 
-        if (pwdev_priv->rssi_monitor_enable == 0 || check_fwstate(pmlmepriv, _FW_LINKED) != _TRUE)
+        if (pwdev_priv->rssi_monitor_enable == 0 || check_fwstate(pmlmepriv, WIFI_ASOC_STATE) != _TRUE)
                 return;
 
         if (rssi < pwdev_priv->rssi_monitor_max || rssi > pwdev_priv->rssi_monitor_min)
@@ -1364,7 +1374,7 @@ void rtw_cfgvendor_rssi_monitor_evt(_adapter *padapter) {
 exit:
 	return;
 }
-#endif /* CONFIG_RTW_CFGVEDNOR_RSSIMONITR */
+#endif /* CONFIG_RTW_CFGVENDOR_RSSIMONITR */
 
 #ifdef CONFIG_RTW_CFGVENDOR_WIFI_LOGGER
 static int rtw_cfgvendor_logger_start_logging(struct wiphy *wiphy,
@@ -1589,21 +1599,6 @@ void rtw_hal_pno_random_gen_mac_addr(PADAPTER adapter)
 #endif
 }
 
-void rtw_hal_set_hw_mac_addr(PADAPTER adapter, u8 *mac_addr)
-{
-	rtw_ps_deny(adapter, PS_DENY_IOCTL);
-	LeaveAllPowerSaveModeDirect(adapter);
-
-#ifdef CONFIG_MI_WITH_MBSSID_CAM
-	rtw_hal_change_macaddr_mbid(adapter, mac_addr);
-#else
-	rtw_hal_set_hwreg(adapter, HW_VAR_MAC_ADDR, mac_addr);
-#endif
-#ifdef CONFIG_RTW_DEBUG
-	rtw_hal_dump_macaddr(RTW_DBGDUMP, adapter);
-#endif
-	rtw_ps_deny_cancel(adapter, PS_DENY_IOCTL);
-}
 
 static int rtw_cfgvendor_set_rand_mac_oui(struct wiphy *wiphy,
 		struct wireless_dev *wdev, const void  *data, int len)
@@ -1660,14 +1655,52 @@ static int rtw_cfgvendor_set_rand_mac_oui(struct wiphy *wiphy,
 
 	return err;
 }
-
 #endif
 
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
+void rtw_hal_set_hw_mac_addr(PADAPTER adapter, u8 *mac_addr)
+{
+	rtw_ps_deny(adapter, PS_DENY_IOCTL);
+	LeaveAllPowerSaveModeDirect(adapter);
+
+#ifdef CONFIG_MI_WITH_MBSSID_CAM
+	rtw_hal_change_macaddr_mbid(adapter, mac_addr);
+#else
+	rtw_hal_set_hwreg(adapter, HW_VAR_MAC_ADDR, mac_addr);
+#endif
+#ifdef CONFIG_RTW_DEBUG
+	rtw_hal_dump_macaddr(RTW_DBGDUMP, adapter);
+#endif
+	rtw_ps_deny_cancel(adapter, PS_DENY_IOCTL);
+}
+#endif
+
+#ifdef CONFIG_RTW_CFGVENDOR_WIFI_OFFLOAD
+static int rtw_cfgvendor_start_mkeep_alive(struct wiphy *wiphy, struct wireless_dev *wdev,
+	const void *data, int len)
+{
+	int ret = WIFI_SUCCESS;
+
+	RTW_INFO("%s : TODO\n", __func__);
+
+	return ret;
+}
+
+static int rtw_cfgvendor_stop_mkeep_alive(struct wiphy *wiphy, struct wireless_dev *wdev,
+	const void *data, int len)
+{
+	int ret = WIFI_SUCCESS;
+
+	RTW_INFO("%s : TODO\n", __func__);
+
+	return ret;
+}
+#endif
 
 static int rtw_cfgvendor_set_nodfs_flag(struct wiphy *wiphy,
 	struct wireless_dev *wdev, const void *data, int len)
 {
-	int err = 0;
+	int err = 0;	
 	int type;
 	u32 nodfs = 0;
 	_adapter *padapter = GET_PRIMARY_ADAPTER(wiphy_to_adapter(wiphy));
@@ -1683,7 +1716,7 @@ static int rtw_cfgvendor_set_nodfs_flag(struct wiphy *wiphy,
 	}
 
 	RTW_INFO("%s nodfs=%d, err=%d\n", __func__, nodfs, err);
-
+	
 	return err;
 }
 
@@ -1721,7 +1754,7 @@ static int rtw_cfgvendor_set_country(struct wiphy *wiphy,
 static int rtw_cfgvendor_set_nd_offload(struct wiphy *wiphy,
 	struct wireless_dev *wdev, const void *data, int len)
 {
-	int err = 0;
+	int err = 0;	
 	int type;
 	u8 nd_en = 0;
 	_adapter *padapter = GET_PRIMARY_ADAPTER(wiphy_to_adapter(wiphy));
@@ -1737,7 +1770,7 @@ static int rtw_cfgvendor_set_nd_offload(struct wiphy *wiphy,
 	}
 
 	RTW_INFO("%s nd_en=%d, err=%d\n", __func__, nd_en, err);
-
+	
 	return err;
 }
 #endif /* CONFIG_RTW_WIFI_HAL */
@@ -1843,13 +1876,16 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 		.doit = rtw_cfgvendor_rtt_get_capability
 	},
 #endif /* RTT_SUPPORT */
-#ifdef CONFIG_RTW_CFGVEDNOR_LLSTATS
+#ifdef CONFIG_RTW_CFGVENDOR_LLSTATS
 	{
 		{
 			.vendor_id = OUI_GOOGLE,
 			.subcmd = LSTATS_SUBCMD_GET_INFO
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_lstats_get_info
 	},
 	{
@@ -1858,6 +1894,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LSTATS_SUBCMD_SET_INFO
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_lstats_set_info
 	},
 	{
@@ -1866,19 +1905,25 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LSTATS_SUBCMD_CLEAR_INFO
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_lstats_clear_info
 	},
-#endif /* CONFIG_RTW_CFGVEDNOR_LLSTATS */
-#ifdef CONFIG_RTW_CFGVEDNOR_RSSIMONITOR
+#endif /* CONFIG_RTW_CFGVENDOR_LLSTATS */
+#ifdef CONFIG_RTW_CFGVENDOR_RSSIMONITOR
         {
                 {
                         .vendor_id = OUI_GOOGLE,
                         .subcmd = WIFI_SUBCMD_SET_RSSI_MONITOR
                 },
                 .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
                 .doit = rtw_cfgvendor_set_rssi_monitor
         },
-#endif /* CONFIG_RTW_CFGVEDNOR_RSSIMONITOR */
+#endif /* CONFIG_RTW_CFGVENDOR_RSSIMONITOR */
 #ifdef CONFIG_RTW_CFGVENDOR_WIFI_LOGGER
 	{
 		{
@@ -1886,6 +1931,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LOGGER_START_LOGGING
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_logger_start_logging
 	},
 	{
@@ -1894,6 +1942,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LOGGER_GET_FEATURE
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_logger_get_feature
 	},
 	{
@@ -1902,6 +1953,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LOGGER_GET_VER
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_logger_get_version
 	},
 	{
@@ -1910,6 +1964,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LOGGER_GET_RING_STATUS
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_logger_get_ring_status
 	},
 	{
@@ -1918,6 +1975,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LOGGER_GET_RING_DATA
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_logger_get_ring_data
 	},
 	{
@@ -1926,6 +1986,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LOGGER_TRIGGER_MEM_DUMP
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_logger_get_firmware_memory_dump
 	},
 	{
@@ -1934,6 +1997,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LOGGER_START_PKT_FATE_MONITORING
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_logger_start_pkt_fate_monitoring
 	},
 	{
@@ -1942,6 +2008,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LOGGER_GET_TX_PKT_FATES
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_logger_get_tx_pkt_fates
 	},
 	{
@@ -1950,8 +2019,11 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = LOGGER_GET_RX_PKT_FATES
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_logger_get_rx_pkt_fates
-	},
+	},	
 #endif /* CONFIG_RTW_CFGVENDOR_WIFI_LOGGER */
 #ifdef CONFIG_RTW_WIFI_HAL
 #ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
@@ -1961,7 +2033,34 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = WIFI_SUBCMD_SET_PNO_RANDOM_MAC_OUI
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_set_rand_mac_oui
+	},
+#endif
+#ifdef CONFIG_RTW_CFGVENDOR_WIFI_OFFLOAD
+	{
+		{
+			.vendor_id = OUI_GOOGLE,
+			.subcmd = WIFI_OFFLOAD_SUBCMD_START_MKEEP_ALIVE
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
+		.doit = rtw_cfgvendor_start_mkeep_alive
+	},
+	{
+		{
+			.vendor_id = OUI_GOOGLE,
+			.subcmd = WIFI_OFFLOAD_SUBCMD_STOP_MKEEP_ALIVE
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
+		.doit = rtw_cfgvendor_stop_mkeep_alive
 	},
 #endif
 	{
@@ -1970,6 +2069,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = WIFI_SUBCMD_NODFS_SET
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_set_nodfs_flag
 
 	},
@@ -1979,6 +2081,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = WIFI_SUBCMD_SET_COUNTRY_CODE
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_set_country
 	},
 	{
@@ -1987,6 +2092,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = WIFI_SUBCMD_CONFIG_ND_OFFLOAD
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_set_nd_offload
 	},
 #endif /* CONFIG_RTW_WIFI_HAL */
@@ -1996,6 +2104,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = WIFI_SUBCMD_GET_FEATURE_SET
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_get_feature_set
 	},
 	{
@@ -2004,6 +2115,9 @@ static const struct wiphy_vendor_command rtw_vendor_cmds[] = {
 			.subcmd = WIFI_SUBCMD_GET_FEATURE_SET_MATRIX
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+		.policy = VENDOR_CMD_RAW_DATA,
+#endif
 		.doit = rtw_cfgvendor_get_feature_set_matrix
 	}
 };
@@ -2019,9 +2133,9 @@ static const struct  nl80211_vendor_cmd_info rtw_vendor_events[] = {
 	{ OUI_GOOGLE, RTT_EVENT_COMPLETE },
 #endif /* RTT_SUPPORT */
 
-#ifdef CONFIG_RTW_CFGVEDNOR_RSSIMONITOR
+#ifdef CONFIG_RTW_CFGVENDOR_RSSIMONITOR
 	{ OUI_GOOGLE, GOOGLE_RSSI_MONITOR_EVENT },
-#endif /* RTW_CFGVEDNOR_RSSIMONITR */
+#endif /* RTW_CFGVENDOR_RSSIMONITR */
 
 #if defined(GSCAN_SUPPORT) && 0
 	{ OUI_GOOGLE, GSCAN_EVENT_COMPLETE_SCAN },

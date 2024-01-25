@@ -86,18 +86,17 @@ static void rtw_dev_shutdown(struct device *dev)
 
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 23))
 /* Some useful macros to use to create struct usb_device_id */
-#define USB_DEVICE_ID_MATCH_VENDOR			 0x0001
-#define USB_DEVICE_ID_MATCH_PRODUCT			 0x0002
-#define USB_DEVICE_ID_MATCH_DEV_LO			 0x0004
-#define USB_DEVICE_ID_MATCH_DEV_HI			 0x0008
-#define USB_DEVICE_ID_MATCH_DEV_CLASS			 0x0010
-#define USB_DEVICE_ID_MATCH_DEV_SUBCLASS		 0x0020
-#define USB_DEVICE_ID_MATCH_DEV_PROTOCOL		 0x0040
-#define USB_DEVICE_ID_MATCH_INT_CLASS			 0x0080
-#define USB_DEVICE_ID_MATCH_INT_SUBCLASS		 0x0100
-#define USB_DEVICE_ID_MATCH_INT_PROTOCOL		 0x0200
-#define USB_DEVICE_ID_MATCH_INT_NUMBER		 0x0400
-
+#define USB_DEVICE_ID_MATCH_VENDOR		0x0001
+#define USB_DEVICE_ID_MATCH_PRODUCT		0x0002
+#define USB_DEVICE_ID_MATCH_DEV_LO		0x0004
+#define USB_DEVICE_ID_MATCH_DEV_HI		0x0008
+#define USB_DEVICE_ID_MATCH_DEV_CLASS		0x0010
+#define USB_DEVICE_ID_MATCH_DEV_SUBCLASS	0x0020
+#define USB_DEVICE_ID_MATCH_DEV_PROTOCOL	0x0040
+#define USB_DEVICE_ID_MATCH_INT_CLASS		0x0080
+#define USB_DEVICE_ID_MATCH_INT_SUBCLASS	0x0100
+#define USB_DEVICE_ID_MATCH_INT_PROTOCOL	0x0200
+#define USB_DEVICE_ID_MATCH_INT_NUMBER		0x0400
 
 #define USB_DEVICE_ID_MATCH_INT_INFO \
 	(USB_DEVICE_ID_MATCH_INT_CLASS | \
@@ -338,7 +337,7 @@ struct rtw_usb_drv usb_drv = {
 	.usbdrv.reset_resume   = rtw_resume,
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 19)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0))
 	.usbdrv.drvwrap.driver.shutdown = rtw_dev_shutdown,
 #else
 	.usbdrv.driver.shutdown = rtw_dev_shutdown,

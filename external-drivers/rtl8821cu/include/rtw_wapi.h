@@ -29,12 +29,12 @@
 /* WAPI trace debug */
 extern u32 wapi_debug_component;
 
-static inline void dump_buf(u8 *buf, u32 len)
+static inline void dump_wapi_buf(u8 *buf, u32 len)
 {
 	u32 i;
 	printk("-----------------Len %d----------------\n", len);
 	for (i = 0; i < len; i++)
-		printk("%2.2x-", *(buf + i));
+		printk(KERN_CONT "%2.2x-", *(buf + i));
 	printk("\n");
 }
 
@@ -47,17 +47,17 @@ static inline void dump_buf(u8 *buf, u32 len)
 #define WAPI_DATA(component, x, buf, len) \
 	do { if (wapi_debug_component & (component)) { \
 			printk("%s:\n", x);\
-			dump_buf((buf), (len)); } \
+			dump_wapi_buf((buf), (len)); } \
 	} while (0);
 
-#define RT_ASSERT_RET(_Exp)								\
+#define RT_WAPI_ASSERT_RET(_Exp)								\
 	if (!(_Exp)) {									\
 		printk("RTWLAN: ");					\
 		printk("Assertion failed! %s,%s, line=%d\n", \
 		       #_Exp, __FUNCTION__, __LINE__);          \
 		return;						\
 	}
-#define RT_ASSERT_RET_VALUE(_Exp, Ret)								\
+#define RT_WAPI_ASSERT_RET_VALUE(_Exp, Ret)								\
 	if (!(_Exp)) {									\
 		printk("RTWLAN: ");					\
 		printk("Assertion failed! %s,%s, line=%d\n", \
@@ -66,8 +66,8 @@ static inline void dump_buf(u8 *buf, u32 len)
 	}
 
 #else
-#define RT_ASSERT_RET(_Exp) do {} while (0)
-#define RT_ASSERT_RET_VALUE(_Exp, Ret) do {} while (0)
+#define RT_WAPI_ASSERT_RET(_Exp) do {} while (0)
+#define RT_WAPI_ASSERT_RET_VALUE(_Exp, Ret) do {} while (0)
 #define WAPI_TRACE(component, x, args...) do {} while (0)
 #define WAPI_DATA(component, x, buf, len) do {} while (0)
 #endif

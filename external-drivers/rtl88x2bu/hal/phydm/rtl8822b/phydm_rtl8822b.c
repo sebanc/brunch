@@ -500,7 +500,7 @@ phydm_pw_sat_8822b(
 
 			odm_set_bb_reg(dm, 0x830, MASKDWORD, 0x79a0eaaa);
 			odm_set_bb_reg(dm, 0xe58, BIT(20), 0x1);
-
+				
 			odm_set_bb_reg(dm, 0xcb0, (MASKBYTE2 | MASKLWORD),
 					0x177717);
 			odm_set_bb_reg(dm, 0xeb0, (MASKBYTE2 | MASKLWORD),

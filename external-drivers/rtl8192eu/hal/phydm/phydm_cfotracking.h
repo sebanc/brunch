@@ -26,7 +26,8 @@
 #ifndef __PHYDMCFOTRACK_H__
 #define __PHYDMCFOTRACK_H__
 
-#define CFO_TRACKING_VERSION "2.0"
+/* 2019.03.28 fix 8197G crystal_cap register address*/
+#define CFO_TRACKING_VERSION "2.4"
 
 #define		CFO_TRK_ENABLE_TH	20 /* @kHz enable CFO_Track threshold*/
 #define		CFO_TRK_STOP_TH		10 /* @kHz disable CFO_Track threshold*/
@@ -55,9 +56,9 @@ struct phydm_cfo_rpt {
 
 void phydm_get_cfo_info(void *dm_void, struct phydm_cfo_rpt *cfo);
 
-void phydm_set_crystal_cap(void *dm_void, u8 crystal_cap);
-
 boolean phydm_set_crystal_cap_reg(void *dm_void, u8 crystal_cap);
+
+void phydm_set_crystal_cap(void *dm_void, u8 crystal_cap);
 
 void phydm_cfo_tracking_init(void *dm_void);
 

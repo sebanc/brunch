@@ -103,10 +103,12 @@ extern const u16 _vht_max_mpdu_len[];
 #define VHT_SUP_CH_WIDTH_SET_MAX 3
 extern const u8 _vht_sup_ch_width_set_to_bw_cap[];
 #define vht_sup_ch_width_set_to_bw_cap(set) (((set) >= VHT_SUP_CH_WIDTH_SET_MAX) ? _vht_sup_ch_width_set_to_bw_cap[VHT_SUP_CH_WIDTH_SET_MAX] : _vht_sup_ch_width_set_to_bw_cap[(set)])
+#define VHT_MAX_AMPDU_LEN(f) ((1 << (13 + f)) - 1)
+
+#ifdef CONFIG_RTW_DEBUG
 extern const char *const _vht_sup_ch_width_set_str[];
 #define vht_sup_ch_width_set_str(set) (((set) >= VHT_SUP_CH_WIDTH_SET_MAX) ? _vht_sup_ch_width_set_str[VHT_SUP_CH_WIDTH_SET_MAX] : _vht_sup_ch_width_set_str[(set)])
 
-#define VHT_MAX_AMPDU_LEN(f) ((1 << (13 + f)) - 1)
 void dump_vht_cap_ie(void *sel, const u8 *ie, u32 ie_len);
 
 #define VHT_OP_CH_WIDTH_MAX 4
@@ -114,6 +116,12 @@ extern const char *const _vht_op_ch_width_str[];
 #define vht_op_ch_width_str(ch_width) (((ch_width) >= VHT_OP_CH_WIDTH_MAX) ? _vht_op_ch_width_str[VHT_OP_CH_WIDTH_MAX] : _vht_op_ch_width_str[(ch_width)])
 
 void dump_vht_op_ie(void *sel, const u8 *ie, u32 ie_len);
+#endif
+
+struct vht_bf_cap {
+	u8 is_mu_bfer;
+	u8 su_sound_dim;
+};
 
 struct vht_priv {
 	u8	vht_option;
@@ -121,7 +129,7 @@ struct vht_priv {
 	u8	ldpc_cap;
 	u8	stbc_cap;
 	u16	beamform_cap;
-	u8	ap_is_mu_bfer;
+	struct	vht_bf_cap ap_bf_cap;
 
 	u8	sgi_80m;/* short GI */
 	u8	ampdu_len;
@@ -158,14 +166,14 @@ void	rtw_vht_use_default_setting(_adapter *padapter);
 u32	rtw_build_vht_operation_ie(_adapter *padapter, u8 *pbuf, u8 channel);
 u32	rtw_build_vht_op_mode_notify_ie(_adapter *padapter, u8 *pbuf, u8 bw);
 u32	rtw_build_vht_cap_ie(_adapter *padapter, u8 *pbuf);
-void	update_sta_vht_info_apmode(_adapter *padapter, PVOID psta);
+void	update_sta_vht_info_apmode(_adapter *padapter, void *psta);
 void	update_hw_vht_param(_adapter *padapter);
 void	VHT_caps_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE);
 #ifdef ROKU_PRIVATE
 void	VHT_caps_handler_infra_ap(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE);
 #endif /* ROKU_PRIVATE */
 void	VHT_operation_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE);
-void	rtw_process_vht_op_mode_notify(_adapter *padapter, u8 *pframe, PVOID sta);
+void	rtw_process_vht_op_mode_notify(_adapter *padapter, u8 *pframe, void *sta);
 u32	rtw_restructure_vht_ie(_adapter *padapter, u8 *in_ie, u8 *out_ie, uint in_len, uint *pout_len);
 void	VHTOnAssocRsp(_adapter *padapter);
 u8	rtw_vht_mcsmap_to_nss(u8 *pvht_mcs_map);

@@ -12278,6 +12278,11 @@ static void rtw_mlmeext_disconnect(_adapter *padapter)
 		self_action = MLME_STA_DISCONNECTED;
 	else if (MLME_IS_ADHOC(padapter) || MLME_IS_ADHOC_MASTER(padapter))
 		self_action = MLME_ADHOC_STOPPED;
+/* nrm */
+#ifdef CONFIG_WIFI_MONITOR
+	else if (MLME_IS_MONITOR(padapter))
+		self_action = MLME_ACTION_NONE;
+#endif
 	else {
 		RTW_INFO("state:0x%x\n", MLME_STATE(padapter));
 		rtw_warn_on(1);
@@ -16350,6 +16355,12 @@ u8 rtw_set_chbw_hdl(_adapter *padapter, u8 *pbuf)
 	}
 	
 	LeaveAllPowerSaveModeDirect(padapter);
+
+#ifdef CONFIG_MONITOR_MODE_XMIT
+	pmlmeext->cur_channel = set_ch_parm->ch;
+	pmlmeext->cur_ch_offset = set_ch_parm->ch_offset;
+	pmlmeext->cur_bwmode = set_ch_parm->bw;
+#endif /* CONFIG_MONITOR_MODE_XMIT */
 	
 	set_channel_bwmode(padapter, set_ch_parm->ch, set_ch_parm->ch_offset, set_ch_parm->bw);
 

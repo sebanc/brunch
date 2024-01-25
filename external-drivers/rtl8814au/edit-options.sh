@@ -1,10 +1,8 @@
-#!/bin/bash
-#
-OPTIONS_FILE="8814au.conf"
+#!/bin/sh
 
-SCRIPT_NAME="edit-options.sh"
+# Purpose: Make it easier to edit the correct driver options file.
 #
-# Purpose: Make it easier to edit the driver options file.
+# Flexible editor support.
 #
 # To make this file executable:
 #
@@ -14,20 +12,45 @@ SCRIPT_NAME="edit-options.sh"
 #
 # $ sudo ./edit-options.sh
 #
-if [[ $EUID -ne 0 ]]
-then
+# Copyright(c) 2023 Nick Morrow
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+
+SCRIPT_NAME="edit-options.sh"
+# SCRIPT_VERSION="20230126"
+OPTIONS_FILE="8814au.conf"
+
+# check to ensure sudo was used to start the script
+if [ "$(id -u)" -ne 0 ]; then
 	echo "You must run this script with superuser (root) privileges."
 	echo "Try: \"sudo ./${SCRIPT_NAME}\""
 	exit 1
 fi
 
-nano /etc/modprobe.d/${OPTIONS_FILE}
-
-read -p "Do you want to apply the new options by rebooting now? [y/N] " -n 1 -r
-echo    # move to a new line
-if [[ $REPLY =~ ^[Yy]$ ]]
-then
-    reboot
+DEFAULT_EDITOR="$(cat default-editor.txt)"
+# try to find the user's default text editor through the EDITORS_SEARCH array
+for TEXT_EDITOR in "${VISUAL}" "${EDITOR}" "${DEFAULT_EDITOR}" vi; do
+        command -v "${TEXT_EDITOR}" >/dev/null 2>&1 && break
+done
+# failure message if no editor was found
+if ! command -v "${TEXT_EDITOR}" >/dev/null 2>&1; then
+        echo "No text editor was found (default: ${DEFAULT_EDITOR})."
+        echo "Please install ${DEFAULT_EDITOR} or edit the file 'default-editor.txt' to specify your editor."
+        echo "Once complete, please run \"sudo ./${SCRIPT_NAME}\""
+        exit 1
 fi
 
-exit 0
+${TEXT_EDITOR} /etc/modprobe.d/${OPTIONS_FILE}
+
+printf "Do you want to apply the new options by rebooting now? (recommended) [y/N] "
+read -r REPLY
+case "$REPLY" in
+	[yY]*) reboot ;;
+esac

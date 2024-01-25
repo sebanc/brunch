@@ -30,7 +30,6 @@
 /* ************************************************************
  * Global var
  * ************************************************************ */
-
 #ifdef CONFIG_SUPPORT_HW_WPS_PBC
 static void dm_CheckPbcGPIO(_adapter *padapter)
 {
@@ -86,9 +85,9 @@ static void dm_CheckPbcGPIO(_adapter *padapter)
  *
  *	Created by Roger, 2010.03.05.
  *   */
-VOID
+void
 dm_InterruptMigration(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
@@ -107,7 +106,7 @@ dm_InterruptMigration(
 	/* when interrupt migration is set before. 2010.03.05. */
 	/*  */
 	if (!Adapter->registrypriv.wifi_spec &&
-	    (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) &&
+	    (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _TRUE) &&
 	    pmlmepriv->LinkDetectInfo.bHigherBusyTraffic) {
 		IntMtToSet = _TRUE;
 
@@ -159,9 +158,10 @@ dm_InterruptMigration(
 /*
  * Initialize GPIO setting registers
  *   */
+#ifdef CONFIG_USB_HCI
 static void
 dm_InitGPIOSetting(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
 	PHAL_DATA_TYPE		pHalData = GET_HAL_DATA(Adapter);
@@ -174,7 +174,7 @@ dm_InitGPIOSetting(
 	rtw_write8(Adapter, REG_GPIO_MUXCFG, tmp1byte);
 
 }
-
+#endif
 /* ************************************************************
  * functions
  * ************************************************************ */
@@ -205,7 +205,7 @@ static void Init_ODM_ComInfo_8192e(PADAPTER	Adapter)
 
 void
 rtl8192e_InitHalDm(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
@@ -219,9 +219,9 @@ rtl8192e_InitHalDm(
 }
 
 
-VOID
+void
 rtl8192e_HalDmWatchDog(
-	IN	PADAPTER	Adapter
+		PADAPTER	Adapter
 )
 {
 	BOOLEAN		bFwCurrentInPSMode = _FALSE;
@@ -253,7 +253,6 @@ rtl8192e_HalDmWatchDog(
 		/*  */
 		/* Dynamically switch RTS/CTS protection. */
 		/*  */
-		/* dm_CheckProtection(Adapter); */
 
 #ifdef CONFIG_PCI_HCI
 		/* 20100630 Joseph: Disable Interrupt Migration mechanism temporarily because it degrades Rx throughput. */
@@ -286,7 +285,7 @@ skip_dm:
 	return;
 }
 
-void rtl8192e_init_dm_priv(IN PADAPTER Adapter)
+void rtl8192e_init_dm_priv(PADAPTER Adapter)
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
 	struct dm_struct		*podmpriv = &pHalData->odmpriv;
@@ -296,9 +295,10 @@ void rtl8192e_init_dm_priv(IN PADAPTER Adapter)
 
 }
 
-void rtl8192e_deinit_dm_priv(IN PADAPTER Adapter)
+void rtl8192e_deinit_dm_priv(PADAPTER Adapter)
 {
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
 	struct dm_struct		*podmpriv = &pHalData->odmpriv;
+	/* _rtw_spinlock_free(&pHalData->odm_stainfo_lock);		 */
 	odm_cancel_all_timers(podmpriv);
 }

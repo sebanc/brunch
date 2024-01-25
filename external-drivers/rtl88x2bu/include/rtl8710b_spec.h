@@ -417,9 +417,9 @@
 /* ****************************************************************************
  *	8723 Regsiter Bit and Content definition
  * **************************************************************************** */
-
+ 
  /* -----------------------------------------------------
- * REG_SYS_SYSTEM_CFG0
+ * REG_SYS_SYSTEM_CFG0 
  * ----------------------------------------------------- */
 #define BIT_RTL_ID_8710B BIT(16)
 
@@ -431,18 +431,18 @@
 #define BIT_GET_VENDOR_ID_8710B(x) (((x) >> BIT_SHIFT_VENDOR_ID_8710B) & BIT_MASK_VENDOR_ID_8710B)
 
  /* -----------------------------------------------------
- * REG_SYS_SYSTEM_CFG1
+ * REG_SYS_SYSTEM_CFG1 
  * ----------------------------------------------------- */
 #define BIT_SPSLDO_SEL_8710B BIT(25)
 
  /* -----------------------------------------------------
- * REG_SYS_SYSTEM_CFG2
+ * REG_SYS_SYSTEM_CFG2 
  * ----------------------------------------------------- */
 #define BIT_MASK_RF_RL_ID_8710B 0xf
 #define BIT_GET_RF_RL_ID_8710B(x) ((x) & BIT_MASK_RF_RL_ID_8710B)
 
  /* -----------------------------------------------------
- * REG_SYS_SYSTEM_CFG2
+ * REG_SYS_SYSTEM_CFG2 
  * ----------------------------------------------------- */
 #define BIT_EERPOMSEL_8710B BIT(4)
 #define BIT_AUTOLOAD_SUS_8710B BIT(5)

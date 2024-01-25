@@ -109,6 +109,20 @@
 		#endif
 	#endif
 
+	#if (CONFIG_RTW_ANDROID >= 11)
+		#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0))
+			#ifndef CONFIG_RTW_ANDROID_GKI
+			#define CONFIG_RTW_ANDROID_GKI
+			#endif
+		#endif
+
+		#ifdef CONFIG_RTW_ANDROID_GKI
+			#ifdef CONFIG_ADAPTOR_INFO_CACHING_FILE
+			#undef CONFIG_ADAPTOR_INFO_CACHING_FILE
+			#endif
+		#endif
+	#endif
+
 	#ifdef CONFIG_RTW_WIFI_HAL
 	#ifndef CONFIG_RTW_WIFI_HAL_DEBUG
 	//#define CONFIG_RTW_WIFI_HAL_DEBUG
@@ -119,6 +133,10 @@
 	#if (CONFIG_RTW_ANDROID < 11)
 	#ifndef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
 	#define CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+	#endif
+	#else
+	#ifndef CONFIG_RTW_SCAN_RAND
+	#define CONFIG_RTW_SCAN_RAND
 	#endif
 	#endif
 	#ifndef CONFIG_RTW_CFGVENDOR_RSSIMONITOR
@@ -152,6 +170,15 @@
 
 	/* Android expect dbm as the rx signal strength unit */
 	#define CONFIG_SIGNAL_DISPLAY_DBM
+
+#else // for Linux
+
+	#ifdef CONFIG_IOCTL_CFG80211
+	#ifndef CONFIG_RTW_SCAN_RAND
+	#define CONFIG_RTW_SCAN_RAND
+	#endif
+	#endif
+
 #endif // CONFIG_RTW_ANDROID
 
 /*

@@ -132,10 +132,8 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, s32 sz, u8 bag
 
 		rtl8822b_fill_txdesc_vcs(padapter, pattrib, ptxdesc);
 
-#ifdef CONFIG_CONCURRENT_MODE
 		if (bmcst)
 			rtl8822b_fill_txdesc_force_bmc_camid(pattrib, ptxdesc);
-#endif
 #ifdef CONFIG_SUPPORT_DYNAMIC_TXPWR
 		rtw_phydm_set_dyntxpwr(padapter, ptxdesc, pattrib->mac_id);
 #endif
@@ -206,7 +204,7 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, s32 sz, u8 bag
 #ifdef CONFIG_WMMPS_STA
 			if (pattrib->trigger_frame)
 				SET_TX_DESC_TRI_FRAME_8822B (ptxdesc, 1);
-#endif /* CONFIG_WMMPS_STA */
+#endif /* CONFIG_WMMPS_STA */			
 
 		} else {
 			/*
@@ -392,7 +390,7 @@ static s32 rtw_dump_xframe(PADAPTER padapter, struct xmit_frame *pxmitframe)
 	    (pxmitframe->attrib.ether_type != 0x888e) &&
 	    (pxmitframe->attrib.ether_type != 0x88b4) &&
 	    (pxmitframe->attrib.dhcp_pkt != 1))
-		rtw_issue_addbareq_cmd(padapter, pxmitframe);
+		rtw_issue_addbareq_cmd(padapter, pxmitframe, _FALSE);
 #endif /* CONFIG_80211N_HT */
 
 	mem_addr = pxmitframe->buf_addr;
@@ -439,7 +437,7 @@ static s32 rtw_dump_xframe(PADAPTER padapter, struct xmit_frame *pxmitframe)
 			/* download rsvd page or fw */
 			inner_ret = rtw_write_port(padapter, ff_hwaddr, w_sz, (unsigned char *)pxmitbuf);
 		else
-			enqueue_pending_xmitbuf(pxmitpriv, pxmitbuf);
+			enqueue_pending_xmitbuf(pxmitpriv, pxmitbuf);		
 #else
 		inner_ret = rtw_write_port(padapter, ff_hwaddr, w_sz, (unsigned char *)pxmitbuf);
 #endif
@@ -499,7 +497,14 @@ static s32 rtl8822bu_xmitframe_complete(PADAPTER padapter, struct xmit_priv *pxm
 	int res = _SUCCESS;
 #endif
 
-
+#ifdef CONFIG_RTW_MGMT_QUEUE
+	/* dump management frame directly */
+	pxmitframe = rtw_dequeue_mgmt_xframe(pxmitpriv);
+	if (pxmitframe) {
+		rtw_dump_xframe(padapter, pxmitframe);
+		return _TRUE;
+	}
+#endif
 
 	/* check xmitbuffer is ok */
 	if (pxmitbuf == NULL) {
@@ -711,7 +716,7 @@ agg_end:
 	    (pfirstframe->attrib.ether_type != 0x888e) &&
 	    (pfirstframe->attrib.ether_type != 0x88b4) &&
 	    (pfirstframe->attrib.dhcp_pkt != 1))
-		rtw_issue_addbareq_cmd(padapter, pfirstframe);
+		rtw_issue_addbareq_cmd(padapter, pfirstframe, _FALSE);
 #endif /* CONFIG_80211N_HT */
 #ifndef CONFIG_USE_USB_BUFFER_ALLOC_TX
 	/* 3. update first frame txdesc */
@@ -748,7 +753,7 @@ agg_end:
 		/* download rsvd page or fw */
 		rtw_write_port(padapter, ff_hwaddr, pbuf_tail, (u8 *)pxmitbuf);
 	else
-		enqueue_pending_xmitbuf(pxmitpriv, pxmitbuf);
+		enqueue_pending_xmitbuf(pxmitpriv, pxmitbuf);		
 #else
 	rtw_write_port(padapter, ff_hwaddr, pbuf_tail, (u8 *)pxmitbuf);
 #endif
@@ -782,6 +787,14 @@ static s32 rtl8822bu_xmitframe_complete(PADAPTER padapter, struct xmit_priv *pxm
 	phwxmits = pxmitpriv->hwxmits;
 	hwentry = pxmitpriv->hwxmit_entry;
 
+#ifdef CONFIG_RTW_MGMT_QUEUE
+	/* dump management frame directly */
+	pxmitframe = rtw_dequeue_mgmt_xframe(pxmitpriv);
+	if (pxmitframe) {
+		rtw_dump_xframe(padapter, pxmitframe);
+		return _TRUE;
+	}
+#endif
 
 	if (pxmitbuf == NULL) {
 		pxmitbuf = rtw_alloc_xmitbuf(pxmitpriv);
@@ -834,10 +847,10 @@ static s32 rtl8822bu_xmitframe_complete(PADAPTER padapter, struct xmit_priv *pxm
 }
 #endif
 
-static void rtl8822bu_xmit_tasklet(void *priv)
+static void rtl8822bu_xmit_tasklet(unsigned long data)
 {
 	int ret = _FALSE;
-	_adapter *padapter = (_adapter *)priv;
+	_adapter *padapter = (_adapter *)data;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 
 	while (1) {
@@ -865,7 +878,7 @@ s32	rtl8822bu_init_xmit_priv(PADAPTER padapter)
 
 #ifdef PLATFORM_LINUX
 	tasklet_init(&pxmitpriv->xmit_tasklet,
-		     (void(*)(unsigned long))rtl8822bu_xmit_tasklet,
+		     rtl8822bu_xmit_tasklet,
 		     (unsigned long)padapter);
 #endif
 #ifdef CONFIG_TX_EARLY_MODE
@@ -962,6 +975,25 @@ s32 rtl8822bu_hal_xmit(PADAPTER padapter, struct xmit_frame *pxmitframe)
 {
 	return pre_xmitframe(padapter, pxmitframe);
 }
+
+#ifdef CONFIG_RTW_MGMT_QUEUE
+s32 rtl8822bu_hal_mgmt_xmitframe_enqueue(PADAPTER padapter, struct xmit_frame *pxmitframe)
+{
+	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
+	s32 err;
+
+	err = rtw_mgmt_xmitframe_enqueue(padapter, pxmitframe);
+	if (err != _SUCCESS) {
+		rtw_free_xmitframe(pxmitpriv, pxmitframe);
+		pxmitpriv->tx_drop++;
+	} else {
+#ifdef PLATFORM_LINUX
+		tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
+#endif
+	}
+	return err;
+}
+#endif
 
 s32 rtl8822bu_hal_xmitframe_enqueue(PADAPTER padapter, struct xmit_frame *pxmitframe)
 {

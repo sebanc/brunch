@@ -53,7 +53,7 @@ struct rm_event {
 
 struct rm_clock {
 	struct rm_obj *prm;
-	atomic_t counter;
+	ATOMIC_T counter;
 	enum RM_EV_ID evid;
 };
 

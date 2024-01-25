@@ -97,6 +97,8 @@ PHY_SetTxPowerLevel8188F(
 		u8			channel
 );
 
+void rtl8188f_set_txpwr_done(_adapter *adapter);
+
 void
 PHY_SetSwChnlBWMode8188F(
 		PADAPTER			Adapter,

@@ -1,0 +1,15 @@
+2023-01-02
+
+The guides provided in this folder were provided by Realtek in the driver
+distribution. Use CAUTION with these guides as many have not been updated
+as changes have taken place in the Linux econsystem over the last few years.
+
+DO NOT use these guides without confirming with recent information that the
+information is correct. Linux changes and improves over time but old,
+outdated information hangs around. My recommendation is that you set your
+search engine to provide links that are one year old or less so as to
+weed out old outdated information.
+
+Regards,
+
+Nick

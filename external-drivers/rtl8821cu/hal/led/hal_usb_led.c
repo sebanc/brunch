@@ -1745,6 +1745,22 @@ void BlinkHandler(PLED_USB pLed)
 		return;
 	}
 
+	#ifdef CONFIG_SW_LED
+	// 1 is normal blinking
+	if (padapter->registrypriv.led_ctrl != 1) {
+		if (padapter->registrypriv.led_ctrl == 0)
+		{
+			// Set LED to off
+			pLed->BlinkingLedState = RTW_LED_OFF;
+		} else {
+			// Set LED to solid for 2 or greater
+			pLed->BlinkingLedState = RTW_LED_ON;
+		}
+		// Skip various switch cases where SwLedBlink*() is called below
+		pLed->CurrLedState = LED_UNKNOWN;
+	}
+	#endif
+
 	switch (ledpriv->LedStrategy) {
 	#if CONFIG_RTW_SW_LED_TRX_DA_CLASSIFY
 	case SW_LED_MODE_UC_TRX_ONLY:

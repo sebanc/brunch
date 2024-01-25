@@ -304,6 +304,7 @@ struct sta_info {
 	union Keytype	dot118021x_UncstKey;
 	union pn48		dot11txpn;			/* PN48 used for Unicast xmit */
 	union pn48		dot11rxpn;			/* PN48 used for Unicast recv. */
+	ATOMIC_T	keytrack;
 #ifdef CONFIG_RTW_MESH
 	/* peer's GTK, RX only */
 	u8 group_privacy;

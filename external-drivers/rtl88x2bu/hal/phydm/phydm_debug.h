@@ -31,8 +31,8 @@
 /*#define DEBUG_VERSION	"1.3"*/ /*2016.04.28 YuChen*/
 /*#define DEBUG_VERSION	"1.4"*/ /*2017.03.13 Dino*/
 /*#define DEBUG_VERSION "2.0"*/ /*2018.01.10 Dino*/
-/* 2019.03.25 fix nhm_r[11] debug msg error*/
-#define DEBUG_VERSION "2.6"
+/*2020.07.03 fix cck report bug due to 8723F coding error*/
+#define DEBUG_VERSION "4.6"
 
 /*@
  * ============================================================

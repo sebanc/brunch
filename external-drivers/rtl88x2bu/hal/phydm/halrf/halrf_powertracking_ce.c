@@ -664,6 +664,23 @@ u8 get_cck_swing_index(void *dm_void)
 	return i;
 }
 
+s8
+get_txagc_default_index(
+	void *dm_void
+)
+{
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
+	s8 tmp;
+
+	if (dm->support_ic_type == ODM_RTL8814B) {
+		tmp = (s8)(odm_get_bb_reg(dm, R_0x18a0, 0x7f) & 0xff);
+		if (tmp & BIT(6))
+			tmp = tmp | 0x80;
+		return tmp;
+	} else
+		return 0;
+}
+
 void odm_txpowertracking_thermal_meter_init(void *dm_void)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
@@ -696,14 +713,15 @@ void odm_txpowertracking_thermal_meter_init(void *dm_void)
 	cali_info->thermal_value_iqk = rf->eeprom_thermal;
 	cali_info->thermal_value_lck = rf->eeprom_thermal;
 
-#if (RTL8822C_SUPPORT == 1 || RTL8814B_SUPPORT == 1)
-	if (dm->support_ic_type == ODM_RTL8822C) {
+#if (RTL8822C_SUPPORT == 1 || RTL8814B_SUPPORT == 1 || RTL8723F_SUPPORT == 1)
+	if (dm->support_ic_type == ODM_RTL8822C || 
+	    dm->support_ic_type == ODM_RTL8723F) {
 		cali_info->thermal_value_path[RF_PATH_A] = tssi->thermal[RF_PATH_A];
 		cali_info->thermal_value_path[RF_PATH_B] = tssi->thermal[RF_PATH_B];
 		cali_info->thermal_value_iqk = tssi->thermal[RF_PATH_A];
 		cali_info->thermal_value_lck = tssi->thermal[RF_PATH_A];
 	}
-
+	
 	if (dm->support_ic_type == ODM_RTL8814B) {
 		cali_info->thermal_value_path[RF_PATH_A] = tssi->thermal[RF_PATH_A];
 		cali_info->thermal_value_path[RF_PATH_B] = tssi->thermal[RF_PATH_B];
@@ -747,6 +765,8 @@ void odm_txpowertracking_thermal_meter_init(void *dm_void)
 				cali_info->default_ofdm_index = 24;
 			else
 				cali_info->default_ofdm_index = swing_idx;
+
+			cali_info->default_txagc_index = get_txagc_default_index(dm);
 
 			cali_info->default_cck_index = 24;
 		}
@@ -805,6 +825,12 @@ void odm_txpowertracking_check_ce(void *dm_void)
 #if (DM_ODM_SUPPORT_TYPE == ODM_CE)
 	if (!(rf->rf_supportability & HAL_RF_TX_PWR_TRACK))
 		return;
+#if (RTL8723F_SUPPORT == 1)
+	if (dm->support_ic_type & ODM_RTL8723F) {
+		/*RF_DBG(dm, DBG_RF_TX_PWR_TRACK, "[RF][TSSI] Pwrtrack return!\n");*/
+		return;
+	}
+#endif
 
 	if ((rf->power_track_type & 0xf0) >> 4 != 0) {
 		if (dm->support_ic_type & ODM_RTL8822C) {
@@ -827,7 +853,7 @@ void odm_txpowertracking_check_ce(void *dm_void)
 			odm_set_rf_reg(dm, RF_PATH_A, R_0x42, BIT(19), 0x01);
 			odm_set_rf_reg(dm, RF_PATH_A, R_0x42, BIT(19), 0x00);
 			odm_set_rf_reg(dm, RF_PATH_A, R_0x42, BIT(19), 0x01);
-
+			
 			odm_set_rf_reg(dm, RF_PATH_B, R_0x42, BIT(19), 0x01);
 			odm_set_rf_reg(dm, RF_PATH_B, R_0x42, BIT(19), 0x00);
 			odm_set_rf_reg(dm, RF_PATH_B, R_0x42, BIT(19), 0x01);
@@ -850,7 +876,7 @@ void odm_txpowertracking_check_ce(void *dm_void)
 		dm->rf_calibrate_info.tm_trigger = 1;
 		return;
 	}
-
+	
 	if (dm->support_ic_type & (ODM_RTL8822C | ODM_RTL8814B)) {
 #if (RTL8822C_SUPPORT == 1 || RTL8814B_SUPPORT == 1)
 		odm_txpowertracking_new_callback_thermal_meter(dm);
@@ -868,10 +894,17 @@ odm_txpowertracking_direct_ce(void *dm_void)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	struct _hal_rf_ *rf = &dm->rf_table;
+
 #if (DM_ODM_SUPPORT_TYPE == ODM_CE)
 
 	if (!(rf->rf_supportability & HAL_RF_TX_PWR_TRACK))
 		return;
+	if (dm->support_ic_type & ODM_RTL8723F) {
+#if (RTL8723F_SUPPORT == 1)
+		/*RF_DBG(dm, DBG_RF_TX_PWR_TRACK, "[RF]===>%s 8723F TSSI, return!\n", __func__);*/
+		return;
+#endif
+	}
 
 	if (dm->support_ic_type & ODM_RTL8822C) {
 		/*halrf_tssi_cck(dm);*/
@@ -890,7 +923,7 @@ odm_txpowertracking_direct_ce(void *dm_void)
 		odm_set_rf_reg(dm, RF_PATH_A, R_0x42, BIT(19), 0x01);
 		odm_set_rf_reg(dm, RF_PATH_A, R_0x42, BIT(19), 0x00);
 		odm_set_rf_reg(dm, RF_PATH_A, R_0x42, BIT(19), 0x01);
-
+			
 		odm_set_rf_reg(dm, RF_PATH_B, R_0x42, BIT(19), 0x01);
 		odm_set_rf_reg(dm, RF_PATH_B, R_0x42, BIT(19), 0x00);
 		odm_set_rf_reg(dm, RF_PATH_B, R_0x42, BIT(19), 0x01);

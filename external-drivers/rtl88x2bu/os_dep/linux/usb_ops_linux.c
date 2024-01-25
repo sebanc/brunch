@@ -132,7 +132,7 @@ int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u8 request, u16 value, u16 inde
 					RTW_INFO("reg 0x%x, usb %s %u fail, status:%d, vendorreq_times:%d\n"
 						, value, (requesttype == 0x01) ? "read" : "write" , len, status, vendorreq_times);
 				break;
-
+				
 			}
 
 			if (status < 0) {
@@ -410,11 +410,12 @@ void usb_read_port_cancel(struct intf_hdl *pintfhdl)
 	int i;
 	struct recv_buf *precvbuf;
 	_adapter	*padapter = pintfhdl->padapter;
+	struct registry_priv *regsty = adapter_to_regsty(padapter);
 	precvbuf = (struct recv_buf *)padapter->recvpriv.precv_buf;
 
 	RTW_INFO("%s\n", __func__);
 
-	for (i = 0; i < NR_RECVBUFF ; i++) {
+	for (i = 0; i < regsty->recvbuf_nr ; i++) {
 
 		if (precvbuf->purb)	 {
 			/* RTW_INFO("usb_read_port_cancel : usb_kill_urb\n"); */
@@ -745,10 +746,10 @@ void usb_init_recvbuf(_adapter *padapter, struct recv_buf *precvbuf)
 int recvbuf2recvframe(PADAPTER padapter, void *ptr);
 
 #ifdef CONFIG_USE_USB_BUFFER_ALLOC_RX
-void usb_recv_tasklet(void *priv)
+void usb_recv_tasklet(unsigned long data)
 {
 	struct recv_buf *precvbuf = NULL;
-	_adapter	*padapter = (_adapter *)priv;
+	_adapter	*padapter = (_adapter *)data;
 	struct recv_priv	*precvpriv = &padapter->recvpriv;
 
 	while (NULL != (precvbuf = rtw_dequeue_recvbuf(&precvpriv->recv_buf_pending_queue))) {
@@ -883,10 +884,10 @@ u32 usb_read_port(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *rmem)
 }
 #else	/* CONFIG_USE_USB_BUFFER_ALLOC_RX */
 
-void usb_recv_tasklet(void *priv)
+void usb_recv_tasklet(unsigned long data)
 {
 	_pkt			*pskb;
-	_adapter		*padapter = (_adapter *)priv;
+	_adapter		*padapter = (_adapter *)data;
 	struct recv_priv	*precvpriv = &padapter->recvpriv;
 	struct recv_buf	*precvbuf = NULL;
 

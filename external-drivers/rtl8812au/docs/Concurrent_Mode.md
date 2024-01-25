@@ -29,7 +29,7 @@ How do I Enable Concurrent Mode?
 Edit the `Makefile` with a text editor:
 
 ```
-nano Makefile
+${EDITOR} Makefile
 ```
 
 Change the following line:

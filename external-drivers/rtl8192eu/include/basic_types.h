@@ -31,6 +31,45 @@
 	#define _FALSE	FALSE
 #endif
 
+#ifdef PLATFORM_WINDOWS
+
+	typedef signed char s8;
+	typedef unsigned char u8;
+
+	typedef signed short s16;
+	typedef unsigned short u16;
+
+	typedef signed long s32;
+	typedef unsigned long u32;
+
+	typedef unsigned int	uint;
+	typedef	signed int		sint;
+
+
+	typedef signed long long s64;
+	typedef unsigned long long u64;
+
+	#ifdef NDIS50_MINIPORT
+
+		#define NDIS_MAJOR_VERSION       5
+		#define NDIS_MINOR_VERSION       0
+
+	#endif
+
+	#ifdef NDIS51_MINIPORT
+
+		#define NDIS_MAJOR_VERSION       5
+		#define NDIS_MINOR_VERSION       1
+
+	#endif
+
+	typedef NDIS_PROC proc_t;
+
+	typedef LONG atomic_t;
+
+#endif
+
+
 #ifdef PLATFORM_LINUX
 	#include <linux/version.h>
 	#include <linux/types.h>
@@ -38,28 +77,8 @@
 	#include <linux/kernel.h>
 	#include <linux/init.h>
 	#include <linux/utsname.h>
-	#define IN
-	#define OUT
-	#define VOID void
-	#define NDIS_OID uint
-	#define NDIS_STATUS uint
 
 	typedef	signed int sint;
-
-	#ifndef RHEL_RELEASE_CODE
-        #define RHEL_RELEASE_VERSION(a,b) (((a) << 8) + (b))
-        #define RHEL_RELEASE_CODE 0
-	#endif
-
-	#ifndef	PVOID
-		typedef void *PVOID;
-		/* #define PVOID	(void *) */
-	#endif
-
-	#define UCHAR u8
-	#define USHORT u16
-	#define UINT u32
-	#define ULONG u32
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 19))
 typedef _Bool bool;
@@ -76,38 +95,40 @@ enum {
 	typedef	__kernel_ssize_t	SSIZE_T;
 	#define FIELD_OFFSET(s, field)	((SSIZE_T)&((s *)(0))->field)
 
-#define u1Byte		u8
-#define pu1Byte		u8*
+#define NDIS_OID uint
+#endif /*PLATFORM_LINUX*/
 
-#define u2Byte		u16
-#define pu2Byte		u16*
 
-#define u4Byte		u32
-#define pu4Byte		u32*
+#ifdef PLATFORM_FREEBSD
 
-#define u8Byte		u64
-#define pu8Byte		u64*
+	typedef signed char s8;
+	typedef unsigned char u8;
 
-#define s1Byte		s8
-#define ps1Byte		s8*
+	typedef signed short s16;
+	typedef unsigned short u16;
 
-#define s2Byte		s16
-#define ps2Byte		s16*
+	typedef signed int s32;
+	typedef unsigned int u32;
 
-#define s4Byte		s32
-#define ps4Byte		s32*
+	typedef unsigned int	uint;
+	typedef	signed int		sint;
+	typedef long atomic_t;
 
-#define s8Byte		s64
-#define ps8Byte		s64*
+	typedef signed long long s64;
+	typedef unsigned long long u64;
 
-#define UCHAR u8
-#define USHORT u16
-#define UINT u32
-#define ULONG u32
-#define PULONG u32*
+	typedef u32 dma_addr_t;
+
+	typedef void (*proc_t)(void *);
+
+	typedef unsigned int __kernel_size_t;
+	typedef int __kernel_ssize_t;
+
+	typedef	__kernel_size_t	SIZE_T;
+	typedef	__kernel_ssize_t	SSIZE_T;
+	#define FIELD_OFFSET(s, field)	((SSIZE_T)&((s *)(0))->field)
 
 #endif
-
 
 #define MEM_ALIGNMENT_OFFSET	(sizeof (SIZE_T))
 #define MEM_ALIGNMENT_PADDING	(sizeof(SIZE_T) - 1)

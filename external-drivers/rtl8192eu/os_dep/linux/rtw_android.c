@@ -371,7 +371,7 @@ int rtw_android_get_rssi(struct net_device *net, char *command, int total_len)
 	struct	wlan_network	*pcur_network = &pmlmepriv->cur_network;
 	int bytes_written = 0;
 
-	if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) {
+	if (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _TRUE) {
 		bytes_written += snprintf(&command[bytes_written], total_len, "%s rssi %d",
 			pcur_network->network.Ssid.Ssid, padapter->recvpriv.rssi);
 	}
@@ -415,7 +415,7 @@ int rtw_android_get_p2p_dev_addr(struct net_device *net, char *command, int tota
 	int bytes_written = 0;
 
 	/* We use the same address as our HW MAC address */
-	memcpy(command, net->dev_addr, ETH_ALEN);
+	_rtw_memcpy(command, net->dev_addr, ETH_ALEN);
 
 	bytes_written = ETH_ALEN;
 	return bytes_written;
@@ -538,7 +538,7 @@ int rtw_gtk_offload(struct net_device *net, u8 *cmd_ptr)
 		/* string command length of "GTK_REKEY_OFFLOAD" */
 		cmd_ptr += 18;
 
-		memcpy(psta->kek, cmd_ptr, RTW_KEK_LEN);
+		_rtw_memcpy(psta->kek, cmd_ptr, RTW_KEK_LEN);
 		cmd_ptr += RTW_KEK_LEN;
 		/*
 		printk("supplicant KEK: ");
@@ -546,13 +546,13 @@ int rtw_gtk_offload(struct net_device *net, u8 *cmd_ptr)
 			printk(" %02x ", psta->kek[i]);
 		printk("\n supplicant KCK: ");
 		*/
-		memcpy(psta->kck, cmd_ptr, RTW_KCK_LEN);
+		_rtw_memcpy(psta->kck, cmd_ptr, RTW_KCK_LEN);
 		cmd_ptr += RTW_KCK_LEN;
 		/*
 		for(i=0;i<RTW_KEK_LEN; i++)
 			printk(" %02x ", psta->kck[i]);
 		*/
-		memcpy(psta->replay_ctr, cmd_ptr, RTW_REPLAY_CTR_LEN);
+		_rtw_memcpy(psta->replay_ctr, cmd_ptr, RTW_REPLAY_CTR_LEN);
 		psecuritypriv->binstallKCK_KEK = _TRUE;
 
 		/* printk("\nREPLAY_CTR: "); */
@@ -663,11 +663,11 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		ret = -ENOMEM;
 		goto exit;
 	}
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)) || (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8,0))
-	if (!access_ok(priv_cmd.buf, priv_cmd.total_len)){
-#else
+	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+	if (!access_ok(priv_cmd.buf, priv_cmd.total_len)) {
+	#else
 	if (!access_ok(VERIFY_READ, priv_cmd.buf, priv_cmd.total_len)) {
-#endif
+	#endif
 		RTW_INFO("%s: failed to access memory\n", __FUNCTION__);
 		ret = -EFAULT;
 		goto exit;
@@ -828,11 +828,13 @@ int rtw_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		break;
 
 #ifdef CONFIG_IOCTL_CFG80211
+	#ifdef CONFIG_AP_MODE
 	case ANDROID_WIFI_CMD_SET_AP_WPS_P2P_IE: {
 		int skip = strlen(android_wifi_cmd_str[ANDROID_WIFI_CMD_SET_AP_WPS_P2P_IE]) + 3;
 		bytes_written = rtw_cfg80211_set_mgnt_wpsp2pie(net, command + skip, priv_cmd.total_len - skip, *(command + skip - 2) - '0');
 		break;
 	}
+	#endif
 #endif /* CONFIG_IOCTL_CFG80211 */
 
 #ifdef CONFIG_WFD
@@ -1148,6 +1150,7 @@ extern PADAPTER g_test_adapter;
 
 static void shutdown_card(void)
 {
+	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(g_test_adapter);
 	u32 addr;
 	u8 tmp8, cnt = 0;
 
@@ -1164,7 +1167,7 @@ static void shutdown_card(void)
 #ifdef CONFIG_GPIO_WAKEUP
 	/*default wake up pin change to BT*/
 	RTW_INFO("%s:default wake up pin change to BT\n", __FUNCTION__);
-	rtw_hal_switch_gpio_wl_ctrl(g_test_adapter, WAKEUP_GPIO_IDX, _FALSE);
+	rtw_hal_switch_gpio_wl_ctrl(g_test_adapter, pwrpriv->wowlan_gpio_index, _FALSE);
 #endif /* CONFIG_GPIO_WAKEUP */
 #endif /* CONFIG_WOWLAN */
 
@@ -1186,7 +1189,7 @@ static void shutdown_card(void)
 			break;
 		}
 
-		mdelay(10);
+		rtw_mdelay_os(10);
 	} while (1);
 
 	/* unlock register I/O */

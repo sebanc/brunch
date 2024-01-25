@@ -115,7 +115,7 @@ static void _get_sta_beamform_cap(PADAPTER adapter, struct sta_info *sta,
 	mlme = &adapter->mlmepriv;
 
 	if (is_supported_ht(sta->wireless_mode) == _FALSE)
-		return;
+		goto get_bfcap_next;
 
 	/* HT */
 	if (check_fwstate(mlme, WIFI_AP_STATE)) {
@@ -154,8 +154,8 @@ static void _get_sta_beamform_cap(PADAPTER adapter, struct sta_info *sta,
 		}
 	}
 
+get_bfcap_next:
 #ifdef CONFIG_80211AC_VHT
-
 	if (is_supported_vht(sta->wireless_mode) == _FALSE)
 		return;
 

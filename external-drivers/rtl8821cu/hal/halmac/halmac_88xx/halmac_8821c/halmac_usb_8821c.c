@@ -87,7 +87,8 @@ mac_pwr_switch_usb_8821c(struct halmac_adapter *adapter,
 		HALMAC_REG_W8_CLR(REG_SYS_STATUS1 + 1, BIT(0));
 
 		if ((HALMAC_REG_R8(REG_SW_MDIO + 3) & BIT(0)) == BIT(0))
-			PLTFM_MSG_ALWAYS("[ALWAYS]shall R reg twice!!\n");
+			/* nrm */
+			// PLTFM_MSG_ALWAYS("[ALWAYS]shall R reg twice!!\n");
 
 		adapter->halmac_state.mac_pwr = HALMAC_MAC_POWER_ON;
 	}

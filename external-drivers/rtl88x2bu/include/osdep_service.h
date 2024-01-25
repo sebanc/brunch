@@ -30,6 +30,7 @@
 #define RTW_XBUF_UNAVAIL		11
 #define RTW_TX_BALANCE			12
 #define RTW_TX_WAIT_MORE_FRAME	13
+#define RTW_QUEUE_MGMT 14
 
 /* #define RTW_STATUS_TIMEDOUT -110 */
 
@@ -68,6 +69,9 @@
 
 #ifndef BIT
 	#define BIT(x)	(1 << (x))
+#endif
+#ifndef BIT_ULL
+#define BIT_ULL(x)	(1ULL << (x))
 #endif
 
 #define CHECK_BIT(a, b) (!!((a) & (b)))
@@ -309,6 +313,7 @@ u32 rtw_os_pkt_len(_pkt *pkt);
 extern void	_rtw_memcpy(void *dec, const void *sour, u32 sz);
 extern void _rtw_memmove(void *dst, const void *src, u32 sz);
 extern int	_rtw_memcmp(const void *dst, const void *src, u32 sz);
+extern int _rtw_memcmp2(const void *dst, const void *src, u32 sz);
 extern void	_rtw_memset(void *pbuf, int c, u32 sz);
 
 extern void	_rtw_init_listhead(_list *list);
@@ -380,6 +385,30 @@ extern bool _rtw_time_after(systime a, systime b);
 #define rtw_time_before(a,b) _rtw_time_after(b,a)
 #endif
 
+sysptime rtw_sptime_get(void);
+sysptime rtw_sptime_set(s64 secs, const u32 nsecs);
+sysptime rtw_sptime_zero(void);
+
+int rtw_sptime_cmp(const sysptime cmp1, const sysptime cmp2);
+bool rtw_sptime_eql(const sysptime cmp1, const sysptime cmp2);
+bool rtw_sptime_is_zero(const sysptime sptime);
+sysptime rtw_sptime_sub(const sysptime lhs, const sysptime rhs);
+sysptime rtw_sptime_add(const sysptime lhs, const sysptime rhs);
+
+s64 rtw_sptime_to_ms(const sysptime sptime);
+sysptime rtw_ms_to_sptime(u64 ms);
+s64 rtw_sptime_to_us(const sysptime sptime);
+sysptime rtw_us_to_sptime(u64 us);
+s64 rtw_sptime_to_ns(const sysptime sptime);
+sysptime rtw_ns_to_sptime(u64 ns);
+
+s64 rtw_sptime_diff_ms(const sysptime start, const sysptime end);
+s64 rtw_sptime_pass_ms(const sysptime start);
+s64 rtw_sptime_diff_us(const sysptime start, const sysptime end);
+s64 rtw_sptime_pass_us(const sysptime start);
+s64 rtw_sptime_diff_ns(const sysptime start, const sysptime end);
+s64 rtw_sptime_pass_ns(const sysptime start);
+
 extern void	rtw_sleep_schedulable(int ms);
 
 extern void	rtw_msleep_os(int ms);
@@ -399,6 +428,39 @@ extern void	rtw_udelay_os(int us);
 
 extern void rtw_yield_os(void);
 
+enum rtw_pwait_type {
+	RTW_PWAIT_TYPE_MSLEEP,
+	RTW_PWAIT_TYPE_USLEEP,
+	RTW_PWAIT_TYPE_YIELD,
+	RTW_PWAIT_TYPE_MDELAY,
+	RTW_PWAIT_TYPE_UDELAY,
+
+	RTW_PWAIT_TYPE_NUM,
+};
+
+#define RTW_PWAIT_TYPE_VALID(type) (type < RTW_PWAIT_TYPE_NUM)
+
+struct rtw_pwait_conf {
+	enum rtw_pwait_type type;
+	s32 wait_time;
+	s32 wait_cnt_lmt;
+};
+
+struct rtw_pwait_ctx {
+	struct rtw_pwait_conf conf;
+	s32 wait_cnt;
+	void (*wait_hdl)(int us);
+};
+
+extern const char *_rtw_pwait_type_str[];
+#define rtw_pwait_type_str(type) (RTW_PWAIT_TYPE_VALID(type) ? _rtw_pwait_type_str[type] : _rtw_pwait_type_str[RTW_PWAIT_TYPE_NUM])
+
+#define rtw_pwctx_reset(pwctx) (pwctx)->wait_cnt = 0
+#define rtw_pwctx_wait(pwctx) do { (pwctx)->wait_hdl((pwctx)->conf.wait_time); (pwctx)->wait_cnt++; } while(0)
+#define rtw_pwctx_waited(pwctx) ((pwctx)->wait_cnt)
+#define rtw_pwctx_exceed(pwctx) ((pwctx)->conf.wait_cnt_lmt >= 0 && (pwctx)->wait_cnt >= (pwctx)->conf.wait_cnt_lmt)
+
+int rtw_pwctx_config(struct rtw_pwait_ctx *pwctx, enum rtw_pwait_type type, s32 time, s32 cnt_lmt);
 
 extern void rtw_init_timer(_timer *ptimer, void *padapter, void *pfunc, void *ctx);
 
@@ -596,7 +658,7 @@ static inline int largest_bit_64(u64 bitmask)
 	int i;
 
 	for (i = 63; i >= 0; i--)
-		if (bitmask & BIT(i))
+		if (bitmask & BIT_ULL(i))
 			break;
 
 	return i;
@@ -604,6 +666,7 @@ static inline int largest_bit_64(u64 bitmask)
 
 #define rtw_abs(a) (a < 0 ? -a : a)
 #define rtw_min(a, b) ((a > b) ? b : a)
+#define rtw_max(a, b) ((a > b) ? a : b)
 #define rtw_is_range_a_in_b(hi_a, lo_a, hi_b, lo_b) (((hi_a) <= (hi_b)) && ((lo_a) >= (lo_b)))
 #define rtw_is_range_overlap(hi_a, lo_a, hi_b, lo_b) (((hi_a) > (lo_b)) && ((lo_a) < (hi_b)))
 
@@ -788,11 +851,13 @@ struct blacklist_ent {
 	systime exp_time;
 };
 
+#ifdef CONFIG_RTW_MESH
 int rtw_blacklist_add(_queue *blist, const u8 *addr, u32 timeout_ms);
 int rtw_blacklist_del(_queue *blist, const u8 *addr);
 int rtw_blacklist_search(_queue *blist, const u8 *addr);
 void rtw_blacklist_flush(_queue *blist);
 void dump_blacklist(void *sel, _queue *blist, const char *title);
+#endif
 
 /* String handler */
 
@@ -807,6 +872,8 @@ char alpha_to_upper(char c);
 int hex2num_i(char c);
 int hex2byte_i(const char *hex);
 int hexstr2bin(const char *hex, u8 *buf, size_t len);
+
+int hwaddr_aton_i(const char *txt, u8 *addr);
 
 /*
  * Write formatted output to sized buffer

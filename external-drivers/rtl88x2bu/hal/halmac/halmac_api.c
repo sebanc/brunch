@@ -133,7 +133,7 @@ halmac_init_adapter(void *drv_adapter, struct halmac_platform_api *pltfm_api,
 			     "HALMAC_MAJOR_VER = %d\n"
 			     "HALMAC_PROTOTYPE_VER = %d\n"
 			     "HALMAC_MINOR_VER = %d\n"
-			     "HALMAC_PATCH_VER = %s\n",
+			     "HALMAC_PATCH_VER = %d\n",
 			     HALMAC_MAJOR_VER, HALMAC_PROTOTYPE_VER,
 			     HALMAC_MINOR_VER, HALMAC_PATCH_VER);
 

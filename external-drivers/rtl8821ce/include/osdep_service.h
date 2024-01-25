@@ -408,7 +408,11 @@ static __inline void thread_enter(char *name)
 	printf("%s", "RTKTHREAD_enter");
 #endif
 }
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0))
+void __noreturn thread_exit(_completion *comp);
+#else
 void thread_exit(_completion *comp);
+#endif
 void _rtw_init_completion(_completion *comp);
 void _rtw_wait_for_comp_timeout(_completion *comp);
 void _rtw_wait_for_comp(_completion *comp);

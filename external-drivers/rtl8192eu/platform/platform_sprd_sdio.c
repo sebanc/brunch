@@ -41,15 +41,15 @@ int platform_wifi_power_on(void)
 	/* Pull up BT reset pin. */
 	rtw_wifi_gpio_wlan_ctrl(WLAN_BT_PWDN_ON);
 #endif
-	mdelay(5);
+	rtw_mdelay_os(5);
 
 	sdhci_bus_scan();
 #ifdef CONFIG_RTL8723B
 	/* YJ,test,130305 */
-	mdelay(1000);
+	rtw_mdelay_os(1000);
 #endif
 #ifdef ANDROID_2X
-	mdelay(200);
+	rtw_mdelay_os(200);
 #else /* !ANDROID_2X */
 	if (1) {
 		int i = 0;
@@ -70,7 +70,7 @@ void platform_wifi_power_off(void)
 {
 	/* Pull down pwd pin, make wifi enter power down mode. */
 	rtw_wifi_gpio_wlan_ctrl(WLAN_PWDN_OFF);
-	mdelay(5);
+	rtw_mdelay_os(5);
 	rtw_wifi_gpio_deinit();
 
 #ifdef CONFIG_RTL8188E

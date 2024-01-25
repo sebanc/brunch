@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2015 - 2017 Realtek Corporation.
+ * Copyright(c) 2015 - 2019 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -35,11 +35,22 @@
  */
 static u8 sdio_io(struct dvobj_priv *d, u32 addr, void *buf, size_t len, u8 write, u8 cmd52)
 {
+#ifdef DBG_SDIO
+#if (DBG_SDIO >= 3)
+	struct sdio_data *sdio;
+#endif /* DBG_SDIO >= 3 */
+#endif /* DBG_SDIO */
 	u32 addr_drv;	/* address with driver defined bit */
 	int err;
 	u8 retry = 0;
 	u8 stop_retry = _FALSE;	/* flag for stopping retry or not */
 
+
+#ifdef DBG_SDIO
+#if (DBG_SDIO >= 3)
+	sdio = &d->intf_data;
+#endif /* DBG_SDIO >= 3 */
+#endif /* DBG_SDIO */
 
 	if (rtw_is_surprise_removed(dvobj_get_primary_adapter(d))) {
 		RTW_ERR("%s: bSurpriseRemoved, skip %s 0x%05x, %zu bytes\n",
@@ -60,7 +71,7 @@ static u8 sdio_io(struct dvobj_priv *d, u32 addr, void *buf, size_t len, u8 writ
 			if (retry) {
 				RTW_INFO("%s: Retry %s OK! addr=0x%05x %zu bytes, retry=%u,%u\n",
 					 __FUNCTION__, write?"write":"read",
-					 addr, len, retry, atomic_read(&d->continual_io_error));
+					 addr, len, retry, ATOMIC_READ(&d->continual_io_error));
 				RTW_INFO_DUMP("Data: ", buf, len);
 			}
 			rtw_reset_continual_io_error(d);
@@ -68,14 +79,30 @@ static u8 sdio_io(struct dvobj_priv *d, u32 addr, void *buf, size_t len, u8 writ
 		}
 		RTW_ERR("%s: %s FAIL! error(%d) addr=0x%05x %zu bytes, retry=%u,%u\n",
 			__FUNCTION__, write?"write":"read", err, addr, len,
-			retry, atomic_read(&d->continual_io_error));
+			retry, ATOMIC_READ(&d->continual_io_error));
+
+#ifdef DBG_SDIO
+#if (DBG_SDIO >= 3)
+		if (sdio->dbg_enable) {
+			if (sdio->err_test && sdio->err_test_triggered)
+				sdio->err_test = 0;
+
+			if (sdio->err_stop) {
+				RTW_ERR("%s: I/O error! Set surprise remove flag ON!\n",
+					__FUNCTION__);
+				rtw_set_surprise_removed(dvobj_get_primary_adapter(d));
+				return _FAIL;
+			}
+		}
+#endif /* DBG_SDIO >= 3 */
+#endif /* DBG_SDIO */
 
 		retry++;
 		stop_retry = rtw_inc_and_chk_continual_io_error(d);
 		if ((err == -1) || (stop_retry == _TRUE) || (retry > SD_IO_TRY_CNT)) {
 			/* critical error, unrecoverable */
 			RTW_ERR("%s: Fatal error! Set surprise remove flag ON! (retry=%u,%u)\n",
-				__FUNCTION__, retry, atomic_read(&d->continual_io_error));
+				__FUNCTION__, retry, ATOMIC_READ(&d->continual_io_error));
 			rtw_set_surprise_removed(dvobj_get_primary_adapter(d));
 			return _FAIL;
 		}
@@ -84,7 +111,7 @@ static u8 sdio_io(struct dvobj_priv *d, u32 addr, void *buf, size_t len, u8 writ
 		if ((addr & 0x10000) || !(addr & 0xE000)) {
 			RTW_WARN("%s: Retry %s addr=0x%05x %zu bytes, retry=%u,%u\n",
 				 __FUNCTION__, write?"write":"read", addr, len,
-				 retry, atomic_read(&d->continual_io_error));
+				 retry, ATOMIC_READ(&d->continual_io_error));
 			continue;
 		}
 		return _FAIL;

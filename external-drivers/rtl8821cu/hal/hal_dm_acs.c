@@ -289,11 +289,12 @@ void rtw_acs_info_dump(void *sel, _adapter *adapter)
 	u8 max_chan_nums = rfctl->max_chan_nums;
 	u8 ch_idx, ch_num;
 
+	#ifdef CONFIG_RTW_ACS_DBG
 	_RTW_PRINT_SEL(sel, "========== ACS (VER-%d) ==========\n", RTK_ACS_VERSION);
 	_RTW_PRINT_SEL(sel, "Best 24G Channel:%d\n", hal_data->acs.best_chan_24g);
-	_RTW_PRINT_SEL(sel, "Best 5G Channel:%d\n\n", hal_data->acs.best_chan_5g);
+	_RTW_PRINT_SEL(sel, "Best 5G Channel:%d\n", hal_data->acs.best_chan_5g);
+	_RTW_PRINT_SEL(sel, "==================================\n");
 
-	#ifdef CONFIG_RTW_ACS_DBG
 	_RTW_PRINT_SEL(sel, "Advanced setting - scan_type:%c, ch_ms:%d(ms), igi:0x%02x, bw:%d\n",
 		hal_data->acs.scan_type ? 'A' : 'P', hal_data->acs.scan_time, hal_data->acs.igi, hal_data->acs.bw);
 

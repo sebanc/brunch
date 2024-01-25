@@ -32,10 +32,10 @@
  *
  * Note:		For RF type 0222D
  *---------------------------------------------------------------------------*/
-VOID
+void
 PHY_RF6052SetBandwidth8192E(
-	IN	PADAPTER				Adapter,
-	IN	enum channel_width		Bandwidth)	/* 20M or 40M */
+		PADAPTER				Adapter,
+		enum channel_width		Bandwidth)	/* 20M or 40M */
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 
@@ -61,12 +61,13 @@ PHY_RF6052SetBandwidth8192E(
 
 static int
 phy_RF6052_Config_ParaFile_8192E(
-	IN	PADAPTER		Adapter
+		PADAPTER		Adapter
 )
 {
 	enum rf_path			eRFPath;
 	int					rtStatus = _SUCCESS;
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(Adapter);
 	BB_REGISTER_DEFINITION_T	*pPhyReg;
 
 	u32 u4RegValue, MaskforPhySet = 0;;
@@ -74,8 +75,7 @@ phy_RF6052_Config_ParaFile_8192E(
 	/* 3 */ /* ----------------------------------------------------------------- */
 	/* 3 */ /* <2> Initialize RF */
 	/* 3 */ /* ----------------------------------------------------------------- */
-	/* for(eRFPath = RF_PATH_A; eRFPath <pHalData->NumTotalRFPath; eRFPath++) */
-	for (eRFPath = RF_PATH_A; eRFPath < pHalData->NumTotalRFPath; eRFPath++) {
+	for (eRFPath = RF_PATH_A; eRFPath < hal_spec->rf_reg_path_num; eRFPath++) {
 		pPhyReg = &pHalData->PHYRegDef[eRFPath];
 		switch (eRFPath) {
 		case RF_PATH_A:
@@ -94,18 +94,18 @@ phy_RF6052_Config_ParaFile_8192E(
 
 		/*----Set RF_ENV enable----*/
 		phy_set_bb_reg(Adapter, pPhyReg->rfintfe | MaskforPhySet, bRFSI_RFENV << 16, 0x1);
-		udelay(1);/* PlatformStallExecution(1); */
+		rtw_udelay_os(1);/* PlatformStallExecution(1); */
 
 		/*----Set RF_ENV output high----*/
 		phy_set_bb_reg(Adapter, pPhyReg->rfintfo | MaskforPhySet, bRFSI_RFENV, 0x1);
-		udelay(1);/* PlatformStallExecution(1); */
+		rtw_udelay_os(1);/* PlatformStallExecution(1); */
 
 		/* Set bit number of Address and Data for RF register */
 		phy_set_bb_reg(Adapter, pPhyReg->rfHSSIPara2 | MaskforPhySet, b3WireAddressLength, 0x0);	/* Set 1 to 4 bits for 8255 */
-		udelay(1);/* PlatformStallExecution(1); */
+		rtw_udelay_os(1);/* PlatformStallExecution(1); */
 
 		phy_set_bb_reg(Adapter, pPhyReg->rfHSSIPara2 | MaskforPhySet, b3WireDataLength, 0x0);	/* Set 0 to 12  bits for 8255 */
-		udelay(1);/* PlatformStallExecution(1); */
+		rtw_udelay_os(1);/* PlatformStallExecution(1); */
 
 		/*----Initialize RF fom connfiguration file----*/
 		switch (eRFPath) {
@@ -175,9 +175,8 @@ phy_RF6052_Config_ParaFile_Fail:
 
 int
 PHY_RF6052_Config_8192E(
-	IN	PADAPTER		Adapter)
+		PADAPTER		Adapter)
 {
-	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(Adapter);
 	int					rtStatus = _SUCCESS;
 
 	/*  */
@@ -186,7 +185,6 @@ PHY_RF6052_Config_8192E(
 	rtStatus = phy_RF6052_Config_ParaFile_8192E(Adapter);
 
 	return rtStatus;
-
 }
 
 

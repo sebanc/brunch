@@ -145,8 +145,8 @@ static inline u16 rtw_u16_field_get(const u8 *preq_elem, int shift, BOOLEAN ae)
 #define RTW_PERR_IE_TARGET_SN(x)	rtw_u32_field_get(x, 9, 0)
 #define RTW_PERR_IE_TARGET_RCODE(x)	rtw_u16_field_get(x, 13, 0)
 
-#define RTW_TU_TO_SYSTIME(x)	(usecs_to_jiffies((x) * 1024))
-#define RTW_TU_TO_EXP_TIME(x)	(jiffies + RTW_TU_TO_SYSTIME(x))
+#define RTW_TU_TO_SYSTIME(x)	(rtw_us_to_systime((x) * 1024))
+#define RTW_TU_TO_EXP_TIME(x)	(rtw_get_current_time() + RTW_TU_TO_SYSTIME(x))
 #define RTW_MSEC_TO_TU(x) (x*1000/1024)
 #define RTW_SN_GT(x, y) ((s32)(y - x) < 0)
 #define RTW_SN_LT(x, y) ((s32)(x - y) < 0)
@@ -158,16 +158,16 @@ static inline u32 RTW_SN_DELTA(u32 x, u32 y)
 }
 
 #define rtw_net_traversal_jiffies(adapter) \
-	msecs_to_jiffies(adapter->mesh_cfg.dot11MeshHWMPnetDiameterTraversalTime)
+	rtw_ms_to_systime(adapter->mesh_cfg.dot11MeshHWMPnetDiameterTraversalTime)
 #define rtw_default_lifetime(adapter) \
 	RTW_MSEC_TO_TU(adapter->mesh_cfg.dot11MeshHWMPactivePathTimeout)
 #define rtw_min_preq_int_jiff(adapter) \
-	(msecs_to_jiffies(adapter->mesh_cfg.dot11MeshHWMPpreqMinInterval))
+	(rtw_ms_to_systime(adapter->mesh_cfg.dot11MeshHWMPpreqMinInterval))
 #define rtw_max_preq_retries(adapter) (adapter->mesh_cfg.dot11MeshHWMPmaxPREQretries)
 #define rtw_disc_timeout_jiff(adapter) \
-	msecs_to_jiffies(adapter->mesh_cfg.min_discovery_timeout)
+	rtw_ms_to_systime(adapter->mesh_cfg.min_discovery_timeout)
 #define rtw_root_path_confirmation_jiffies(adapter) \
-	msecs_to_jiffies(adapter->mesh_cfg.dot11MeshHWMPconfirmationInterval)
+	rtw_ms_to_systime(adapter->mesh_cfg.dot11MeshHWMPconfirmationInterval)
 
 static inline BOOLEAN rtw_ether_addr_equal(const u8 *addr1, const u8 *addr2)
 {
@@ -216,10 +216,10 @@ static int rtw_mesh_path_sel_frame_tx(enum rtw_mpath_frame_type mpath_action, u8
 	struct xmit_priv *pxmitpriv = &(adapter->xmitpriv);
 	struct mlme_ext_priv *pmlmeext = &(adapter->mlmeextpriv);
 	struct xmit_frame *pmgntframe = NULL;
-	struct ieee80211_hdr *pwlanhdr = NULL;
+	struct rtw_ieee80211_hdr *pwlanhdr = NULL;
 	struct pkt_attrib *pattrib = NULL;
-	u8 category = WLAN_CATEGORY_MESH_ACTION;
-	u8 action = WLAN_MESH_ACTION_HWMP_PATH_SELECTION;
+	u8 category = RTW_WLAN_CATEGORY_MESH;
+	u8 action = RTW_ACT_MESH_HWMP_PATH_SELECTION;
 	u16 *fctrl = NULL;
 	u8 *pos, ie_len;
 
@@ -230,25 +230,25 @@ static int rtw_mesh_path_sel_frame_tx(enum rtw_mpath_frame_type mpath_action, u8
 
 	pattrib = &pmgntframe->attrib;
 	update_mgntframe_attrib(adapter, pattrib);
-	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pos = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
-	pwlanhdr = (struct ieee80211_hdr *)pos;
+	pwlanhdr = (struct rtw_ieee80211_hdr *)pos;
 
 
-	fctrl =&pwlanhdr->frame_control;
+	fctrl = &(pwlanhdr->frame_ctl);
 	*(fctrl) = 0;
 
-	memcpy(pwlanhdr->addr1, da, ETH_ALEN);
-	memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
-	memcpy(pwlanhdr->addr3, adapter_mac_addr(adapter), ETH_ALEN);
+	_rtw_memcpy(pwlanhdr->addr1, da, ETH_ALEN);
+	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
+	_rtw_memcpy(pwlanhdr->addr3, adapter_mac_addr(adapter), ETH_ALEN);
 
 	SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
 	pmlmeext->mgnt_seq++;
-	set_frame_sub_type(pos, IEEE80211_STYPE_ACTION);
+	set_frame_sub_type(pos, WIFI_ACTION);
 
-	pos += sizeof(struct ieee80211_hdr_3addr);
-	pattrib->pktlen = sizeof(struct ieee80211_hdr_3addr);
+	pos += sizeof(struct rtw_ieee80211_hdr_3addr);
+	pattrib->pktlen = sizeof(struct rtw_ieee80211_hdr_3addr);
 
 	pos = rtw_set_fixed_ie(pos, 1, &(category), &(pattrib->pktlen));
 	pos = rtw_set_fixed_ie(pos, 1, &(action), &(pattrib->pktlen));
@@ -268,7 +268,7 @@ static int rtw_mesh_path_sel_frame_tx(enum rtw_mpath_frame_type mpath_action, u8
 		break;
 	case RTW_MPATH_RANN:
 		RTW_HWMP_DBG("sending RANN from "MAC_FMT"\n", MAC_ARG(originator_addr));
-		ie_len = sizeof(struct ieee80211_rann_ie);
+		ie_len = sizeof(struct rtw_ieee80211_rann_ie);
 		pattrib->pktlen += (ie_len + 2);
 		*pos++ = WLAN_EID_RANN;
 		break;
@@ -282,7 +282,7 @@ static int rtw_mesh_path_sel_frame_tx(enum rtw_mpath_frame_type mpath_action, u8
 	*pos++ = hopcount;
 	*pos++ = ttl;
 	if (mpath_action == RTW_MPATH_PREP) {
-		memcpy(pos, target, ETH_ALEN);
+		_rtw_memcpy(pos, target, ETH_ALEN);
 		pos += ETH_ALEN;
 		*(u32 *)pos = cpu_to_le32(target_sn);
 		pos += 4;
@@ -291,7 +291,7 @@ static int rtw_mesh_path_sel_frame_tx(enum rtw_mpath_frame_type mpath_action, u8
 			*(u32 *)pos = cpu_to_le32(preq_id);
 			pos += 4;
 		}
-		memcpy(pos, originator_addr, ETH_ALEN);
+		_rtw_memcpy(pos, originator_addr, ETH_ALEN);
 		pos += ETH_ALEN;
 		*(u32 *)pos = cpu_to_le32(originator_sn);
 		pos += 4;
@@ -303,12 +303,12 @@ static int rtw_mesh_path_sel_frame_tx(enum rtw_mpath_frame_type mpath_action, u8
 	if (mpath_action == RTW_MPATH_PREQ) {
 		*pos++ = 1; /* support only 1 destination now */
 		*pos++ = target_flags;
-		memcpy(pos, target, ETH_ALEN);
+		_rtw_memcpy(pos, target, ETH_ALEN);
 		pos += ETH_ALEN;
 		*(u32 *)pos = cpu_to_le32(target_sn);
 		pos += 4;
 	} else if (mpath_action == RTW_MPATH_PREP) {
-		memcpy(pos, originator_addr, ETH_ALEN);
+		_rtw_memcpy(pos, originator_addr, ETH_ALEN);
 		pos += ETH_ALEN;
 		*(u32 *)pos = cpu_to_le32(originator_sn);
 		pos += 4;
@@ -327,15 +327,15 @@ int rtw_mesh_path_error_tx(_adapter *adapter,
 	struct xmit_priv *pxmitpriv = &(adapter->xmitpriv);
 	struct mlme_ext_priv *pmlmeext = &(adapter->mlmeextpriv);
 	struct xmit_frame *pmgntframe = NULL;
-	struct ieee80211_hdr *pwlanhdr = NULL;
+	struct rtw_ieee80211_hdr *pwlanhdr = NULL;
 	struct pkt_attrib *pattrib = NULL;
 	struct rtw_mesh_info *minfo = &adapter->mesh_info;
-	u8 category = WLAN_CATEGORY_MESH_ACTION;
-	u8 action = WLAN_MESH_ACTION_HWMP_PATH_SELECTION;
+	u8 category = RTW_WLAN_CATEGORY_MESH;
+	u8 action = RTW_ACT_MESH_HWMP_PATH_SELECTION;
 	u8 *pos, ie_len;
 	u16 *fctrl = NULL;
 
-	if (rtw_time_before(jiffies, minfo->next_perr))
+	if (rtw_time_before(rtw_get_current_time(), minfo->next_perr))
 		return -1;
 
 	pmgntframe = alloc_mgtxmitframe(pxmitpriv);
@@ -344,24 +344,24 @@ int rtw_mesh_path_error_tx(_adapter *adapter,
 
 	pattrib = &pmgntframe->attrib;
 	update_mgntframe_attrib(adapter, pattrib);
-	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pos = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
-	pwlanhdr = (struct ieee80211_hdr *)pos;
+	pwlanhdr = (struct rtw_ieee80211_hdr *)pos;
 
-	fctrl =&pwlanhdr->frame_control;
+	fctrl = &(pwlanhdr->frame_ctl);
 	*(fctrl) = 0;
 
-	memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
-	memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
-	memcpy(pwlanhdr->addr3, adapter_mac_addr(adapter), ETH_ALEN);
+	_rtw_memcpy(pwlanhdr->addr1, ra, ETH_ALEN);
+	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(adapter), ETH_ALEN);
+	_rtw_memcpy(pwlanhdr->addr3, adapter_mac_addr(adapter), ETH_ALEN);
 
 	SetSeqNum(pwlanhdr, pmlmeext->mgnt_seq);
 	pmlmeext->mgnt_seq++;
-	set_frame_sub_type(pos, IEEE80211_STYPE_ACTION);
+	set_frame_sub_type(pos, WIFI_ACTION);
 
-	pos += sizeof(struct ieee80211_hdr_3addr);
-	pattrib->pktlen = sizeof(struct ieee80211_hdr_3addr);
+	pos += sizeof(struct rtw_ieee80211_hdr_3addr);
+	pattrib->pktlen = sizeof(struct rtw_ieee80211_hdr_3addr);
 
 	pos = rtw_set_fixed_ie(pos, 1, &(category), &(pattrib->pktlen));
 	pos = rtw_set_fixed_ie(pos, 1, &(action), &(pattrib->pktlen));
@@ -377,7 +377,7 @@ int rtw_mesh_path_error_tx(_adapter *adapter,
 	/* Flags format | B7 | B6 | B5:B0 | = | rsvd | AE | rsvd | */
 	*pos = 0;
 	pos++;
-	memcpy(pos, target, ETH_ALEN);
+	_rtw_memcpy(pos, target, ETH_ALEN);
 	pos += ETH_ALEN;
 	*(u32 *)pos = cpu_to_le32(target_sn);
 	pos += 4;
@@ -392,162 +392,6 @@ int rtw_mesh_path_error_tx(_adapter *adapter,
 	RTW_HWMP_DBG("TX PERR toward "MAC_FMT", ra = "MAC_FMT"\n", MAC_ARG(target), MAC_ARG(ra));
 	
 	return 0;
-}
-
-static u32 rtw_get_vht_bitrate(u8 mcs, u8 bw, u8 nss, u8 sgi)
-{
-	static const u32 base[4][10] = {
-		{   6500000,
-		   13000000,
-		   19500000,
-		   26000000,
-		   39000000,
-		   52000000,
-		   58500000,
-		   65000000,
-		   78000000,
-		/* not in the spec, but some devices use this: */
-		   86500000,
-		},
-		{  13500000,
-		   27000000,
-		   40500000,
-		   54000000,
-		   81000000,
-		  108000000,
-		  121500000,
-		  135000000,
-		  162000000,
-		  180000000,
-		},
-		{  29300000,
-		   58500000,
-		   87800000,
-		  117000000,
-		  175500000,
-		  234000000,
-		  263300000,
-		  292500000,
-		  351000000,
-		  390000000,
-		},
-		{  58500000,
-		  117000000,
-		  175500000,
-		  234000000,
-		  351000000,
-		  468000000,
-		  526500000,
-		  585000000,
-		  702000000,
-		  780000000,
-		},
-	};
-	u32 bitrate;
-	int bw_idx;
-
-	if (mcs > 9) {
-		RTW_HWMP_INFO("Invalid mcs = %d\n", mcs);
-		return 0;
-	}
-
-	if (nss > 4 || nss < 1) {
-		RTW_HWMP_INFO("Now only support nss = 1, 2, 3, 4\n");
-	}
-
-	switch (bw) {
-	case CHANNEL_WIDTH_160:
-		bw_idx = 3;
-		break;
-	case CHANNEL_WIDTH_80:
-		bw_idx = 2;
-		break;
-	case CHANNEL_WIDTH_40:
-		bw_idx = 1;
-		break;
-	case CHANNEL_WIDTH_20:
-		bw_idx = 0;
-		break;
-	default:
-		RTW_HWMP_INFO("bw = %d currently not supported\n", bw);
-		return 0;
-	}
-
-	bitrate = base[bw_idx][mcs];
-	bitrate *= nss;
-
-	if (sgi)
-		bitrate = (bitrate / 9) * 10;
-
-	/* do NOT round down here */
-	return (bitrate + 50000) / 100000;
-}
-
-static u32 rtw_get_ht_bitrate(u8 mcs, u8 bw, u8 sgi)
-{
-	int modulation, streams, bitrate;
-
-	/* the formula below does only work for MCS values smaller than 32 */
-	if (mcs >= 32) {
-		RTW_HWMP_INFO("Invalid mcs = %d\n", mcs);
-		return 0;
-	}
-
-	if (bw > 1) {
-		RTW_HWMP_INFO("Now HT only support bw = 0(20Mhz), 1(40Mhz)\n");
-		return 0;
-	}
-
-	modulation = mcs & 7;
-	streams = (mcs >> 3) + 1;
-
-	bitrate = (bw == 1) ? 13500000 : 6500000;
-
-	if (modulation < 4)
-		bitrate *= (modulation + 1);
-	else if (modulation == 4)
-		bitrate *= (modulation + 2);
-	else
-		bitrate *= (modulation + 3);
-
-	bitrate *= streams;
-
-	if (sgi)
-		bitrate = (bitrate / 9) * 10;
-
-	/* do NOT round down here */
-	return (bitrate + 50000) / 100000;
-}
-
-/**
- * @bw: 0(20Mhz), 1(40Mhz), 2(80Mhz), 3(160Mhz)
- * @rate_idx: DESC_RATEXXXX & 0x7f
- * @sgi: DESC_RATEXXXX >> 7
- * Returns: bitrate in 100kbps
- */
-static u32 rtw_desc_rate_to_bitrate(u8 bw, u8 rate_idx, u8 sgi)
-{
-	u32 bitrate;
-
-	if (rate_idx <= DESC_RATE54M){
-		u16 ofdm_rate[12] = {10, 20, 55, 110,
-			60, 90, 120, 180, 240, 360, 480, 540};
-		bitrate = ofdm_rate[rate_idx];
-	} else if ((DESC_RATEMCS0 <= rate_idx) &&
-		   (rate_idx <= DESC_RATEMCS31)) {
-		u8 mcs = rate_idx - DESC_RATEMCS0;
-		bitrate = rtw_get_ht_bitrate(mcs, bw, sgi);
-	} else if ((DESC_RATEVHTSS1MCS0 <= rate_idx) &&
-		   (rate_idx <= DESC_RATEVHTSS4MCS9)) {
-		u8 mcs = (rate_idx - DESC_RATEVHTSS1MCS0) % 10;
-		u8 nss = ((rate_idx - DESC_RATEVHTSS1MCS0) / 10) + 1;
-		bitrate = rtw_get_vht_bitrate(mcs, bw, nss, sgi);
-	} else {
-		/* 60Ghz ??? */
-		bitrate = 1;
-	}
-
-	return bitrate;
 }
 
 static u32 rtw_airtime_link_metric_get(_adapter *adapter, struct sta_info *sta)
@@ -622,7 +466,7 @@ void rtw_ieee80211s_update_metric(_adapter *adapter, u8 mac_id,
 }
 
 static void rtw_hwmp_preq_frame_process(_adapter *adapter,
-					struct ieee80211_hdr_3addr *mgmt,
+					struct rtw_ieee80211_hdr_3addr *mgmt,
 					const u8 *preq_elem, u32 originator_metric)
 {
 	struct rtw_mesh_info *minfo = &adapter->mesh_info;
@@ -644,7 +488,7 @@ static void rtw_hwmp_preq_frame_process(_adapter *adapter,
 	target_flags = RTW_PREQ_IE_TARGET_F(preq_elem);
 	/* PREQ gate announcements */
 	flags = RTW_PREQ_IE_FLAGS(preq_elem);
-	preq_is_gate = !!(flags & IEEE80211_PREQ_IS_GATE_FLAG);
+	preq_is_gate = !!(flags & RTW_IEEE80211_PREQ_IS_GATE_FLAG);
 
 	RTW_HWMP_DBG("received PREQ from "MAC_FMT"\n", MAC_ARG(originator_addr));
 
@@ -669,24 +513,24 @@ static void rtw_hwmp_preq_frame_process(_adapter *adapter,
 		reply = _TRUE;
 		to_gate_ask = 1;
 		target_metric = 0;
-		if (rtw_time_after(jiffies, minfo->last_sn_update +
+		if (rtw_time_after(rtw_get_current_time(), minfo->last_sn_update +
 					rtw_net_traversal_jiffies(adapter)) ||
-		    rtw_time_before(jiffies, minfo->last_sn_update)) {
+		    rtw_time_before(rtw_get_current_time(), minfo->last_sn_update)) {
 			++minfo->sn;
-			minfo->last_sn_update = jiffies;
+			minfo->last_sn_update = rtw_get_current_time();
 		}
 		target_sn = minfo->sn;
 	} else if (is_broadcast_mac_addr(target_addr) &&
-		   (target_flags & IEEE80211_PREQ_TO_FLAG)) {
+		   (target_flags & RTW_IEEE80211_PREQ_TO_FLAG)) {
 		rtw_rcu_read_lock();
 		path = rtw_mesh_path_lookup(adapter, originator_addr);
 		if (path) {
-			if (flags & IEEE80211_PREQ_PROACTIVE_PREP_FLAG) {
+			if (flags & RTW_IEEE80211_PREQ_PROACTIVE_PREP_FLAG) {
 				reply = _TRUE;
 				target_addr = adapter_mac_addr(adapter);
 				target_sn = ++minfo->sn;
 				target_metric = 0;
-				minfo->last_sn_update = jiffies;
+				minfo->last_sn_update = rtw_get_current_time();
 			}
 
 			if (preq_is_gate) {
@@ -722,13 +566,13 @@ static void rtw_hwmp_preq_frame_process(_adapter *adapter,
 					RTW_SN_LT(path->sn, target_sn)) {
 				path->sn = target_sn;
 				path->flags |= RTW_MESH_PATH_SN_VALID;
-			} else if ((!(target_flags & IEEE80211_PREQ_TO_FLAG)) &&
+			} else if ((!(target_flags & RTW_IEEE80211_PREQ_TO_FLAG)) &&
 					(path->flags & RTW_MESH_PATH_ACTIVE)) {
 				reply = _TRUE;
 				target_metric = path->metric;
 				target_sn = path->sn;
 				/* Case E2 of sec 13.10.9.3 IEEE 802.11-2012*/
-				target_flags |= IEEE80211_PREQ_TO_FLAG;
+				target_flags |= RTW_IEEE80211_PREQ_TO_FLAG;
 			}
 		}
 		rtw_rcu_read_unlock();
@@ -748,7 +592,7 @@ static void rtw_hwmp_preq_frame_process(_adapter *adapter,
 			RTW_HWMP_DBG("replying to the PREQ (PREQ for us)\n");
 			if (mshcfg->dot11MeshGateAnnouncementProtocol) {
 				/* BIT 7 is used to identify the prep is from mesh gate */
-				to_gate_ask = IEEE80211_PREQ_IS_GATE_FLAG | BIT(7);
+				to_gate_ask = RTW_IEEE80211_PREQ_IS_GATE_FLAG | BIT(7);
 			} else {
 				to_gate_ask = 0;
 			}
@@ -780,7 +624,7 @@ static void rtw_hwmp_preq_frame_process(_adapter *adapter,
 		da = (path && path->is_root) ?
 			path->rann_snd_addr : bcast_addr;
 
-		if (flags & IEEE80211_PREQ_PROACTIVE_PREP_FLAG) {
+		if (flags & RTW_IEEE80211_PREQ_PROACTIVE_PREP_FLAG) {
 			target_addr = RTW_PREQ_IE_TARGET_ADDR(preq_elem);
 			target_sn = RTW_PREQ_IE_TARGET_SN(preq_elem);
 		}
@@ -805,7 +649,7 @@ rtw_next_hop_deref_protected(struct rtw_mesh_path *path)
 }
 
 static void rtw_hwmp_prep_frame_process(_adapter *adapter,
-					struct ieee80211_hdr_3addr *mgmt,
+					struct rtw_ieee80211_hdr_3addr *mgmt,
 					const u8 *prep_elem, u32 metric)
 {
 	struct rtw_mesh_cfg *mshcfg = &adapter->mesh_cfg;
@@ -831,7 +675,7 @@ static void rtw_hwmp_prep_frame_process(_adapter *adapter,
 				enter_critical_bh(&path->state_lock);
 				path->gate_asked = false;
 				exit_critical_bh(&path->state_lock);
-				if (!(flags & IEEE80211_PREQ_IS_GATE_FLAG)) {
+				if (!(flags & RTW_IEEE80211_PREQ_IS_GATE_FLAG)) {
 					enter_critical_bh(&path->state_lock);
 					rtw_mesh_gate_del(adapter->mesh_info.mesh_paths, path);
 					exit_critical_bh(&path->state_lock);
@@ -862,7 +706,7 @@ static void rtw_hwmp_prep_frame_process(_adapter *adapter,
 		exit_critical_bh(&path->state_lock);
 		goto fail;
 	}
-	memcpy(next_hop, rtw_next_hop_deref_protected(path)->cmn.mac_addr, ETH_ALEN);
+	_rtw_memcpy(next_hop, rtw_next_hop_deref_protected(path)->cmn.mac_addr, ETH_ALEN);
 	exit_critical_bh(&path->state_lock);
 	--ttl;
 	flags = RTW_PREP_IE_FLAGS(prep_elem);
@@ -887,7 +731,7 @@ fail:
 }
 
 static void rtw_hwmp_perr_frame_process(_adapter *adapter,
-					struct ieee80211_hdr_3addr *mgmt,
+					struct rtw_ieee80211_hdr_3addr *mgmt,
 					const u8 *perr_elem)
 {
 	struct rtw_mesh_cfg *mshcfg = &adapter->mesh_cfg;
@@ -942,8 +786,8 @@ endperr:
 }
 
 static void rtw_hwmp_rann_frame_process(_adapter *adapter,
-					struct ieee80211_hdr_3addr *mgmt,
-					const struct ieee80211_rann_ie *rann)
+					struct rtw_ieee80211_hdr_3addr *mgmt,
+					const struct rtw_ieee80211_rann_ie *rann)
 {
 	struct sta_info *sta;
 	struct sta_priv *pstapriv = &adapter->stapriv;
@@ -957,7 +801,7 @@ static void rtw_hwmp_rann_frame_process(_adapter *adapter,
 
 	ttl = rann->rann_ttl;
 	flags = rann->rann_flags;
-	root_is_gate = !!(flags & RANN_FLAG_IS_GATE);
+	root_is_gate = !!(flags & RTW_RANN_FLAG_IS_GATE);
 	originator_addr = rann->rann_addr;
 	originator_sn = le32_to_cpu(rann->rann_seq);
 	interval = le32_to_cpu(rann->rann_interval);
@@ -998,9 +842,9 @@ static void rtw_hwmp_rann_frame_process(_adapter *adapter,
 	}
 
 	if ((!(path->flags & (RTW_MESH_PATH_ACTIVE | RTW_MESH_PATH_RESOLVING)) ||
-	     (rtw_time_after(jiffies, path->last_preq_to_root +
+	     (rtw_time_after(rtw_get_current_time(), path->last_preq_to_root +
 				  rtw_root_path_confirmation_jiffies(adapter)) ||
-	     rtw_time_before(jiffies, path->last_preq_to_root))) &&
+	     rtw_time_before(rtw_get_current_time(), path->last_preq_to_root))) &&
 	     !(path->flags & RTW_MESH_PATH_FIXED) && (ttl != 0)) {
 		u8 preq_node_flag = RTW_PREQ_Q_F_START | RTW_PREQ_Q_F_REFRESH;
 
@@ -1015,14 +859,14 @@ static void rtw_hwmp_rann_frame_process(_adapter *adapter,
 				     "add_chk_rann_snd_addr= "MAC_FMT"\n",
 					MAC_ARG(mgmt->addr2),
 					MAC_ARG(path->rann_snd_addr));
-			memcpy(path->add_chk_rann_snd_addr,
+			_rtw_memcpy(path->add_chk_rann_snd_addr,
 				    path->rann_snd_addr, ETH_ALEN);
 			preq_node_flag |= RTW_PREQ_Q_F_CHK;
 			
 		}
 #endif
 		rtw_mesh_queue_preq(path, preq_node_flag);
-		path->last_preq_to_root = jiffies;
+		path->last_preq_to_root = rtw_get_current_time();
 	}
 
 	path->sn = originator_sn;
@@ -1030,7 +874,7 @@ static void rtw_hwmp_rann_frame_process(_adapter *adapter,
 	path->is_root = _TRUE;
 	/* Recording RANNs sender address to send individually
 	 * addressed PREQs destined for root mesh STA */
-	memcpy(path->rann_snd_addr, mgmt->addr2, ETH_ALEN);
+	_rtw_memcpy(path->rann_snd_addr, mgmt->addr2, ETH_ALEN);
 
 	if (root_is_gate) {
 		path->gate_ann_int = interval;
@@ -1060,7 +904,7 @@ static void rtw_hwmp_rann_frame_process(_adapter *adapter,
 }
 
 static u32 rtw_hwmp_route_info_get(_adapter *adapter,
-				   struct ieee80211_hdr_3addr *mgmt,
+				   struct rtw_ieee80211_hdr_3addr *mgmt,
 				   const u8 *hwmp_ie, enum rtw_mpath_frame_type action)
 {
 	struct rtw_mesh_path *path;
@@ -1159,7 +1003,7 @@ static u32 rtw_hwmp_route_info_get(_adapter *adapter,
 			rtw_mesh_path_activate(path);
 #ifdef CONFIG_RTW_MESH_ADD_ROOT_CHK
 			if (path->is_root && (action == RTW_MPATH_PREP)) {
-				memcpy(path->rann_snd_addr, 
+				_rtw_memcpy(path->rann_snd_addr, 
 				mgmt->addr2, ETH_ALEN);
 				path->rann_metric = new_metric;
 			}
@@ -1227,8 +1071,8 @@ void rtw_mesh_rx_path_sel_frame(_adapter *adapter, union recv_frame *rframe)
 	struct rx_pkt_attrib *attrib = &rframe->u.hdr.attrib;
 	u8 *pframe = rframe->u.hdr.rx_data, *start;
 	uint frame_len = rframe->u.hdr.len, left;
-	struct ieee80211_hdr_3addr *frame_hdr = (struct ieee80211_hdr_3addr *)pframe;
-	u8 *frame_body = (u8 *)(pframe + sizeof(struct ieee80211_hdr_3addr));
+	struct rtw_ieee80211_hdr_3addr *frame_hdr = (struct rtw_ieee80211_hdr_3addr *)pframe;
+	u8 *frame_body = (u8 *)(pframe + sizeof(struct rtw_ieee80211_hdr_3addr));
 	ParseRes parse_res;
 
 	plink = rtw_mesh_plink_get(adapter, get_addr2_ptr(pframe));
@@ -1238,7 +1082,7 @@ void rtw_mesh_rx_path_sel_frame(_adapter *adapter, union recv_frame *rframe)
 	rtw_mesh_rx_hwmp_frame_cnts(adapter, get_addr2_ptr(pframe));
 
 	/* Mesh action frame IE offset = 2 */
-	attrib->hdrlen = sizeof(struct ieee80211_hdr_3addr);
+	attrib->hdrlen = sizeof(struct rtw_ieee80211_hdr_3addr);
 	left = frame_len - attrib->hdrlen - attrib->iv_len - attrib->icv_len - 2;
 	start = pframe + attrib->hdrlen + 2;
 
@@ -1277,7 +1121,7 @@ void rtw_mesh_rx_path_sel_frame(_adapter *adapter, union recv_frame *rframe)
 		rtw_hwmp_perr_frame_process(adapter, frame_hdr, elems.perr);
 	}
 	if (elems.rann)
-		rtw_hwmp_rann_frame_process(adapter, frame_hdr, (struct ieee80211_rann_ie *)elems.rann);
+		rtw_hwmp_rann_frame_process(adapter, frame_hdr, (struct rtw_ieee80211_rann_ie *)elems.rann);
 }
 
 void rtw_mesh_queue_preq(struct rtw_mesh_path *path, u8 flags)
@@ -1309,7 +1153,7 @@ void rtw_mesh_queue_preq(struct rtw_mesh_path *path, u8 flags)
 		return;
 	}
 
-	memcpy(preq_node->dst, path->dst, ETH_ALEN);
+	_rtw_memcpy(preq_node->dst, path->dst, ETH_ALEN);
 	preq_node->flags = flags;
 
 	path->flags |= RTW_MESH_PATH_REQ_QUEUED;
@@ -1319,18 +1163,20 @@ void rtw_mesh_queue_preq(struct rtw_mesh_path *path, u8 flags)
 #endif
 	if (flags & RTW_PREQ_Q_F_PEER_AKA)
 		path->flags |= RTW_MESH_PATH_PEER_AKA;
+	if (flags & RTW_PREQ_Q_F_BCAST_PREQ)
+		path->flags |= RTW_MESH_PATH_BCAST_PREQ;
 	_rtw_spinunlock(&path->state_lock);
 
 	rtw_list_insert_tail(&preq_node->list, &minfo->preq_queue.list);
 	++minfo->preq_queue_len;
 	exit_critical_bh(&minfo->mesh_preq_queue_lock);
 
-	if (rtw_time_after(jiffies, minfo->last_preq + rtw_min_preq_int_jiff(adapter)))
+	if (rtw_time_after(rtw_get_current_time(), minfo->last_preq + rtw_min_preq_int_jiff(adapter)))
 		rtw_mesh_work(&adapter->mesh_work);
 
-	else if (rtw_time_before(jiffies, minfo->last_preq)) {
+	else if (rtw_time_before(rtw_get_current_time(), minfo->last_preq)) {
 		/* systime wrapped around issue */
-		minfo->last_preq = jiffies - rtw_min_preq_int_jiff(adapter) - 1;
+		minfo->last_preq = rtw_get_current_time() - rtw_min_preq_int_jiff(adapter) - 1;
 		rtw_mesh_work(&adapter->mesh_work);
 	} else
 		rtw_mod_timer(&adapter->mesh_path_timer, minfo->last_preq +
@@ -1338,12 +1184,15 @@ void rtw_mesh_queue_preq(struct rtw_mesh_path *path, u8 flags)
 }
 
 static const u8 *rtw_hwmp_preq_da(struct rtw_mesh_path *path,
-			    BOOLEAN is_root_add_chk, BOOLEAN da_is_peer)
+			    BOOLEAN is_root_add_chk, BOOLEAN da_is_peer,
+			    BOOLEAN force_preq_bcast)
 {
 	const u8 *da;
 
 	if (da_is_peer)
 		da = path->dst;
+	else if (force_preq_bcast)
+		da = bcast_addr;
 	else if (path->is_root)
 #ifdef CONFIG_RTW_MESH_ADD_ROOT_CHK
 		da = is_root_add_chk ? path->add_chk_rann_snd_addr:
@@ -1368,11 +1217,11 @@ void rtw_mesh_path_start_discovery(_adapter *adapter)
 	u32 lifetime;
 	u8 flags = 0;
 	BOOLEAN is_root_add_chk = _FALSE;
-	BOOLEAN da_is_peer;
+	BOOLEAN da_is_peer, force_preq_bcast;
 
 	enter_critical_bh(&minfo->mesh_preq_queue_lock);
 	if (!minfo->preq_queue_len ||
-		rtw_time_before(jiffies, minfo->last_preq +
+		rtw_time_before(rtw_get_current_time(), minfo->last_preq +
 				rtw_min_preq_int_jiff(adapter))) {
 		exit_critical_bh(&minfo->mesh_preq_queue_lock);
 		return;
@@ -1412,13 +1261,13 @@ void rtw_mesh_path_start_discovery(_adapter *adapter)
 		goto enddiscovery;
 	}
 
-	minfo->last_preq = jiffies;
+	minfo->last_preq = rtw_get_current_time();
 
-	if (rtw_time_after(jiffies, minfo->last_sn_update +
+	if (rtw_time_after(rtw_get_current_time(), minfo->last_sn_update +
 				rtw_net_traversal_jiffies(adapter)) ||
-	    rtw_time_before(jiffies, minfo->last_sn_update)) {
+	    rtw_time_before(rtw_get_current_time(), minfo->last_sn_update)) {
 		++minfo->sn;
-		minfo->last_sn_update = jiffies;
+		minfo->last_sn_update = rtw_get_current_time();
 	}
 	lifetime = rtw_default_lifetime(adapter);
 	ttl = mshcfg->element_ttl;
@@ -1429,26 +1278,28 @@ void rtw_mesh_path_start_discovery(_adapter *adapter)
 	}
 
 	if (preq_node->flags & RTW_PREQ_Q_F_REFRESH)
-		target_flags |= IEEE80211_PREQ_TO_FLAG;
+		target_flags |= RTW_IEEE80211_PREQ_TO_FLAG;
 	else
-		target_flags &= ~IEEE80211_PREQ_TO_FLAG;
+		target_flags &= ~RTW_IEEE80211_PREQ_TO_FLAG;
 
 #ifdef CONFIG_RTW_MESH_ADD_ROOT_CHK
 	is_root_add_chk = !!(path->flags & RTW_MESH_PATH_ROOT_ADD_CHK);
 #endif
 	da_is_peer = !!(path->flags & RTW_MESH_PATH_PEER_AKA);
+	force_preq_bcast = !!(path->flags & RTW_MESH_PATH_BCAST_PREQ);
 	exit_critical_bh(&path->state_lock);
 
-	da = rtw_hwmp_preq_da(path, is_root_add_chk, da_is_peer);
+	da = rtw_hwmp_preq_da(path, is_root_add_chk,
+			      da_is_peer, force_preq_bcast);
 
 #ifdef CONFIG_RTW_MESH_ON_DMD_GANN
 	flags = (mshcfg->dot11MeshGateAnnouncementProtocol)
-		? IEEE80211_PREQ_IS_GATE_FLAG : 0;
+		? RTW_IEEE80211_PREQ_IS_GATE_FLAG : 0;
 #endif
 	rtw_mesh_path_sel_frame_tx(RTW_MPATH_PREQ, flags, adapter_mac_addr(adapter), minfo->sn,
 				   target_flags, path->dst, path->sn, da, 0,
 				   ttl, lifetime, 0, minfo->preq_id++, adapter);
-	rtw_mod_timer(&path->timer, jiffies + path->discovery_timeout);
+	rtw_mod_timer(&path->timer, rtw_get_current_time() + path->discovery_timeout);
 
 enddiscovery:
 	rtw_rcu_read_unlock();
@@ -1475,7 +1326,8 @@ void rtw_mesh_path_timer(void *ctx)
 		path->flags &= ~(RTW_MESH_PATH_RESOLVING |
 				 RTW_MESH_PATH_RESOLVED |
 				 RTW_MESH_PATH_ROOT_ADD_CHK |
-				 RTW_MESH_PATH_PEER_AKA);
+				 RTW_MESH_PATH_PEER_AKA |
+				 RTW_MESH_PATH_BCAST_PREQ);
 		exit_critical_bh(&path->state_lock);
 	} else if (path->discovery_retries < rtw_max_preq_retries(adapter)) {
 		++path->discovery_retries;
@@ -1495,8 +1347,9 @@ void rtw_mesh_path_timer(void *ctx)
 				  RTW_MESH_PATH_RESOLVED |
 				  RTW_MESH_PATH_REQ_QUEUED |
 				  RTW_MESH_PATH_ROOT_ADD_CHK |
-				  RTW_MESH_PATH_PEER_AKA);
-		path->exp_time = jiffies;
+				  RTW_MESH_PATH_PEER_AKA |
+				  RTW_MESH_PATH_BCAST_PREQ);
+		path->exp_time = rtw_get_current_time();
 		exit_critical_bh(&path->state_lock);
 		if (!path->is_gate && rtw_mesh_gate_num(adapter) > 0) {
 			ret = rtw_mesh_path_send_to_gates(path);
@@ -1516,21 +1369,21 @@ void rtw_mesh_path_tx_root_frame(_adapter *adapter)
 	u8 flags, target_flags = 0;
 
 	flags = (mshcfg->dot11MeshGateAnnouncementProtocol)
-			? RANN_FLAG_IS_GATE : 0;
+			? RTW_RANN_FLAG_IS_GATE : 0;
 
 	switch (mshcfg->dot11MeshHWMPRootMode) {
-	case IEEE80211_PROACTIVE_RANN:
+	case RTW_IEEE80211_PROACTIVE_RANN:
 		rtw_mesh_path_sel_frame_tx(RTW_MPATH_RANN, flags, adapter_mac_addr(adapter),
 					   ++minfo->sn, 0, NULL, 0, bcast_addr,
 					   0, mshcfg->element_ttl,
 					   interval, 0, 0, adapter);
 		break;
-	case IEEE80211_PROACTIVE_PREQ_WITH_PREP:
-		flags |= IEEE80211_PREQ_PROACTIVE_PREP_FLAG;
-	case IEEE80211_PROACTIVE_PREQ_NO_PREP:
+	case RTW_IEEE80211_PROACTIVE_PREQ_WITH_PREP:
+		flags |= RTW_IEEE80211_PREQ_PROACTIVE_PREP_FLAG;
+	case RTW_IEEE80211_PROACTIVE_PREQ_NO_PREP:
 		interval = mshcfg->dot11MeshHWMPactivePathToRootTimeout;
-		target_flags |= IEEE80211_PREQ_TO_FLAG |
-				IEEE80211_PREQ_USN_FLAG;
+		target_flags |= RTW_IEEE80211_PREQ_TO_FLAG |
+				RTW_IEEE80211_PREQ_USN_FLAG;
 		rtw_mesh_path_sel_frame_tx(RTW_MPATH_PREQ, flags, adapter_mac_addr(adapter),
 					   ++minfo->sn, target_flags,
 					   (u8 *) bcast_addr, 0, bcast_addr,
@@ -1570,7 +1423,7 @@ static void rtw_ieee80211_mesh_rootpath(_adapter *adapter)
 
 	rtw_mesh_path_tx_root_frame(adapter);
 
-	if (adapter->mesh_cfg.dot11MeshHWMPRootMode == IEEE80211_PROACTIVE_RANN)
+	if (adapter->mesh_cfg.dot11MeshHWMPRootMode == RTW_IEEE80211_PROACTIVE_RANN)
 		interval = adapter->mesh_cfg.dot11MeshHWMPRannInterval;
 	else
 		interval = adapter->mesh_cfg.dot11MeshHWMProotInterval;
@@ -1583,7 +1436,7 @@ BOOLEAN rtw_ieee80211_mesh_root_setup(_adapter *adapter)
 {
 	BOOLEAN root_enabled = _FALSE;
 
-	if (adapter->mesh_cfg.dot11MeshHWMPRootMode > IEEE80211_ROOTMODE_ROOT) {
+	if (adapter->mesh_cfg.dot11MeshHWMPRootMode > RTW_IEEE80211_ROOTMODE_ROOT) {
 		rtw_set_bit(RTW_MESH_WORK_ROOT, &adapter->wrkq_flags);
 		root_enabled = _TRUE;
 	}
@@ -1602,7 +1455,7 @@ void rtw_mesh_work_hdl(_workitem *work)
 	_adapter *adapter = container_of(work, _adapter, mesh_work);
 
 	while(adapter->mesh_info.preq_queue_len) {
-		if (rtw_time_after(jiffies,
+		if (rtw_time_after(rtw_get_current_time(),
 		       adapter->mesh_info.last_preq + rtw_min_preq_int_jiff(adapter)))
 		       /* It will consume preq_queue_len */
 		       rtw_mesh_path_start_discovery(adapter);

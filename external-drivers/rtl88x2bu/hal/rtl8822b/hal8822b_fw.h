@@ -25,10 +25,10 @@ extern u32 array_length_mp_8822b_fw_ap;
 #endif
 
 #if (DM_ODM_SUPPORT_TYPE & (ODM_WIN)) || (DM_ODM_SUPPORT_TYPE & (ODM_CE))
-extern u8 array_mp_8822b_fw_nic[160504];
+extern u8 array_mp_8822b_fw_nic[161240];
 extern u32 array_length_mp_8822b_fw_nic;
 #ifdef CONFIG_WOWLAN
-extern u8 array_mp_8822b_fw_wowlan[102944];
+extern u8 array_mp_8822b_fw_wowlan[103328];
 extern u32 array_length_mp_8822b_fw_wowlan;
 #endif /*CONFIG_WOWLAN*/
 #endif

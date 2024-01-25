@@ -546,6 +546,7 @@ enum halmac_ret_status {
 	HALMAC_RET_INIT_XTAL_AAC_FAIL = 0x76,
 	HALMAC_RET_PINMUX_NOT_SUPPORT = 0x77,
 	HALMAC_RET_FWFF_NO_EMPTY = 0x78,
+	HALMAC_RET_ADR_NOT_ALIGN = 0x79,
 };
 
 enum halmac_chip_id {
@@ -565,6 +566,13 @@ enum halmac_chip_ver {
 	HALMAC_CHIP_VER_D_CUT = 0x03,
 	HALMAC_CHIP_VER_E_CUT = 0x04,
 	HALMAC_CHIP_VER_F_CUT = 0x05,
+	HALMAC_CHIP_VER_G_CUT = 0x06,
+	HALMAC_CHIP_VER_H_CUT = 0x07,
+	HALMAC_CHIP_VER_I_CUT = 0x08,
+	HALMAC_CHIP_VER_J_CUT = 0x09,
+	HALMAC_CHIP_VER_K_CUT = 0x0A,
+	HALMAC_CHIP_VER_L_CUT = 0x0B,
+	HALMAC_CHIP_VER_M_CUT = 0x0C,
 	HALMAC_CHIP_VER_TEST = 0xFF,
 	HALMAC_CHIP_VER_UNDEFINE = 0x7FFF,
 };
@@ -1285,6 +1293,7 @@ enum halmac_feature_id {
 	HALMAC_FEATURE_POWER_TRACKING,  /* Support */
 	HALMAC_FEATURE_PSD,             /* Support */
 	HALMAC_FEATURE_FW_SNDING,       /* Support */
+	HALMAC_FEATURE_DPK,             /* Support */
 	HALMAC_FEATURE_ALL,             /* Support, only for reset */
 };
 
@@ -1649,8 +1658,10 @@ enum halmac_api_id {
 	HALMAC_API_CFGSPC_SET_PCIE = 0x9E,
 	HALMAC_API_GET_WATCHER = 0x9F,
 	HALMAC_API_DUMP_LOGICAL_EFUSE_MASK = 0xA0,
-	HALMAC_API_READ_WIFI_PHY_EFUSE = 0xA1,
-	HALMAC_API_WRITE_WIFI_PHY_EFUSE = 0xA2,
+	HALMAC_API_WRITE_LOGICAL_EFUSE_WORD = 0xA1,
+	HALMAC_API_READ_WIFI_PHY_EFUSE = 0xA2,
+	HALMAC_API_WRITE_WIFI_PHY_EFUSE = 0xA3,
+	HALMAC_API_START_DPK = 0xA4,
 	HALMAC_API_MAX
 };
 
@@ -1798,6 +1809,8 @@ enum halmac_gpio_func {
 	HALMAC_GPIO_FUNC_S1_TRSW = 23,
 	HALMAC_GPIO_FUNC_S0_TRSWB = 24,
 	HALMAC_GPIO_FUNC_S1_TRSWB = 25,
+	HALMAC_GPIO_FUNC_ANTSW = 26,
+	HALMAC_GPIO_FUNC_ANTSWB = 27,
 	HALMAC_GPIO_FUNC_UNDEFINE = 0X7F,
 };
 
@@ -2095,6 +2108,8 @@ struct halmac_pinmux_info {
 	u8 s1_pape:1;
 	u8 s0_trswb:1;
 	u8 s1_trswb:1;
+	u8 antswb:1;
+	u8 antsw:1;
 };
 
 struct halmac_ofld_func_info {
@@ -2279,6 +2294,9 @@ struct halmac_api {
 	(*halmac_write_logical_efuse)(struct halmac_adapter *adapter,
 				      u32 offset, u8 value);
 	enum halmac_ret_status
+	(*halmac_write_logical_efuse_word)(struct halmac_adapter *adapter,
+					   u32 offset, u16 value);
+	enum halmac_ret_status
 	(*halmac_read_logical_efuse)(struct halmac_adapter *adapter, u32 offset,
 				     u8 *value);
 	enum halmac_ret_status
@@ -2422,6 +2440,8 @@ struct halmac_api {
 	enum halmac_ret_status
 	(*halmac_start_iqk)(struct halmac_adapter *adapter,
 			    struct halmac_iqk_para *param);
+	enum halmac_ret_status
+	(*halmac_start_dpk)(struct halmac_adapter *adapter);
 	enum halmac_ret_status
 	(*halmac_ctrl_pwr_tracking)(struct halmac_adapter *adapter,
 				    struct halmac_pwr_tracking_option *opt);

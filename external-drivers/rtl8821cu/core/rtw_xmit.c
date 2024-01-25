@@ -1387,6 +1387,9 @@ static s32 update_attrib_sec_info(_adapter *padapter, struct pkt_attrib *pattrib
 		pattrib->bswenc = _FALSE;
 #endif
 
+	if ((pattrib->encrypt) && (eapol_type == EAPOL_4_4))
+		pattrib->bswenc = _TRUE;
+
 exit:
 
 	return res;
@@ -2693,6 +2696,7 @@ u32 rtw_calculate_wlan_pkt_size_by_attribue(struct pkt_attrib *pattrib)
 s32 check_amsdu(struct xmit_frame *pxmitframe)
 {
 	struct pkt_attrib *pattrib;
+	struct sta_info *psta = NULL;
 	s32 ret = _TRUE;
 
 	if (!pxmitframe)
@@ -2700,6 +2704,11 @@ s32 check_amsdu(struct xmit_frame *pxmitframe)
 
 	pattrib = &pxmitframe->attrib;
 
+	psta = rtw_get_stainfo(&pxmitframe->padapter->stapriv, &pattrib->ra[0]);
+	if (psta) {
+		if (psta->flags & WLAN_STA_AMSDU_DISABLE)
+			ret =_FALSE;
+	}
 	if (IS_MCAST(pattrib->ra))
 		ret = _FALSE;
 
@@ -5415,43 +5424,49 @@ s32 rtw_xmit(_adapter *padapter, _pkt **ppkt, u16 os_qid)
 
 #if defined(CONFIG_AP_MODE) || defined(CONFIG_RTW_MESH)
 	if (MLME_STATE(padapter) & (WIFI_AP_STATE | WIFI_MESH_STATE)) {
-		_list b2u_list;
+		_list f_list;
 
 		#ifdef CONFIG_RTW_MESH
 		if (MLME_IS_MESH(padapter))
-			res = rtw_mesh_addr_resolve(padapter, os_qid, pxmitframe, *ppkt, &b2u_list);
+			res = rtw_mesh_addr_resolve(padapter, os_qid, pxmitframe, *ppkt, &f_list);
 		else
 		#endif
-			res = rtw_ap_addr_resolve(padapter, os_qid, pxmitframe, *ppkt, &b2u_list);
+			res = rtw_ap_addr_resolve(padapter, os_qid, pxmitframe, *ppkt, &f_list);
 		if (res == RTW_RA_RESOLVING)
 			return 1;
 		if (res == _FAIL)
 			return -1;
 
-		#if CONFIG_RTW_DATA_BMC_TO_UC
-		if (!rtw_is_list_empty(&b2u_list)) {
-			_list *list = get_next(&b2u_list);
-			struct xmit_frame *b2uframe;
+		#if defined(CONFIG_RTW_WDS) || CONFIG_RTW_DATA_BMC_TO_UC
+		if (!rtw_is_list_empty(&f_list)) {
+			_list *list = get_next(&f_list);
+			struct xmit_frame *fframe;
 
-			while ((rtw_end_of_queue_search(&b2u_list, list)) == _FALSE) {
-				b2uframe = LIST_CONTAINOR(list, struct xmit_frame, list);
+			while ((rtw_end_of_queue_search(&f_list, list)) == _FALSE) {
+				fframe = LIST_CONTAINOR(list, struct xmit_frame, list);
 				list = get_next(list);
-				rtw_list_delete(&b2uframe->list);
+				rtw_list_delete(&fframe->list);
 
-				b2uframe->pkt = rtw_os_pkt_copy(*ppkt);
-				if (!b2uframe->pkt) {
-					if (res == RTW_BMC_NO_NEED)
+				if (res == RTW_ORI_NO_NEED && rtw_is_list_empty(&f_list)) {
+					fframe->pkt = pxmitframe->pkt; /* last frame */
+					pxmitframe->pkt = NULL;
+				} else {
+					fframe->pkt = rtw_os_pkt_copy(*ppkt);
+				}
+
+				if (!fframe->pkt) {
+					if (res == RTW_ORI_NO_NEED && IS_MCAST(pxmitframe->attrib.dst))
 						res = _SUCCESS;
-					rtw_free_xmitframe(pxmitpriv, b2uframe);
+					rtw_free_xmitframe(pxmitpriv, fframe);
 					continue;
 				}
 
-				rtw_xmit_posthandle(padapter, b2uframe, b2uframe->pkt);
+				rtw_xmit_posthandle(padapter, fframe, fframe->pkt);
 			}
 		}
 		#endif
 
-		if (res == RTW_BMC_NO_NEED) {
+		if (res == RTW_ORI_NO_NEED) {
 			rtw_free_xmitframe(&padapter->xmitpriv, pxmitframe);
 			return 0;
 		}

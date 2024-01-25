@@ -1646,11 +1646,11 @@ u32 rtw_aes_encrypt(_adapter *padapter, u8 *pxmitframe)
 			if ((curfragnum + 1) == pattrib->nr_frags) {    /* the last fragment */
 				plen = pattrib->last_txcmdsz - pattrib->hdrlen - pattrib->iv_len - pattrib->icv_len;
 
-				_rtw_ccmp_encrypt(prwskey, prwskeylen, pattrib->hdrlen, pframe, plen);
+				_rtw_ccmp_encrypt(padapter, prwskey, prwskeylen, pattrib->hdrlen, pframe, plen);
 			} else {
 				plen = pxmitpriv->frag_len - pattrib->hdrlen - pattrib->iv_len - pattrib->icv_len;
 
-				_rtw_ccmp_encrypt(prwskey, prwskeylen, pattrib->hdrlen, pframe, plen);
+				_rtw_ccmp_encrypt(padapter, prwskey, prwskeylen, pattrib->hdrlen, pframe, plen);
 				pframe += pxmitpriv->frag_len;
 				pframe = (u8 *)RND4((SIZE_PTR)(pframe));
 
@@ -2118,7 +2118,7 @@ u32 rtw_aes_decrypt(_adapter *padapter, u8 *precvframe)
 			} else
 				prwskey = &stainfo->dot118021x_UncstKey.skey[0];
 
-			res = _rtw_ccmp_decrypt(prwskey,
+			res = _rtw_ccmp_decrypt(padapter, prwskey,
 				prxattrib->encrypt == _CCMP_256_ ? 32 : 16,
 				prxattrib->hdrlen, pframe,
 				((union recv_frame *)precvframe)->u.hdr.len);
@@ -2629,11 +2629,11 @@ u32 rtw_gcmp_encrypt(_adapter *padapter, u8 *pxmitframe)
 				/* the last fragment */
 				plen = pattrib->last_txcmdsz - pattrib->hdrlen - pattrib->iv_len - pattrib->icv_len;
 
-				_rtw_gcmp_encrypt(prwskey, prwskeylen, pattrib->hdrlen, pframe, plen);
+				_rtw_gcmp_encrypt(padapter, prwskey, prwskeylen, pattrib->hdrlen, pframe, plen);
 			} else {
 				plen = pxmitpriv->frag_len - pattrib->hdrlen - pattrib->iv_len - pattrib->icv_len;
 
-				_rtw_gcmp_encrypt(prwskey, prwskeylen, pattrib->hdrlen, pframe, plen);
+				_rtw_gcmp_encrypt(padapter, prwskey, prwskeylen, pattrib->hdrlen, pframe, plen);
 				pframe += pxmitpriv->frag_len;
 				pframe = (u8 *)RND4((SIZE_PTR)(pframe));
 			}
@@ -2718,7 +2718,7 @@ u32 rtw_gcmp_decrypt(_adapter *padapter, u8 *precvframe)
 			} else
 				prwskey = &stainfo->dot118021x_UncstKey.skey[0];
 
-			res = _rtw_gcmp_decrypt(prwskey,
+			res = _rtw_gcmp_decrypt(padapter, prwskey,
 				prxattrib->encrypt == _GCMP_256_ ? 32 : 16,
 				prxattrib->hdrlen, pframe,
 				((union recv_frame *)precvframe)->u.hdr.len);

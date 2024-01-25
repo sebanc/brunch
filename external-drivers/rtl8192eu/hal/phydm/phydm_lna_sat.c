@@ -264,7 +264,7 @@ void phydm_lna_sat_chk(
 	#endif
 		phydm_set_ofdm_agc_tab(dm, OFDM_AGC_TAB_0);
 	/*@open rf power detection ckt & set detection range */
-	#if (RTL8198F_SUPPORT || RTL8814B_SUPPORT)
+#if (RTL8198F_SUPPORT)
 	if (dm->support_ic_type & ODM_RTL8198F) {
 		/*@set rf detection range (threshold)*/
 		config_phydm_write_rf_reg_8198f(dm, RF_PATH_A, 0x85,
@@ -280,37 +280,34 @@ void phydm_lna_sat_chk(
 		config_phydm_write_rf_reg_8198f(dm, RF_PATH_B, 0x86, 0x10, 1);
 		config_phydm_write_rf_reg_8198f(dm, RF_PATH_C, 0x86, 0x10, 1);
 		config_phydm_write_rf_reg_8198f(dm, RF_PATH_D, 0x86, 0x10, 1);
-	} else if (dm->support_ic_type & ODM_RTL8814B) {
-		/*@set rf detection range (threshold)*/
-#if 0
-		config_phydm_write_rf_reg_8814b(dm, RF_PATH_A, 0x87, 0x3, 0x3);
-		config_phydm_write_rf_reg_8814b(dm, RF_PATH_B, 0x87, 0x3, 0x3);
-		config_phydm_write_rf_reg_8814b(dm, RF_PATH_C, 0x87, 0x3, 0x3);
-		config_phydm_write_rf_reg_8814b(dm, RF_PATH_D, 0x87, 0x3, 0x3);
-#endif
-		/*@open rf power detection ckt*/
-#if 0
-		config_phydm_write_rf_reg_8814b(dm, RF_PATH_A, 0x87, 0x10, 1);
-		config_phydm_write_rf_reg_8814b(dm, RF_PATH_B, 0x87, 0x10, 1);
-		config_phydm_write_rf_reg_8814b(dm, RF_PATH_C, 0x87, 0x10, 1);
-		config_phydm_write_rf_reg_8814b(dm, RF_PATH_D, 0x87, 0x10, 1);
-#endif
-	} else
-	#endif
-	{
-		odm_set_rf_reg(dm, RF_PATH_A, RF_0x86, 0x1f, 0x10);
-		odm_set_rf_reg(dm, RF_PATH_B, RF_0x86, 0x1f, 0x10);
-		#ifdef PHYDM_IC_ABOVE_3SS
-		odm_set_rf_reg(dm, RF_PATH_C, RF_0x86, 0x1f, 0x10);
-		#endif
-		#ifdef PHYDM_IC_ABOVE_4SS
-		odm_set_rf_reg(dm, RF_PATH_D, RF_0x86, 0x1f, 0x10);
-		#endif
 	}
+#elif (RTL8814B_SUPPORT)
+	if (dm->support_ic_type & ODM_RTL8814B) {
+		/*@set rf detection range (threshold)*/
+		config_phydm_write_rf_reg_8814b(dm, RF_PATH_A, 0x8B, 0x3, 0x3);
+		config_phydm_write_rf_reg_8814b(dm, RF_PATH_B, 0x8B, 0x3, 0x3);
+		config_phydm_write_rf_reg_8814b(dm, RF_PATH_C, 0x8B, 0x3, 0x3);
+		config_phydm_write_rf_reg_8814b(dm, RF_PATH_D, 0x8B, 0x3, 0x3);
+		/*@open rf power detection ckt*/
+		config_phydm_write_rf_reg_8814b(dm, RF_PATH_A, 0x8B, 0x4, 1);
+		config_phydm_write_rf_reg_8814b(dm, RF_PATH_B, 0x8B, 0x4, 1);
+		config_phydm_write_rf_reg_8814b(dm, RF_PATH_C, 0x8B, 0x4, 1);
+		config_phydm_write_rf_reg_8814b(dm, RF_PATH_D, 0x8B, 0x4, 1);
+	}
+#else
+	odm_set_rf_reg(dm, RF_PATH_A, RF_0x86, 0x1f, 0x10);
+	odm_set_rf_reg(dm, RF_PATH_B, RF_0x86, 0x1f, 0x10);
+	#ifdef PHYDM_IC_ABOVE_3SS
+	odm_set_rf_reg(dm, RF_PATH_C, RF_0x86, 0x1f, 0x10);
+	#endif
+	#ifdef PHYDM_IC_ABOVE_4SS
+	odm_set_rf_reg(dm, RF_PATH_D, RF_0x86, 0x1f, 0x10);
+	#endif
+#endif
 
 	/*@check saturation status*/
 	for (i = 0; i < chk_cnt; i++) {
-	#if (RTL8198F_SUPPORT || RTL8814B_SUPPORT)
+#if (RTL8198F_SUPPORT)
 	if (dm->support_ic_type & ODM_RTL8198F) {
 		sat_status_a = config_phydm_read_rf_reg_8198f(dm, RF_PATH_A,
 							      RF_0xae,
@@ -324,9 +321,10 @@ void phydm_lna_sat_chk(
 		sat_status_d = config_phydm_read_rf_reg_8198f(dm, RF_PATH_D,
 							      RF_0xae,
 							      0xe0000);
-	} else if (dm->support_ic_type & ODM_RTL8814B) {
+	}
+#elif (RTL8814B_SUPPORT)
+	if (dm->support_ic_type & ODM_RTL8814B) {
 	/*@read peak detector info from 8814B rf reg*/
-#if 0
 		sat_status_a = config_phydm_read_rf_reg_8814b(dm, RF_PATH_A,
 							      RF_0xae,
 							      0xc0000);
@@ -339,10 +337,8 @@ void phydm_lna_sat_chk(
 		sat_status_d = config_phydm_read_rf_reg_8814b(dm, RF_PATH_D,
 							      RF_0xae,
 							      0xc0000);
-#endif
-	} else
-	#endif
-	{
+	}
+#else
 		sat_status_a = odm_get_rf_reg(dm, RF_PATH_A, RF_0xae, 0xc0000);
 		sat_status_b = odm_get_rf_reg(dm, RF_PATH_B, RF_0xae, 0xc0000);
 		#ifdef PHYDM_IC_ABOVE_3SS
@@ -351,7 +347,7 @@ void phydm_lna_sat_chk(
 		#ifdef PHYDM_IC_ABOVE_4SS
 		sat_status_d = odm_get_rf_reg(dm, RF_PATH_D, RF_0xae, 0xc0000);
 		#endif
-	}
+#endif
 
 		if (sat_status_a != 0)
 			lna_info->sat_cnt_acc_patha++;
@@ -625,10 +621,6 @@ void phydm_snr_collect(
 	struct phydm_lna_sat_t	*pinfo = &dm->dm_lna_sat_info;
 
 	if (pinfo->is_sm_done) {
-#if 0
-		/*PHYDM_DBG(dm, DBG_LNA_SAT_CHK, "%s ==>\n", __func__);*/
-#endif
-
 		/* @adapt only path-A for calculation */
 		pinfo->snr_statistic[pinfo->cnt_snr_statistic] = rx_snr;
 

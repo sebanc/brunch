@@ -43,20 +43,38 @@
 	#include "halrf/rtl8198f/halrf_dpk_8198f.h"
 #endif
 
+#if (RTL8812F_SUPPORT == 1)
+	#include "halrf/rtl8812f/halrf_iqk_8812f.h"
+	#include "halrf/rtl8812f/halrf_dpk_8812f.h"
+	#include "halrf/rtl8812f/halrf_tssi_8812f.h"
+#endif
+
 #if (RTL8814B_SUPPORT == 1)
 	#include "halrf/rtl8814b/halrf_iqk_8814b.h"
+	#include "halrf/rtl8814b/halrf_dpk_8814b.h"
+	#include "halrf/rtl8814b/halrf_txgapk_8814b.h"
+#endif
+
+#if (RTL8197G_SUPPORT == 1)
+	#include "halrf/rtl8197g/halrf_iqk_8197g.h"
+	#include "halrf/rtl8197g/halrf_dpk_8197g.h"
+	#include "halrf/rtl8197g/halrf_tssi_8197g.h"
 #endif
 
 enum pwrtrack_method {
 	BBSWING,
 	TXAGC,
 	MIX_MODE,
-	TSSI_MODE
+	TSSI_MODE,
+	MIX_2G_TSSI_5G_MODE,
+	MIX_5G_TSSI_2G_MODE,
+	CLEAN_MODE
 };
 
 typedef void	(*func_set_pwr)(void *, enum pwrtrack_method, u8, u8);
 typedef void(*func_iqk)(void *, u8, u8, u8);
 typedef void	(*func_lck)(void *);
+typedef void	(*func_tssi_dck)(void *, u8);
 /* refine by YuChen for 8814A */
 typedef void	(*func_swing)(void *, u8 **, u8 **, u8 **, u8 **);
 typedef void	(*func_swing8814only)(void *, u8 **, u8 **, u8 **, u8 **);
@@ -74,11 +92,17 @@ struct txpwrtrack_cfg {
 	func_set_pwr	odm_tx_pwr_track_set_pwr;
 	func_iqk	do_iqk;
 	func_lck		phy_lc_calibrate;
+	func_tssi_dck	do_tssi_dck;
 	func_swing	get_delta_swing_table;
 	func_swing8814only	get_delta_swing_table8814only;
 	func_all_swing		get_delta_all_swing_table;
 	func_all_swing_ex	get_delta_all_swing_table_ex;
 };
+
+void
+odm_clear_txpowertracking_state(
+	void *dm_void
+);
 
 void
 configure_txpower_track(
@@ -111,9 +135,16 @@ odm_txpowertracking_callback_thermal_meter_jaguar_series(
 	void		*dm_void
 );
 
-#elif (RTL8197F_SUPPORT == 1 || RTL8822B_SUPPORT == 1)
+#elif (RTL8197F_SUPPORT == 1 || RTL8192F_SUPPORT == 1 || RTL8822B_SUPPORT == 1 ||\
+	RTL8821C_SUPPORT == 1 || RTL8198F_SUPPORT == 1)
 void
 odm_txpowertracking_callback_thermal_meter_jaguar_series3(
+	void		*dm_void
+);
+
+#elif (RTL8814B_SUPPORT == 1 || RTL8812F_SUPPORT == 1 || RTL8822C_SUPPORT == 1 || RTL8197G_SUPPORT == 1)
+void
+odm_txpowertracking_callback_thermal_meter_jaguar_series4(
 	void		*dm_void
 );
 

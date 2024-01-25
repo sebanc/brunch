@@ -43,7 +43,17 @@ rtw89core-y +=  core.o \
 		ps.o \
 		debug.o \
 		ser.o \
-		wow.o
+		wow.o \
+		acpi.o
+
+obj-m += rtw_8851b.o
+rtw_8851b-y := rtw8851b.o \
+		    rtw8851b_table.o \
+		    rtw8851b_rfk.o \
+		    rtw8851b_rfk_table.o
+
+obj-m += rtw_8851be.o
+rtw_8851be-y := rtw8851be.o
 
 obj-m += rtw_8852a.o
 rtw_8852a-y := rtw8852a.o \
@@ -71,9 +81,6 @@ rtw_8852c-y := rtw8852c.o \
 
 obj-m += rtw_8852ce.o
 rtw_8852ce-y := rtw8852ce.o
-
-#obj-m += rtw89debug.o
-#rtw89debug-y := debug.o
 
 obj-m += rtw89pci.o
 rtw89pci-y := pci.o
@@ -123,6 +130,8 @@ else
 endif
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89core.ko
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89pci.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8851b.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8851be.ko
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852a.ko
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852ae.ko
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852b.ko

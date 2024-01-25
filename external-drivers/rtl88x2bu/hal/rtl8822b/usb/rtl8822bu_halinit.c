@@ -255,6 +255,7 @@ exit:
 
 u32 rtl8822bu_inirp_init(PADAPTER padapter)
 {
+	struct registry_priv *regsty = adapter_to_regsty(padapter);
 	u8 i, status;
 	struct recv_buf *precvbuf;
 	struct dvobj_priv *pdev = adapter_to_dvobj(padapter);
@@ -285,7 +286,7 @@ u32 rtl8822bu_inirp_init(PADAPTER padapter)
 
 	/* issue Rx irp to receive data */
 	precvbuf = (struct recv_buf *)precvpriv->precv_buf;
-	for (i = 0; i < NR_RECVBUFF; i++) {
+	for (i = 0; i < regsty->recvbuf_nr; i++) {
 		if (_read_port(pintfhdl, precvpriv->ff_hwaddr, 0, (u8 *)precvbuf) == _FALSE) {
 			status = _FAIL;
 			goto exit;

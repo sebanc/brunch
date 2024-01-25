@@ -364,6 +364,7 @@ void rtw_dump_fw_info(void *sel, _adapter *adapter);
 void rtw_restore_hw_port_cfg(_adapter *adapter);
 void rtw_mi_set_mac_addr(_adapter *adapter);/*set mac addr when hal_init for all iface*/
 void rtw_hal_dump_macaddr(void *sel, _adapter *adapter);
+void rtw_hal_set_hw_macaddr(PADAPTER adapter, u8 *mac_addr);
 
 void rtw_init_hal_com_default_value(PADAPTER Adapter);
 

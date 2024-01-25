@@ -203,7 +203,9 @@ void _rtw_init_stainfo(struct sta_info *psta)
 	/* _rtw_init_listhead(&psta->wakeup_list);	 */
 
 	_rtw_init_queue(&psta->sleep_q);
-
+#ifdef CONFIG_RTW_MGMT_QUEUE
+	_rtw_init_queue(&psta->mgmt_sleep_q);
+#endif
 	_rtw_init_sta_xmit_priv(&psta->sta_xmitpriv);
 	_rtw_init_sta_recv_priv(&psta->sta_recvpriv);
 
@@ -285,6 +287,9 @@ u32	_rtw_init_sta_priv(struct	sta_priv *pstapriv)
 	_rtw_spinlock_init(&pstapriv->auth_list_lock);
 	pstapriv->asoc_list_cnt = 0;
 	pstapriv->auth_list_cnt = 0;
+#ifdef CONFIG_RTW_TOKEN_BASED_XMIT
+	pstapriv->tbtx_asoc_list_cnt = 0;
+#endif
 
 	pstapriv->auth_to = 3; /* 3*2 = 6 sec */
 	pstapriv->assoc_to = 3;
@@ -300,12 +305,11 @@ u32	_rtw_init_sta_priv(struct	sta_priv *pstapriv)
 #endif
 	pstapriv->max_num_sta = NUM_STA;
 
-#endif
-
 #if CONFIG_RTW_MACADDR_ACL
 	for (i = 0; i < RTW_ACL_PERIOD_NUM; i++)
 		rtw_macaddr_acl_init(adapter, i);
 #endif
+#endif /* CONFIG_AP_MODE */
 
 #if CONFIG_RTW_PRE_LINK_STA
 	rtw_pre_link_sta_ctl_init(pstapriv);
@@ -365,6 +369,9 @@ void	_rtw_free_sta_xmit_priv_lock(struct sta_xmit_priv *psta_xmitpriv)
 	_rtw_spinlock_free(&(psta_xmitpriv->bk_q.sta_pending.lock));
 	_rtw_spinlock_free(&(psta_xmitpriv->vi_q.sta_pending.lock));
 	_rtw_spinlock_free(&(psta_xmitpriv->vo_q.sta_pending.lock));
+#ifdef CONFIG_RTW_MGMT_QUEUE
+	_rtw_spinlock_free(&(psta_xmitpriv->mgmt_q.sta_pending.lock));
+#endif
 }
 
 static void	_rtw_free_sta_recv_priv_lock(struct sta_recv_priv *psta_recvpriv)
@@ -380,13 +387,13 @@ static void	_rtw_free_sta_recv_priv_lock(struct sta_recv_priv *psta_recvpriv)
 void rtw_mfree_stainfo(struct sta_info *psta);
 void rtw_mfree_stainfo(struct sta_info *psta)
 {
-    // Here used to be some calls to helper functions that would call
-    // _rtw_spinlock_free several times. However, _rtw_spinlock_free does not
-    // do anything on Linux. Since this project is concerned only with Linux,
-    // it is safe to remove the calls entirely.
-    // This function is kept. Removing it would force us to remove it in the
-    // callers, which has the danger of becoming incompatible with possible
-    // future patches.
+
+	if (&(psta->lock) != NULL)
+		_rtw_spinlock_free(&psta->lock);
+
+	_rtw_free_sta_xmit_priv_lock(&psta->sta_xmitpriv);
+	_rtw_free_sta_recv_priv_lock(&psta->sta_recvpriv);
+
 }
 
 
@@ -520,7 +527,7 @@ struct	sta_info *rtw_alloc_stainfo(struct	sta_priv *pstapriv, const u8 *hwaddr)
 	_enter_critical_bh(&(pstapriv->sta_hash_lock), &irqL2);
 	if (_rtw_queue_empty(pfree_sta_queue) == _TRUE) {
 		/* _exit_critical_bh(&(pfree_sta_queue->lock), &irqL); */
-		_exit_critical_bh(&(pstapriv->sta_hash_lock), &irqL2);
+		/* _exit_critical_bh(&(pstapriv->sta_hash_lock), &irqL2); */
 		psta = NULL;
 	} else {
 		psta = LIST_CONTAINOR(get_next(&pfree_sta_queue->queue), struct sta_info, list);
@@ -561,6 +568,8 @@ struct	sta_info *rtw_alloc_stainfo(struct	sta_priv *pstapriv, const u8 *hwaddr)
 			_rtw_memcpy(&psta->sta_recvpriv.bmc_tid_rxseq[i], &wRxSeqInitialValue, 2);
 			_rtw_memset(&psta->sta_recvpriv.rxcache.iv[i], 0, sizeof(psta->sta_recvpriv.rxcache.iv[i]));
 		}
+		_rtw_memcpy(&psta->sta_recvpriv.nonqos_bmc_rxseq,&wRxSeqInitialValue,2);
+		_rtw_memcpy(&psta->sta_recvpriv.nonqos_rxseq,&wRxSeqInitialValue,2);
 
 		rtw_init_timer(&psta->addba_retry_timer, psta->padapter, addba_timer_hdl, psta);
 #ifdef CONFIG_IEEE80211W
@@ -582,7 +591,6 @@ struct	sta_info *rtw_alloc_stainfo(struct	sta_priv *pstapriv, const u8 *hwaddr)
 				, FUNC_ADPT_ARG(pstapriv->padapter), i, preorder_ctrl->indicate_seq);
 			#endif
 			preorder_ctrl->wend_b = 0xffff;
-			/* preorder_ctrl->wsize_b = (NR_RECVBUFF-2); */
 			preorder_ctrl->wsize_b = 64;/* 64; */
 			preorder_ctrl->ampdu_size = RX_AMPDU_SIZE_INVALID;
 
@@ -592,7 +600,7 @@ struct	sta_info *rtw_alloc_stainfo(struct	sta_priv *pstapriv, const u8 *hwaddr)
 			rtw_clear_bit(RTW_RECV_ACK_OR_TIMEOUT, &preorder_ctrl->rec_abba_rsp_ack);
 
 		}
-
+		ATOMIC_SET(&psta->keytrack, 0);
 
 		/* init for DM */
 		psta->cmn.rssi_stat.rssi = (-1);
@@ -600,6 +608,10 @@ struct	sta_info *rtw_alloc_stainfo(struct	sta_priv *pstapriv, const u8 *hwaddr)
 		psta->cmn.rssi_stat.rssi_ofdm = (-1);
 #ifdef CONFIG_ATMEL_RC_PATCH
 		psta->flag_atmel_rc = 0;
+#endif
+
+#ifdef CONFIG_RTW_TOKEN_BASED_XMIT
+		psta->tbtx_enable = _FALSE;
 #endif
 		/* init for the sequence number of received management frame */
 		psta->RxMgmtFrameSeqNum = 0xffff;
@@ -629,7 +641,7 @@ u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta)
 {
 	int i;
 	_irqL irqL0;
-	_queue *pfree_sta_queue;
+	_queue *pfree_sta_queue, *pdefrag_q = NULL;
 	struct recv_reorder_ctrl *preorder_ctrl;
 	struct	sta_xmit_priv	*pstaxmitpriv;
 	struct	xmit_priv	*pxmitpriv = &padapter->xmitpriv;
@@ -637,9 +649,11 @@ u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta)
 	struct hw_xmit *phwxmit;
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
-
 	int pending_qcnt[4];
 	u8 is_pre_link_sta = _FALSE;
+	_list	*phead, *plist;
+	_queue *pfree_recv_queue = &padapter->recvpriv.free_recv_queue;
+	union recv_frame *prframe;
 
 	if (psta == NULL)
 		goto exit;
@@ -663,7 +677,7 @@ u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta)
 	}
 
 	_enter_critical_bh(&psta->lock, &irqL0);
-	psta->state &= ~_FW_LINKED;
+	psta->state &= ~WIFI_ASOC_STATE;
 	_exit_critical_bh(&psta->lock, &irqL0);
 
 	pfree_sta_queue = &pstapriv->free_sta_queue;
@@ -682,6 +696,11 @@ u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta)
 
 	rtw_free_xmitframe_queue(pxmitpriv, &psta->sleep_q);
 	psta->sleepq_len = 0;
+
+#ifdef CONFIG_RTW_MGMT_QUEUE
+	rtw_free_mgmt_xmitframe_queue(pxmitpriv, &psta->mgmt_sleep_q);
+	psta->mgmt_sleepq_len = 0;
+#endif
 
 	/* vo */
 	/* _enter_critical_bh(&(pxmitpriv->vo_pending.lock), &irqL0); */
@@ -723,6 +742,15 @@ u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta)
 	pstaxmitpriv->bk_q.qcnt = 0;
 	/* _exit_critical_bh(&(pxmitpriv->bk_pending.lock), &irqL0); */
 
+#ifdef CONFIG_RTW_MGMT_QUEUE
+	/* mgmt */
+	rtw_free_xmitframe_queue(pxmitpriv, &pstaxmitpriv->mgmt_q.sta_pending);
+	rtw_list_delete(&(pstaxmitpriv->mgmt_q.tx_pending));
+	phwxmit = pxmitpriv->hwxmits + 4;
+	phwxmit->accnt -= pstaxmitpriv->mgmt_q.qcnt;
+	pstaxmitpriv->mgmt_q.qcnt = 0;
+#endif
+
 	rtw_os_wake_queue_at_free_stainfo(padapter, pending_qcnt);
 
 	_exit_critical_bh(&pxmitpriv->lock, &irqL0);
@@ -743,10 +771,7 @@ u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta)
 	/* for A-MPDU Rx reordering buffer control, cancel reordering_ctrl_timer */
 	for (i = 0; i < 16 ; i++) {
 		_irqL irqL;
-		_list	*phead, *plist;
-		union recv_frame *prframe;
 		_queue *ppending_recvframe_queue;
-		_queue *pfree_recv_queue = &padapter->recvpriv.free_recv_queue;
 
 		preorder_ctrl = &psta->recvreorder_ctrl[i];
 		rtw_clear_bit(RTW_RECV_ACK_OR_TIMEOUT, &preorder_ctrl->rec_abba_rsp_ack);
@@ -774,6 +799,20 @@ u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta)
 		_exit_critical_bh(&ppending_recvframe_queue->lock, &irqL);
 
 	}
+
+	/* CVE-2020-24586, clear defrag queue */
+	pdefrag_q = &psta->sta_recvpriv.defrag_q;
+	enter_critical_bh(&pdefrag_q->lock);
+	phead = get_list_head(pdefrag_q);
+	plist = get_next(phead);
+	while (!rtw_is_list_empty(phead)) {
+		prframe = LIST_CONTAINOR(plist, union recv_frame, u);
+		plist = get_next(plist);
+		rtw_list_delete(&(prframe->u.hdr.list));
+		rtw_free_recvframe(prframe, pfree_recv_queue);
+	}
+	exit_critical_bh(&pdefrag_q->lock);
+
 
 	if (!((psta->state & WIFI_AP_STATE) || MacAddr_isBcst(psta->cmn.mac_addr)) && is_pre_link_sta == _FALSE)
 		rtw_hal_set_odm_var(padapter, HAL_ODM_STA_INFO, psta, _FALSE);
@@ -828,9 +867,9 @@ u32	rtw_free_stainfo(_adapter *padapter , struct sta_info *psta)
 
 #endif /* CONFIG_NATIVEAP_MLME	 */
 
-#ifdef CONFIG_TX_MCAST2UNI
+#if !defined(CONFIG_ACTIVE_KEEP_ALIVE_CHECK) && defined(CONFIG_80211N_HT)
 	psta->under_exist_checking = 0;
-#endif /* CONFIG_TX_MCAST2UNI */
+#endif
 
 #endif /* CONFIG_AP_MODE	 */
 
@@ -961,7 +1000,6 @@ u32 rtw_init_bcmc_stainfo(_adapter *padapter)
 	NDIS_802_11_MAC_ADDRESS	bcast_addr = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 	struct	sta_priv *pstapriv = &padapter->stapriv;
-	/* _queue	*pstapending = &padapter->xmitpriv.bm_pending; */
 
 
 	psta = rtw_alloc_stainfo(pstapriv, bcast_addr);
@@ -1342,3 +1380,4 @@ void dump_pre_link_sta_ctl(void *sel, struct sta_priv *stapriv)
 	}
 }
 #endif /* CONFIG_RTW_PRE_LINK_STA */
+

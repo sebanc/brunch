@@ -23,5 +23,7 @@ void rtl8192f_HalDmWatchDog(PADAPTER Adapter);
 /* void rtl8192c_dm_CheckTXPowerTracking(PADAPTER Adapter); */
 
 /* void rtl8192c_dm_RF_Saving(PADAPTER pAdapter, u8 bForceInNormal); */
-
+#if defined (CONFIG_CONCURRENT_MODE)  && defined (CONFIG_TSF_SYNC)
+void rtl8192f_sync_tsfr(_adapter *Adapter);
+#endif/*(CONFIG_CONCURRENT_MODE)  && defined (CONFIG_TSF_SYNC)*/
 #endif

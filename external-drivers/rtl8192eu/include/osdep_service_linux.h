@@ -23,6 +23,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/namei.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 5))
 	#include <linux/kref.h>
 #endif
@@ -50,6 +51,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>	/* for struct tasklet_struct */
+#include <linux/ip.h>
 #include <linux/kthread.h>
 #include <linux/list.h>
 #include <linux/vmalloc.h>
@@ -120,11 +122,6 @@
 
 #ifdef CONFIG_USB_HCI
 	typedef struct urb   *PURB;
-	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 22))
-		#ifdef CONFIG_USB_SUSPEND
-			#define CONFIG_AUTOSUSPEND	1
-		#endif
-	#endif
 #endif
 
 #if defined(CONFIG_RTW_GRO) && (!defined(CONFIG_RTW_NAPI))
@@ -216,14 +213,7 @@ typedef void *timer_hdl_context;
 #endif
 
 typedef unsigned long systime;
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
-/* Porting from linux kernel v5.15-rc1 48eab831ae8b9f7002a533fa4235eed63ea1f1a3 */
-static inline void eth_hw_addr_set(struct net_device *dev, const u8 *addr)
-{
-	memcpy(dev->dev_addr, addr, ETH_ALEN);
-}
-#endif
+typedef struct tasklet_struct _tasklet;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 22))
 /* Porting from linux kernel, for compatible with old kernel. */
@@ -391,6 +381,11 @@ __inline static void _cancel_timer(_timer *ptimer, u8 *bcancelled)
 	*bcancelled = del_timer_sync(&ptimer->timer) == 1 ? 1 : 0;
 }
 
+__inline static void _cancel_timer_async(_timer *ptimer)
+{
+	del_timer(&ptimer->timer);
+}
+
 static inline void _init_workitem(_workitem *pwork, void *pfunc, void *cntx)
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 20))
@@ -520,7 +515,7 @@ static inline int rtw_merge_string(char *dst, int dst_len, const char *src1, con
 #define PATH_LENGTH_MAX PATH_MAX
 
 /* Atomic integer operations */
-#define atomic_t atomic_t
+#define ATOMIC_T atomic_t
 
 #define rtw_netdev_priv(netdev) (((struct rtw_netdev_priv_indicator *)netdev_priv(netdev))->priv)
 
@@ -540,7 +535,21 @@ struct rtw_netdev_priv_indicator {
 struct net_device *rtw_alloc_etherdev_with_old_priv(int sizeof_priv, void *old_priv);
 extern struct net_device *rtw_alloc_etherdev(int sizeof_priv);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
+#define rtw_get_same_net_ndev_by_name(ndev, name) dev_get_by_name(name)
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 26))
+#define rtw_get_same_net_ndev_by_name(ndev, name) dev_get_by_name(ndev->nd_net, name)
+#else
+#define rtw_get_same_net_ndev_by_name(ndev, name) dev_get_by_name(dev_net(ndev), name)
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
+#define rtw_get_bridge_ndev_by_name(name) dev_get_by_name(name)
+#else
+#define rtw_get_bridge_ndev_by_name(name) dev_get_by_name(&init_net, name)
+#endif
+
 #define STRUCT_PACKED __attribute__ ((packed))
 
 
-#endif
+#endif /* __OSDEP_LINUX_SERVICE_H_ */

@@ -69,6 +69,10 @@ enum halmac_ret_status
 write_log_efuse_88xx(struct halmac_adapter *adapter, u32 offset, u8 value);
 
 enum halmac_ret_status
+write_log_efuse_word_88xx(struct halmac_adapter *adapter, u32 offset,
+			  u16 value);
+
+enum halmac_ret_status
 pg_efuse_by_map_88xx(struct halmac_adapter *adapter,
 		     struct halmac_pg_efuse_info *info,
 		     enum halmac_efuse_read_cfg cfg);

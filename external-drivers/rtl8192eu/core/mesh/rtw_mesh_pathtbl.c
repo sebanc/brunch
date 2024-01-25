@@ -61,7 +61,7 @@ static const rtw_rhashtable_params rtw_mesh_rht_params = {
 static inline bool rtw_mpath_expired(struct rtw_mesh_path *mpath)
 {
 	return (mpath->flags & RTW_MESH_PATH_ACTIVE) &&
-	       rtw_time_after(jiffies, mpath->exp_time) &&
+	       rtw_time_after(rtw_get_current_time(), mpath->exp_time) &&
 	       !(mpath->flags & RTW_MESH_PATH_FIXED);
 }
 
@@ -82,7 +82,7 @@ static struct rtw_mesh_table *rtw_mesh_table_alloc(void)
 		return NULL;
 
 	rtw_hlist_head_init(&newtbl->known_gates);
-	atomic_set(&newtbl->entries,  0);
+	ATOMIC_SET(&newtbl->entries,  0);
 	_rtw_spinlock_init(&newtbl->gates_lock);
 
 	return newtbl;
@@ -114,10 +114,10 @@ void rtw_mesh_path_assign_nexthop(struct rtw_mesh_path *mpath, struct sta_info *
 	enter_critical_bh(&mpath->frame_queue.lock);
 	head = &mpath->frame_queue.queue;
 	list = get_next(head);
-	while (head != list) {
+	while (rtw_end_of_queue_search(head, list) == _FALSE) {
 		xframe = LIST_CONTAINOR(list, struct xmit_frame, list);
 		list = get_next(list);
-		memcpy(xframe->attrib.ra, sta->cmn.mac_addr, ETH_ALEN);
+		_rtw_memcpy(xframe->attrib.ra, sta->cmn.mac_addr, ETH_ALEN);
 	}
 
 	exit_critical_bh(&mpath->frame_queue.lock);
@@ -135,9 +135,9 @@ static void rtw_prepare_for_gate(struct xmit_frame *xframe, char *dst_addr,
 	/* update next hop */
 	rtw_rcu_read_lock();
 	next_hop = rtw_rcu_dereference(gate_mpath->next_hop)->cmn.mac_addr;
-	memcpy(attrib->ra, next_hop, ETH_ALEN);
+	_rtw_memcpy(attrib->ra, next_hop, ETH_ALEN);
 	rtw_rcu_read_unlock();
-	memcpy(attrib->mda, dst_addr, ETH_ALEN);
+	_rtw_memcpy(attrib->mda, dst_addr, ETH_ALEN);
 }
 
 /**
@@ -183,7 +183,7 @@ static void rtw_mesh_path_move_to_queue(struct rtw_mesh_path *gate_mpath,
 
 	head = &failq;
 	list = get_next(head);
-	while (head != list) {
+	while (rtw_end_of_queue_search(head, list) == _FALSE) {
 		if (gate_mpath->frame_queue_len >= RTW_MESH_FRAME_QUEUE_LEN) {
 			RTW_MPATH_DBG(FUNC_ADPT_FMT" mpath queue for gate %pM is full!\n"
 				, FUNC_ADPT_ARG(gate_mpath->adapter), gate_mpath->dst);
@@ -324,6 +324,63 @@ rtw_mesh_path_lookup_by_idx(_adapter *adapter, int idx)
 	return __rtw_mesh_path_lookup_by_idx(adapter->mesh_info.mesh_paths, idx);
 }
 
+void dump_mpath(void *sel, _adapter *adapter)
+{
+	struct rtw_mesh_path *mpath;
+	int idx = 0;
+	char dst[ETH_ALEN];
+	char next_hop[ETH_ALEN];
+	u32 sn, metric, qlen;
+	u32 exp_ms = 0, dto_ms;
+	u8 drty;
+	enum rtw_mesh_path_flags flags;
+
+	RTW_PRINT_SEL(sel, "%-17s %-17s %-10s %-10s %-4s %-6s %-6s %-4s flags\n"
+		, "dst", "next_hop", "sn", "metric", "qlen", "exp_ms", "dto_ms", "drty"
+	);
+
+	do {
+		rtw_rcu_read_lock();
+
+		mpath = rtw_mesh_path_lookup_by_idx(adapter, idx);
+		if (mpath) {
+			_rtw_memcpy(dst, mpath->dst, ETH_ALEN);
+			_rtw_memcpy(next_hop, mpath->next_hop->cmn.mac_addr, ETH_ALEN);
+			sn = mpath->sn;
+			metric = mpath->metric;
+			qlen = mpath->frame_queue_len;
+			if (rtw_time_after(mpath->exp_time, rtw_get_current_time()))
+				exp_ms = rtw_get_remaining_time_ms(mpath->exp_time);
+			dto_ms = rtw_systime_to_ms(mpath->discovery_timeout);
+			drty = mpath->discovery_retries;
+			flags = mpath->flags;
+		}
+
+		rtw_rcu_read_unlock();
+
+		if (mpath) {
+			RTW_PRINT_SEL(sel, MAC_FMT" "MAC_FMT" %10u %10u %4u %6u %6u %4u%s%s%s%s%s%s%s%s%s%s\n"
+				, MAC_ARG(dst), MAC_ARG(next_hop), sn, metric, qlen
+				, exp_ms < 999999 ? exp_ms : 999999
+				, dto_ms < 999999 ? dto_ms : 999999
+				, drty
+				, (flags & RTW_MESH_PATH_ACTIVE) ? " ACT" : ""
+				, (flags & RTW_MESH_PATH_RESOLVING) ? " RSVING" : ""
+				, (flags & RTW_MESH_PATH_SN_VALID) ? " SN_VALID" : ""
+				, (flags & RTW_MESH_PATH_FIXED) ?  " FIXED" : ""
+				, (flags & RTW_MESH_PATH_RESOLVED) ? " RSVED" : ""
+				, (flags & RTW_MESH_PATH_REQ_QUEUED) ? " REQ_IN_Q" : ""
+				, (flags & RTW_MESH_PATH_DELETED) ? " DELETED" : ""
+				, (flags & RTW_MESH_PATH_ROOT_ADD_CHK) ? " R_ADD_CHK" : ""
+				, (flags & RTW_MESH_PATH_PEER_AKA) ? " PEER_AKA" : ""
+				, (flags & RTW_MESH_PATH_BCAST_PREQ) ? " BC_PREQ" : ""
+			);
+		}
+
+		idx++;
+	} while (mpath);
+}
+
 /**
  * rtw_mpp_path_lookup_by_idx - look up a path in the proxy path table by its index
  * @idx: index
@@ -359,8 +416,8 @@ int rtw_mesh_path_add_gate(struct rtw_mesh_path *mpath)
 
 	enter_critical_bh(&mpath->state_lock);
 	mcfg = &mpath->adapter->mesh_cfg;
-	mpath->gate_timeout = jiffies +
-			      msecs_to_jiffies(mcfg->path_gate_timeout_factor *
+	mpath->gate_timeout = rtw_get_current_time() +
+			      rtw_ms_to_systime(mcfg->path_gate_timeout_factor *
 					        mpath->gate_ann_int);
 	if (mpath->is_gate) {
 		err = -EEXIST;
@@ -388,7 +445,7 @@ int rtw_mesh_path_add_gate(struct rtw_mesh_path *mpath)
 	exit_critical_bh(&mpath->state_lock);
 
 	if (ori_num_gates == 0) {
-		update_beacon(mpath->adapter, WLAN_EID_MESH_CONFIG, NULL, _TRUE);
+		update_beacon(mpath->adapter, WLAN_EID_MESH_CONFIG, NULL, _TRUE, 0);
 		#if CONFIG_RTW_MESH_CTO_MGATE_CARRIER
 		if (!rtw_mesh_cto_mgate_required(mpath->adapter))
 			rtw_netif_carrier_on(mpath->adapter->pnetdev);
@@ -448,7 +505,7 @@ void rtw_mesh_gate_del(struct rtw_mesh_table *tbl, struct rtw_mesh_path *mpath)
 	exit_critical_bh(&tbl->gates_lock);
 
 	if (ori_num_gates == 1) {
-		update_beacon(mpath->adapter, WLAN_EID_MESH_CONFIG, NULL, _TRUE);
+		update_beacon(mpath->adapter, WLAN_EID_MESH_CONFIG, NULL, _TRUE, 0);
 		#if CONFIG_RTW_MESH_CTO_MGATE_CARRIER
 		if (rtw_mesh_cto_mgate_required(mpath->adapter))
 			rtw_netif_carrier_off(mpath->adapter->pnetdev);
@@ -543,15 +600,15 @@ struct rtw_mesh_path *rtw_mesh_path_new(_adapter *adapter,
 	if (!new_mpath)
 		return NULL;
 
-	memcpy(new_mpath->dst, dst, ETH_ALEN);
-	memset(new_mpath->rann_snd_addr, 0xFF, ETH_ALEN);
+	_rtw_memcpy(new_mpath->dst, dst, ETH_ALEN);
+	_rtw_memset(new_mpath->rann_snd_addr, 0xFF, ETH_ALEN);
 	new_mpath->is_root = false;
 	new_mpath->adapter = adapter;
 	new_mpath->flags = 0;
 	new_mpath->gate_asked = false;
 	_rtw_init_queue(&new_mpath->frame_queue);
 	new_mpath->frame_queue_len = 0;
-	new_mpath->exp_time = jiffies;
+	new_mpath->exp_time = rtw_get_current_time();
 	_rtw_spinlock_init(&new_mpath->state_lock);
 	rtw_init_timer(&new_mpath->timer, adapter, rtw_mesh_path_timer, new_mpath);
 
@@ -584,7 +641,7 @@ struct rtw_mesh_path *rtw_mesh_path_add(_adapter *adapter,
 	if (is_multicast_mac_addr(dst))
 		return ERR_PTR(-ENOTSUPP);
 
-	if (atomic_inc_unless(&adapter->mesh_info.mpaths, RTW_MESH_MAX_MPATHS) == 0)
+	if (ATOMIC_INC_UNLESS(&adapter->mesh_info.mpaths, RTW_MESH_MAX_MPATHS) == 0)
 		return ERR_PTR(-ENOSPC);
 
 	new_mpath = rtw_mesh_path_new(adapter, dst);
@@ -640,7 +697,7 @@ int rtw_mpp_path_add(_adapter *adapter,
 	if (!new_mpath)
 		return -ENOMEM;
 
-	memcpy(new_mpath->mpp, mpp, ETH_ALEN);
+	_rtw_memcpy(new_mpath->mpp, mpp, ETH_ALEN);
 	ret = rtw_rhashtable_lookup_insert_fast(&tbl->rhead,
 					    &new_mpath->rhash,
 					    rtw_mesh_rht_params);
@@ -663,8 +720,8 @@ void dump_mpp(void *sel, _adapter *adapter)
 
 		mpath = rtw_mpp_path_lookup_by_idx(adapter, idx);
 		if (mpath) {
-			memcpy(dst, mpath->dst, ETH_ALEN);
-			memcpy(mpp, mpath->mpp, ETH_ALEN);
+			_rtw_memcpy(dst, mpath->dst, ETH_ALEN);
+			_rtw_memcpy(mpp, mpath->mpp, ETH_ALEN);
 		}
 
 		rtw_rcu_read_unlock();
@@ -739,8 +796,9 @@ static void rtw_mesh_path_free_rcu(struct rtw_mesh_table *tbl,
 	rtw_mesh_gate_del(tbl, mpath);
 	exit_critical_bh(&mpath->state_lock);
 	_cancel_timer_ex(&mpath->timer);
-	atomic_dec(&adapter->mesh_info.mpaths);
-	atomic_dec(&tbl->entries);
+	ATOMIC_DEC(&adapter->mesh_info.mpaths);
+	ATOMIC_DEC(&tbl->entries);
+	_rtw_spinlock_free(&mpath->state_lock);
 
 	rtw_mesh_path_flush_pending(mpath);
 
@@ -1047,7 +1105,7 @@ void rtw_mesh_path_flush_pending(struct rtw_mesh_path *mpath)
 
 	head = &tmp;
 	list = get_next(head);
-	while (head != list) {
+	while (rtw_end_of_queue_search(head, list) == _FALSE) {
 		xframe = LIST_CONTAINOR(list, struct xmit_frame, list);
 		list = get_next(list);
 		rtw_list_delete(&xframe->list);
@@ -1134,21 +1192,21 @@ void rtw_mesh_path_tbl_expire(_adapter *adapter,
 			break;
 		if ((!(mpath->flags & RTW_MESH_PATH_RESOLVING)) &&
 		    (!(mpath->flags & RTW_MESH_PATH_FIXED)) &&
-		     rtw_time_after(jiffies, mpath->exp_time + RTW_MESH_PATH_EXPIRE))
+		     rtw_time_after(rtw_get_current_time(), mpath->exp_time + RTW_MESH_PATH_EXPIRE))
 			__rtw_mesh_path_del(tbl, mpath);
 
 		if (mpath->is_gate &&  /* need not to deal with non-gate case */
-		    rtw_time_after(jiffies, mpath->gate_timeout)) {
+		    rtw_time_after(rtw_get_current_time(), mpath->gate_timeout)) {
 			RTW_MPATH_DBG(FUNC_ADPT_FMT"mpath [%pM] expired systime is %lu systime is %lu\n",
 				      FUNC_ADPT_ARG(adapter), mpath->dst,
-				      mpath->gate_timeout, jiffies);
+				      mpath->gate_timeout, rtw_get_current_time());
 			enter_critical_bh(&mpath->state_lock);
 			if (mpath->gate_asked) { /* asked gate before */
 				rtw_mesh_gate_del(tbl, mpath);
 				exit_critical_bh(&mpath->state_lock);
 			} else {
 				mpath->gate_asked = true;
-				mpath->gate_timeout = jiffies + msecs_to_jiffies(mpath->gate_ann_int);
+				mpath->gate_timeout = rtw_get_current_time() + rtw_ms_to_systime(mpath->gate_ann_int);
 				exit_critical_bh(&mpath->state_lock);
 				rtw_mesh_queue_preq(mpath, RTW_PREQ_Q_F_START | RTW_PREQ_Q_F_REFRESH);
 				RTW_MPATH_DBG(FUNC_ADPT_FMT"mpath [%pM] ask mesh gate existence (is_root=%d)\n",

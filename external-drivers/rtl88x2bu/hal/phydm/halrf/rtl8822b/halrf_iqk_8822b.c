@@ -44,10 +44,10 @@ void phydm_get_read_counter_8822b(struct dm_struct *dm)
 
 	while (1) {
 		rf_reg = odm_get_rf_reg(dm, RF_PATH_A, RF_0x8, MASK20BITS);
-		if (rf_reg == 0xabcde || counter > 300)
+		if (rf_reg == 0xabcde || counter > 20000)
 			break;
 		counter++;
-		ODM_delay_ms(1);
+		ODM_delay_us(10);
 	}
 
 	odm_set_rf_reg(dm, RF_PATH_A, RF_0x8, MASK20BITS, 0x0);
@@ -184,11 +184,8 @@ void _iqk_fill_iqk_report_8822b(void *dm_void, u8 ch)
 	odm_write_4byte(dm, 0x1b00, 0xf8000008);
 	odm_set_bb_reg(dm, R_0x1bf0, 0x0000ffff, tmp1 | tmp2 | tmp3);
 
-	for (i = 0; i < 2; i++) {
-		data = ((iqk->rxiqk_agc[ch][(i * 2) + 1] << 16) |
-			iqk->rxiqk_agc[ch][i * 2]);
-		odm_write_4byte(dm, 0x1be8 + (i * 4), data);
-	}
+	data = (iqk->rxiqk_agc[ch][1] << 16) | iqk->rxiqk_agc[ch][0];
+	odm_write_4byte(dm, 0x1be8, data);
 }
 
 void _iqk_fail_count_8822b(void *dm_void)
@@ -298,11 +295,11 @@ void _iqk_bb_reset_8822b(struct dm_struct *dm)
 		odm_set_bb_reg(dm, R_0x198c, 0x7, 0x7);
 		cca_ing = (boolean)odm_get_bb_reg(dm, R_0xfa0, BIT(3));
 
-		if (count > 30)
+		if (count > 20000)
 			cca_ing = false;
 
 		if (cca_ing) {
-			ODM_delay_ms(1);
+			ODM_delay_us(10);
 			count++;
 		} else {
 			/*RX ant off*/
@@ -404,7 +401,7 @@ void _iqk_backup_iqk_8822b_subfunction(struct dm_struct *dm)
 	u8 i, j, k;
 
 	iqk->iqk_channel[1] = iqk->iqk_channel[0];
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < SS_8822B; i++) {
 		iqk->lok_idac[1][i] = iqk->lok_idac[0][i];
 		iqk->rxiqk_agc[1][i] = iqk->rxiqk_agc[0][i];
 		iqk->bypass_iqk[1][i] = iqk->bypass_iqk[0][i];
@@ -431,7 +428,7 @@ void _iqk_backup_iqk_8822b(struct dm_struct *dm, u8 step, u8 path)
 	case 0:
 		_iqk_backup_iqk_8822b_subfunction(dm);
 
-		for (i = 0; i < 4; i++) {
+		for (i = 0; i < SS_8822B; i++) {
 			iqk->rxiqk_fail_code[0][i] = 0x0;
 			iqk->rxiqk_agc[0][i] = 0x0;
 			for (j = 0; j < 2; j++) {
@@ -467,7 +464,7 @@ void _iqk_reload_iqk_setting_8822b(struct dm_struct *dm, u8 ch,
 	u32 bmask20_16 = (BIT(20) | BIT(19) | BIT(18) | BIT(17) | BIT(16));
 	boolean report;
 
-	for (path = 0; path < 2; path++) {
+	for (path = 0; path < SS_8822B; path++) {
 		if (reload_idx == 2) {
 #if 0
 			/*odm_set_rf_reg(dm, (enum rf_path)path, RF_0xdf, BIT(4), 0x1);*/
@@ -584,7 +581,7 @@ void _iqk_rf_setting_8822b(struct dm_struct *dm)
 	odm_write_4byte(dm, 0x1b00, 0xf8000008);
 	odm_write_4byte(dm, 0x1bb8, 0x00000000);
 
-	for (path = 0; path < 2; path++) {
+	for (path = 0; path < SS_8822B; path++) {
 		/*0xdf:B11 = 1,B4 = 0, B1 = 1*/
 		tmp = odm_get_rf_reg(dm, (enum rf_path)path,
 				     RF_0xdf, MASK20BITS);
@@ -830,11 +827,11 @@ _iqk_check_cal_8822b(struct dm_struct *dm, u8 path, u8 cmd)
 					odm_get_bb_reg(dm, R_0x1b08, BIT(26));
 			notready = false;
 		} else {
-			ODM_delay_ms(1);
+			ODM_delay_us(10);
 			delay_count++;
 		}
 
-		if (delay_count >= 50) {
+		if (delay_count >= 20000) {
 			fail = true;
 			RF_DBG(dm, DBG_RF_IQK, "[IQK]IQK timeout!!!\n");
 			break;
@@ -864,13 +861,17 @@ _iqk_rxk_gsearch_fail_8822b(struct dm_struct *dm, u8 path, u8 step)
 		_iqk_ltec_write_8822b(dm, 0x38, 0xffff,0x7700);
 		odm_write_4byte(dm, 0x1b00, IQK_CMD);
 		odm_write_4byte(dm, 0x1b00, IQK_CMD + 0x1);
-		ODM_delay_ms(GS_delay_8822B);
+		ODM_delay_us(10);
 		fail = _iqk_check_cal_8822b(dm, path, 0x1);
 		_iqk_ltec_write_8822b(dm, 0x38, MASKDWORD, iqk->tmp_gntwl);
 	} else if (step == RXIQK2) {
 		for (idx = 0; idx < 4; idx++) {
 			if (iqk->tmp1bcc == IQMUX[idx])
 				break;
+		}
+		if (idx == 4) {
+			RF_DBG(dm, DBG_RF_IQK, "[IQK] rx_gs overflow\n");
+			return fail;
 		}
 		odm_write_4byte(dm, 0x1b00, 0xf8000008 | path << 1);
 		odm_write_4byte(dm, 0x1bcc, iqk->tmp1bcc);
@@ -882,7 +883,7 @@ _iqk_rxk_gsearch_fail_8822b(struct dm_struct *dm, u8 path, u8 step)
 		_iqk_ltec_write_8822b(dm, 0x38, 0xffff,0x7700);
 		odm_write_4byte(dm, 0x1b00, IQK_CMD);
 		odm_write_4byte(dm, 0x1b00, IQK_CMD + 0x1);
-		ODM_delay_ms(GS_delay_8822B);
+		ODM_delay_us(10);
 		fail = _iqk_check_cal_8822b(dm, path, 0x1);
 		_iqk_ltec_write_8822b(dm, 0x38, MASKDWORD, iqk->tmp_gntwl);
 
@@ -950,7 +951,7 @@ _lok_one_shot_8822b(void *dm_void, u8 path)
 	odm_write_4byte(dm, 0x1b00, IQK_CMD + 1);
 	/*LOK: CMD ID = 0	{0xf8000018, 0xf8000028}*/
 	/*LOK: CMD ID = 0	{0xf8000019, 0xf8000029}*/
-	ODM_delay_ms(LOK_delay_8822B);
+	ODM_delay_us(10);
 	LOK_notready = _iqk_check_cal_8822b(dm, path, 0x0);
 	_iqk_ltec_write_8822b(dm, 0x38, MASKDWORD, iqk->tmp_gntwl);
 
@@ -1023,7 +1024,7 @@ _iqk_one_shot_8822b(void *dm_void, u8 path, u8 idx)
 	_iqk_ltec_write_8822b(dm, 0x38, 0xffff,0x7700);
 	odm_write_4byte(dm, 0x1b00, IQK_CMD);
 	odm_write_4byte(dm, 0x1b00, IQK_CMD + 0x1);
-	ODM_delay_ms(WBIQK_delay_8822B);
+	ODM_delay_us(10);
 	fail = _iqk_check_cal_8822b(dm, path, 0x1);
 	_iqk_ltec_write_8822b(dm, 0x38, MASKDWORD, iqk->tmp_gntwl);
 
@@ -1297,7 +1298,7 @@ void _iqk_iqk_by_path_8822b(void *dm_void, boolean segment_iqk)
 			       "[IQK]B_GS1_retry = %d B_GS2_retry = %d\n",
 			       iqk->gs_retry_count[0][RF_PATH_B][0],
 			       iqk->gs_retry_count[0][RF_PATH_B][1]);
-			for (i = 0; i < 2; i++) {
+			for (i = 0; i < SS_8822B; i++) {
 				odm_write_4byte(dm, 0x1b00,
 						0xf8000008 | i << 1);
 				odm_write_4byte(dm, 0x1b2c, 0x7);
@@ -1425,7 +1426,7 @@ u32 _iqk_tximr_selfcheck_8822b(void *dm_void, u8 tone_index, u8 path)
 	odm_write_4byte(dm, 0x1b38, 0x20000000);
 	odm_write_4byte(dm, 0x1b3c, 0x20000000);
 	/* ======derive pwr1========*/
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < SS_8822B; i++) {
 		odm_write_4byte(dm, 0x1b00, 0xf8000008 | path << 1);
 		if (i == 0)
 			odm_write_4byte(dm, 0x1bcc, 0x0f);
@@ -1463,7 +1464,7 @@ void _iqk_start_tximr_test_8822b(struct dm_struct *dm, u8 imr_limit)
 	u8 path, i, tone_index;
 	u32 imr_result;
 
-	for (path = 0; path < 2; path++) {
+	for (path = 0; path < SS_8822B; path++) {
 		_iqk_txk_setting_8822b(dm, path);
 		KFAIL = _iqk_one_shot_8822b(dm, path, TXIQK);
 		for (i = 0x0; i < imr_limit; i++) {
@@ -1765,7 +1766,7 @@ void _iqk_start_rximr_test_8822b(struct dm_struct *dm, u8 imr_limit)
 {
 	u8 path;
 
-	for (path = 0; path < 2; path++)
+	for (path = 0; path < SS_8822B; path++)
 		_iqk_rximr_test_8822b(dm, path, imr_limit);
 }
 
@@ -1793,13 +1794,14 @@ void _phy_iq_calibrate_8822b(struct dm_struct *dm, boolean reset,
 	u32 MAC_backup[MAC_REG_NUM_8822B], BB_backup[BB_REG_NUM_8822B];
 	u32 RF_backup[RF_REG_NUM_8822B][SS_8822B];
 	u32 backup_mac_reg[MAC_REG_NUM_8822B] = {0x520, 0x550};
-	u32 backup_bb_reg[BB_REG_NUM_8822B] = {0x808, 0x90c, 0xc00, 0xcb0,
+	u32 backup_bb_reg[BB_REG_NUM_8822B] = {0x808, 0x90c, 0xc00, 0xcb0, 
 					       0xcb4, 0xcbc, 0xe00, 0xeb0,
 					       0xeb4, 0xebc, 0x1990, 0x9a4,
 					       0xa04, 0xb00, 0x838, 0xc58,
 					       0xc5c, 0xc6c, 0xe58, 0xe5c,
 					       0xe6c};
 	u32 backup_rf_reg[RF_REG_NUM_8822B] = {0xdf, 0x8f, 0x65, 0x0, 0x1};
+	u32 i;
 	boolean is_mp = false;
 
 	struct dm_iqk_info *iqk = &dm->IQK_info;
@@ -1817,7 +1819,7 @@ void _phy_iq_calibrate_8822b(struct dm_struct *dm, boolean reset,
 	       "[IQK]band_type=%s band_width=%d ExtPA2G=%d ext_pa_5g=%d\n",
 	       (*dm->band_type == ODM_BAND_5G) ? "5G" : "2G", *dm->band_width,
 	       dm->ext_pa, dm->ext_pa_5g);
-	RF_DBG(dm, DBG_RF_IQK, "[IQK]Interface = %d, cut_version = %x\n",
+	RF_DBG(dm, DBG_RF_IQK, "[IQK]Interface = %d, Cv = %x\n",
 	       dm->support_interface, dm->cut_version);
 
 	iqk->iqk_times++;
@@ -1853,7 +1855,8 @@ void _phy_iq_calibrate_8822b(struct dm_struct *dm, boolean reset,
 			break;
 		iqk->kcount = 0;
 		RF_DBG(dm, DBG_RF_IQK, "[IQK]delay 50ms!!!\n");
-		ODM_delay_ms(50);
+		for (i = 0; i < 5000; i++)
+			ODM_delay_us(10);
 	};
 	if (segment_iqk)
 		_iqk_reload_iqk_setting_8822b(dm, 0x0, 0x1);
@@ -1889,17 +1892,17 @@ void _phy_iq_calibrate_by_fw_8822b(void *dm_void, u8 clear, u8 segment_iqk)
 		RF_DBG(dm, DBG_RF_IQK, "[IQK]FWIQK fail!!!\n");
 }
 
-/*IQK_version:0x2f, NCTL:0x8*/
-/*1.disable CCK block and OFDM CCA block while IQKing*/
 void phy_iq_calibrate_8822b(void *dm_void, boolean clear, boolean segment_iqk)
 {
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
+	u32 i;
 
 	if (*dm->mp_mode)
 		halrf_iqk_hwtx_check(dm, true);
-	/*FW IQK*/
 	if (dm->fw_offload_ability & PHYDM_RF_IQK_OFFLOAD) {
 		_phy_iq_calibrate_by_fw_8822b(dm, clear, (u8)(segment_iqk));
+		for (i = 0; i < 100; i++)
+			ODM_delay_us(10);
 		phydm_get_read_counter_8822b(dm);
 		halrf_iqk_check_if_reload(dm);
 	} else {
@@ -1921,7 +1924,7 @@ void _phy_imr_measure_8822b(struct dm_struct *dm)
 	u32 MAC_backup[MAC_REG_NUM_8822B], BB_backup[BB_REG_NUM_8822B];
 	u32 RF_backup[RF_REG_NUM_8822B][SS_8822B];
 	u32 backup_mac_reg[MAC_REG_NUM_8822B] = {0x520, 0x550};
-	u32 backup_bb_reg[BB_REG_NUM_8822B] = {0x808, 0x90c, 0xc00, 0xcb0,
+	u32 backup_bb_reg[BB_REG_NUM_8822B] = {0x808, 0x90c, 0xc00, 0xcb0, 
 					       0xcb4, 0xcbc, 0xe00, 0xeb0,
 					       0xeb4, 0xebc, 0x1990, 0x9a4,
 					       0xa04, 0xb00, 0x838, 0xc58,
@@ -1982,8 +1985,8 @@ void phy_get_iqk_cfir_8822b(void *dm_void, u8 idx, u8 path, boolean debug)
 		odm_set_bb_reg(dm, R_0x1bd8, MASKDWORD, 0xe0000001 + (i * 4));
 		tmp = odm_get_bb_reg(dm, R_0x1bfc, MASKDWORD);
 		iqk_info->iqk_cfir_real[ch][path][idx][i] =
-						(tmp & 0x0fff0000) >> 16;
-		iqk_info->iqk_cfir_imag[ch][path][idx][i] = tmp & 0xfff;
+						(u16)((tmp & 0x0fff0000) >> 16);
+		iqk_info->iqk_cfir_imag[ch][path][idx][i] = (u16)tmp & 0xfff;
 	}
 	odm_set_bb_reg(dm, R_0x1bd8, MASKDWORD, 0x0);
 	odm_set_bb_reg(dm, R_0x1b0c, BIT(13) | BIT(12), 0x0);
@@ -1997,11 +2000,11 @@ void phy_iqk_dbg_cfir_backup_8822b(void *dm_void)
 
 	RF_DBG(dm, DBG_RF_IQK, "[IQK]%-20s\n", "backup TX/RX CFIR");
 
-	for (path = 0; path < 2; path++)
+	for (path = 0; path < SS_8822B; path++)
 		for (idx = 0; idx < 2; idx++)
 			phydm_get_iqk_cfir(dm, idx, path, true);
 
-	for (path = 0; path < 2; path++) {
+	for (path = 0; path < SS_8822B; path++) {
 		for (idx = 0; idx < 2; idx++) {
 			for (i = 0; i < 8; i++) {
 				RF_DBG(dm, DBG_RF_IQK,
@@ -2036,7 +2039,7 @@ void phy_iqk_dbg_cfir_backup_update_8822b(void *dm_void)
 		RF_DBG(dm, DBG_RF_IQK, "[IQK]%-20s\n", "CFIR is invalid");
 		return;
 	}
-	for (path = 0; path < 2; path++) {
+	for (path = 0; path < SS_8822B; path++) {
 		for (idx = 0; idx < 2; idx++) {
 			odm_set_bb_reg(dm, R_0x1b00, MASKDWORD,
 				       0xf8000008 | path << 1);
@@ -2083,7 +2086,7 @@ void phy_iqk_dbg_cfir_reload_8822b(void *dm_void)
 		RF_DBG(dm, DBG_RF_IQK, "[IQK]%-20s\n", "CFIR is invalid");
 		return;
 	}
-	for (path = 0; path < 2; path++) {
+	for (path = 0; path < SS_8822B; path++) {
 		for (idx = 0; idx < 2; idx++) {
 			odm_set_bb_reg(dm, R_0x1b00, MASKDWORD,
 				       0xf8000008 | path << 1);
@@ -2137,7 +2140,7 @@ void phy_iqk_dbg_cfir_backup_show_8822b(void *dm_void)
 
 	RF_DBG(dm, DBG_RF_IQK, "[IQK]%-20s\n", "backup TX/RX CFIR");
 
-	for (path = 0; path < 2; path++) {
+	for (path = 0; path < SS_8822B; path++) {
 		for (idx = 0; idx < 2; idx++) {
 			for (i = 0; i < 8; i++) {
 				RF_DBG(dm, DBG_RF_IQK,

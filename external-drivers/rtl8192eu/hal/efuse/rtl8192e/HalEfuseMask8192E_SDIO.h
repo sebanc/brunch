@@ -18,9 +18,9 @@
 /******************************************************************************
 *                           MSDIO.TXT
 ******************************************************************************/
-u2Byte EFUSE_GetArrayLen_MP_8192E_MSDIO(VOID);
+u16 EFUSE_GetArrayLen_MP_8192E_MSDIO(void);
 
-VOID EFUSE_GetMaskArray_MP_8192E_MSDIO(pu1Byte Array);
+void EFUSE_GetMaskArray_MP_8192E_MSDIO(u8 *Array);
 
 BOOLEAN EFUSE_IsAddressMasked_MP_8192E_MSDIO(/* TC: Test Chip, MP: MP Chip */
-	u2Byte Offset);
+	u16 Offset);

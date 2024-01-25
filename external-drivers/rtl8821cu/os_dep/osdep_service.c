@@ -2381,6 +2381,7 @@ inline bool ATOMIC_INC_UNLESS(ATOMIC_T *v, int u)
 }
 
 #ifdef PLATFORM_LINUX
+#if !defined(CONFIG_RTW_ANDROID_GKI)
 /*
 * Open a file with the specific @param path, @param flag, @param mode
 * @param fpp the pointer of struct file pointer to get struct file pointer while file opening is success
@@ -2538,54 +2539,7 @@ static int isFileReadable(const char *path, u32 *sz)
 }
 
 /*
-* Open the file with @param path and retrive the file content into memory starting from @param buf for @param sz at most
-* @param path the path of the file to open and read
-* @param buf the starting address of the buffer to store file content
-* @param sz how many bytes to read at most
-* @return the byte we've read, or Linux specific error code
-*/
-static int retriveFromFile(const char *path, u8 *buf, u32 sz)
-{
-	int ret = -1;
-	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
-	mm_segment_t oldfs;
-	#endif
-	struct file *fp;
-
-	if (path && buf) {
-		ret = openFile(&fp, path, O_RDONLY, 0);
-		if (0 == ret) {
-			RTW_INFO("%s openFile path:%s fp=%p\n", __FUNCTION__, path , fp);
-
-			#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
-			oldfs = get_fs();
-			#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
-			set_fs(KERNEL_DS);
-			#else
-			set_fs(get_ds());
-			#endif
-			#endif
-
-			ret = readFile(fp, buf, sz);
-
-			#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
-			set_fs(oldfs);
-			#endif
-			closeFile(fp);
-
-			RTW_INFO("%s readFile, ret:%d\n", __FUNCTION__, ret);
-
-		} else
-			RTW_INFO("%s openFile path:%s Fail, ret:%d\n", __FUNCTION__, path, ret);
-	} else {
-		RTW_INFO("%s NULL pointer\n", __FUNCTION__);
-		ret =  -EINVAL;
-	}
-	return ret;
-}
-
-/*
-* Open the file with @param path and wirte @param sz byte of data starting from @param buf into the file
+* Open the file with @param path and write @param sz byte of data starting from @param buf into the file
 * @param path the path of the file to open and write
 * @param buf the starting address of the data to write into file
 * @param sz how many bytes to write at most
@@ -2630,8 +2584,10 @@ static int storeToFile(const char *path, u8 *buf, u32 sz)
 	}
 	return ret;
 }
+#endif /* !defined(CONFIG_RTW_ANDROID_GKI)*/
 #endif /* PLATFORM_LINUX */
 
+#if !defined(CONFIG_RTW_ANDROID_GKI)
 /*
 * Test if the specifi @param path is a direct and readable
 * @param path the path of the direct to test
@@ -2649,6 +2605,89 @@ int rtw_is_dir_readable(const char *path)
 	return _FALSE;
 #endif
 }
+#endif /* !defined(CONFIG_RTW_ANDROID_GKI) */
+
+/*
+* Open the file with @param path and retrive the file content into memory starting from @param buf for @param sz at most
+* @param path the path of the file to open and read
+* @param buf the starting address of the buffer to store file content
+* @param sz how many bytes to read at most
+* @return the byte we've read, or Linux specific error code
+*/
+static int retriveFromFile(const char *path, u8 *buf, u32 sz)
+{
+#if defined(CONFIG_RTW_ANDROID_GKI)
+	int ret = -1;
+	//char req_fw_buf[4096];
+	const struct firmware *fw = NULL;
+	char* const delim = "/";
+	char *name, *token, *cur, path_tmp[1024] = {0};
+
+	if (path && buf) {
+		_rtw_memcpy(path_tmp, path, strlen(path));
+		cur = path_tmp;
+
+		token = strsep(&cur, delim);
+		while (token != NULL) {
+			token = strsep(&cur, delim);
+			if(token)
+				name = token;
+		}
+
+		ret = request_firmware(&fw, name, NULL);
+		if (ret == 0) {
+			RTW_INFO("%s() success, file size : %zu\n", __func__, fw->size);
+			_rtw_memcpy(buf, fw->data, (u32)fw->size);
+			ret = (u32)fw->size;
+		} else {
+			RTW_INFO("%s() fail, error : %d\n", __func__, ret);
+		}
+		if(fw)
+			release_firmware(fw);
+	}else {
+		RTW_INFO("%s NULL pointer\n", __FUNCTION__);
+		ret =  -EINVAL;
+	}
+	return ret;
+#else /* !defined(CONFIG_RTW_ANDROID_GKI) */
+	int ret = -1;
+	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
+	mm_segment_t oldfs;
+	#endif
+	struct file *fp;
+
+	if (path && buf) {
+		ret = openFile(&fp, path, O_RDONLY, 0);
+		if (0 == ret) {
+			RTW_INFO("%s openFile path:%s fp=%p\n", __FUNCTION__, path , fp);
+
+			#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
+			oldfs = get_fs();
+			#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0))
+			set_fs(KERNEL_DS);
+			#else
+			set_fs(get_ds());
+			#endif
+			#endif
+
+			ret = readFile(fp, buf, sz);
+
+			#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
+			set_fs(oldfs);
+			#endif
+			closeFile(fp);
+
+			RTW_INFO("%s readFile, ret:%d\n", __FUNCTION__, ret);
+
+		} else
+			RTW_INFO("%s openFile path:%s Fail, ret:%d\n", __FUNCTION__, path, ret);
+	} else {
+		RTW_INFO("%s NULL pointer\n", __FUNCTION__);
+		ret =  -EINVAL;
+	}
+	return ret;
+#endif /* defined(CONFIG_RTW_ANDROID_GKI) */
+}
 
 /*
 * Test if the specifi @param path is a file and readable
@@ -2658,10 +2697,15 @@ int rtw_is_dir_readable(const char *path)
 int rtw_is_file_readable(const char *path)
 {
 #ifdef PLATFORM_LINUX
+#if !defined(CONFIG_RTW_ANDROID_GKI)
 	if (isFileReadable(path, NULL) == 0)
 		return _TRUE;
 	else
 		return _FALSE;
+#else
+	RTW_INFO("%s() Android GKI prohibbit kernel_read, return _TRUE\n", __func__);
+	return  _TRUE;
+#endif /* !defined(CONFIG_RTW_ANDROID_GKI) */
 #else
 	/* Todo... */
 	return _FALSE;
@@ -2677,10 +2721,16 @@ int rtw_is_file_readable(const char *path)
 int rtw_is_file_readable_with_size(const char *path, u32 *sz)
 {
 #ifdef PLATFORM_LINUX
+#if !defined(CONFIG_RTW_ANDROID_GKI)
 	if (isFileReadable(path, sz) == 0)
 		return _TRUE;
 	else
 		return _FALSE;
+#else
+	RTW_INFO("%s() Android GKI prohibbit kernel_read, return _TRUE\n", __func__);
+	*sz = 0;
+	return  _TRUE;
+#endif /* !defined(CONFIG_RTW_ANDROID_GKI) */
 #else
 	/* Todo... */
 	return _FALSE;
@@ -2724,6 +2774,7 @@ int rtw_retrieve_from_file(const char *path, u8 *buf, u32 sz)
 #endif
 }
 
+#if !defined(CONFIG_RTW_ANDROID_GKI)
 /*
 * Open the file with @param path and wirte @param sz byte of data starting from @param buf into the file
 * @param path the path of the file to open and write
@@ -2741,6 +2792,7 @@ int rtw_store_to_file(const char *path, u8 *buf, u32 sz)
 	return 0;
 #endif
 }
+#endif /* !defined(CONFIG_RTW_ANDROID_GKI) */
 
 #ifdef PLATFORM_LINUX
 struct net_device *rtw_alloc_etherdev_with_old_priv(int sizeof_priv, void *old_priv)
@@ -3479,5 +3531,5 @@ int hwaddr_aton_i(const char *txt, u8 *addr)
 	}
 
 	return 0;
-}
 
+}

@@ -2287,6 +2287,7 @@ u32 process_assoc_req_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pframe, uint l
 
 	while (p2p_ie) {
 		/* Check P2P Capability ATTR */
+		attr_contentlen = sizeof(cap_attr);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_CAPABILITY, (u8 *)&cap_attr, (uint *) &attr_contentlen)) {
 			RTW_INFO("[%s] Got P2P Capability Attr!!\n", __FUNCTION__);
 			cap_attr = le16_to_cpu(cap_attr);
@@ -2303,7 +2304,6 @@ u32 process_assoc_req_p2p_ie(struct wifidirect_info *pwdinfo, u8 *pframe, uint l
 			if (pattr_content) {
 				u8 num_of_secdev_type;
 				u16 dev_name_len;
-
 
 				rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_DEVICE_INFO , pattr_content, (uint *)&attr_contentlen);
 
@@ -2384,10 +2384,11 @@ u32 process_p2p_devdisc_req(struct wifidirect_info *pwdinfo, u8 *pframe, uint le
 		u8 dev_addr[ETH_ALEN] = { 0x00 };
 		u32	attr_contentlen = 0;
 
+		attr_contentlen = sizeof(groupid);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_GROUP_ID, groupid, &attr_contentlen)) {
 			if (_rtw_memcmp(pwdinfo->device_addr, groupid, ETH_ALEN) &&
 			    _rtw_memcmp(pwdinfo->p2p_group_ssid, groupid + ETH_ALEN, pwdinfo->p2p_group_ssid_len)) {
-				attr_contentlen = 0;
+				attr_contentlen = sizeof(dev_addr);
 				if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_DEVICE_ID, dev_addr, &attr_contentlen)) {
 					_irqL irqL;
 					_list	*phead, *plist;
@@ -2455,6 +2456,7 @@ u8 process_p2p_provdisc_req(struct wifidirect_info *pwdinfo,  u8 *pframe, uint l
 
 	wpsie = rtw_get_wps_ie(frame_body + _PUBLIC_ACTION_IE_OFFSET_, len - _PUBLIC_ACTION_IE_OFFSET_, NULL, &wps_ielen);
 	if (wpsie) {
+		attr_contentlen = sizeof(uconfig_method);
 		if (rtw_get_wps_attr_content(wpsie, wps_ielen, WPS_ATTR_CONF_METHOD , (u8 *) &uconfig_method, &attr_contentlen)) {
 			uconfig_method = be16_to_cpu(uconfig_method);
 			switch (uconfig_method) {
@@ -2552,6 +2554,7 @@ u8 process_p2p_group_negotation_req(struct wifidirect_info *pwdinfo, u8 *pframe,
 		/*	If some device wants to do p2p handshake without sending prov_disc_req */
 		/*	We have to get peer_req_cm from here. */
 		if (_rtw_memcmp(pwdinfo->rx_prov_disc_info.strconfig_method_desc_of_prov_disc_req, "000", 3)) {
+			wps_devicepassword_id_len = sizeof(wps_devicepassword_id);
 			rtw_get_wps_attr_content(wpsie, wps_ielen, WPS_ATTR_DEVICE_PWID, (u8 *) &wps_devicepassword_id, &wps_devicepassword_id_len);
 			wps_devicepassword_id = be16_to_cpu(wps_devicepassword_id);
 
@@ -2595,6 +2598,7 @@ u8 process_p2p_group_negotation_req(struct wifidirect_info *pwdinfo, u8 *pframe,
 		rtw_p2p_set_state(pwdinfo, P2P_STATE_GONEGO_ING);
 
 		/* Check P2P Capability ATTR */
+		attr_contentlen = sizeof(cap_attr);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_CAPABILITY, (u8 *)&cap_attr, (uint *)&attr_contentlen)) {
 			cap_attr = le16_to_cpu(cap_attr);
 
@@ -2604,6 +2608,7 @@ u8 process_p2p_group_negotation_req(struct wifidirect_info *pwdinfo, u8 *pframe,
 #endif /* defined(CONFIG_WFD) && defined(CONFIG_TDLS) */
 		}
 
+		attr_contentlen = sizeof(attr_content);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_GO_INTENT , &attr_content, &attr_contentlen)) {
 			RTW_INFO("[%s] GO Intent = %d, tie = %d\n", __FUNCTION__, attr_content >> 1, attr_content & 0x01);
 			pwdinfo->peer_intent = attr_content;	/*	include both intent and tie breaker values. */
@@ -2631,17 +2636,19 @@ u8 process_p2p_group_negotation_req(struct wifidirect_info *pwdinfo, u8 *pframe,
 			}
 		}
 
+		attr_contentlen = sizeof(listen_ch_attr);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_LISTEN_CH, (u8 *)listen_ch_attr, (uint *) &attr_contentlen) && attr_contentlen == 5)
 			pwdinfo->nego_req_info.peer_ch = listen_ch_attr[4];
 
 		RTW_INFO(FUNC_ADPT_FMT" listen channel :%u\n", FUNC_ADPT_ARG(padapter), pwdinfo->nego_req_info.peer_ch);
 
-		attr_contentlen = 0;
+		attr_contentlen = sizeof(pwdinfo->p2p_peer_interface_addr);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_INTENDED_IF_ADDR, pwdinfo->p2p_peer_interface_addr, &attr_contentlen)) {
 			if (attr_contentlen != ETH_ALEN)
 				_rtw_memset(pwdinfo->p2p_peer_interface_addr, 0x00, ETH_ALEN);
 		}
 
+		ch_cnt = sizeof(ch_content);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_CH_LIST, ch_content, &ch_cnt)) {
 			peer_ch_num = rtw_p2p_get_peer_ch_list(pwdinfo, ch_content, ch_cnt, peer_ch_list);
 			ch_num_inclusioned = rtw_p2p_ch_inclusion(padapter, peer_ch_list, peer_ch_num, ch_list_inclusioned);
@@ -2667,8 +2674,8 @@ u8 process_p2p_group_negotation_req(struct wifidirect_info *pwdinfo, u8 *pframe,
 #endif /* CONFIG_CONCURRENT_MODE */
 					{
 						u8 operatingch_info[5] = { 0x00 }, peer_operating_ch = 0;
-						attr_contentlen = 0;
 
+						attr_contentlen = sizeof(operatingch_info);
 						if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_OPERATING_CH, operatingch_info, &attr_contentlen))
 							peer_operating_ch = operatingch_info[4];
 
@@ -2754,6 +2761,7 @@ u8 process_p2p_group_negotation_resp(struct wifidirect_info *pwdinfo, u8 *pframe
 		while (p2p_ie) {	/*	Found the P2P IE. */
 
 			/* Check P2P Capability ATTR */
+			attr_contentlen = sizeof(cap_attr);
 			if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_CAPABILITY, (u8 *)&cap_attr, (uint *)&attr_contentlen)) {
 				cap_attr = le16_to_cpu(cap_attr);
 #ifdef CONFIG_TDLS
@@ -2762,6 +2770,7 @@ u8 process_p2p_group_negotation_resp(struct wifidirect_info *pwdinfo, u8 *pframe
 #endif /* CONFIG_TDLS */
 			}
 
+			attr_contentlen = sizeof(attr_content);
 			rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_STATUS, &attr_content, &attr_contentlen);
 			if (attr_contentlen == 1) {
 				RTW_INFO("[%s] Status = %d\n", __FUNCTION__, attr_content);
@@ -2779,7 +2788,7 @@ u8 process_p2p_group_negotation_resp(struct wifidirect_info *pwdinfo, u8 *pframe
 			}
 
 			/*	Try to get the peer's interface address */
-			attr_contentlen = 0;
+			attr_contentlen = sizeof(pwdinfo->p2p_peer_interface_addr);
 			if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_INTENDED_IF_ADDR, pwdinfo->p2p_peer_interface_addr, &attr_contentlen)) {
 				if (attr_contentlen != ETH_ALEN)
 					_rtw_memset(pwdinfo->p2p_peer_interface_addr, 0x00, ETH_ALEN);
@@ -2787,7 +2796,7 @@ u8 process_p2p_group_negotation_resp(struct wifidirect_info *pwdinfo, u8 *pframe
 
 			/*	Try to get the peer's intent and tie breaker value. */
 			attr_content = 0x00;
-			attr_contentlen = 0;
+			attr_contentlen = sizeof(attr_content);
 			if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_GO_INTENT , &attr_content, &attr_contentlen)) {
 				RTW_INFO("[%s] GO Intent = %d, tie = %d\n", __FUNCTION__, attr_content >> 1, attr_content & 0x01);
 				pwdinfo->peer_intent = attr_content;	/*	include both intent and tie breaker values. */
@@ -2826,13 +2835,14 @@ u8 process_p2p_group_negotation_resp(struct wifidirect_info *pwdinfo, u8 *pframe
 
 			/*	Try to get the operation channel information */
 
-			attr_contentlen = 0;
+			attr_contentlen = sizeof(operatingch_info);
 			if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_OPERATING_CH, operatingch_info, &attr_contentlen)) {
 				RTW_INFO("[%s] Peer's operating channel = %d\n", __FUNCTION__, operatingch_info[4]);
 				pwdinfo->peer_operating_ch = operatingch_info[4];
 			}
 
 			/*	Try to get the channel list information */
+			pwdinfo->channel_list_attr_len = sizeof(pwdinfo->channel_list_attr);
 			if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_CH_LIST, pwdinfo->channel_list_attr, &pwdinfo->channel_list_attr_len)) {
 				RTW_INFO("[%s] channel list attribute found, len = %d\n", __FUNCTION__,  pwdinfo->channel_list_attr_len);
 
@@ -2860,7 +2870,7 @@ u8 process_p2p_group_negotation_resp(struct wifidirect_info *pwdinfo, u8 *pframe
 #endif /* CONFIG_CONCURRENT_MODE */
 						{
 							u8 operatingch_info[5] = { 0x00 }, peer_operating_ch = 0;
-							attr_contentlen = 0;
+							attr_contentlen = sizeof(operatingch_info);
 
 							if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_OPERATING_CH, operatingch_info, &attr_contentlen))
 								peer_operating_ch = operatingch_info[4];
@@ -2886,8 +2896,8 @@ u8 process_p2p_group_negotation_resp(struct wifidirect_info *pwdinfo, u8 *pframe
 				RTW_INFO("[%s] channel list attribute not found!\n", __FUNCTION__);
 
 			/*	Try to get the group id information if peer is GO */
-			attr_contentlen = 0;
 			_rtw_memset(groupid, 0x00, 38);
+			attr_contentlen = sizeof(groupid);
 			if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_GROUP_ID, groupid, &attr_contentlen)) {
 				_rtw_memcpy(pwdinfo->groupid_info.go_device_addr, &groupid[0], ETH_ALEN);
 				_rtw_memcpy(pwdinfo->groupid_info.ssid, &groupid[6], attr_contentlen - ETH_ALEN);
@@ -2928,6 +2938,7 @@ u8 process_p2p_group_negotation_confirm(struct wifidirect_info *pwdinfo, u8 *pfr
 		u32	attr_contentlen = 0;
 
 		pwdinfo->negotiation_dialog_token = 1;
+		attr_contentlen = sizeof(attr_content);
 		rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_STATUS, &attr_content, &attr_contentlen);
 		if (attr_contentlen == 1) {
 			RTW_INFO("[%s] Status = %d\n", __FUNCTION__, attr_content);
@@ -2968,15 +2979,15 @@ u8 process_p2p_group_negotation_confirm(struct wifidirect_info *pwdinfo, u8 *pfr
 		}
 
 		/*	Try to get the group id information */
-		attr_contentlen = 0;
 		_rtw_memset(groupid, 0x00, 38);
+		attr_contentlen = sizeof(groupid);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_GROUP_ID, groupid, &attr_contentlen)) {
 			RTW_INFO("[%s] Ssid = %s, ssidlen = %zu\n", __FUNCTION__, &groupid[ETH_ALEN], strlen(&groupid[ETH_ALEN]));
 			_rtw_memcpy(pwdinfo->groupid_info.go_device_addr, &groupid[0], ETH_ALEN);
 			_rtw_memcpy(pwdinfo->groupid_info.ssid, &groupid[6], attr_contentlen - ETH_ALEN);
 		}
 
-		attr_contentlen = 0;
+		attr_contentlen = sizeof(operatingch_info);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_OPERATING_CH, operatingch_info, &attr_contentlen)) {
 			RTW_INFO("[%s] Peer's operating channel = %d\n", __FUNCTION__, operatingch_info[4]);
 			pwdinfo->peer_operating_ch = operatingch_info[4];
@@ -4015,6 +4026,7 @@ int process_p2p_cross_connect_ie(PADAPTER padapter, u8 *IEs, u32 IELength)
 
 	while (p2p_ie) {
 		/* Get P2P Manageability IE. */
+		attr_contentlen = sizeof(p2p_attr);
 		if (rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_MANAGEABILITY, p2p_attr, &attr_contentlen)) {
 			if ((p2p_attr[0] & (BIT(0) | BIT(1))) == 0x01)
 				ret = _FALSE;

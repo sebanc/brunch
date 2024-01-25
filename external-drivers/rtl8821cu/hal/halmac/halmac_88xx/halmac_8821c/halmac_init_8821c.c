@@ -1018,11 +1018,12 @@ pre_init_system_cfg_8821c(struct halmac_adapter *adapter)
 	enable_bb = 0;
 	set_hw_value_88xx(adapter, HALMAC_HW_EN_BB_RF, &enable_bb);
 
+/* nrm */
 	if (HALMAC_REG_R8(REG_SYS_CFG1 + 2) & BIT(4)) {
 		PLTFM_MSG_ERR("[ERR]test mode!!\n");
-		return HALMAC_RET_WLAN_MODE_FAIL;
+//		return HALMAC_RET_WLAN_MODE_FAIL;
 	}
-
+ 
 	PLTFM_MSG_TRACE("[TRACE]%s <===\n", __func__);
 
 	return HALMAC_RET_SUCCESS;

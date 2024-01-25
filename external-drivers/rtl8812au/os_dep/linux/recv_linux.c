@@ -139,6 +139,7 @@ int rtw_os_alloc_recvframe(_adapter *padapter, union recv_frame *precvframe, u8 
 
 		precvframe->u.hdr.pkt = rtw_skb_clone(pskb);
 		if (precvframe->u.hdr.pkt) {
+			RTW_INFO("%s: rtw_skb_clone success, RX throughput may be low!\n", __FUNCTION__);
 			precvframe->u.hdr.pkt->dev = padapter->pnetdev;
 			precvframe->u.hdr.rx_head = precvframe->u.hdr.rx_data = precvframe->u.hdr.rx_tail = pdata;
 			precvframe->u.hdr.rx_end =  pdata + alloc_sz;
@@ -353,7 +354,6 @@ _pkt *rtw_os_alloc_msdu_pkt(union recv_frame *prframe, const u8 *da, const u8 *s
 	{
 		sub_skb = rtw_skb_clone(prframe->u.hdr.pkt);
 		if (sub_skb) {
-			sub_skb->head = msdu;
 			sub_skb->data = msdu;
 			sub_skb->len = msdu_len;
 			skb_set_tail_pointer(sub_skb, msdu_len);
@@ -400,14 +400,9 @@ static int napi_recv(_adapter *padapter, int budget)
 		rx_ok = _FALSE;
 
 #ifdef CONFIG_RTW_GRO
-		/*	 
-			cloned SKB use dataref to avoid kernel release it.
-			But dataref changed in napi_gro_receive.
-			So, we should prevent cloned SKB go into napi_gro_receive.
-		*/
 		if (pregistrypriv->en_gro && !skb_cloned(pskb)) {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
-			if (rtw_napi_gro_receive(&padapter->napi, pskb) != GRO_MERGED_FREE)
+			rtw_napi_gro_receive(&padapter->napi, pskb);
 #else
 			if (rtw_napi_gro_receive(&padapter->napi, pskb) != GRO_DROP)
 #endif
@@ -619,9 +614,8 @@ void rtw_hostapd_mlme_rx(_adapter *padapter, union recv_frame *precv_frame)
 	if (skb == NULL)
 		return;
 
-	skb->head = precv_frame->u.hdr.rx_head;
 	skb->data = precv_frame->u.hdr.rx_data;
-	skb_set_tail_pointer(skb, precv_frame->u.hdr.rx_tail - precv_frame->u.hdr.rx_data);
+	skb->tail = precv_frame->u.hdr.rx_tail;
 	skb->len = precv_frame->u.hdr.len;
 
 	/* pskb_copy = rtw_skb_copy(skb);
@@ -663,7 +657,6 @@ int rtw_recv_monitor(_adapter *padapter, union recv_frame *precv_frame)
 		goto _recv_drop;
 	}
 
-	skb->head = precv_frame->u.hdr.rx_head;
 	skb->data = precv_frame->u.hdr.rx_data;
 	skb_set_tail_pointer(skb, precv_frame->u.hdr.len);
 	skb->len = precv_frame->u.hdr.len;
@@ -688,7 +681,6 @@ inline void rtw_rframe_set_os_pkt(union recv_frame *rframe)
 {
 	_pkt *skb = rframe->u.hdr.pkt;
 
-	skb->head = rframe->u.hdr.rx_head;
 	skb->data = rframe->u.hdr.rx_data;
 	skb_set_tail_pointer(skb, rframe->u.hdr.len);
 	skb->len = rframe->u.hdr.len;

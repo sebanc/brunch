@@ -178,6 +178,11 @@ void rtw_odm_releasespinlock(_adapter *adapter,	enum rt_spinlock_type type)
 	}
 }
 
+s16 rtw_odm_get_tx_power_mbm(struct dm_struct *dm, u8 rfpath, u8 rate, u8 bw, u8 cch)
+{
+	return phy_get_txpwr_single_mbm(dm->adapter, rfpath, mgn_rate_to_rs(rate), rate, bw, cch, 0, 0, 0, NULL);
+}
+
 #ifdef CONFIG_DFS_MASTER
 inline void rtw_odm_radar_detect_reset(_adapter *adapter)
 {
@@ -198,6 +203,20 @@ inline void rtw_odm_radar_detect_enable(_adapter *adapter)
 inline BOOLEAN rtw_odm_radar_detect(_adapter *adapter)
 {
 	return phydm_radar_detect(adapter_to_phydm(adapter));
+}
+
+static enum phydm_dfs_region_domain _rtw_dfs_regd_to_phydm[] = {
+	[RTW_DFS_REGD_NONE]	= PHYDM_DFS_DOMAIN_UNKNOWN,
+	[RTW_DFS_REGD_FCC]	= PHYDM_DFS_DOMAIN_FCC,
+	[RTW_DFS_REGD_MKK]	= PHYDM_DFS_DOMAIN_MKK,
+	[RTW_DFS_REGD_ETSI]	= PHYDM_DFS_DOMAIN_ETSI,
+};
+
+#define rtw_dfs_regd_to_phydm(region) (((region) >= RTW_DFS_REGD_NUM) ? _rtw_dfs_regd_to_phydm[RTW_DFS_REGD_NONE] : _rtw_dfs_regd_to_phydm[(region)])
+
+void rtw_odm_update_dfs_region(struct dvobj_priv *dvobj)
+{
+	odm_cmn_info_init(dvobj_to_phydm(dvobj), ODM_CMNINFO_DFS_REGION_DOMAIN, rtw_dfs_regd_to_phydm(rtw_rfctl_get_dfs_domain(dvobj_to_rfctl(dvobj))));
 }
 
 inline u8 rtw_odm_radar_detect_polling_int_ms(struct dvobj_priv *dvobj)
@@ -476,7 +495,7 @@ debug_IQK(
 	if (idx == TX_IQK) {//TXCFIR
 		odm_set_bb_reg(dm, R_0x1b20, BIT(31) | BIT(30), 0x3);
 	} else {//RXCFIR
-		odm_set_bb_reg(dm, R_0x1b20, BIT(31) | BIT(30), 0x1);
+		odm_set_bb_reg(dm, R_0x1b20, BIT(31) | BIT(30), 0x1);		
 	}
 	odm_set_bb_reg(dm, R_0x1bd4, BIT(21), 0x1);
 	odm_set_bb_reg(dm, R_0x1bd4, bit_mask_20_16, 0x10);
@@ -487,7 +506,7 @@ debug_IQK(
 		//iqk_info->iqk_cfir_real[ch][path][idx][i] =
 		//				(tmp & 0x0fff0000) >> 16;
 		RTW_INFO("iqk_cfir_imag[%d][%d][%d] = 0x%x\n", path, idx, i, (tmp & 0x0fff));
-		//iqk_info->iqk_cfir_imag[ch][path][idx][i] = tmp & 0x0fff;
+		//iqk_info->iqk_cfir_imag[ch][path][idx][i] = tmp & 0x0fff;		
 	}
 	odm_set_bb_reg(dm, R_0x1b20, BIT(31) | BIT(30), 0x0);
 	//odm_set_bb_reg(dm, R_0x1bd8, MASKDWORD, 0x0);
@@ -523,7 +542,7 @@ extern void _dpk_get_coef_8822c(void *dm_void, u8 path);
 __odm_func__ void
 debug_reload_data_8822c(
 	void *dm_void)
-{
+{	
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	struct dm_dpk_info *dpk_info = &dm->dpk_info;
 
@@ -548,7 +567,7 @@ debug_reload_data_8822c(
 
 		u32tmp = odm_get_bb_reg(dm, R_0x1b64, MASKBYTE3);
 		RTW_INFO("[DPK] dpk_txagc = 0x%08x\n", u32tmp);
-
+		
 		//debug_coef_write_8822c(dm, path, dpk_info->dpk_path_ok & BIT(path) >> path);
 		_dpk_get_coef_8822c(dm, path);
 
@@ -558,11 +577,11 @@ debug_reload_data_8822c(
 
 		if (path == RF_PATH_A)
 			u32tmp = odm_get_bb_reg(dm, R_0x1b04, 0x0fffffff);
-		else
+		else 
 			u32tmp = odm_get_bb_reg(dm, R_0x1b5c, 0x0fffffff);
 
 		RTW_INFO("[DPK] dpk_gs = 0x%08x\n", u32tmp);
-
+		
 	}
 }
 
@@ -574,7 +593,7 @@ void odm_lps_pg_debug_8822c(void *dm_void)
 	debug_IQK(dm, TX_IQK, RF_PATH_A);
 	debug_IQK(dm, RX_IQK, RF_PATH_A);
 	debug_IQK(dm, TX_IQK, RF_PATH_B);
-	debug_IQK(dm, RX_IQK, RF_PATH_B);
+	debug_IQK(dm, RX_IQK, RF_PATH_B);	
 	debug_reload_data_8822c(dm);
 }
 #endif /* defined(CONFIG_RTL8822C) && defined(CONFIG_LPS_PG) */

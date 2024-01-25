@@ -52,6 +52,7 @@
 #if (RTL8814B_SUPPORT == 1)
 	#include "halrf/rtl8814b/halrf_iqk_8814b.h"
 	#include "halrf/rtl8814b/halrf_dpk_8814b.h"
+	#include "halrf/rtl8814b/halrf_txgapk_8814b.h"
 #endif
 
 #if (RTL8197G_SUPPORT == 1)

@@ -458,11 +458,13 @@ void _phy_lc_calibrate_8822b(struct dm_struct *dm)
 	odm_set_rf_reg(dm, RF_PATH_A, RF_CHNLBW, RFREGOFFSETMASK,
 		       lc_cal | 0x08000);
 	ODM_delay_ms(100);
-	for (cnt = 0; cnt < 100; cnt++) {
+	for (cnt = 0; cnt < 5; cnt++) {
 		if (odm_get_rf_reg(dm, RF_PATH_A, RF_CHNLBW, 0x8000) != 0x1)
 			break;
 		ODM_delay_ms(10);
 	}
+	if (cnt == 5)
+		RF_DBG(dm, DBG_RF_LCK, "LCK time out\n");
 	/*Recover channel number*/
 	odm_set_rf_reg(dm, RF_PATH_A, RF_CHNLBW, RFREGOFFSETMASK, lc_cal);
 	/*enable RTK*/

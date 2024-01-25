@@ -115,15 +115,15 @@
 /* RFE */
 #define rA_RFE_Pinmux_Jaguar	0xCB0	/* hal_mp.c */
 #define	rB_RFE_Pinmux_Jaguar	0xEB0	/* Path_B RFE control pinmux */
-#define	rA_RFE_Inv_Jaguar		0xCB4	/* Path_A RFE cotrol */
+#define	rA_RFE_Inv_Jaguar		0xCB4	/* Path_A RFE cotrol */  
 #define	rB_RFE_Inv_Jaguar		0xEB4	/* Path_B RFE control */
-#define	rA_RFE_Jaguar			0xCB8 	/* Path_A RFE cotrol */
+#define	rA_RFE_Jaguar			0xCB8 	/* Path_A RFE cotrol */  
 #define	rB_RFE_Jaguar			0xEB8	/* Path_B RFE control */
 #define	rA_RFE_Inverse_Jaguar	0xCBC	/* Path_A RFE control inverse */
 #define	rB_RFE_Inverse_Jaguar	0xEBC	/* Path_B RFE control inverse */
 #define	r_ANTSEL_SW_Jaguar		0x900	/* ANTSEL SW Control */
 #define	bMask_RFEInv_Jaguar	0x3FF00000
-#define	bMask_AntselPathFollow_Jaguar 0x00030000
+#define	bMask_AntselPathFollow_Jaguar 0x00030000   
 
 #define rOFDM1_LSTF					0xD00
 #define rOFDM1_TRxPathEnable			0xD04	/* hal_mp.c */

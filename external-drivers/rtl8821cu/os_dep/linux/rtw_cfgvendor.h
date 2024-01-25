@@ -629,8 +629,6 @@ void rtw_cfgvendor_rssi_monitor_evt(_adapter *padapter);
 
 #ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
 void rtw_hal_pno_random_gen_mac_addr(PADAPTER adapter);
-void rtw_hal_set_hw_mac_addr(PADAPTER adapter, u8 *mac_addr);
 #endif
-
 
 #endif /* _RTW_CFGVENDOR_H_ */

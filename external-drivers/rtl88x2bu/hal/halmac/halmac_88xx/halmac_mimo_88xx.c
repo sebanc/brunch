@@ -63,10 +63,10 @@ cfg_txbf_88xx(struct halmac_adapter *adapter, u8 userid, enum halmac_bw bw,
 		switch (bw) {
 		case HALMAC_BW_80:
 			tmp42c |= BIT_R_TXBF0_80M;
-			__attribute__((__fallthrough__));
+			/* fall through */
 		case HALMAC_BW_40:
 			tmp42c |= BIT_R_TXBF0_40M;
-			__attribute__((__fallthrough__));
+			/* fall through */
 		case HALMAC_BW_20:
 			tmp42c |= BIT_R_TXBF0_20M;
 			break;

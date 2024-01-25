@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2019 Realtek Corporation.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -166,14 +166,15 @@ struct rtw_wdev_priv {
 	u8 bandroid_scan;
 	bool block;
 	bool block_scan;
-	bool power_mgmt;
 
-	#if LINUX_VERSION_CODE <= KERNEL_VERSION(5,8,0)
-	u32 mgmt_mask;
-	#endif
-
-	/* report mgmt_frame registered */
-	u16 report_mgmt;
+	/**
+	 * mgmt_regs: bitmap of management frame subtypes registered for the
+	 * 	given interface
+	 * mcast_mgmt_regs: mcast RX is needed on this interface for these
+	 * 	subtypes
+	 */
+	u32 mgmt_regs;
+	/* u32 mcast_mgmt_regs; */
 
 	u8 is_mgmt_tx;
 	u16 mgmt_tx_cookie;
@@ -184,12 +185,12 @@ struct rtw_wdev_priv {
 	ATOMIC_T switch_ch_to;
 #endif
 
-#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
 	u8 pno_mac_addr[ETH_ALEN];
 	u16 pno_scan_seq_num;
 #endif
 
-#ifdef CONFIG_RTW_CFGVEDNOR_RSSIMONITOR
+#ifdef CONFIG_RTW_CFGVENDOR_RSSIMONITOR
         s8 rssi_monitor_max;
         s8 rssi_monitor_min;
         u8 rssi_monitor_enable;
@@ -244,8 +245,8 @@ struct rtw_wiphy_data {
 	struct wireless_dev *pd_wdev; /* P2P device wdev */
 #endif
 
-	s16 txpwr_total_lmt_mbm;
-	s16 txpwr_total_target_mbm;
+	s16 txpwr_total_lmt_mbm;	/* EIRP */
+	s16 txpwr_total_target_mbm;	/* EIRP */
 };
 
 #define rtw_wiphy_priv(wiphy) ((struct rtw_wiphy_data *)wiphy_priv(wiphy))
@@ -267,9 +268,13 @@ struct rtw_wiphy_data {
 #define FUNC_WIPHY_FMT "%s("WIPHY_FMT")"
 #define FUNC_WIPHY_ARG(wiphy) __func__, WIPHY_ARG(wiphy)
 
-#define SET_CFG80211_REPORT_MGMT(w, t, v) (w->report_mgmt |= BIT(t >> 4))
-#define CLR_CFG80211_REPORT_MGMT(w, t, v) (w->report_mgmt &= (~BIT(t >> 4)))
-#define GET_CFG80211_REPORT_MGMT(w, t) ((w->report_mgmt & BIT(t >> 4)) > 0)
+#define SET_CFG80211_MGMT_REGS(w, t) (w |= BIT(t >> 4))
+#define CLR_CFG80211_MGMT_REGS(w, t) (w &= (~BIT(t >> 4)))
+#define GET_CFG80211_MGMT_REGS(w, t) ((w & BIT(t >> 4)) > 0)
+
+#define SET_CFG80211_REPORT_MGMT(w, t) (SET_CFG80211_MGMT_REGS(w->mgmt_regs, t))
+#define CLR_CFG80211_REPORT_MGMT(w, t) (CLR_CFG80211_MGMT_REGS(w->mgmt_regs, t))
+#define GET_CFG80211_REPORT_MGMT(w, t) (GET_CFG80211_MGMT_REGS(w->mgmt_regs, t))
 
 struct wiphy *rtw_wiphy_alloc(_adapter *padapter, struct device *dev);
 void rtw_wiphy_free(struct wiphy *wiphy);
@@ -293,14 +298,13 @@ s16 rtw_cfg80211_dev_get_total_txpwr_lmt_mbm(struct dvobj_priv *dvobj);
 s16 rtw_cfg80211_dev_get_total_txpwr_target_mbm(struct dvobj_priv *dvobj);
 
 void rtw_cfg80211_init_wdev_data(_adapter *padapter);
-void rtw_cfg80211_init_wiphy(_adapter *padapter);
 
 void rtw_cfg80211_unlink_bss(_adapter *padapter, struct wlan_network *pnetwork);
 void rtw_cfg80211_surveydone_event_callback(_adapter *padapter);
 struct cfg80211_bss *rtw_cfg80211_inform_bss(_adapter *padapter, struct wlan_network *pnetwork);
 int rtw_cfg80211_check_bss(_adapter *padapter);
 void rtw_cfg80211_ibss_indicate_connect(_adapter *padapter);
-int rtw_cfg80211_indicate_connect(_adapter *padapter);
+void rtw_cfg80211_indicate_connect(_adapter *padapter);
 void rtw_cfg80211_indicate_disconnect(_adapter *padapter, u16 reason, u8 locally_generated);
 void rtw_cfg80211_indicate_scan_done(_adapter *adapter, bool aborted);
 u32 rtw_cfg80211_wait_scan_req_empty(_adapter *adapter, u32 timeout_ms);
@@ -313,15 +317,16 @@ void rtw_cfg80211_indicate_scan_done_for_buddy(_adapter *padapter, bool bscan_ab
 #ifdef CONFIG_AP_MODE
 void rtw_cfg80211_indicate_sta_assoc(_adapter *padapter, u8 *pmgmt_frame, uint frame_len);
 void rtw_cfg80211_indicate_sta_disassoc(_adapter *padapter, const u8 *da, unsigned short reason);
+int rtw_cfg80211_set_mgnt_wpsp2pie(struct net_device *net, char *buf, int len, int type);
 #endif /* CONFIG_AP_MODE */
 
-#ifdef CONFIG_P2P
 void rtw_cfg80211_set_is_roch(_adapter *adapter, bool val);
 bool rtw_cfg80211_get_is_roch(_adapter *adapter);
 bool rtw_cfg80211_is_ro_ch_once(_adapter *adapter);
 void rtw_cfg80211_set_last_ro_ch_time(_adapter *adapter);
 s32 rtw_cfg80211_get_last_ro_ch_passing_ms(_adapter *adapter);
 
+#ifdef CONFIG_P2P
 int rtw_cfg80211_iface_has_p2p_group_cap(_adapter *adapter);
 int rtw_cfg80211_is_p2p_scan(_adapter *adapter);
 #if defined(RTW_DEDICATED_P2P_DEVICE)
@@ -347,8 +352,6 @@ void rtw_cfg80211_rx_probe_request(_adapter *padapter, union recv_frame *rframe)
 void rtw_cfg80211_external_auth_request(_adapter *padapter, union recv_frame *rframe);
 void rtw_cfg80211_external_auth_status(struct wiphy *wiphy, struct net_device *dev,
 	struct rtw_external_auth_params *params);
-
-int rtw_cfg80211_set_mgnt_wpsp2pie(struct net_device *net, char *buf, int len, int type);
 
 bool rtw_cfg80211_pwr_mgmt(_adapter *adapter);
 #ifdef CONFIG_RTW_80211K
@@ -419,6 +422,11 @@ void rtw_cfg80211_deinit_rfkill(struct wiphy *wiphy);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0))
 u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter, u8 ch, u8 bw, u8 offset, u8 ht, bool started);
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 31))
+#define IEEE80211_CHAN_NO_HT40PLUS IEEE80211_CHAN_NO_FAT_ABOVE
+#define IEEE80211_CHAN_NO_HT40MINUS IEEE80211_CHAN_NO_FAT_BELOW
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0))

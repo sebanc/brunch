@@ -1144,7 +1144,7 @@ PHY_SwitchWirelessBand8814A(
 	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(Adapter);
 	u8	PreBand = pHalData->current_band_type, tepReg = 0;
 
-	RTW_INFO("==>PHY_SwitchWirelessBand8814() %s\n", ((Band == 0) ? "2.4G" : "5G"));
+	//RTW_INFO("==>PHY_SwitchWirelessBand8814() %s\n", ((Band == 0) ? "2.4G" : "5G"));
 
 	pHalData->current_band_type = (BAND_TYPE)Band;
 

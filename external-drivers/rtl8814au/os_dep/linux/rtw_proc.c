@@ -266,44 +266,41 @@ static ssize_t rtw_drv_proc_write(struct file *file, const char __user *buffer, 
 
 	return -EROFS;
 }
+
+static const struct rtw_proc_ops rtw_drv_proc_seq_fops = {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
-static const struct proc_ops rtw_drv_proc_seq_fops = {
-//	.proc_owner = THIS_MODULE,
 	.proc_open = rtw_drv_proc_open,
 	.proc_read = seq_read,
 	.proc_lseek = seq_lseek,
 	.proc_release = seq_release,
 	.proc_write = rtw_drv_proc_write,
-};
 #else
-static const struct file_operations rtw_drv_proc_seq_fops = {
 	.owner = THIS_MODULE,
 	.open = rtw_drv_proc_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = seq_release,
 	.write = rtw_drv_proc_write,
-};
 #endif
+};
+
+static const struct rtw_proc_ops rtw_drv_proc_sseq_fops = {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
-static const struct proc_ops rtw_drv_proc_sseq_fops = {
-	//.owner = THIS_MODULE,
 	.proc_open = rtw_drv_proc_open,
 	.proc_read = seq_read,
 	.proc_lseek = seq_lseek,
 	.proc_release = single_release,
 	.proc_write = rtw_drv_proc_write,
-};
 #else
-static const struct file_operations rtw_drv_proc_sseq_fops = {
 	.owner = THIS_MODULE,
 	.open = rtw_drv_proc_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
 	.write = rtw_drv_proc_write,
-};
 #endif
+};
+
 int rtw_drv_proc_init(void)
 {
 	int ret = _FAIL;
@@ -1314,7 +1311,6 @@ static int proc_get_chan_plan(struct seq_file *m, void *v)
 	_adapter *adapter = (_adapter *)rtw_netdev_priv(dev);
 
 	dump_cur_chset(m, adapter_to_rfctl(adapter));
-
 	return 0;
 }
 

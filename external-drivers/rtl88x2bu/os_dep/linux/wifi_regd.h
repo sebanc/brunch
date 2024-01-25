@@ -17,6 +17,11 @@
 #define __WIFI_REGD_H__
 
 void rtw_regd_apply_flags(struct wiphy *wiphy);
+#ifdef CONFIG_REGD_SRC_FROM_OS
+struct _RT_CHANNEL_INFO;
+u8 rtw_os_init_channel_set(_adapter *padapter, struct _RT_CHANNEL_INFO *channel_set);
+s16 rtw_os_get_total_txpwr_regd_lmt_mbm(_adapter *adapter, u8 cch, enum channel_width bw);
+#endif
 int rtw_regd_init(struct wiphy *wiphy);
 
 #endif /* __WIFI_REGD_H__ */

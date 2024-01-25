@@ -15,6 +15,6 @@
 #ifndef __RTL8710B_RF_H__
 #define __RTL8710B_RF_H__
 
-int PHY_RF6052_Config8710B(IN PADAPTER pdapter);
+int PHY_RF6052_Config8710B(PADAPTER pdapter);
 
 #endif

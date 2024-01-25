@@ -435,7 +435,7 @@ void Init_ODM_ComInfo(_adapter *adapter)
 	odm_cmn_info_init(pDM_Odm, ODM_CMNINFO_EFUSE0X3D8, pHalData->efuse0x3d8);
 
 	/* waiting for PhyDMV034 support*/
-	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_MANUAL_SUPPORTABILITY, &(adapter->registrypriv.phydm_ability)); 
+	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_MANUAL_SUPPORTABILITY, &(adapter->registrypriv.phydm_ability));
 	/*Add by YuChen for adaptivity init*/
 	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_ADAPTIVITY, &(adapter->registrypriv.adaptivity_en));
 	phydm_adaptivity_info_init(pDM_Odm, PHYDM_ADAPINFO_CARRIER_SENSE_ENABLE, (adapter->registrypriv.adaptivity_mode != 0) ? TRUE : FALSE);
@@ -553,20 +553,20 @@ struct turbo_edca_setting{
 static struct turbo_edca_setting rtw_turbo_edca[TURBO_EDCA_MODE_NUM] = {
 	TURBO_EDCA_ENT(0xa42b, 0xa42b), /* mode 0 */
 	TURBO_EDCA_ENT(0x431c, 0x431c), /* mode 1 */
-	TURBO_EDCA_ENT(0x4319, 0x4319), /* mode 2 */	
-	
+	TURBO_EDCA_ENT(0x4319, 0x4319), /* mode 2 */
+
 	TURBO_EDCA_ENT(0x5ea42b, 0x5ea42b), /* mode 3 */
 	TURBO_EDCA_ENT(0x5e431c, 0x5e431c), /* mode 4 */
-	TURBO_EDCA_ENT(0x5e4319, 0x5e4319), /* mode 5 */	
-	
+	TURBO_EDCA_ENT(0x5e4319, 0x5e4319), /* mode 5 */
+
 	TURBO_EDCA_ENT(0x6ea42b, 0x6ea42b), /* mode 6 */
 	TURBO_EDCA_ENT(0x6e431c, 0x6e431c), /* mode 7 */
 	TURBO_EDCA_ENT(0x6e4319, 0x6e4319), /* mode 8 */
-	
+
 	TURBO_EDCA_ENT(0x5ea42b, 0xa42b), /* mode 9 */
 	TURBO_EDCA_ENT(0x5e431c, 0x431c), /* mode 10 */
 	TURBO_EDCA_ENT(0x5e4319, 0x4319), /* mode 11 */
-	
+
 	TURBO_EDCA_ENT(0x6ea42b, 0xa42b), /* mode 12 */
 	TURBO_EDCA_ENT(0x6e431c, 0x431c), /* mode 13 */
 	TURBO_EDCA_ENT(0x6e4319, 0x4319), /* mode 14 */
@@ -583,18 +583,18 @@ static struct turbo_edca_setting rtw_turbo_edca[TURBO_EDCA_MODE_NUM] = {
 	/* { UL, DL } */
 	TURBO_EDCA_ENT(0x5e431c, 0x431c), /* mode 0 */
 
-	TURBO_EDCA_ENT(0x431c, 0x431c), /* mode 1 */	
-	
+	TURBO_EDCA_ENT(0x431c, 0x431c), /* mode 1 */
+
 	TURBO_EDCA_ENT(0x5e431c, 0x5e431c), /* mode 2 */
 
 	TURBO_EDCA_ENT(0x5ea42b, 0x5ea42b), /* mode 3 */
-	
+
 	TURBO_EDCA_ENT(0x5ea42b, 0x431c), /* mode 4 */
-	
+
 	TURBO_EDCA_ENT(0x6ea42b, 0x6ea42b), /* mode 5 */
 
 	TURBO_EDCA_ENT(0xa42b, 0xa42b), /* mode 6 */
-	
+
 	TURBO_EDCA_ENT(0x5e431c, 0xa42b), /* mode 7 */
 };
 #endif
@@ -731,15 +731,15 @@ void rtw_hal_turbo_edca(_adapter *adapter)
 				EDCA_BE_DL = 0x00431c;
 
 #ifdef CONFIG_RTW_TPT_MODE
-			if ( dvobj->tpt_mode > 0 ) {				
+			if ( dvobj->tpt_mode > 0 ) {
 				EDCA_BE_UL = dvobj->edca_be_ul;
 				EDCA_BE_DL = dvobj->edca_be_dl;
 			}
 #endif /* CONFIG_RTW_TPT_MODE */
 
 			/* keep this condition at last check */
-			if (hal_data->dis_turboedca == 2) {					
-				
+			if (hal_data->dis_turboedca == 2) {
+
 					if (hal_data->edca_param_mode < TURBO_EDCA_MODE_NUM) {
 
 						struct turbo_edca_setting param;
@@ -748,12 +748,12 @@ void rtw_hal_turbo_edca(_adapter *adapter)
 
 						EDCA_BE_UL = param.edca_ul;
 						EDCA_BE_DL = param.edca_dl;
-						
+
 					} else {
-					
+
 						EDCA_BE_UL = hal_data->edca_param_mode;
 						EDCA_BE_DL = hal_data->edca_param_mode;
-					}				
+					}
 			}
 
 			if (traffic_index == DOWN_LINK)
@@ -771,7 +771,7 @@ void rtw_hal_turbo_edca(_adapter *adapter)
 			struct sta_info *psta;
 			struct macid_ctl_t *macid_ctl = dvobj_to_macidctl(dvobj);
 			u8 mac_id, role, current_rate_id;
-			
+
 			/*	search all used & connect2AP macid	*/
 			for (mac_id = 0; mac_id < macid_ctl->num; mac_id++) {
 				if (rtw_macid_is_used(macid_ctl, mac_id))  {
@@ -816,7 +816,7 @@ void rtw_hal_turbo_edca(_adapter *adapter)
 #endif
 
 			if ( edca_param != hal_data->ac_param_be) {
-				
+
 				rtw_hal_set_hwreg(adapter, HW_VAR_AC_PARAM_BE, (u8 *)(&edca_param));
 
 				RTW_INFO("Turbo EDCA =0x%x\n", edca_param);
@@ -1237,7 +1237,7 @@ void rtw_phydm_wd_lps_lclk_hdl(_adapter *adapter)
 #ifdef CONFIG_LPS_PG
 	if (pwrpriv->lps_level == LPS_PG) {
 		 if (rtw_hal_set_lps_pg_info_cmd(adapter) == _FAIL)
-		 	RTW_INFO(FUNC_ADPT_FMT": Send PG H2C command Fail! \n", 
+		 	RTW_INFO(FUNC_ADPT_FMT": Send PG H2C command Fail! \n",
 		 			 FUNC_ADPT_ARG(adapter));
 	}
 #endif /* CONFIG_LPS_PG */
@@ -1321,7 +1321,7 @@ void dump_sta_traffic(void *sel, _adapter *adapter, struct sta_info *psta)
 	else
 		_RTW_PRINT_SEL(sel, "Tx : %d(Kbps) ", psta->sta_stats.tx_tp_kbits);
 
-	if (rx_tp_mbips) 
+	if (rx_tp_mbips)
 		_RTW_PRINT_SEL(sel, "Rx : %d(Mbps) ", rx_tp_mbips);
 	else
 		_RTW_PRINT_SEL(sel, "Rx : %d(Kbps) ", psta->sta_stats.rx_tp_kbits);
@@ -1341,7 +1341,7 @@ void dump_sta_traffic(void *sel, _adapter *adapter, struct sta_info *psta)
 	else
 		_RTW_PRINT_SEL(sel, "Tx : %d(Kbps) ", psta->sta_stats.smooth_tx_tp_kbits);
 
-	if (rx_tp_mbips) 
+	if (rx_tp_mbips)
 		_RTW_PRINT_SEL(sel, "Rx : %d(Mbps) ", rx_tp_mbips);
 	else
 		_RTW_PRINT_SEL(sel, "Rx : %d(Kbps) ", psta->sta_stats.smooth_rx_tp_kbits);
@@ -1392,7 +1392,8 @@ void dump_sta_info(void *sel, struct sta_info *psta)
 			HDATA_RATE(curr_tx_rate), (curr_tx_sgi) ? "S" : "L");
 	RTW_PRINT_SEL(sel, "curr_tx_bw : %s\n", ch_width_str(ra_info->curr_tx_bw));
 	RTW_PRINT_SEL(sel, "curr_retry_ratio : %d\n", ra_info->curr_retry_ratio);
-	RTW_PRINT_SEL(sel, "ra_mask : 0x%016llx\n\n", ra_info->ramask);
+	/* nrm */
+	RTW_PRINT_SEL(sel, "ra_mask : 0x%016llx\n", ra_info->ramask);
 }
 
 void rtw_phydm_ra_registed(_adapter *adapter, struct sta_info *psta)
@@ -1496,7 +1497,7 @@ u8 rtw_hal_runtime_trx_path_decision(_adapter *adapter)
 			rtw_warn_on(1);
 			goto exit;
 		}
-	} else 
+	} else
 		txpath_1ss = txpath;
 
 	if (hal_data->txpath_nss[0] != txpath_1ss) {
@@ -1672,7 +1673,7 @@ static u8 _rtw_phydm_rfk_condition_check(_adapter *adapter, u8 is_scaning, u8 if
 
 	#ifdef CONFIG_MCC_MODE
 	/*not in MCC State*/
-	if (MCC_EN(adapter) && 
+	if (MCC_EN(adapter) &&
 		rtw_hal_check_mcc_status(adapter, MCC_STATUS_DOING_MCC)) {
 		rfk_allowed = _FALSE;
 		if (0)
@@ -1788,15 +1789,15 @@ void rtw_dyn_soml_config(_adapter *adapter)
 		RTW_INFO("dyn_soml_en = 1\n");
 	} else {
 		if (adapter->registrypriv.dyn_soml_en == 2) {
-			rtw_dyn_soml_para_set(adapter, 
-				adapter->registrypriv.dyn_soml_train_num, 
-				adapter->registrypriv.dyn_soml_interval, 
+			rtw_dyn_soml_para_set(adapter,
+				adapter->registrypriv.dyn_soml_train_num,
+				adapter->registrypriv.dyn_soml_interval,
 				adapter->registrypriv.dyn_soml_period,
 				adapter->registrypriv.dyn_soml_delay);
 			RTW_INFO("dyn_soml_en = 2\n");
 			RTW_INFO("dyn_soml_en, param = %d, %d, %d, %d\n",
 				adapter->registrypriv.dyn_soml_train_num,
-				adapter->registrypriv.dyn_soml_interval, 
+				adapter->registrypriv.dyn_soml_interval,
 				adapter->registrypriv.dyn_soml_period,
 				adapter->registrypriv.dyn_soml_delay);
 		} else if (adapter->registrypriv.dyn_soml_en == 0) {

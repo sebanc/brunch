@@ -402,8 +402,10 @@ sint rtw_fill_radiotap_hdr(_adapter *padapter, struct rx_pkt_attrib *a, u8 *buf)
 		}
 
 		if (a->ampdu_eof) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
 			tmp_16bit |= cpu_to_le16(IEEE80211_RADIOTAP_AMPDU_EOF_KNOWN);
 			tmp_16bit |= cpu_to_le16(IEEE80211_RADIOTAP_AMPDU_EOF);
+#endif
 		}
 
 		_rtw_memcpy(&hdr_buf[rt_len], &tmp_16bit, 2);

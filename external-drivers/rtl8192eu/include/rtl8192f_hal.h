@@ -117,7 +117,8 @@ typedef struct _RT_8192F_FIRMWARE_HDR {
  * NS offload: 2 NDP info: 1
  */
 #ifdef CONFIG_WOWLAN
-	#define WOWLAN_PAGE_NUM_8192F	0x07
+	/* 7 pages for wow rsvd page + 2 pages for pattern */
+	#define WOWLAN_PAGE_NUM_8192F	0x09
 #else
 	#define WOWLAN_PAGE_NUM_8192F	0x00
 #endif
@@ -234,10 +235,10 @@ void Hal_InitPGData(PADAPTER padapter, u8 *PROMContent);
 void Hal_EfuseParseIDCode(PADAPTER padapter, u8 *hwinfo);
 void Hal_EfuseParseTxPowerInfo_8192F(PADAPTER padapter,
 					u8 *PROMContent, BOOLEAN AutoLoadFail);
-/*
+#ifdef CONFIG_BT_COEXIST
 void Hal_EfuseParseBTCoexistInfo_8192F(PADAPTER padapter,
 				       u8 *hwinfo, BOOLEAN AutoLoadFail);
-*/
+#endif /* CONFIG_BT_COEXIST */
 void Hal_EfuseParseEEPROMVer_8192F(PADAPTER padapter,
 				   u8 *hwinfo, BOOLEAN AutoLoadFail);
 void Hal_EfuseParseChnlPlan_8192F(PADAPTER padapter,
@@ -250,9 +251,9 @@ void Hal_EfuseParseXtal_8192F(PADAPTER pAdapter,
 			      u8 *hwinfo, u8 AutoLoadFail);
 void Hal_EfuseParseThermalMeter_8192F(PADAPTER padapter,
 				      u8 *hwinfo, u8 AutoLoadFail);
-VOID Hal_EfuseParseVoltage_8192F(PADAPTER pAdapter,
+void Hal_EfuseParseVoltage_8192F(PADAPTER pAdapter,
 				 u8 *hwinfo, BOOLEAN	AutoLoadFail);
-VOID Hal_EfuseParseBoardType_8192F(PADAPTER Adapter,
+void Hal_EfuseParseBoardType_8192F(PADAPTER Adapter,
 				   u8	*PROMContent, BOOLEAN AutoloadFail);
 u8	Hal_ReadRFEType_8192F(PADAPTER Adapter, u8 *PROMContent, BOOLEAN AutoloadFail);
 void rtl8192f_set_hal_ops(struct hal_ops *pHalFunc);
@@ -286,7 +287,7 @@ void rtl8192f_stop_thread(_adapter *padapter);
 	void HalSetOutPutGPIO(PADAPTER padapter, u8 index, u8 OutPutValue);
 #endif
 #ifdef CONFIG_MP_INCLUDED
-int FirmwareDownloadBT(IN PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
+int FirmwareDownloadBT(PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
 #endif
 void CCX_FwC2HTxRpt_8192f(PADAPTER padapter, u8 *pdata, u8 len);
 
@@ -306,8 +307,8 @@ void rtl8192f_pretx_cd_config(_adapter *adapter);
 
 #ifdef CONFIG_PCI_HCI
 	BOOLEAN	InterruptRecognized8192FE(PADAPTER Adapter);
-	VOID	UpdateInterruptMask8192FE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
-	VOID InitMAC_TRXBD_8192FE(PADAPTER Adapter);
+	void	UpdateInterruptMask8192FE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
+	void InitMAC_TRXBD_8192FE(PADAPTER Adapter);
 
 	u16 get_txbd_rw_reg(u16 ff_hwaddr);
 #endif

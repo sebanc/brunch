@@ -23,12 +23,12 @@
  *
  *****************************************************************************/
 /*RTL8192E PHY Parameters*/
-/*
-[Caution]
-  Since 01/Aug/2015, the commit rules will be simplified.
-  You do not need to fill up the version.h anymore,
+/* 
+[Caution] 
+  Since 01/Aug/2015, the commit rules will be simplified. 
+  You do not need to fill up the version.h anymore, 
   only the maintenance supervisor fills it before formal release.
 */
-#define	RELEASE_DATE_8192E		20180719
+#define	RELEASE_DATE_8192E		20190111
 #define	COMMIT_BY_8192E			"BB_Dino"
-#define	RELEASE_VERSION_8192E		60
+#define	RELEASE_VERSION_8192E		61

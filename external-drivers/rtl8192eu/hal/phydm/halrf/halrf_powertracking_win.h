@@ -130,12 +130,15 @@ struct dm_rf_calibration_struct {
 
 	u8  	thermal_meter[2];    /* thermal_meter, index 0 for RFIC0, and 1 for RFIC1 */
 	u8	thermal_value;
+	u8	thermal_value_path[MAX_RF_PATH];
 	u8	thermal_value_lck;
 	u8	thermal_value_iqk;
-	u8  thermal_value_dpk;
-	s8  	thermal_value_delta; /* delta of thermal_value and efuse thermal */
+	u8	thermal_value_dpk;
+	s8	thermal_value_delta; /* delta of thermal_value and efuse thermal */
 	u8	thermal_value_avg[AVG_THERMAL_NUM];
+	u8	thermal_value_avg_path[MAX_RF_PATH][AVG_THERMAL_NUM];
 	u8	thermal_value_avg_index;
+	u8	thermal_value_avg_index_path[MAX_RF_PATH];
 	u8	thermal_value_rx_gain;
 
 
@@ -213,6 +216,7 @@ struct dm_rf_calibration_struct {
 	u8			bb_swing_idx_cck_base;
 	u8			default_ofdm_index;
 	u8			default_cck_index;
+	s8			default_txagc_index;
 	boolean			bb_swing_flag_cck;
 
 	s8			absolute_ofdm_swing_idx[MAX_RF_PATH];

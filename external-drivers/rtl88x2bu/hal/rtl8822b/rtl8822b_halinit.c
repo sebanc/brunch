@@ -31,11 +31,14 @@ void rtl8822b_init_hal_spec(PADAPTER adapter)
 	hal_spec->ic_name = "rtl8822b";
 	hal_spec->macid_num = 128;
 	/* hal_spec->sec_cam_ent_num follow halmac setting */
-	hal_spec->sec_cap = SEC_CAP_CHK_BMC;
+	hal_spec->sec_cap = SEC_CAP_CHK_BMC | SEC_CAP_CHK_EXTRA_SEC;
+	hal_spec->wow_cap = WOW_CAP_TKIP_OL;
+	hal_spec->macid_cap = MACID_DROP;
 
 	hal_spec->rfpath_num_2g = 2;
 	hal_spec->rfpath_num_5g = 2;
-	hal_spec->rf_reg_path_num = 2;
+	hal_spec->rf_reg_path_num = hal_spec->rf_reg_path_avail_num = 2;
+	hal_spec->rf_reg_trx_path_bmp = 0x33;
 	hal_spec->max_tx_cnt = 2;
 
 	hal_spec->tx_nss_num = 2;
@@ -54,9 +57,7 @@ void rtl8822b_init_hal_spec(PADAPTER adapter)
 			    | WL_FUNC_TDLS
 			    ;
 
-#if CONFIG_TX_AC_LIFETIME
 	hal_spec->tx_aclt_unit_factor = 8;
-#endif
 
 	hal_spec->rx_tsf_filter = 1;
 
@@ -70,6 +71,12 @@ void rtl8822b_init_hal_spec(PADAPTER adapter)
 		, REG_MACID_SLEEP1_8822B
 		, REG_MACID_SLEEP2_8822B
 		, REG_MACID_SLEEP3_8822B);
+
+	rtw_macid_ctl_init_drop_reg(adapter_to_macidctl(adapter)
+		, REG_MACID_DROP0_8822B
+		, REG_MACID_DROP1_8822B
+		, REG_MACID_DROP2_8822B
+		, REG_MACID_DROP3_8822B);
 }
 
 u32 rtl8822b_power_on(PADAPTER adapter)
@@ -168,7 +175,7 @@ u8 rtl8822b_hal_init(PADAPTER adapter)
 		return _FALSE;
 	}
 
-
+	
 
 	RTW_INFO("%s Download Firmware from %s success\n", __FUNCTION__, (fw_bin) ? "file" : "array");
 	RTW_INFO("%s FW Version:%d SubVersion:%d FW size:%d\n", "NIC",
@@ -350,9 +357,6 @@ void rtl8822b_init_default_value(PADAPTER adapter)
 
 	/* init default value */
 	hal->fw_ractrl = _FALSE;
-
-	if (!adapter_to_pwrctl(adapter)->bkeepfwalive)
-		hal->LastHMEBoxNum = 0;
 
 	/* init phydm default value */
 	hal->bIQKInitialized = _FALSE;

@@ -28,8 +28,8 @@
 
 #if (PHYDM_LA_MODE_SUPPORT)
 
-/* fix compile time flag*/
-#define DYNAMIC_LA_MODE "4.1"
+/* 2020.07.03 [8723F] Fix SD4 compile error*/
+#define DYNAMIC_LA_MODE "4.2"
 
 /* @1 ============================================================
  * 1  Definition
@@ -168,22 +168,5 @@ void adc_smp_de_init(void *dm_void);
 #if (DM_ODM_SUPPORT_TYPE & ODM_WIN)
 void adc_smp_work_item_callback(void *context);
 #endif
-
-#if 0
-#if (DM_ODM_SUPPORT_TYPE & ODM_WIN)
-enum rt_status adc_smp_query(void *dm_void, ULONG info_buf_length,
-			     void *info_buf, PULONG bytes_written);
-
-#elif (DM_ODM_SUPPORT_TYPE & ODM_CE)
-
-void adc_smp_query(void *dm_void, void *output, u32 out_len, u32 *pused);
-
-s32 adc_smp_get_sample_counts(void *dm_void);
-
-s32 adc_smp_query_single_data(void *dm_void, void *output, u32 out_len,
-			      u32 idx);
-#endif
-#endif
-
 #endif
 #endif

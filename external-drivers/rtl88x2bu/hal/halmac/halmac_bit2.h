@@ -71499,6 +71499,26 @@
 
 #endif
 
+#if (HALMAC_8822B_SUPPORT)
+
+/* 2 REG_MACRX_HANG_TIMER_CONTROL		(Offset 0x1661) */
+
+#define BIT_TIMEOUT_COUNTER_EN BIT(7)
+#define BIT_RESET_FIFO_CONTROL BIT(5)
+
+#define BIT_SHIFT_COUNT_TIMEOUT 0
+#define BIT_MASK_COUNT_TIMEOUT 0x1f
+#define BIT_COUNT_TIMEOUT(x)                                                   \
+	(((x) & BIT_MASK_COUNT_TIMEOUT) << BIT_SHIFT_COUNT_TIMEOUT)
+#define BITS_COUNT_TIMEOUT (BIT_MASK_COUNT_TIMEOUT << BIT_SHIFT_COUNT_TIMEOUT)
+#define BIT_CLEAR_COUNT_TIMEOUT(x) ((x) & (~BITS_COUNT_TIMEOUT))
+#define BIT_GET_COUNT_TIMEOUT(x)                                               \
+	(((x) >> BIT_SHIFT_COUNT_TIMEOUT) & BIT_MASK_COUNT_TIMEOUT)
+#define BIT_SET_COUNT_TIMEOUT(x, v)                                            \
+	(BIT_CLEAR_COUNT_TIMEOUT(x) | BIT_COUNT_TIMEOUT(v))
+
+#endif
+
 #if (HALMAC_8814B_SUPPORT)
 
 /* 2 REG_GENERAL_OPTION			(Offset 0x1664) */

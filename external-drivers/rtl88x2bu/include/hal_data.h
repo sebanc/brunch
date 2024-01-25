@@ -224,10 +224,16 @@ struct hal_spec_t {
 
 	u8 sec_cam_ent_num;
 	u8 sec_cap;
+	u8 wow_cap;
+	u8 macid_cap;
+	u16 macid_txrpt;
+	u8 macid_txrpt_pgsz;
 
 	u8 rfpath_num_2g:4;	/* used for tx power index path */
 	u8 rfpath_num_5g:4;	/* used for tx power index path */
 	u8 rf_reg_path_num;
+	u8 rf_reg_path_avail_num;
+	u8 rf_reg_trx_path_bmp; /* [7:4]TX path bmp, [0:3]RX path bmp */
 	u8 max_tx_cnt;
 
 	u8 tx_nss_num:4;
@@ -243,9 +249,7 @@ struct hal_spec_t {
 
 	u8 wl_func;		/* value of WL_FUNC_XXX */
 
-#if CONFIG_TX_AC_LIFETIME
 	u8 tx_aclt_unit_factor; /* how many 32us */
-#endif
 
 	u8 rx_tsf_filter:1;
 
@@ -367,7 +371,6 @@ typedef struct hal_com_data {
 	WIRELESS_MODE	CurrentWirelessMode;
 	enum channel_width current_channel_bw;
 	BAND_TYPE		current_band_type;	/* 0:2.4G, 1:5G */
-	BAND_TYPE		BandSet;
 	u8				current_channel;
 	u8				cch_20;
 	u8				cch_40;
@@ -379,7 +382,9 @@ typedef struct hal_com_data {
 	u8				bDisableSWChannelPlan; /* flag of disable software change channel plan	 */
 	u16				BasicRateSet;
 	u32				ReceiveConfig;
-	u32				rcr_backup; /* used for switching back from monitor mode */
+#ifdef CONFIG_WIFI_MONITOR
+	struct mon_reg_backup		mon_backup; /* used for switching back from monitor mode */
+#endif /* CONFIG_WIFI_MONITOR */
 	u8				rx_tsf_addr_filter_config; /* for 8822B/8821C USE */
 	BOOLEAN			bSwChnl;
 	BOOLEAN			bSetChnlBW;
@@ -403,6 +408,7 @@ typedef struct hal_com_data {
 	u8 max_tx_cnt;
 	u8	tx_nss; /*tx Spatial Streams - GET_HAL_TX_NSS*/
 	u8	rx_nss; /*rx Spatial Streams - GET_HAL_RX_NSS*/
+	u8 txpath_cap_num_nss[4]; /* capable path num for NSS TX, [0] for 1SS, [3] for 4SS */
 
 	u8	PackageType;
 	u8	antenna_test;
@@ -417,7 +423,7 @@ typedef struct hal_com_data {
 	u16	ForcedDataRate;	/* Force Data Rate. 0: Auto, 0x02: 1M ~ 0x6C: 54M. */
 	u8	bDumpRxPkt;
 	u8	bDumpTxPkt;
-	u8	dis_turboedca; /* 1: disable turboedca,
+	u8	dis_turboedca; /* 1: disable turboedca, 
 						  2: disable turboedca and setting EDCA parameter based on the input parameter*/
 	u32 edca_param_mode;
 
@@ -519,8 +525,16 @@ typedef struct hal_com_data {
 	u8	target_txpwr_5g[TX_PWR_BY_RATE_NUM_RF]
 		[NUM_OF_TARGET_TXPWR_5G];
 
-#if defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8822C) || defined(CONFIG_RTL8814B)
+	bool set_entire_txpwr;
+
+#if defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8822C) || defined(CONFIG_RTL8814B) \
+    || defined(CONFIG_RTL8723F)
 	u32 txagc_set_buf;
+#endif
+
+#ifdef CONFIG_FW_OFFLOAD_SET_TXPWR_IDX
+	u8 txpwr_idx_offload_buf[3]; /* for CCK, OFDM, HT1SS */
+	struct submit_ctx txpwr_idx_offload_sctx;
 #endif
 
 	u8	txpwr_by_rate_loaded:1;
@@ -582,6 +596,7 @@ typedef struct hal_com_data {
 	u8			neediqk_24g;
 	u8			IQK_MP_Switch;
 	u8			bScanInProcess;
+	u8			phydm_init_result; /*BB and RF para match or not*/
 	/******** PHY DM & DM Section **********/
 
 
@@ -617,6 +632,8 @@ typedef struct hal_com_data {
 	u8 rxagg_dma_size;
 	u8 rxagg_dma_timeout;
 #endif /* RTW_RX_AGGREGATION */
+
+	bool intf_start;
 
 #if defined(CONFIG_SDIO_HCI) || defined(CONFIG_GSPI_HCI)
 	/*  */
@@ -655,7 +672,7 @@ typedef struct hal_com_data {
 	/* SDIO Rx FIFO related. */
 	/*  */
 	u8			SdioRxFIFOCnt;
-#ifdef CONFIG_RTL8822C
+#if defined (CONFIG_RTL8822C) || defined (CONFIG_RTL8192F)
 	u32			SdioRxFIFOSize;
 #else
 	u16			SdioRxFIFOSize;
@@ -819,7 +836,7 @@ typedef struct hal_com_data {
 #endif
 	/* for multi channel case (ex: MCC/TDLS) */
 	u8 multi_ch_switch_mode;
-
+	
 #ifdef CONFIG_RTL8814B
 	u8 dma_ch_map[32];	/* TXDESC qsel maximum size */
 #endif

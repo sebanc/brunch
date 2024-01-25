@@ -400,7 +400,11 @@ int hostapd_mode_init(_adapter *padapter)
 	mac[4] = 0x11;
 	mac[5] = 0x12;
 
+  #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
 	_rtw_memcpy(pnetdev->dev_addr, mac, ETH_ALEN);
+	#else
+  eth_hw_addr_set(pnetdev, mac);
+  #endif
 
 
 	rtw_netif_carrier_off(pnetdev);

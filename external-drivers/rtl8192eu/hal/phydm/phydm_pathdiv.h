@@ -27,7 +27,13 @@
 #define __PHYDMPATHDIV_H__
 
 #ifdef CONFIG_PATH_DIVERSITY
-#define PATHDIV_VERSION "4.0"
+/* @2019.03.07 open resp tx path h2c only for 1ss status*/
+#define PATHDIV_VERSION "4.4"
+
+#if (RTL8192F_SUPPORT || RTL8822B_SUPPORT || RTL8822C_SUPPORT ||\
+	RTL8812F_SUPPORT || RTL8197G_SUPPORT)
+	#define PHYDM_CONFIG_PATH_DIV_V2
+#endif
 
 #define USE_PATH_A_AS_DEFAULT_ANT /* @for 8814 dynamic TX path selection */
 
@@ -57,10 +63,24 @@ enum phydm_path_div_type {
 
 enum phydm_path_ctrl {
 	TX_PATH_BY_REG = 0,
-	TX_PATH_BY_DESC = 1
+	TX_PATH_BY_DESC = 1,
+	TX_PATH_CTRL_INIT
+};
+
+struct path_txdesc_ctrl {
+	u8 ant_map_a : 2;
+	u8 ant_map_b : 2;
+	u8 ntx_map : 4;
 };
 
 struct _ODM_PATH_DIVERSITY_ {
+	boolean stop_path_div; /*@Limit by enabled path number*/
+	boolean path_div_in_progress;
+	boolean	cck_fix_path_en; /*@ BB Reg for Adv-Ctrl (or debug mode)*/
+	boolean	ofdm_fix_path_en; /*@ BB Reg for Adv-Ctrl (or debug mode)*/
+	enum bb_path cck_fix_path_sel; /*@ BB Reg for Adv-Ctrl (or debug mode)*/
+	enum bb_path ofdm_fix_path_sel;/*@ BB Reg for Adv-Ctrl (or debug mode)*/
+	enum phydm_path_ctrl tx_path_ctrl;
 	enum bb_path default_tx_path;
 	enum bb_path path_sel[ODM_ASSOCIATE_ENTRY_NUM];
 	u32	path_a_sum[ODM_ASSOCIATE_ENTRY_NUM];
@@ -68,6 +88,7 @@ struct _ODM_PATH_DIVERSITY_ {
 	u16	path_a_cnt[ODM_ASSOCIATE_ENTRY_NUM];
 	u16	path_b_cnt[ODM_ASSOCIATE_ENTRY_NUM];
 	u8	phydm_path_div_type;
+	boolean force_update;
 #if RTL8814A_SUPPORT
 
 	u32	path_a_sum_all;
@@ -102,9 +123,10 @@ struct _ODM_PATH_DIVERSITY_ {
 #endif
 };
 
-void phydm_set_tx_path_by_bb_reg(void *dm_void, u8 path);
+void phydm_set_tx_path_by_bb_reg(void *dm_void, enum bb_path tx_path_sel_1ss);
 
-u8 phydm_get_tx_path_txdesc(void *dm_void, u8 macid);
+void phydm_get_tx_path_txdesc_jgr3(void *dm_void, u8 macid,
+				   struct path_txdesc_ctrl *desc);
 
 void phydm_c2h_dtp_handler(void *dm_void, u8 *cmd_buf, u8 cmd_len);
 

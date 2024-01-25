@@ -488,6 +488,20 @@ static int rtw89_cam_get_avail_addr_cam(struct rtw89_dev *rtwdev,
 	return 0;
 }
 
+static u8 rtw89_get_addr_cam_entry_size(struct rtw89_dev *rtwdev)
+{
+	const struct rtw89_chip_info *chip = rtwdev->chip;
+
+	switch (chip->chip_id) {
+	case RTL8852A:
+	case RTL8852B:
+	case RTL8851B:
+		return ADDR_CAM_ENT_SIZE;
+	default:
+		return ADDR_CAM_ENT_SHORT_SIZE;
+	}
+}
+
 int rtw89_cam_init_addr_cam(struct rtw89_dev *rtwdev,
 			    struct rtw89_addr_cam_entry *addr_cam,
 			    const struct rtw89_bssid_cam_entry *bssid_cam)
@@ -509,7 +523,7 @@ int rtw89_cam_init_addr_cam(struct rtw89_dev *rtwdev,
 	}
 
 	addr_cam->addr_cam_idx = addr_cam_idx;
-	addr_cam->len = ADDR_CAM_ENT_SIZE;
+	addr_cam->len = rtw89_get_addr_cam_entry_size(rtwdev);
 	addr_cam->offset = 0;
 	addr_cam->valid = true;
 	addr_cam->addr_mask = 0;
@@ -608,7 +622,7 @@ int rtw89_cam_fill_bssid_cam_info(struct rtw89_dev *rtwdev,
 				  struct rtw89_vif *rtwvif,
 				  struct rtw89_sta *rtwsta, u8 *cmd)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 	struct ieee80211_vif *vif = rtwvif_to_vif(rtwvif);
 #endif
 	struct rtw89_bssid_cam_entry *bssid_cam = rtw89_get_bssid_cam_of(rtwvif, rtwsta);
@@ -720,7 +734,7 @@ void rtw89_cam_fill_addr_cam_info(struct rtw89_dev *rtwdev,
 	FWCMD_SET_ADDR_FRM_TGT_IND(cmd, rtwvif->frm_tgt_ind);
 	FWCMD_SET_ADDR_MACID(cmd, rtwsta ? rtwsta->mac_id : rtwvif->mac_id);
 	if (rtwvif->net_type == RTW89_NET_TYPE_INFRA)
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0) || (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(9, 0)))
 		FWCMD_SET_ADDR_AID12(cmd, vif->cfg.aid & 0xfff);
 #else
 		FWCMD_SET_ADDR_AID12(cmd, vif->bss_conf.aid & 0xfff);

@@ -1546,7 +1546,7 @@ static void _mgt_dispatcher(_adapter *padapter, struct mlme_handler *ptable, uni
 		/* receive the frames that ra(a1) is my address or ra(a1) is bc address. */
 		if (!_rtw_memcmp(GetAddr1Ptr(pframe), adapter_mac_addr(padapter), ETH_ALEN) &&
 		    !_rtw_memcmp(GetAddr1Ptr(pframe), bc_addr, ETH_ALEN))
-#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
 		{
 			struct rtw_wdev_priv *pwdev_priv = adapter_wdev_data(padapter);
 
@@ -1600,7 +1600,7 @@ void mgt_dispatcher(_adapter *padapter, union recv_frame *precv_frame)
 	/* receive the frames that ra(a1) is my address or ra(a1) is bc address. */
 	if (!_rtw_memcmp(GetAddr1Ptr(pframe), adapter_mac_addr(padapter), ETH_ALEN) &&
 	    !_rtw_memcmp(GetAddr1Ptr(pframe), bc_addr, ETH_ALEN))
-#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
 		{
 			struct rtw_wdev_priv *pwdev_priv = adapter_wdev_data(padapter);
 
@@ -1778,13 +1778,15 @@ unsigned int OnProbeReq(_adapter *padapter, union recv_frame *precv_frame)
 	u8 wifi_test_chk_rate = 1;
 
 #ifdef CONFIG_IOCTL_CFG80211
-	if ((pwdinfo->driver_interface == DRIVER_CFG80211)
-	    && !rtw_p2p_chk_state(pwdinfo, P2P_STATE_NONE)
-	    && (GET_CFG80211_REPORT_MGMT(adapter_wdev_data(padapter), IEEE80211_STYPE_PROBE_REQ) == _TRUE)
-	) {
+#ifdef CONFIG_P2P
+	if ((adapter_to_dvobj(padapter)->wpas_type == RTW_WPAS_W1FI) &&
+		!rtw_p2p_chk_state(pwdinfo, P2P_STATE_NONE) &&
+		(GET_CFG80211_REPORT_MGMT(adapter_wdev_data(padapter),
+				IEEE80211_STYPE_PROBE_REQ) == _TRUE)) {
 		rtw_cfg80211_rx_probe_request(padapter, precv_frame);
 		return _SUCCESS;
 	}
+#endif
 #endif /* CONFIG_IOCTL_CFG80211 */
 
 	if (!rtw_p2p_chk_state(pwdinfo, P2P_STATE_NONE) &&
@@ -2781,6 +2783,10 @@ normal:
 				goto authclnt_fail;
 			}
 
+			if (len > sizeof(pmlmeinfo->chg_txt)) {
+				goto authclnt_fail;
+			}
+
 			_rtw_memcpy((void *)(pmlmeinfo->chg_txt), (void *)(p + 2), len);
 			pmlmeinfo->auth_seq = 3;
 			issue_auth(padapter, NULL, 0);
@@ -3339,7 +3345,7 @@ unsigned int OnAssocRsp(_adapter *padapter, union recv_frame *precv_frame)
 	}
 
 #ifdef CONFIG_WAPI_SUPPORT
-	rtw_wapi_on_assoc_ok(padapter, pIE);
+	rtw_wapi_on_assoc_ok(padapter, pWapiIE);
 #endif
 
 	pmlmeinfo->state &= (~WIFI_FW_ASSOC_STATE);
@@ -4682,6 +4688,7 @@ void issue_p2p_GO_response(_adapter *padapter, u8 *raddr, u8 *frame_body, uint l
 	/*	Try to get the device password ID from the WPS IE of group negotiation request frame */
 	/*	WiFi Direct test plan 5.1.15 */
 	rtw_get_wps_ie(frame_body + _PUBLIC_ACTION_IE_OFFSET_, len - _PUBLIC_ACTION_IE_OFFSET_, wpsie, &wpsielen);
+	wps_devicepassword_id_len = sizeof(wps_devicepassword_id);
 	rtw_get_wps_attr_content(wpsie, wpsielen, WPS_ATTR_DEVICE_PWID, (u8 *) &wps_devicepassword_id, &wps_devicepassword_id_len);
 	wps_devicepassword_id = be16_to_cpu(wps_devicepassword_id);
 
@@ -6783,9 +6790,11 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 
 				merged_p2p_ielen = rtw_p2p_merge_ies(frame_body + _PUBLIC_ACTION_IE_OFFSET_, len - _PUBLIC_ACTION_IE_OFFSET_, merged_p2pie);
 
+				attr_contentlen = sizeof(invitation_flag);
 				rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_INVITATION_FLAGS, &invitation_flag, &attr_contentlen);
 				if (attr_contentlen) {
 
+					attr_contentlen = sizeof(pwdinfo->p2p_peer_interface_addr);
 					rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_GROUP_BSSID, pwdinfo->p2p_peer_interface_addr, &attr_contentlen);
 					/*	Commented by Albert 20120510 */
 					/*	Copy to the pwdinfo->p2p_peer_interface_addr. */
@@ -6804,6 +6813,7 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 						/*	Re-invoke the persistent group. */
 
 						_rtw_memset(&group_id, 0x00, sizeof(struct group_id_info));
+						attr_contentlen = sizeof(struct group_id_info);
 						rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_GROUP_ID, (u8 *) &group_id, &attr_contentlen);
 						if (attr_contentlen) {
 							if (_rtw_memcmp(group_id.go_device_addr, adapter_mac_addr(padapter), ETH_ALEN)) {
@@ -6815,6 +6825,7 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 								/*	The p2p device sending this p2p invitation request wants to be the persistent GO. */
 								if (is_matched_in_profilelist(pwdinfo->p2p_peer_interface_addr, &pwdinfo->profileinfo[0])) {
 									u8 operatingch_info[5] = { 0x00 };
+									attr_contentlen = sizeof(operatingch_info);
 									if (rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_OPERATING_CH, operatingch_info,
 										&attr_contentlen)) {
 										if (rtw_chset_search_ch(adapter_to_chset(padapter), (u32)operatingch_info[4]) >= 0) {
@@ -6858,6 +6869,7 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 						/*	Received the invitation to join a P2P group. */
 
 						_rtw_memset(&group_id, 0x00, sizeof(struct group_id_info));
+						attr_contentlen = sizeof(struct group_id_info);
 						rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_GROUP_ID, (u8 *) &group_id, &attr_contentlen);
 						if (attr_contentlen) {
 							if (_rtw_memcmp(group_id.go_device_addr, adapter_mac_addr(padapter), ETH_ALEN)) {
@@ -6902,6 +6914,7 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 			_cancel_timer_ex(&pwdinfo->restore_p2p_state_timer);
 			p2p_ie = rtw_get_p2p_ie(frame_body + _PUBLIC_ACTION_IE_OFFSET_, len - _PUBLIC_ACTION_IE_OFFSET_, NULL, &p2p_ielen);
 			if (p2p_ie) {
+				attr_contentlen = sizeof(attr_content);
 				rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_STATUS, &attr_content, &attr_contentlen);
 
 				if (attr_contentlen == 1) {
@@ -8532,7 +8545,7 @@ int _issue_probereq(_adapter *padapter, const NDIS_802_11_SSID *pssid, const u8 
 	struct mlme_ext_priv	*pmlmeext = &(padapter->mlmeextpriv);
 	int	bssrate_len = 0;
 	u8	bc_addr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
 	struct rtw_wdev_priv *pwdev_priv = adapter_wdev_data(padapter);
 #endif
 
@@ -8553,7 +8566,7 @@ int _issue_probereq(_adapter *padapter, const NDIS_802_11_SSID *pssid, const u8 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
 
-#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
 	if ((pwdev_priv->pno_mac_addr[0] != 0xFF)
 	    && (check_fwstate(&padapter->mlmepriv, WIFI_STATION_STATE) == _TRUE)
 	    && (check_fwstate(&padapter->mlmepriv, WIFI_ASOC_STATE) == _FALSE))
@@ -8577,7 +8590,7 @@ int _issue_probereq(_adapter *padapter, const NDIS_802_11_SSID *pssid, const u8 
 
 	_rtw_memcpy(pwlanhdr->addr2, mac, ETH_ALEN);
 
-#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
 	if ((pwdev_priv->pno_mac_addr[0] != 0xFF)
 	    && (check_fwstate(&padapter->mlmepriv, WIFI_STATION_STATE) == _TRUE)
 	    && (check_fwstate(&padapter->mlmepriv, WIFI_ASOC_STATE) == _FALSE)) {
@@ -9076,6 +9089,9 @@ void issue_asocrsp(_adapter *padapter, unsigned short status, struct sta_info *p
 			if (pmlmepriv->p2p_assoc_resp_ie && pmlmepriv->p2p_assoc_resp_ie_len > 0) {
 				len = pmlmepriv->p2p_assoc_resp_ie_len;
 				_rtw_memcpy(pframe, pmlmepriv->p2p_assoc_resp_ie, len);
+			} else if (pmlmepriv->assoc_rsp && pmlmepriv->assoc_rsp_len > 0) {
+				len = pmlmepriv->assoc_rsp_len;
+				_rtw_memcpy(pframe, pmlmepriv->assoc_rsp, len);
 			}
 		} else
 			len = build_assoc_resp_p2p_ie(pwdinfo, pframe, pstat->p2p_status_code);
@@ -9391,6 +9407,8 @@ void _issue_assocreq(_adapter *padapter, u8 is_reassoc)
 #endif /* CONFIG_IOCTL_CFG80211 */
 
 				pframe = rtw_set_ie(pframe, EID_WPA2, pIE->Length, pIE->data, &(pattrib->pktlen));
+				/* tmp: update rsn's spp related opt. */
+				/*rtw_set_spp_amsdu_mode(padapter->registrypriv.amsdu_mode, pframe - (pIE->Length + 2), pIE->Length +2);*/
 			}
 			break;
 #ifdef CONFIG_80211N_HT
@@ -10318,6 +10336,12 @@ static int issue_action_ba(_adapter *padapter, unsigned char *raddr, unsigned ch
 			else /* TX AMSDU disabled */
 				BA_para_set &= ~BIT(0);
 #endif
+
+			psta = rtw_get_stainfo(pstapriv, raddr);
+			if (psta != NULL) {
+				if (psta->flags & WLAN_STA_AMSDU_DISABLE)
+					BA_para_set &= ~BIT(0);
+			}
 			BA_para_set = cpu_to_le16(BA_para_set);
 			pframe = rtw_set_fixed_ie(pframe, 2, (unsigned char *)(&(BA_para_set)), &(pattrib->pktlen));
 
@@ -10360,6 +10384,12 @@ static int issue_action_ba(_adapter *padapter, unsigned char *raddr, unsigned ch
 					BA_para_set &= ~BIT(0);
 				else if (pregpriv->rx_ampdu_amsdu == 1) /* enabled */
 					BA_para_set |= BIT(0);
+			}
+
+			psta = rtw_get_stainfo(pstapriv, raddr);
+			if (psta != NULL) {
+				if (psta->flags & WLAN_STA_AMSDU_DISABLE)
+					BA_para_set &= ~BIT(0);
 			}
 
 			BA_para_set = cpu_to_le16(BA_para_set);
@@ -11241,6 +11271,7 @@ u8 collect_bss_info(_adapter *padapter, union recv_frame *precv_frame, WLAN_BSSI
 			u32	attr_contentlen = 0;
 			u8 listen_ch[5] = { 0x00 };
 
+			attr_contentlen = sizeof(listen_ch);
 			rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_LISTEN_CH, listen_ch, &attr_contentlen);
 			bssid->Configuration.DSConfig = listen_ch[4];
 		} else {
@@ -11372,7 +11403,8 @@ u8 collect_bss_info(_adapter *padapter, union recv_frame *precv_frame, WLAN_BSSI
 #ifdef CONFIG_RTW_80211K
 	p = rtw_get_ie(bssid->IEs + ie_offset, _EID_RRM_EN_CAP_IE_, &len, bssid->IELength - ie_offset);
 	if (p)
-		_rtw_memcpy(bssid->PhyInfo.rm_en_cap, (p + 2), *(p + 1));
+		_rtw_memcpy(bssid->PhyInfo.rm_en_cap, (p + 2), MIN(*(p + 1),
+			    sizeof(bssid->PhyInfo.rm_en_cap)));
 
 	/* save freerun counter */
 	bssid->PhyInfo.free_cnt = precv_frame->u.hdr.attrib.free_cnt;
@@ -12208,7 +12240,7 @@ static void rtw_mlmeext_disconnect(_adapter *padapter)
 		self_action = MLME_STA_DISCONNECTED;
 	else if (MLME_IS_ADHOC(padapter) || MLME_IS_ADHOC_MASTER(padapter))
 		self_action = MLME_ADHOC_STOPPED;
-/* nrm */
+// nrm
 #ifdef CONFIG_WIFI_MONITOR
 	else if (MLME_IS_MONITOR(padapter))
 		self_action = MLME_ACTION_NONE;
@@ -12767,14 +12799,15 @@ void linked_status_chk(_adapter *padapter, u8 from_timer)
 #elif defined(CONFIG_LAYER2_ROAMING)
 		if (rtw_chk_roam_flags(padapter, RTW_ROAM_ACTIVE)) {
 			RTW_INFO("signal_strength_data.avg_val = %d\n", precvpriv->signal_strength_data.avg_val);
-			if ((precvpriv->signal_strength_data.avg_val < pmlmepriv->roam_rssi_threshold)
-				&& (rtw_get_passing_time_ms(pmlmepriv->last_roaming) >= pmlmepriv->roam_scan_int*2000)) {
+			if (precvpriv->signal_strength_data.avg_val < pmlmepriv->roam_rssi_threshold) {
+				if (rtw_get_passing_time_ms(pmlmepriv->last_roaming) >= pmlmepriv->roam_scan_int*2000) {
 #ifdef CONFIG_RTW_80211K
-				rtw_roam_nb_discover(padapter, _FALSE);
+					rtw_roam_nb_discover(padapter, _FALSE);
 #endif
-				pmlmepriv->need_to_roam = _TRUE;
-				rtw_drv_scan_by_self(padapter, RTW_AUTO_SCAN_REASON_ROAM);
-				pmlmepriv->last_roaming = rtw_get_current_time();
+					pmlmepriv->need_to_roam = _TRUE;
+					rtw_drv_scan_by_self(padapter, RTW_AUTO_SCAN_REASON_ROAM);
+					pmlmepriv->last_roaming = rtw_get_current_time();
+				}
 			} else
 				pmlmepriv->need_to_roam = _FALSE;
 		}
@@ -14686,8 +14719,8 @@ u8 sitesurvey_cmd_hdl(_adapter *padapter, u8 *pbuf)
 #endif
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct ss_res *ss = &pmlmeext->sitesurvey_res;
-#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
-		struct rtw_wdev_priv *pwdev_priv = adapter_wdev_data(padapter);
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
+	struct rtw_wdev_priv *pwdev_priv = adapter_wdev_data(padapter);
 #endif
 	u8 val8;
 
@@ -14726,14 +14759,16 @@ operation_by_state:
 		goto operation_by_state;
 
 	case SCAN_START:
-#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
 		if ((pwdev_priv->pno_mac_addr[0] != 0xFF)
 			    && (check_fwstate(&padapter->mlmepriv, WIFI_STATION_STATE) == _TRUE)
 	    	    && (check_fwstate(&padapter->mlmepriv, WIFI_ASOC_STATE) == _FALSE)) {
 			u16 seq_num;
 
+#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
 			rtw_hal_pno_random_gen_mac_addr(padapter);
-			rtw_hal_set_hw_mac_addr(padapter, pwdev_priv->pno_mac_addr);
+#endif
+			rtw_hal_set_hw_macaddr(padapter, pwdev_priv->pno_mac_addr);
 			get_random_bytes(&seq_num, 2);
 			pwdev_priv->pno_scan_seq_num = seq_num & 0xFFF;
 			RTW_INFO("%s pno_scan_seq_num %d\n", __func__,
@@ -15019,8 +15054,8 @@ operation_by_state:
 #endif /* CONFIG_P2P */
 
 	case SCAN_COMPLETE:
-#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
-		rtw_hal_set_hw_mac_addr(padapter, adapter_mac_addr(padapter));
+#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
+		rtw_hal_set_hw_macaddr(padapter, adapter_mac_addr(padapter));
 #endif
 #ifdef CONFIG_P2P
 		if (rtw_p2p_chk_state(pwdinfo, P2P_STATE_SCAN)
@@ -15100,6 +15135,19 @@ u8 setauth_hdl(_adapter *padapter, unsigned char *pbuf)
 		pmlmeinfo->auth_algo = pparm->mode;
 
 	return	H2C_SUCCESS;
+}
+
+static u8 amsdu_spp_enable(_adapter *pdapter, enum security_type type)
+{
+	u8 ret = _FALSE;
+
+	if (pdapter->registrypriv.amsdu_mode == RTW_AMSDU_MODE_SPP) {
+		if ( type == _AES_ || type == _CCMP_256_
+			|| type == _GCMP_ || type == _GCMP_256_ )
+			ret = _SUCCESS;
+	}
+
+	return ret;
 }
 
 /*
@@ -15193,8 +15241,10 @@ u8 setkey_hdl(_adapter *padapter, u8 *pbuf)
 	if (pparm->algorithm & _SEC_TYPE_256_)  {
 		RTW_INFO_DUMP("GTK : ", pparm->key, sizeof(pparm->key));
 		ctrl |= BIT(9);
-	}	
+	}
 
+	if (amsdu_spp_enable(padapter, pparm->algorithm) == _SUCCESS)
+		ctrl |= BIT(7);
 	write_cam(padapter, cam_id, ctrl, addr, pparm->key);
 
 	/* if ((cam_id > 3) && (((pmlmeinfo->state&0x03) == WIFI_FW_AP_STATE) || ((pmlmeinfo->state&0x03) == WIFI_FW_ADHOC_STATE)))*/
@@ -15341,8 +15391,11 @@ write_to_cam:
 			RTW_INFO_DUMP("PTK : ", pparm->key, sizeof(pparm->key));
 			ctrl |= BIT(9);
 		}
-
+		if (amsdu_spp_enable(padapter, pparm->algorithm) == _SUCCESS)
+			ctrl |= BIT(7);
 		write_cam(padapter, cam_id, ctrl, pparm->addr, pparm->key);
+		if (!(pparm->gk))
+			ATOMIC_INC(&psta->keytrack);	/*CVE-2020-24587*/
 	}
 	ret = H2C_SUCCESS_RSP;
 
@@ -16112,6 +16165,12 @@ u8 rtw_set_chbw_hdl(_adapter *padapter, u8 *pbuf)
 	}
 	
 	LeaveAllPowerSaveModeDirect(padapter);
+// nrm
+#ifdef CONFIG_MONITOR_MODE_XMIT
+	pmlmeext->cur_channel = set_ch_parm->ch;
+	pmlmeext->cur_ch_offset = set_ch_parm->ch_offset;
+	pmlmeext->cur_bwmode = set_ch_parm->bw;
+#endif /* CONFIG_MONITOR_MODE_XMIT */
 	
 	set_channel_bwmode(padapter, set_ch_parm->ch, set_ch_parm->ch_offset, set_ch_parm->bw);
 

@@ -106,23 +106,28 @@ void rtw_reset_securitypriv(_adapter *adapter)
 	_enter_critical_bh(&adapter->security_key_mutex, &irqL);
 
 	if (adapter->securitypriv.dot11AuthAlgrthm == dot11AuthAlgrthm_8021X) { /* 802.1x */
+		u8 backup_sw_encrypt, backup_sw_decrypt;
+
+		backup_sw_encrypt = adapter->securitypriv.sw_encrypt;
+		backup_sw_decrypt = adapter->securitypriv.sw_decrypt;
+
 		/* Added by Albert 2009/02/18 */
 		/* We have to backup the PMK information for WiFi PMK Caching test item. */
 		/*  */
 		/* Backup the btkip_countermeasure information. */
 		/* When the countermeasure is trigger, the driver have to disconnect with AP for 60 seconds. */
 
-		memset(&backupPMKIDList[0], 0x00, sizeof(RT_PMKID_LIST) * NUM_PMKID_CACHE);
+		_rtw_memset(&backupPMKIDList[0], 0x00, sizeof(RT_PMKID_LIST) * NUM_PMKID_CACHE);
 
-		memcpy(&backupPMKIDList[0], &adapter->securitypriv.PMKIDList[0], sizeof(RT_PMKID_LIST) * NUM_PMKID_CACHE);
+		_rtw_memcpy(&backupPMKIDList[0], &adapter->securitypriv.PMKIDList[0], sizeof(RT_PMKID_LIST) * NUM_PMKID_CACHE);
 		backupPMKIDIndex = adapter->securitypriv.PMKIDIndex;
 		backupTKIPCountermeasure = adapter->securitypriv.btkip_countermeasure;
 		backupTKIPcountermeasure_time = adapter->securitypriv.btkip_countermeasure_time;
-		memset((unsigned char *)&adapter->securitypriv, 0, sizeof(struct security_priv));
+		_rtw_memset((unsigned char *)&adapter->securitypriv, 0, sizeof(struct security_priv));
 
 		/* Added by Albert 2009/02/18 */
 		/* Restore the PMK information to securitypriv structure for the following connection. */
-		memcpy(&adapter->securitypriv.PMKIDList[0], &backupPMKIDList[0], sizeof(RT_PMKID_LIST) * NUM_PMKID_CACHE);
+		_rtw_memcpy(&adapter->securitypriv.PMKIDList[0], &backupPMKIDList[0], sizeof(RT_PMKID_LIST) * NUM_PMKID_CACHE);
 		adapter->securitypriv.PMKIDIndex = backupPMKIDIndex;
 		adapter->securitypriv.btkip_countermeasure = backupTKIPCountermeasure;
 		adapter->securitypriv.btkip_countermeasure_time = backupTKIPcountermeasure_time;
@@ -131,6 +136,9 @@ void rtw_reset_securitypriv(_adapter *adapter)
 		adapter->securitypriv.ndisencryptstatus = Ndis802_11WEPDisabled;
 
 		adapter->securitypriv.extauth_status = WLAN_STATUS_UNSPECIFIED_FAILURE;
+
+		adapter->securitypriv.sw_encrypt = backup_sw_encrypt;
+		adapter->securitypriv.sw_decrypt = backup_sw_decrypt;
 
 	} else { /* reset values in securitypriv */
 		/* if(adapter->mlmepriv.fw_state & WIFI_STATION_STATE) */
@@ -187,7 +195,7 @@ void rtw_report_sec_ie(_adapter *adapter, u8 authmode, u8 *sec_ie)
 
 
 	buff = NULL;
-	if (authmode == WLAN_EID_VENDOR_SPECIFIC) {
+	if (authmode == _WPA_IE_ID_) {
 
 		buff = rtw_zmalloc(IW_CUSTOM_MAX);
 		if (NULL == buff) {
@@ -207,7 +215,7 @@ void rtw_report_sec_ie(_adapter *adapter, u8 authmode, u8 *sec_ie)
 
 		p += sprintf(p, ")");
 
-		memset(&wrqu, 0, sizeof(wrqu));
+		_rtw_memset(&wrqu, 0, sizeof(wrqu));
 
 		wrqu.data.length = p - buff;
 
@@ -242,7 +250,7 @@ void rtw_indicate_sta_assoc_event(_adapter *padapter, struct sta_info *psta)
 
 	wrqu.addr.sa_family = ARPHRD_ETHER;
 
-	memcpy(wrqu.addr.sa_data, psta->cmn.mac_addr, ETH_ALEN);
+	_rtw_memcpy(wrqu.addr.sa_data, psta->cmn.mac_addr, ETH_ALEN);
 
 	RTW_INFO("+rtw_indicate_sta_assoc_event\n");
 
@@ -269,7 +277,7 @@ void rtw_indicate_sta_disassoc_event(_adapter *padapter, struct sta_info *psta)
 
 	wrqu.addr.sa_family = ARPHRD_ETHER;
 
-	memcpy(wrqu.addr.sa_data, psta->cmn.mac_addr, ETH_ALEN);
+	_rtw_memcpy(wrqu.addr.sa_data, psta->cmn.mac_addr, ETH_ALEN);
 
 	RTW_INFO("+rtw_indicate_sta_disassoc_event\n");
 
@@ -404,7 +412,12 @@ int hostapd_mode_init(_adapter *padapter)
 	mac[4] = 0x11;
 	mac[5] = 0x12;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	eth_hw_addr_set(pnetdev, mac);
+#else
+	_rtw_memcpy(pnetdev->dev_addr, mac, ETH_ALEN);
+#endif
+
 
 	rtw_netif_carrier_off(pnetdev);
 

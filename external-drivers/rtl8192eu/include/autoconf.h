@@ -102,7 +102,6 @@
 	/* #define CONFIG_TSF_RESET_OFFLOAD */			/* For 2 PORT TSF SYNC. */
 #endif
 
-#define CONFIG_AP_MODE
 #ifdef CONFIG_AP_MODE
 	/* #define CONFIG_INTERRUPT_BASED_TXBCN */ /* Tx Beacon when driver BCN_OK ,BCN_ERR interrupt occurs */
 	#if defined(CONFIG_CONCURRENT_MODE) && defined(CONFIG_INTERRUPT_BASED_TXBCN)
@@ -121,7 +120,6 @@
 	/* #define	CONFIG_AUTO_AP_MODE */
 #endif
 
-#define CONFIG_P2P
 #ifdef CONFIG_P2P
 	/* The CONFIG_WFD is for supporting the Wi-Fi display */
 	#define CONFIG_WFD
@@ -172,9 +170,6 @@
 #endif
 
 #define RTW_NOTCH_FILTER 0 /* 0:Disable, 1:Enable, */
-
-#define CONFIG_TX_MCAST2UNI		/*Support IP multicast->unicast*/
-/* #define CONFIG_CHECK_AC_LIFETIME 1 */	/* Check packet lifetime of 4 ACs. */
 
 
 /*
@@ -237,6 +232,8 @@
 
 #define ENABLE_USB_DROP_INCORRECT_OUT
 
+
+#define DISABLE_BB_RF	0
 #define RTW_CONFIG_RFREG18_WA
 /* #define RTL8191C_FPGA_NETWORKTYPE_ADHOC 0 */
 
@@ -276,14 +273,13 @@
  */
 #define DBG	1
 
-#define CONFIG_PROC_DEBUG
-
 #define DBG_CONFIG_ERROR_DETECT
 /* #define DBG_CONFIG_ERROR_DETECT_INT */
 /* #define DBG_CONFIG_ERROR_RESET */
 
 /* #define DBG_CMD_QUEUE */
 /* #define DBG_IO */
+/* #define DBG_DELAY_OS */
 /* #define DBG_MEM_ALLOC */
 /* #define DBG_IOCTL */
 

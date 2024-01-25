@@ -890,6 +890,10 @@ void usb_recv_tasklet(void *priv)
 	_adapter		*padapter = (_adapter *)priv;
 	struct recv_priv	*precvpriv = &padapter->recvpriv;
 	struct recv_buf	*precvbuf = NULL;
+#ifdef CONFIG_USB_PROTECT_RX_CLONED_SKB
+	u8 cloned_skb_num;
+	u8 need_sche = _FALSE;
+#endif
 
 	while (NULL != (pskb = skb_dequeue(&precvpriv->rx_skb_queue))) {
 
@@ -900,22 +904,60 @@ void usb_recv_tasklet(void *priv)
 			#ifdef CONFIG_PREALLOC_RX_SKB_BUFFER
 			if (rtw_free_skb_premem(pskb) != 0)
 			#endif /* CONFIG_PREALLOC_RX_SKB_BUFFER */
-				rtw_skb_free(pskb);
-			break;
+			{
+				skb_reset_tail_pointer(pskb);
+				pskb->len = 0;
+				skb_queue_tail(&precvpriv->free_recv_skb_queue, pskb);
+			}
+			continue;
 		}
 
 		recvbuf2recvframe(padapter, pskb);
 
-		skb_reset_tail_pointer(pskb);
-		pskb->len = 0;
+#ifdef CONFIG_USB_PROTECT_RX_CLONED_SKB
+		if (skb_cloned(pskb)) {
+			skb_queue_tail(&precvpriv->rx_cloned_skb_queue, pskb);
+			need_sche = _TRUE;
+		} else
+#endif
+		{
+			skb_reset_tail_pointer(pskb);
+			pskb->len = 0;
+			skb_queue_tail(&precvpriv->free_recv_skb_queue, pskb);
 
-		skb_queue_tail(&precvpriv->free_recv_skb_queue, pskb);
-
-		precvbuf = rtw_dequeue_recvbuf(&precvpriv->recv_buf_pending_queue);
-		if (NULL != precvbuf) {
-			precvbuf->pskb = NULL;
-			rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+			precvbuf = rtw_dequeue_recvbuf(&precvpriv->recv_buf_pending_queue);
+			if (NULL != precvbuf) {
+				precvbuf->pskb = NULL;
+				rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+			}
 		}
+	}
+
+#ifdef CONFIG_USB_PROTECT_RX_CLONED_SKB
+	cloned_skb_num = skb_queue_len(&precvpriv->rx_cloned_skb_queue);
+	while (cloned_skb_num--) {
+		pskb = skb_dequeue(&precvpriv->rx_cloned_skb_queue);
+		if (skb_cloned(pskb)) {
+			skb_queue_tail(&precvpriv->rx_cloned_skb_queue, pskb);
+			need_sche = _TRUE;
+		} else {
+			skb_reset_tail_pointer(pskb);
+			pskb->len = 0;
+			skb_queue_tail(&precvpriv->free_recv_skb_queue, pskb);
+
+			precvbuf = rtw_dequeue_recvbuf(&precvpriv->recv_buf_pending_queue);
+			if (NULL != precvbuf) {
+				precvbuf->pskb = NULL;
+				rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+			}
+		}
+	}
+
+	if (need_sche)
+		tasklet_schedule(&precvpriv->recv_tasklet);
+#endif
+	if (RTW_CANNOT_RUN(padapter)) {
+			while (rtw_dequeue_recvbuf(&precvpriv->recv_buf_pending_queue));
 	}
 }
 

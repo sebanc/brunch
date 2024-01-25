@@ -275,7 +275,9 @@ u8 mac_hidden_wl_func_to_hal_wl_func(u8 func);
 
 #ifdef PLATFORM_LINUX
 u8 rtw_efuse_file_read(PADAPTER padapter, u8 *filepath, u8 *buf, u32 len);
+#if !defined(CONFIG_RTW_ANDROID_GKI)
 u8 rtw_efuse_file_store(PADAPTER padapter, u8 *filepath, u8 *buf, u32 len);
+#endif /* !defined(CONFIG_RTW_ANDROID_GKI) */
 #ifdef CONFIG_EFUSE_CONFIG_FILE
 u32 rtw_read_efuse_from_file(const char *path, u8 *buf, int map_size);
 u32 rtw_read_macaddr_from_file(const char *path, u8 *buf);

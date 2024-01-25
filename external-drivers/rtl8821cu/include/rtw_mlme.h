@@ -539,9 +539,9 @@ struct tdls_txmgmt {
 
 /* used for mlme_priv.roam_flags */
 enum {
-	RTW_ROAM_ON_EXPIRED = BIT0,
-	RTW_ROAM_ON_RESUME = BIT1,
-	RTW_ROAM_ACTIVE = BIT2,
+	RTW_ROAM_ON_EXPIRED = BIT0, /* roam when AP is expired */
+	RTW_ROAM_ON_RESUME = BIT1,  /* roam when device is resumed (after being suspended) */
+	RTW_ROAM_ACTIVE = BIT2,     /* active roam when current rssi (signal strength) is too low */
 };
 
 #define UNASOC_STA_SRC_RX_BMC		0
@@ -568,22 +568,22 @@ struct unassoc_sta_info {
 #endif
 
 struct mlme_priv {
-
 	_lock	lock;
 	sint	fw_state;	/* shall we protect this variable? maybe not necessarily... */
 	u8	to_join; /* flag */
 	u16 join_status;
 #ifdef CONFIG_LAYER2_ROAMING
-	u8 to_roam; /* roaming trying times */
+	u8 to_roam;				/* internal counter for #roaming scans */
 	struct wlan_network *roam_network; /* the target of active roam */
-	u8 roam_flags;
-	u8 roam_rssi_diff_th; /* rssi difference threshold for active scan candidate selection */
-	u32 roam_scan_int; 		/* scan interval for active roam (Unit:2 second)*/
-	u32 roam_scanr_exp_ms; /* scan result expire time in ms  for roam */
+	u8 roam_flags;			/* defines roam types - check enum above */
+	u8 roam_rssi_diff_th;	/* during network scan/survey: the rssi difference between the current network and
+							 * the candidate network must be above this threshold to withhold the candidate */
+	u32 roam_scan_int;		/* minimum interval (unit: 2 seconds) between roaming scans */
+	u32 roam_scanr_exp_ms;	/* expire time in ms: only withhold candidate if last seen within expire time */
 	u8 roam_tgt_addr[ETH_ALEN]; /* request to roam to speicific target without other consideration */
-	u8 roam_rssi_threshold;
-	systime last_roaming;
-	bool need_to_roam;
+	u8 roam_rssi_threshold; /* rssi (signal strength) must be below this threshold to start a roaming scan */
+	systime last_roaming;	/* time of start of last roaming scan */
+	bool need_to_roam;		/* flag to check if roaming is (still) necessary */
 #endif
 
 	u32 defs_lmt_sta;

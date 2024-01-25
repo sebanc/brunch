@@ -1,7 +1,5 @@
 #!/bin/bash
-rmmod 8822be
-rmmod 88x2be
-rmmod 8822bs
-rmmod 88x2bs
-rmmod 8822bu
-rmmod 88x2bu
+rmmod 8192cu
+rmmod 8192ce
+rmmod 8192du
+rmmod 8192de

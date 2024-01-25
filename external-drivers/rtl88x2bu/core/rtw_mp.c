@@ -237,6 +237,7 @@ s32 init_mp_priv(PADAPTER padapter)
 	pmppriv->pktInterval = 0;
 	pmppriv->pktLength = 1000;
 	pmppriv->bprocess_mp_mode = _FALSE;
+	pmppriv->efuse_update_file= _FALSE;
 
 	mp_init_xmit_attrib(&pmppriv->tx, padapter);
 
@@ -392,7 +393,14 @@ void mpt_InitHWConfig(PADAPTER Adapter)
 		PlatformEFIOWrite2Byte(Adapter, REG_RXFLTMAP1_8814B, 0x2000);
 	}
 #endif
-
+#if defined(CONFIG_RTL8723F)
+	/* todo: 8723F not verify yet */
+	else if (IS_HARDWARE_TYPE_8723F(Adapter)) {
+		/* 8723F mac is similar with 8723D,
+		 * but can't find 8723D here.
+		 */
+	}
+#endif
 }
 
 static void PHY_IQCalibrate(PADAPTER padapter, u8 bReCovery)
@@ -512,13 +520,15 @@ static void  PHY_SetRFPathSwitch(PADAPTER padapter , BOOLEAN bMain) {
 #endif
 	} else if (IS_HARDWARE_TYPE_8822C(padapter)) {
 #ifdef CONFIG_RTL8822C
-		/* remove for MP EVM Fail, need to review by willis 20180809
 		phy_set_rf_path_switch_8822c(phydm, bMain);
-		*/
 #endif
 	} else if (IS_HARDWARE_TYPE_8814B(padapter)) {
 #ifdef CONFIG_RTL8814B
 		/* phy_set_rf_path_switch_8814b(phydm, bMain); */
+#endif
+	} else if (IS_HARDWARE_TYPE_8723F(padapter)) {
+#ifdef CONFIG_RTL8723F
+		phy_set_rf_path_switch_8723f(phydm, bMain);
 #endif
 	}
 }
@@ -753,55 +763,59 @@ static void init_mp_data(PADAPTER padapter)
 	pDM_Odm->rf_calibrate_info.txpowertrack_control = _FALSE;
 }
 
-void MPT_PwrCtlDM(PADAPTER padapter, u32 bstart)
+
+void MPT_PwrCtlDM(PADAPTER padapter, u32 trk_type)
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	struct dm_struct		*pDM_Odm = &pHalData->odmpriv;
 	u32	rf_ability;
 
-	padapter->mppriv.tssitrk_on = bstart == 3;
+	padapter->mppriv.tssitrk_on = trk_type == 3;
 
-	if (bstart == 1) {
-		RTW_INFO("in MPT_PwrCtlDM start\n");
+	if (trk_type == 0) { /* thermal PwrTrk off*/
+		struct txpwrtrack_cfg c;
+		u8	chnl = 0 ;
 
-		rf_ability = ((u32)halrf_cmn_info_get(pDM_Odm, HALRF_CMNINFO_ABILITY)) | HAL_RF_TX_PWR_TRACK;
-		halrf_cmn_info_set(pDM_Odm, HALRF_CMNINFO_ABILITY, rf_ability);
-		halrf_set_pwr_track(pDM_Odm, bstart);
-		pDM_Odm->rf_calibrate_info.txpowertrack_control = _TRUE;
-		padapter->mppriv.mp_dm = 1;
-
-	} else {
-		RTW_INFO("in MPT_PwrCtlDM stop\n");
+		RTW_INFO("in Thermal tracking off\n");
 		rf_ability = ((u32)halrf_cmn_info_get(pDM_Odm, HALRF_CMNINFO_ABILITY)) & ~HAL_RF_TX_PWR_TRACK;
 		halrf_cmn_info_set(pDM_Odm, HALRF_CMNINFO_ABILITY, rf_ability);
-		halrf_set_pwr_track(pDM_Odm, bstart);
-		pDM_Odm->rf_calibrate_info.txpowertrack_control = _FALSE;
+		halrf_cmn_info_set(pDM_Odm, HALRF_CMNINFO_POWER_TRACK_CONTROL, trk_type);
+		halrf_set_pwr_track(pDM_Odm, FALSE);
+		pDM_Odm->rf_calibrate_info.txpowertrack_control = trk_type;
 		if (IS_HARDWARE_TYPE_8822C(padapter))
 			padapter->mppriv.mp_dm = 1; /* default enable dpk tracking */
 		else
 			padapter->mppriv.mp_dm = 0;
-		{
-			struct txpwrtrack_cfg c;
-			u8	chnl = 0 ;
-			_rtw_memset(&c, 0, sizeof(struct txpwrtrack_cfg));
-			configure_txpower_track(pDM_Odm, &c);
-			odm_clear_txpowertracking_state(pDM_Odm);
-			if (*c.odm_tx_pwr_track_set_pwr) {
-				if (pDM_Odm->support_ic_type == ODM_RTL8188F)
-					(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, MIX_MODE, RF_PATH_A, chnl);
-				else if (pDM_Odm->support_ic_type == ODM_RTL8723D) {
-					(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, BBSWING, RF_PATH_A, chnl);
-					SetTxPower(padapter);
-				} else if (pDM_Odm->support_ic_type == ODM_RTL8192F) {
-					(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, MIX_MODE, RF_PATH_A, chnl);
-					(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, MIX_MODE, RF_PATH_B, chnl);
-				} else {
-					(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, BBSWING, RF_PATH_A, chnl);
-					(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, BBSWING, RF_PATH_B, chnl);
-				}
+
+		_rtw_memset(&c, 0, sizeof(struct txpwrtrack_cfg));
+		configure_txpower_track(pDM_Odm, &c);
+		odm_clear_txpowertracking_state(pDM_Odm);
+		if (*c.odm_tx_pwr_track_set_pwr) {
+			if (pDM_Odm->support_ic_type == ODM_RTL8188F)
+				(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, MIX_MODE, RF_PATH_A, chnl);
+			else if (pDM_Odm->support_ic_type == ODM_RTL8723D) {
+				(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, BBSWING, RF_PATH_A, chnl);
+				SetTxPower(padapter);
+			} else if (pDM_Odm->support_ic_type == ODM_RTL8192F) {
+				(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, MIX_MODE, RF_PATH_A, chnl);
+				(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, MIX_MODE, RF_PATH_B, chnl);
+			} else {
+				(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, BBSWING, RF_PATH_A, chnl);
+				(*c.odm_tx_pwr_track_set_pwr)(pDM_Odm, BBSWING, RF_PATH_B, chnl);
 			}
 		}
+		return ;
 	}
+
+	rf_ability = ((u32)halrf_cmn_info_get(pDM_Odm, HALRF_CMNINFO_ABILITY)) | HAL_RF_TX_PWR_TRACK;
+	halrf_cmn_info_set(pDM_Odm, HALRF_CMNINFO_ABILITY, rf_ability);
+	halrf_cmn_info_set(pDM_Odm, HALRF_CMNINFO_POWER_TRACK_CONTROL, trk_type);
+	if (trk_type == 1 || trk_type == 3) /* Thermal PwrTrk ON , TSSI PwrTrk ON */
+		halrf_set_pwr_track(pDM_Odm, TRUE);
+	else
+		halrf_set_pwr_track(pDM_Odm, false);/* TSSI K */
+	pDM_Odm->rf_calibrate_info.txpowertrack_control = trk_type;
+	padapter->mppriv.mp_dm = 1;
 
 }
 
@@ -854,7 +868,7 @@ u32 mp_join(PADAPTER padapter, u8 mode)
 		goto end_of_mp_start_test;
 
 	/* init mp_start_test status */
-	if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) {
+	if (check_fwstate(pmlmepriv, WIFI_ASOC_STATE) == _TRUE) {
 		rtw_disassoc_cmd(padapter, 500, 0);
 		rtw_indicate_disconnect(padapter, 0, _FALSE);
 		rtw_free_assoc_resources_cmd(padapter, _TRUE, 0);
@@ -863,7 +877,7 @@ u32 mp_join(PADAPTER padapter, u8 mode)
 	/*pmlmepriv->fw_state = WIFI_MP_STATE;*/
 	init_fwstate(pmlmepriv, WIFI_MP_STATE);
 
-	set_fwstate(pmlmepriv, _FW_UNDER_LINKING);
+	set_fwstate(pmlmepriv, WIFI_UNDER_LINKING);
 
 	/* 3 2. create a new psta for mp driver */
 	/* clear psta in the cur_network, if any */
@@ -892,8 +906,8 @@ u32 mp_join(PADAPTER padapter, u8 mode)
 	_rtw_memcpy(pnetwork, &padapter->registrypriv.dev_network, padapter->registrypriv.dev_network.Length);
 
 	rtw_indicate_connect(padapter);
-	_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING);
-	set_fwstate(pmlmepriv, _FW_LINKED);
+	_clr_fwstate_(pmlmepriv, WIFI_UNDER_LINKING);
+	set_fwstate(pmlmepriv, WIFI_ASOC_STATE);
 
 end_of_mp_start_test:
 
@@ -1074,7 +1088,7 @@ static void mpt_AdjustRFRegByRateByChan92CU(PADAPTER pAdapter, u8 RateIdx, u8 Ch
 {
 	u8		eRFPath;
 	u32		rfReg0x26;
-	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(pAdapter);
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(pAdapter);
 
 
 	if (RateIdx < MPT_RATE_6M) 	/* CCK rate,for 88cu */
@@ -1106,7 +1120,7 @@ static void mpt_AdjustRFRegByRateByChan92CU(PADAPTER pAdapter, u8 RateIdx, u8 Ch
 		}
 	}
 
-	for (eRFPath = 0; eRFPath < pHalData->NumTotalRFPath; eRFPath++)
+	for (eRFPath = 0; eRFPath < hal_spec->rf_reg_path_num; eRFPath++)
 		write_rfreg(pAdapter, eRFPath, RF_SYN_G2, rfReg0x26);
 }
 #endif
@@ -1280,7 +1294,7 @@ static struct xmit_frame *alloc_mp_xmitframe(struct xmit_priv *pxmitpriv)
 	struct xmit_frame	*pmpframe;
 	struct xmit_buf	*pxmitbuf;
 
-	pmpframe = rtw_alloc_xmitframe(pxmitpriv);
+	pmpframe = rtw_alloc_xmitframe(pxmitpriv, 0);
 	if (pmpframe == NULL)
 		return NULL;
 
@@ -2003,6 +2017,11 @@ void SetPacketTx(PADAPTER padapter)
 		rtl8814b_prepare_mp_txdesc(padapter, pmp_priv);
 #endif /* CONFIG_RTL8814B */
 
+#if defined(CONFIG_RTL8723F)
+	if (IS_HARDWARE_TYPE_8723F(padapter))
+		rtl8723f_prepare_mp_txdesc(padapter, pmp_priv);
+#endif /* CONFIG_RTL8723F */
+
 	/* 3 4. make wlan header, make_wlanhdr() */
 	hdr = (struct rtw_ieee80211_hdr *)pkt_start;
 	set_frame_sub_type(&hdr->frame_ctl, pattrib->subtype);
@@ -2122,6 +2141,7 @@ void SetPacketRx(PADAPTER pAdapter, u8 bStartRx, u8 bAB)
 			pHalData->ReceiveConfig |= RCR_APP_PHYST_RXFF;
 
 #if defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8822C)
+/* todo: 8723F */
 			write_bbreg(pAdapter, 0x550, BIT3, bEnable);
 #endif
 			rtw_write16(pAdapter, REG_RXFLTMAP0, 0xFFEF); /* REG_RXFLTMAP0 (RX Filter Map Group 0) */
@@ -2363,7 +2383,9 @@ static u32 rtw_GetPSDData(PADAPTER pAdapter, u32 point)
 {
 	u32 psd_val = 0;
 
-#if defined(CONFIG_RTL8812A) || defined(CONFIG_RTL8821A) || defined(CONFIG_RTL8814A) || defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8822C)
+#if defined(CONFIG_RTL8812A) || defined(CONFIG_RTL8821A) || defined(CONFIG_RTL8814A) \
+			|| defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C)
+
 	u16 psd_reg = 0x910;
 	u16 psd_regL = 0xF44;
 #else
@@ -2438,12 +2460,12 @@ u32 mp_query_psd(PADAPTER pAdapter, u8 *data)
 	data[0] = '\0';
 	pdata = data;
 
-	if (psd_stop > 1536 || psd_stop < 1) {
+	if (psd_stop > 1920 || psd_stop < 1) {
 		rtw_warn_on(1);
-		psd_stop = 1536;
+		psd_stop = 1920;
 	}
 
-	if (IS_HARDWARE_TYPE_8822C(pAdapter)) {
+	if (IS_HARDWARE_TYPE_8822C(pAdapter) || IS_HARDWARE_TYPE_8723F(pAdapter)) {
 			u32 *psdbuf = rtw_zmalloc(sizeof(u32)*256);
 
 			if (psdbuf == NULL) {
@@ -3133,7 +3155,7 @@ u32 mpt_get_tx_power_finalabs_val(PADAPTER	padapter, u8 rf_path)
 	u32 powerdbm = 0;
 
 	powerdbm = phy_get_tx_power_final_absolute_value(padapter, rf_path, mgn_rate, pHalData->current_channel_bw, pHalData->current_channel);
-
+	
 	RTW_INFO("bw=%d, ch=%d, rateid=%d, TSSI Power(dBm):%d\n",
 		pHalData->current_channel_bw, pHalData->current_channel, mgn_rate ,powerdbm);
 

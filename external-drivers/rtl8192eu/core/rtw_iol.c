@@ -24,7 +24,7 @@ struct xmit_frame	*rtw_IOL_accquire_xmit_frame(ADAPTER *adapter)
 	struct xmit_priv	*pxmitpriv = &(adapter->xmitpriv);
 
 #if 1
-	xmit_frame = rtw_alloc_xmitframe(pxmitpriv);
+	xmit_frame = rtw_alloc_xmitframe(pxmitpriv, 0);
 	if (xmit_frame == NULL) {
 		RTW_INFO("%s rtw_alloc_xmitframe return null\n", __FUNCTION__);
 		goto exit;
@@ -46,7 +46,7 @@ struct xmit_frame	*rtw_IOL_accquire_xmit_frame(ADAPTER *adapter)
 	pattrib = &xmit_frame->attrib;
 	update_mgntframe_attrib(adapter, pattrib);
 	pattrib->qsel = QSLT_BEACON;/* Beacon	 */
-	pattrib->subtype = IEEE80211_STYPE_BEACON;
+	pattrib->subtype = WIFI_BEACON;
 	pattrib->pktlen = pattrib->last_txcmdsz = 0;
 
 #else
@@ -82,7 +82,7 @@ int rtw_IOL_append_cmds(struct xmit_frame *xmit_frame, u8 *IOL_cmds, u32 cmd_len
 		return _FAIL;
 	}
 
-	memcpy(xmit_frame->buf_addr + buf_offset + pattrib->pktlen, IOL_cmds, cmd_len);
+	_rtw_memcpy(xmit_frame->buf_addr + buf_offset + pattrib->pktlen, IOL_cmds, cmd_len);
 	pattrib->pktlen += cmd_len;
 	pattrib->last_txcmdsz += cmd_len;
 
@@ -118,6 +118,7 @@ int _rtw_IOL_append_WB_cmd(struct xmit_frame *xmit_frame, u16 addr, u8 value, u8
 {
 	struct ioreg_cfg cmd = {8, IOREG_CMD_WB_REG, 0x0, 0x0, 0x0};
 
+	/* RTW_PUT_LE16((u8*)&cmd.address, addr);	 */
 	/* RTW_PUT_LE32((u8*)&cmd.value, (u32)value);	 */
 	cmd.address = cpu_to_le16(addr);
 	cmd.data = cpu_to_le32(value);
@@ -137,6 +138,7 @@ int _rtw_IOL_append_WW_cmd(struct xmit_frame *xmit_frame, u16 addr, u16 value, u
 {
 	struct ioreg_cfg cmd = {8, IOREG_CMD_WW_REG, 0x0, 0x0, 0x0};
 
+	/* RTW_PUT_LE16((u8*)&cmd.address, addr);	 */
 	/* RTW_PUT_LE32((u8*)&cmd.value, (u32)value);	 */
 	cmd.address = cpu_to_le16(addr);
 	cmd.data = cpu_to_le32(value);
@@ -156,6 +158,7 @@ int _rtw_IOL_append_WD_cmd(struct xmit_frame *xmit_frame, u16 addr, u32 value, u
 {
 	struct ioreg_cfg cmd = {8, IOREG_CMD_WD_REG, 0x0, 0x0, 0x0};
 
+	/* RTW_PUT_LE16((u8*)&cmd.address, addr);	 */
 	/* RTW_PUT_LE32((u8*)&cmd.value, (u32)value);	 */
 	cmd.address = cpu_to_le16(addr);
 	cmd.data = cpu_to_le32(value);
@@ -176,6 +179,7 @@ int _rtw_IOL_append_WRF_cmd(struct xmit_frame *xmit_frame, u8 rf_path, u16 addr,
 {
 	struct ioreg_cfg cmd = {8, IOREG_CMD_W_RF, 0x0, 0x0, 0x0};
 
+	/* RTW_PUT_LE16((u8*)&cmd.address, addr);	 */
 	/* RTW_PUT_LE32((u8*)&cmd.value, (u32)value);	 */
 	cmd.address = (rf_path << 8) | ((addr) & 0xFF);
 	cmd.data = cpu_to_le32(value);
@@ -197,6 +201,7 @@ int _rtw_IOL_append_WRF_cmd(struct xmit_frame *xmit_frame, u8 rf_path, u16 addr,
 int rtw_IOL_append_DELAY_US_cmd(struct xmit_frame *xmit_frame, u16 us)
 {
 	struct ioreg_cfg cmd = {4, IOREG_CMD_DELAY_US, 0x0, 0x0, 0x0};
+	/* RTW_PUT_LE16((u8*)&cmd.address, us);	 */
 	cmd.address = cpu_to_le16(us);
 
 	/* RTW_INFO("%s %u\n", __FUNCTION__, us); */
@@ -207,6 +212,7 @@ int rtw_IOL_append_DELAY_MS_cmd(struct xmit_frame *xmit_frame, u16 ms)
 {
 	struct ioreg_cfg cmd = {4, IOREG_CMD_DELAY_US, 0x0, 0x0, 0x0};
 
+	/* RTW_PUT_LE16((u8*)&cmd.address, ms);	 */
 	cmd.address = cpu_to_le16(ms);
 
 	/* RTW_INFO("%s %u\n", __FUNCTION__, ms); */
@@ -295,11 +301,9 @@ int _rtw_IOL_append_WD_cmd(struct xmit_frame *xmit_frame, u16 addr, u32 value)
 #ifdef DBG_IO
 int dbg_rtw_IOL_append_WB_cmd(struct xmit_frame *xmit_frame, u16 addr, u8 value, const char *caller, const int line)
 {
-	const struct rtw_io_sniff_ent *ent = match_write_sniff(xmit_frame->padapter, addr, 1, value);
-
-	if (ent) {
-		RTW_INFO("DBG_IO %s:%d IOL_WB(0x%04x, 0x%02x) %s\n"
-			, caller, line, addr, value, rtw_io_sniff_ent_get_tag(ent));
+	if (match_write_sniff(xmit_frame->padapter, addr, 1, value)) {
+		RTW_INFO("DBG_IO %s:%d IOL_WB(0x%04x, 0x%02x)\n"
+			, caller, line, addr, value);
 	}
 
 	return _rtw_IOL_append_WB_cmd(xmit_frame, addr, value);
@@ -307,11 +311,9 @@ int dbg_rtw_IOL_append_WB_cmd(struct xmit_frame *xmit_frame, u16 addr, u8 value,
 
 int dbg_rtw_IOL_append_WW_cmd(struct xmit_frame *xmit_frame, u16 addr, u16 value, const char *caller, const int line)
 {
-	const struct rtw_io_sniff_ent *ent = match_write_sniff(xmit_frame->padapter, addr, 2, value);
-
-	if (ent) {
-		RTW_INFO("DBG_IO %s:%d IOL_WW(0x%04x, 0x%04x) %s\n"
-			, caller, line, addr, value, rtw_io_sniff_ent_get_tag(ent));
+	if (match_write_sniff(xmit_frame->padapter, addr, 2, value)) {
+		RTW_INFO("DBG_IO %s:%d IOL_WW(0x%04x, 0x%04x)\n"
+			, caller, line, addr, value);
 	}
 
 	return _rtw_IOL_append_WW_cmd(xmit_frame, addr, value);
@@ -319,11 +321,9 @@ int dbg_rtw_IOL_append_WW_cmd(struct xmit_frame *xmit_frame, u16 addr, u16 value
 
 int dbg_rtw_IOL_append_WD_cmd(struct xmit_frame *xmit_frame, u16 addr, u32 value, const char *caller, const int line)
 {
-	const struct rtw_io_sniff_ent *ent = match_write_sniff(xmit_frame->padapter, addr, 4, value);
-
-	if (ent) {
-		RTW_INFO("DBG_IO %s:%d IOL_WD(0x%04x, 0x%08x) %s\n"
-			, caller, line, addr, value, rtw_io_sniff_ent_get_tag(ent));
+	if (match_write_sniff(xmit_frame->padapter, addr, 4, value)) {
+		RTW_INFO("DBG_IO %s:%d IOL_WD(0x%04x, 0x%08x)\n"
+			, caller, line, addr, value);
 	}
 
 	return _rtw_IOL_append_WD_cmd(xmit_frame, addr, value);

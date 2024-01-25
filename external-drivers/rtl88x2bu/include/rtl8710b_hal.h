@@ -175,10 +175,10 @@ typedef struct _RT_8710B_FIRMWARE_HDR {
 #define   PACKAGE_QFN32_S           0
 #define   PACKAGE_QFN48M_S        1    //definiton 8188GU Dongle Package, Efuse Physical Address 0xF8 = 0xFE
 #define   PACKAGE_QFN48_S  	       2
-#define   PACKAGE_QFN64_S  	       3
-#define   PACKAGE_QFN32_U  		4
+#define   PACKAGE_QFN64_S  	       3     
+#define   PACKAGE_QFN32_U  		4    
 #define   PACKAGE_QFN48M_U  	5   //definiton 8188GU Dongle Package, Efuse Physical Address 0xF8 = 0xEE
-#define   PACKAGE_QFN48_U  		6
+#define   PACKAGE_QFN48_U  		6 
 #define   PACKAGE_QFN68_U  		7
 
 typedef enum _PACKAGE_TYPE_E

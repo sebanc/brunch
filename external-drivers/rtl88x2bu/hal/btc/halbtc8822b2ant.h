@@ -273,6 +273,7 @@ struct coex_sta_8822b_2ant {
 	u32	high_priority_rx;
 	u32	low_priority_tx;
 	u32	low_priority_rx;
+	boolean bt_ctr_ok;
 	boolean is_hi_pri_rx_overhead;
 	u8	bt_rssi;
 	u8	pre_bt_rssi_state;
@@ -281,6 +282,8 @@ struct coex_sta_8822b_2ant {
 	u32	bt_info_c2h_cnt[BT_8822B_2ANT_INFO_SRC_MAX];
 	boolean bt_whck_test;
 	boolean c2h_bt_inquiry_page;
+	boolean bt_inq_page_pre;
+	boolean bt_inq_page_remain;
 	boolean c2h_bt_remote_name_req;
 
 	u8	bt_info_lb2;
@@ -365,6 +368,7 @@ struct coex_sta_8822b_2ant {
 
 	u8	bt_afh_map[10];
 	u8	bt_relink_downcount;
+	u8	bt_inq_page_downcount;
 	boolean is_tdma_btautoslot;
 
 	boolean is_esco_mode;
@@ -421,6 +425,7 @@ struct coex_sta_8822b_2ant {
 	u8	tdma_timer_base;
 	boolean wl_slot_toggle;
 	boolean wl_slot_toggle_change; /* if toggle to no-toggle */
+	u8	wl_iot_peer;
 };
 
 #define BT_8822B_2ANT_EXT_BAND_SWITCH_USE_DPDT	0

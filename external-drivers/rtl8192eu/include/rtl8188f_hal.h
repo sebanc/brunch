@@ -208,7 +208,7 @@ void Hal_EfuseParseThermalMeter_8188F(PADAPTER padapter, u8 *hwinfo, u8 AutoLoad
 void Hal_EfuseParseKFreeData_8188F(PADAPTER pAdapter, u8 *hwinfo, BOOLEAN AutoLoadFail);
 
 #if 0 /* Do not need for rtl8188f */
-VOID Hal_EfuseParseVoltage_8188F(PADAPTER pAdapter, u8 *hwinfo, BOOLEAN	AutoLoadFail);
+void Hal_EfuseParseVoltage_8188F(PADAPTER pAdapter, u8 *hwinfo, BOOLEAN	AutoLoadFail);
 #endif
 
 void rtl8188f_set_pll_ref_clk_sel(_adapter *adapter, u8 sel);
@@ -244,7 +244,7 @@ void HalSetOutPutGPIO(PADAPTER padapter, u8 index, u8 OutPutValue);
 #endif
 
 #ifdef CONFIG_MP_INCLUDED
-int FirmwareDownloadBT(IN PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
+int FirmwareDownloadBT(PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
 #endif
 
 void CCX_FwC2HTxRpt_8188f(PADAPTER padapter, u8 *pdata, u8 len);
@@ -254,7 +254,7 @@ u8 HwRateToMRate8188F(u8	 rate);
 
 #ifdef CONFIG_PCI_HCI
 BOOLEAN	InterruptRecognized8188FE(PADAPTER Adapter);
-VOID	UpdateInterruptMask8188FE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
+void	UpdateInterruptMask8188FE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
 #endif
 
 #endif

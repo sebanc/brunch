@@ -1,0 +1,78 @@
+diff -Naur android-11.0.0.r3-original/src/ap/acs.c wpa_supplicant_8_11.0.0.r3_rtw_20201005/src/ap/acs.c
+--- android-11.0.0.r3-original/src/ap/acs.c	2020-10-05 15:07:38.000000000 +0800
++++ wpa_supplicant_8_11.0.0.r3_rtw_20201005/src/ap/acs.c	2020-10-05 15:45:36.000000000 +0800
+@@ -511,6 +511,17 @@
+ 	return freq_range_list_includes(&iface->conf->acs_ch_list, chan->chan);
+ }
+ 
++#ifdef REALTEK_WIFI_VENDOR
++static int is_in_freqlist(struct hostapd_iface *iface,
++			  struct hostapd_channel_data *chan)
++{
++	if (!iface->conf->acs_freq_list.num)
++		return 1;
++
++	return freq_range_list_includes(&iface->conf->acs_freq_list,
++					chan->freq);
++}
++#endif
+ 
+ static void acs_survey_mode_interference_factor(
+ 	struct hostapd_iface *iface, struct hostapd_hw_modes *mode)
+@@ -527,6 +538,10 @@
+ 		if (!is_in_chanlist(iface, chan))
+ 			continue;
+ 
++#ifdef REALTEK_WIFI_VENDOR
++		if (!is_in_freqlist(iface, chan))
++			continue;
++#endif
+ 		wpa_printf(MSG_DEBUG, "ACS: Survey analysis for channel %d (%d MHz)",
+ 			   chan->chan, chan->freq);
+ 
+@@ -651,6 +666,11 @@
+ 		if (!is_in_chanlist(iface, chan))
+ 			continue;
+ 
++#ifdef REALTEK_WIFI_VENDOR
++		if (!is_in_freqlist(iface, chan))
++			continue;
++#endif
++
+ 		if (!chan_bw_allowed(chan, bw, 1, 1)) {
+ 			wpa_printf(MSG_DEBUG,
+ 				   "ACS: Channel %d: BW %u is not supported",
+@@ -1013,6 +1033,11 @@
+ 		if (!is_in_chanlist(iface, chan))
+ 			continue;
+ 
++#ifdef REALTEK_WIFI_VENDOR
++		if (!is_in_freqlist(iface, chan))
++			continue;
++#endif
++
+ 		*freq++ = chan->freq;
+ 	}
+ 
+diff -Naur android-11.0.0.r3-original/src/common/rtw_version.h wpa_supplicant_8_11.0.0.r3_rtw_20201005/src/common/rtw_version.h
+--- android-11.0.0.r3-original/src/common/rtw_version.h	1970-01-01 08:00:00.000000000 +0800
++++ wpa_supplicant_8_11.0.0.r3_rtw_20201005/src/common/rtw_version.h	2020-10-05 15:49:54.000000000 +0800
+@@ -0,0 +1,4 @@
++#ifndef RTW_VERSION_H
++	#define RTW_VERSION_H
++	#define RTW_VERSION "rtw_11.0.0.r3_20201005"
++#endif /* RTW_VERSION_H */
+diff -Naur android-11.0.0.r3-original/src/common/version.h wpa_supplicant_8_11.0.0.r3_rtw_20201005/src/common/version.h
+--- android-11.0.0.r3-original/src/common/version.h	2020-10-05 15:07:38.000000000 +0800
++++ wpa_supplicant_8_11.0.0.r3_rtw_20201005/src/common/version.h	2020-10-05 15:10:32.000000000 +0800
+@@ -11,4 +11,10 @@
+ 
+ #define VERSION_STR "2.10-devel" VERSION_STR_POSTFIX GIT_VERSION_STR_POSTFIX
+ 
++#ifdef REALTEK_WIFI_VENDOR
++	#include "rtw_version.h"
++	#undef VERSION_STR
++	#define VERSION_STR "2.10-devel" VERSION_STR_POSTFIX GIT_VERSION_STR_POSTFIX "_" RTW_VERSION
++#endif
++
+ #endif /* VERSION_H */

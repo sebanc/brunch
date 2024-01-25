@@ -58,7 +58,7 @@ struct	qos_priv	{
 	u8 uapsd_tid_trigger_enabled;
 	/* declare uapsd_ap_supported to record whether the connected ap  supports uapsd or not */
 	u8 uapsd_ap_supported;
-#endif /* CONFIG_WMMPS_STA */
+#endif /* CONFIG_WMMPS_STA */	
 
 };
 

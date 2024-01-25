@@ -369,6 +369,9 @@ struct recv_priv {
 	_sema allrxreturnevt;
 	uint	ff_hwaddr;
 	ATOMIC_T	rx_pending_cnt;
+#ifdef CONFIG_USB_PROTECT_RX_CLONED_SKB
+	struct sk_buff_head rx_cloned_skb_queue;
+#endif
 
 #ifdef CONFIG_USB_INTERRUPT_IN_PIPE
 #ifdef PLATFORM_LINUX
@@ -580,7 +583,7 @@ struct recv_frame_hdr {
 	u8 fragcnt;
 
 	int frame_tag;
-
+	int keytrack;
 	struct rx_pkt_attrib attrib;
 
 	uint  len;

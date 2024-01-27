@@ -31,7 +31,7 @@ jobs:
       - name: Compress kernels source files
         run: tar zcf /tmp/kernels-source.tar.gz kernels
       - name: Upload kernels source
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kernels-source
           path: /tmp/kernels-source.tar.gz
@@ -53,7 +53,7 @@ jobs:
       - name: Checkout Brunch source code
         uses: actions/checkout@v4
       - name: Download kernels source
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: kernels-source
           path: /tmp
@@ -77,7 +77,7 @@ jobs:
       - name: Compress built kernel
         run: tar zcf /tmp/built-kernel-${{ matrix.kernel }}.tar.gz kernels/${{ matrix.kernel }}
       - name: Upload kernels source
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: built-kernel-${{ matrix.kernel }}
           path: /tmp/built-kernel-${{ matrix.kernel }}.tar.gz
@@ -101,7 +101,7 @@ jobs:
       - name: Checkout Brunch source code
         uses: actions/checkout@v4
       - name: Download built kernels
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: /tmp
       - name: Copy built kernels
@@ -115,7 +115,7 @@ jobs:
       - name: Build brunch
         run: sudo bash build_brunch.sh
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: brunch-build
           path: out/brunch_r*.tar.gz
@@ -128,7 +128,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Download built artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: brunch-build
       - name: Identify custom version

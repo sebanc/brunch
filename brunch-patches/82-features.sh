@@ -11,6 +11,7 @@ for i in $(echo "$1" | sed 's#,# #g')
 do
 	if [ "$i" == "acpi_power_button" ]; then acpi_power_button=1; fi
 	if [ "$i" == "acpi_power_button_sleep" ]; then acpi_power_button_sleep=1; fi
+	if [ "$i" == "enable_crosh_sudo" ]; then enable_crosh_sudo=1; fi
 done
 
 cros_debug=0
@@ -44,14 +45,16 @@ else
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 8))); fi
 fi
 
-if [ "$cros_debug" -eq 0 ]; then
+if [ "$enable_crosh_sudo" -eq 1 ]; then
+	sed -i '1s/^/env LD_PRELOAD=\/usr\/bin\/minioverride.so\n/' /roota/etc/init/ui.conf
+fi
 
+if [ "$cros_debug" -eq 0 ]; then
 grep -q '\${CHROME_COMMAND_FLAG}' /roota/etc/init/ui.conf
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 9))); fi
 flags="$(echo $(cat /roota/etc/chrome_dev.conf))"
 sed -i "s#\${CHROME_COMMAND_FLAG}#--chrome-command=/opt/google/chrome/chrome $flags#g" /roota/etc/init/ui.conf
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 10))); fi
-
 fi
 
 exit $ret

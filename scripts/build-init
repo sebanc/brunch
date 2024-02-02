@@ -77,6 +77,29 @@ cp /home/chronos/pv-pkg/usr/bin/pv ../initramfs/sbin/ || { echo "Failed to make 
 cd .. || { echo "Failed to make pv"; exit 1; }
 rm -rf ./pv || { echo "Failed to make pv"; exit 1; }
 
+mkdir ./minioverride || { echo "Failed to make minioverride"; exit 1; }
+cd ./minioverride || { echo "Failed to make minioverride"; exit 1; }
+cat >minioverride.c <<MINIOVERRIDE
+int minijail_no_new_privs(){
+    return 0;
+}
+int minijail_add_fs_restriction_rx(){
+    return 0;
+}
+int minijail_add_fs_restriction_advanced_rw(){
+    return 0;
+}
+int minijail_set_enable_profile_fs_restrictions(){
+    return 0;
+}
+int minijail_enable_default_fs_restrictions(){
+    return 0;
+}
+MINIOVERRIDE
+gcc minioverride.c -o ../binaries-pkg/usr/bin/minioverride.so -shared || { echo "Failed to make minioverride"; exit 1; }
+cd .. || { echo "Failed to make minioverride"; exit 1; }
+rm -rf ./minioverride || { echo "Failed to make minioverride"; exit 1; }
+
 cd ./binaries-pkg || { echo "Failed to make binaries package archive"; exit 1; }
 cp /usr/local/bin/ldd ./usr/bin/ || { echo "Failed to make binaries package archive"; exit 1; }
 cp /usr/local/bin/strings ./usr/bin/ || { echo "Failed to make binaries package archive"; exit 1; }

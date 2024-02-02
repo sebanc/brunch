@@ -1,0 +1,6 @@
+Comment "ZIQIAN N21 1080P Webcam"
+
+SectionUseCase."HiFi" {
+	File "HiFi.conf"
+	Comment "Default"
+}

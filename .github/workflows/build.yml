@@ -87,6 +87,14 @@ jobs:
     needs: build-kernels
     runs-on: ubuntu-22.04
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+      - name: Display disk space
+        run: |
+          echo "Free space:"
+          df -h
       - name: Install dependencies
         run: |
           yes | DEBIAN_FRONTEND=noninteractive sudo apt update
@@ -127,6 +135,14 @@ jobs:
     needs: build-brunch
     runs-on: ubuntu-22.04
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+      - name: Display disk space
+        run: |
+          echo "Free space:"
+          df -h
       - name: Download built artifacts
         uses: actions/download-artifact@v4
         with:

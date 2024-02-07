@@ -21,7 +21,7 @@ index 61d3361381b7..835574e2d5bf 100644
  static const struct dmi_system_id orientation_data[] = {
  	{	/* Acer One 10 (S1003) */
  		.matches = {
-@@ -158,6 +164,37 @@
+@@ -158,6 +164,43 @@
  		  DMI_EXACT_MATCH(DMI_BOARD_NAME, "TW891"),
  		},
  		.driver_data = (void *)&itworks_tw891,

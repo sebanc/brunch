@@ -38848,14 +38848,18 @@ diff -ruN a/mm/page_alloc.c b/mm/page_alloc.c
  #include <asm/sections.h>
  #include <asm/tlbflush.h>
  #include <asm/div64.h>
-@@ -4938,6 +4939,7 @@
- 	 * several times in the row.
- 	 */
- 	if (*no_progress_loops > MAX_RECLAIM_RETRIES) {
+@@ -4938,8 +4939,10 @@
+ 	else
+ 		(*no_progress_loops)++;
+ 
+-	if (*no_progress_loops > MAX_RECLAIM_RETRIES)
++	if (*no_progress_loops > MAX_RECLAIM_RETRIES) {
 +		low_mem_notify();
- 		/* Before OOM, exhaust highatomic_reserve */
- 		return unreserve_highatomic_pageblock(ac, true);
- 	}
+ 		goto out;
++	}
+ 
+ 
+ 	/*
 @@ -5548,6 +5550,8 @@
  			&alloc_gfp, &alloc_flags))
  		return NULL;

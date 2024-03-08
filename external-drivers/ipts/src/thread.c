@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (c) 2016 Intel Corporation
  * Copyright (c) 2023 Dorian Stoll
  *
  * Linux driver for Intel Precise Touch & Stylus
@@ -13,24 +12,19 @@
 
 #include "thread.h"
 
-bool ipts_thread_should_stop(struct ipts_thread *thread)
-{
-	if (!thread)
-		return false;
-
-	return READ_ONCE(thread->should_stop);
-}
-
+/**
+ * ipts_thread_runner() - The function that is passed to kthread as the thread function.
+ *
+ * The data pointer of kthread will be set to the &struct ipts_thread instance, so this function
+ * will get the actual thread function from there and call it.
+ *
+ * Once the actual thread function has exited, this function will trigger the completion object
+ * so that the thread can be cleaned up using kthread_stop().
+ */
 static int ipts_thread_runner(void *data)
 {
 	int ret = 0;
 	struct ipts_thread *thread = data;
-
-	if (!thread)
-		return -EFAULT;
-
-	if (!thread->threadfn)
-		return -EFAULT;
 
 	ret = thread->threadfn(thread);
 	complete_all(&thread->done);
@@ -38,15 +32,14 @@ static int ipts_thread_runner(void *data)
 	return ret;
 }
 
+bool ipts_thread_should_stop(struct ipts_thread *thread)
+{
+	return READ_ONCE(thread->should_stop);
+}
+
 int ipts_thread_start(struct ipts_thread *thread, int (*threadfn)(struct ipts_thread *thread),
 		      void *data, const char *name)
 {
-	if (!thread)
-		return -EFAULT;
-
-	if (!threadfn)
-		return -EFAULT;
-
 	init_completion(&thread->done);
 
 	thread->data = data;
@@ -60,9 +53,6 @@ int ipts_thread_start(struct ipts_thread *thread, int (*threadfn)(struct ipts_th
 int ipts_thread_stop(struct ipts_thread *thread)
 {
 	int ret = 0;
-
-	if (!thread)
-		return -EFAULT;
 
 	if (!thread->thread)
 		return 0;

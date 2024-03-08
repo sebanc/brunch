@@ -5,12 +5,9 @@
 
 sources := dkms.conf
 sources += Makefile
-sources += src/cmd.c
-sources += src/cmd.h
 sources += src/context.h
 sources += src/control.c
 sources += src/control.h
-sources += src/desc.h
 sources += src/hid.c
 sources += src/hid.h
 sources += src/Kconfig
@@ -22,23 +19,25 @@ sources += src/receiver.c
 sources += src/receiver.h
 sources += src/resources.c
 sources += src/resources.h
-sources += src/spec-data.h
-sources += src/spec-device.h
+sources += src/spec-dma.h
 sources += src/spec-hid.h
+sources += src/spec-mei.h
 sources += src/thread.c
 sources += src/thread.h
 
 KVERSION ?= $(shell uname -r)
 KDIR := /lib/modules/$(KVERSION)/build
 
+DEBUG ?= y
+
 all:
-	$(MAKE) -C ../kernel O=out M=$(PWD)/src CONFIG_HID_IPTS=m modules
+	$(MAKE) -C ../kernel O=out M=$(PWD)/src CONFIG_HID_IPTS=m IPTS_DEBUG=$(DEBUG) modules
 
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD)/src CONFIG_HID_IPTS=m clean
+	$(MAKE) -C $(KDIR) M=$(PWD)/src CONFIG_HID_IPTS=m IPTS_DEBUG=$(DEBUG) clean
 
 check:
-	$(KDIR)/scripts/checkpatch.pl -f -q --no-tree --strict --ignore EMBEDDED_FILENAME $(sources)
+	$(KDIR)/scripts/checkpatch.pl -f -q --no-tree --strict --ignore EMBEDDED_FILENAME,UNCOMMENTED_DEFINITION $(sources)
 
 dkms-install: $(sources)
 	./dkms.sh install

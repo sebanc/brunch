@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (c) 2016 Intel Corporation
  * Copyright (c) 2020-2023 Dorian Stoll
  *
  * Linux driver for Intel Precise Touch & Stylus
@@ -17,24 +16,14 @@
 #include <linux/slab.h>
 #include <linux/stddef.h>
 #include <linux/types.h>
-#include <linux/version.h>
 
 #include "context.h"
 #include "control.h"
 #include "mei.h"
-#include "receiver.h"
-#include "spec-device.h"
-
-/*
- * The MEI client ID for IPTS functionality.
- */
-#define IPTS_ID UUID_LE(0x3e8d0870, 0x271a, 0x4208, 0x8e, 0xb5, 0x9a, 0xcb, 0x94, 0x02, 0xae, 0x04)
+#include "spec-mei.h"
 
 static int ipts_set_dma_mask(struct mei_cl_device *cldev)
 {
-	if (!cldev)
-		return -EFAULT;
-
 	if (!dma_coerce_mask_and_coherent(&cldev->dev, DMA_BIT_MASK(64)))
 		return 0;
 
@@ -45,9 +34,6 @@ static int ipts_probe(struct mei_cl_device *cldev, const struct mei_cl_device_id
 {
 	int ret = 0;
 	struct ipts_context *ipts = NULL;
-
-	if (!cldev)
-		return -EFAULT;
 
 	ret = ipts_set_dma_mask(cldev);
 	if (ret) {
@@ -67,11 +53,7 @@ static int ipts_probe(struct mei_cl_device *cldev, const struct mei_cl_device_id
 		return -ENOMEM;
 	}
 
-	ret = ipts_mei_init(&ipts->mei, cldev);
-	if (ret) {
-		dev_err(&cldev->dev, "Failed to init MEI bus logic: %d\n", ret);
-		return ret;
-	}
+	ipts_mei_init(&ipts->mei, cldev);
 
 	ipts->dev = &cldev->dev;
 	ipts->mode = IPTS_MODE_EVENT;
@@ -90,39 +72,10 @@ static int ipts_probe(struct mei_cl_device *cldev, const struct mei_cl_device_id
 	return 0;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
-static int ipts_remove(struct mei_cl_device *cldev)
-{
-	int ret = 0;
-	struct ipts_context *ipts = NULL;
-
-	if (!cldev) {
-		pr_err("MEI device is NULL!");
-		return 0;
-	}
-
-	ipts = mei_cldev_get_drvdata(cldev);
-
-	ret = ipts_control_stop(ipts);
-	if (ret)
-		dev_err(&cldev->dev, "Failed to stop IPTS: %d\n", ret);
-
-	mei_cldev_disable(cldev);
-	
-	return 0;
-}
-#else
 static void ipts_remove(struct mei_cl_device *cldev)
 {
 	int ret = 0;
-	struct ipts_context *ipts = NULL;
-
-	if (!cldev) {
-		pr_err("MEI device is NULL!");
-		return;
-	}
-
-	ipts = mei_cldev_get_drvdata(cldev);
+	struct ipts_context *ipts = mei_cldev_get_drvdata(cldev);
 
 	ret = ipts_control_stop(ipts);
 	if (ret)
@@ -130,10 +83,9 @@ static void ipts_remove(struct mei_cl_device *cldev)
 
 	mei_cldev_disable(cldev);
 }
-#endif
 
 static struct mei_cl_device_id ipts_device_id_table[] = {
-	{ .uuid = IPTS_ID, .version = MEI_CL_VERSION_ANY },
+	{ .uuid = MEI_UUID_IPTS, .version = MEI_CL_VERSION_ANY },
 	{},
 };
 MODULE_DEVICE_TABLE(mei, ipts_device_id_table);

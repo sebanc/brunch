@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- * Copyright (c) 2016 Intel Corporation
  * Copyright (c) 2023 Dorian Stoll
  *
  * Linux driver for Intel Precise Touch & Stylus
@@ -13,48 +12,46 @@
 #include <linux/mutex.h>
 #include <linux/sched.h>
 
-/*
- * This wrapper over kthread is necessary, because calling kthread_stop makes it impossible
- * to issue MEI commands from that thread while it shuts itself down. By using a custom
- * boolean variable and a completion object, we can call kthread_stop only when the thread
- * already finished all of its work and has returned.
+/**
+ * struct ipts_thread - Slim wrapper around kthread for MEI purposes.
+ *
+ * Calling kthread_stop puts the thread into a interrupt state, causes the MEI API functions
+ * to always return -EINTR. This makes it impossible to issue MEI commands from a thread that
+ * is shutting itself down.
+ *
+ * By using a custom boolean variable we can instruct the thread to shut down independently of
+ * kthread_stop. Then we wait and only call kthread_stop once the thread has singnaled that
+ * it has successfully shut itself down.
+ *
+ * @thread:
+ *     The thread that is being wrapped.
+ *
+ * @data:
+ *     Data pointer for passing data to the function running inside the thread.
+ *
+ * @threadfn:
+ *     The function that will be executed inside of the thread.
+ *
+ * @should_stop:
+ *     Whether the thread should start shutting itself down.
+ *
+ * @done:
+ *     Completion object that will be triggered by the actual thread runner function once
+ *     threadfn has exited.
  */
 struct ipts_thread {
 	struct task_struct *thread;
 
-	bool should_stop;
-	struct completion done;
-
 	void *data;
 	int (*threadfn)(struct ipts_thread *thread);
+
+	bool should_stop;
+	struct completion done;
 };
 
-/*
- * ipts_thread_should_stop() - Returns true if the thread is asked to terminate.
- * @thread: The current thread.
- *
- * Returns: true if the thread should stop, false if not.
- */
 bool ipts_thread_should_stop(struct ipts_thread *thread);
-
-/*
- * ipts_thread_start() - Starts an IPTS thread.
- * @thread: The thread to initialize and start.
- * @threadfn: The function to execute.
- * @data: An argument that will be passed to threadfn.
- * @name: The name of the new thread.
- *
- * Returns: 0 on success, <0 on error.
- */
-int ipts_thread_start(struct ipts_thread *thread, int (*threadfn)(struct ipts_thread *thread),
-		      void *data, const char name[]);
-
-/*
- * ipts_thread_stop() - Asks the thread to terminate and waits until it has finished.
- * @thread: The thread that should stop.
- *
- * Returns: The return value of the thread function.
- */
 int ipts_thread_stop(struct ipts_thread *thread);
+int ipts_thread_start(struct ipts_thread *thread, int (*threadfn)(struct ipts_thread *thread),
+		      void *data, const char *name);
 
 #endif /* IPTS_THREAD_H */

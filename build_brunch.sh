@@ -255,7 +255,7 @@ rm -r ./chroot/tmp/acpi_call || { echo "Failed to build external acpi_call modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/ipts ./chroot/tmp/ || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kernel $kernel"; exit 1; }
@@ -266,7 +266,7 @@ rm -r ./chroot/tmp/ipts || { echo "Failed to build external ipts module for kern
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/ithc ./chroot/tmp/ || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/ithc || { echo "Failed to build external ithc module for kernel $kernel"; exit 1; }

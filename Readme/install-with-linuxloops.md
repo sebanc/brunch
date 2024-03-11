@@ -40,9 +40,9 @@ Linuxloops will perform automatically most of the brunch install steps (notably 
   
 2. Install the zenity package for your distro:
   
-Debian-based distro: sudo apt install zenity  
-Arch-based distro: sudo pacman -S zenity  
-Fedora-based distro: sudo dnf install zenity  
+Debian-based distro: `sudo apt install zenity`  
+Arch-based distro: `sudo pacman -S zenity`  
+Fedora-based distro: `sudo dnf install zenity`  
   
 3. Download the linuxloops script.  
   
@@ -127,9 +127,9 @@ It is normal for the first boot to take a very long time, please be patient.
   
 2. Install the zenity package for your distro:  
   
-Debian-based distro: sudo apt install zenity  
-Arch-based distro: sudo pacman -S zenity  
-Fedora-based distro: sudo dnf install zenity  
+Debian-based distro: `sudo apt install zenity`  
+Arch-based distro: `sudo pacman -S zenity`  
+Fedora-based distro: `sudo dnf install zenity`  
   
 3. Download the linuxloops script.  
   

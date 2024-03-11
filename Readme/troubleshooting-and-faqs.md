@@ -8,7 +8,7 @@
 <!-- Project Logo -->
 <p align="center">
   <a href="https://github.com/sebanc/brunch" title="Brunch">
-   <img src="./images/settings_icon-512.png" width="128px" alt="Logo"/>
+   <img src="../Images/settings_icon-512.png" width="128px" alt="Logo"/>
   </a>
 </p>
 <h1 align="center">Troubleshooting and Support</h1>
@@ -365,7 +365,7 @@ It is currently recommended to only update ChromeOS when the matching version of
 <!-- Reference Links -->
 <!-- Badges -->
 [license-shield]: https://img.shields.io/github/license/sebanc/brunch?label=License&logo=Github&style=flat-square
-[license-url]: ./LICENSE
+[license-url]: ../LICENSE
 [forks-shield]: https://img.shields.io/github/forks/sebanc/brunch?label=Forks&logo=Github&style=flat-square
 [forks-url]: https://github.com/sebanc/brunch/fork
 [stars-shield]: https://img.shields.io/github/stars/sebanc/brunch?label=Stars&logo=Github&style=flat-square
@@ -401,24 +401,24 @@ It is currently recommended to only update ChromeOS when the matching version of
 [bite-dasher]: https://github.com/BiteDasher/brcr-update
 
 <!-- Images -->
-[decon-icon-24]: ./images/decon_icon-24.png
-[decon-icon-512]: ./images/decon_icon-512.png
-[terminal-icon-24]: ./images/terminal_icon-24.png
-[terminal-icon-512]: ./images/terminal_icon-512.png
-[settings-icon-512]: ./images/settings_icon-512.png
+[decon-icon-24]: ../Images/decon_icon-24.png
+[decon-icon-512]: ../Images/decon_icon-512.png
+[terminal-icon-24]: ../Images/terminal_icon-24.png
+[terminal-icon-512]: ../Images/terminal_icon-512.png
+[settings-icon-512]: ../Images/settings_icon-512.png
 [windows-img]: https://img.icons8.com/color/24/000000/windows-10.png
 [linux-img]: https://img.icons8.com/color/24/000000/linux--v1.png
   
  <!-- Brunch Configuration Menu Examples -->
-[bcm-crosh]: ./images/brunch-config-menu/edit-brunch-config.png
-[bcm-fo1]: ./images/brunch-config-menu/framework-options-1.png
-[bcm-fo2]: ./images/brunch-config-menu/framework-options-2.png
-[bcm-kernel]: ./images/brunch-config-menu/select-kernel.png
-[bcm-cmd1]: ./images/brunch-config-menu/cmd-line-params.png
-[bcm-cmd2]: ./images/brunch-config-menu/custom-params.png
-[bcm-debug]: ./images/brunch-config-menu/verbose-mode.png
-[bcm-splash]: ./images/brunch-config-menu/select-bootsplash.png
-[bcm-summary]: ./images/brunch-config-menu/summary.png
+[bcm-crosh]: ../Images/brunch-config-menu/edit-brunch-config.png
+[bcm-fo1]: ../Images/brunch-config-menu/framework-options-1.png
+[bcm-fo2]: ../Images/brunch-config-menu/framework-options-2.png
+[bcm-kernel]: ../Images/brunch-config-menu/select-kernel.png
+[bcm-cmd1]: ../Images/brunch-config-menu/cmd-line-params.png
+[bcm-cmd2]: ../Images/brunch-config-menu/custom-params.png
+[bcm-debug]: ../Images/brunch-config-menu/verbose-mode.png
+[bcm-splash]: ../Images/brunch-config-menu/select-bootsplash.png
+[bcm-summary]: ../Images/brunch-config-menu/summary.png
 
 <!-- Brunch Bootsplash Examples -->
 [bs-default1]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/default_dark/main.png
@@ -444,7 +444,7 @@ It is currently recommended to only update ChromeOS when the matching version of
 [windows-guide]: ./install-with-windows.md
 [linux-guide]: ./install-with-linux.md
 [troubleshooting-and-faqs]: ./troubleshooting-and-faqs.md
-[compatibility]: ./README.md#supported-hardware
+[compatibility]: ../README.md#supported-hardware
 [changing-kernels]: ./troubleshooting-and-faqs.md#kernels
 [framework-options]: ./troubleshooting-and-faqs.md#framework-options
 [releases-tab]: https://github.com/sebanc/brunch/releases

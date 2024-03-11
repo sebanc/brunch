@@ -8,7 +8,7 @@
 <!-- Project Logo -->
 <p align="center">
   <a href="https://github.com/sebanc/brunch" title="Brunch">
-   <img src="./images/decon_icon-512.png" width="128px" alt="Logo"/>
+   <img src="./Images/decon_icon-512.png" width="128px" alt="Logo"/>
   </a>
 </p>
 <h1 align="center">Brunch Framework</h1>
@@ -55,6 +55,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 ## Install Instructions
 This guide has been split into seperate sections, please follow one of the links below for a guide suitable to your current operating system.
 
+### [New: Simplified install with Linuxloops (GUI)][linuxloops-guide]
 ### [![Install with Linux][linux-img]][linux-guide]  [Install with Linux][linux-guide]
 ### [![Install with Windows][windows-img]][windows-guide]  [Install with Windows][windows-guide]
 
@@ -109,25 +110,25 @@ Additional troubleshooting and support tips can be found at the following page:
 [bite-dasher]: https://github.com/BiteDasher/brcr-update
 
 <!-- Images -->
-[decon-icon-24]: ./images/decon_icon-24.png
-[decon-icon-512]: ./images/decon_icon-512.png
-[terminal-icon-24]: ./images/terminal_icon-24.png
-[terminal-icon-512]: ./images/terminal_icon-512.png
-[settings-icon-512]: ./images/settings_icon-512.png
+[decon-icon-24]: ./Images/decon_icon-24.png
+[decon-icon-512]: ./Images/decon_icon-512.png
+[terminal-icon-24]: ./Images/terminal_icon-24.png
+[terminal-icon-512]: ./Images/terminal_icon-512.png
+[settings-icon-512]: ./Images/settings_icon-512.png
 [windows-img]: https://img.icons8.com/color/24/000000/windows-10.png
 [linux-img]: https://img.icons8.com/color/24/000000/linux--v1.png
 
 <!-- Internal Links -->
-[cpu-wiki]: https://github.com/sebanc/brunch/wiki/CPUs-&-Recoveries
-[windows-guide]: ./install-with-windows.md
-[linux-guide]: ./install-with-linux.md
-[troubleshooting-and-faqs]: ./troubleshooting-and-faqs.md
+[linuxloops-guide]: ./Readme/install-with-linuxloops.md
+[linux-guide]: ./Readme/install-with-linux.md
+[windows-guide]: ./Readme/install-with-windows.md
+[troubleshooting-and-faqs]: ./Readme/troubleshooting-and-faqs.md
 [compatibility]: ./README.md#supported-hardware
-[changing-kernels]: ./troubleshooting-and-faqs.md#kernels
-[framework-options]: ./troubleshooting-and-faqs.md#framework-options
+[changing-kernels]: ./Readme/troubleshooting-and-faqs.md#kernels
+[framework-options]: ./Readme/troubleshooting-and-faqs.md#framework-options
 [releases-tab]: https://github.com/sebanc/brunch/releases
 [latest-release]: https://github.com/sebanc/brunch/releases/latest
 [brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
-[secure-boot]: ./install-with-linux.md#secure-boot
+[secure-boot]: ./Readme/install-with-linux.md#secure-boot
 [brunch-pwa-info]: https://github.com/sebanc/brunch/wiki/Brunch-PWA-Guide
 

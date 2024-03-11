@@ -115,14 +115,14 @@ write_base_table() {
      : \$(( blocks += 1 ))
   fi
   : \$(( curr += blocks * block_size ))
-  blocks=\$(( 33554432 / block_size ))
-  if [ \$(( 33554432 % block_size )) -gt 0 ]; then
+  blocks=\$(( 67108864 / block_size ))
+  if [ \$(( 67108864 % block_size )) -gt 0 ]; then
      : \$(( blocks += 1 ))
   fi
   cgpt add -i 2 -b \$(( curr / block_size )) -s \${blocks} -t kernel     -l "KERN-A" "\${target}"
   : \$(( curr += blocks * block_size ))
-  blocks=\$(( 33554432 / block_size ))
-  if [ \$(( 33554432 % block_size )) -gt 0 ]; then
+  blocks=\$(( 67108864 / block_size ))
+  if [ \$(( 67108864 % block_size )) -gt 0 ]; then
      : \$(( blocks += 1 ))
   fi
   cgpt add -i 4 -b \$(( curr / block_size )) -s \${blocks} -t kernel     -l "KERN-B" "\${target}"
@@ -141,8 +141,8 @@ write_base_table() {
      : \$(( blocks += 1 ))
   fi
   : \$(( curr += blocks * block_size ))
-  blocks=\$(( 33554432 / block_size ))
-  if [ \$(( 33554432 % block_size )) -gt 0 ]; then
+  blocks=\$(( 67108864 / block_size ))
+  if [ \$(( 67108864 % block_size )) -gt 0 ]; then
      : \$(( blocks += 1 ))
   fi
   cgpt add -i 12 -b \$(( curr / block_size )) -s \${blocks} -t efi     -l "EFI-SYSTEM" "\${target}"

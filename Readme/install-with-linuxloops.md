@@ -14,8 +14,8 @@
   
 <!-- Installation Guides -->
 # Introduction
-Linuxloops is a general purpose linux distro installer that also supports brunch and is available at: [https://github.com/sebanc/linuxloops][linuxloops]
-Linuxloops will perform automatically most of the brunch install steps (notably downloading brunch, downloading the ChromeOS recovery image, installing build dependencies and running the install script).
+Linuxloops is a general purpose linux distro installer that also supports brunch and is available at: [https://github.com/sebanc/linuxloops][linuxloops]  
+Linuxloops will perform automatically most of the brunch install steps (notably downloading brunch, downloading the ChromeOS recovery image, installing build dependencies and running the install script).  
   
 # Install from Linux
   
@@ -23,47 +23,47 @@ Linuxloops will perform automatically most of the brunch install steps (notably 
   <summary>Install Brunch to a USB drive</summary>
   
 ### Requirements
-- x86_64 based computer with UEFI boot support
-- Root access.
-- 8 GB available in your home directory.
-- Target USB must be 16 GB minimum.
+- x86_64 based computer with UEFI boot support  
+- Root access.  
+- 8 GB available in your home directory.  
+- Target USB must be 16 GB minimum.  
   
 ### Install process
-1. Identify the recovery suitable for your CPU:
+1. Identify the recovery suitable for your CPU:  
   
 #### Intel
-* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.
-* 10th gen: "[jinlon][recovery-jinlon]".
-* 11th gen & above: "[voxel][recovery-voxel]".
+* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+* 10th gen: "[jinlon][recovery-jinlon]".  
+* 11th gen & above: "[voxel][recovery-voxel]".  
 #### AMD
-* Ryzen: "[gumboz][recovery-gumboz]".
+* Ryzen: "[gumboz][recovery-gumboz]".  
   
 2. Install the zenity package for your distro:
   
-Debian-based distro: sudo apt install zenity
-Arch-based distro: sudo pacman -S zenity
-Fedora-based distro: sudo dnf install zenity
+Debian-based distro: sudo apt install zenity  
+Arch-based distro: sudo pacman -S zenity  
+Fedora-based distro: sudo dnf install zenity  
   
-3. Download the linuxloops script.
+3. Download the linuxloops script.  
   
-`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`
+`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`  
   
-4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.
+4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.  
   
-`sudo bash ~/linuxloops`
+`sudo bash ~/linuxloops`  
   
-Choose "disk" at the install type prompt and select your USB flashdrive as destination.
+Choose "disk" at the install type prompt and select your USB flashdrive as destination.  
   
-5. Once the install process is finished, reboot your computer and select your USB drive as boot device.
+5. Once the install process is finished, reboot your computer and select your USB drive as boot device.  
   
-6. (secure boot enabled) A blue screen saying `Verification failed: (15) Access Denied` may appear upon boot. 
-  * To enroll the key directly from a USB, select OK -> Enroll key from disk -> EFI-SYSTEM -> brunch.der -> Continue and reboot.
+6. (secure boot enabled) A blue screen saying `Verification failed: (15) Access Denied` may appear upon boot.  
+  * To enroll the key directly from a USB, select OK -> Enroll key from disk -> EFI-SYSTEM -> brunch.der -> Continue and reboot.  
   
 ### Next Steps
-It is normal for the first boot to take a very long time, please be patient.
+It is normal for the first boot to take a very long time, please be patient.  
   
-* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option. 
-* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.
+* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option.  
+* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.  
   
   
 </details>
@@ -72,35 +72,35 @@ It is normal for the first boot to take a very long time, please be patient.
   <summary>Install Brunch to a HDD/SSD</summary>
   
 ### Requirements
-- x86_64 based computer with UEFI boot support
-- Root access.
-- 8 GB available in your home directory.
-- A USB drive that must be 16 GB minimum.
-- A HDD/SSD drive that must also be 16 GB minimum.
+- x86_64 based computer with UEFI boot support  
+- Root access.  
+- 8 GB available in your home directory.  
+- A USB drive that must be 16 GB minimum.  
+- A HDD/SSD drive that must also be 16 GB minimum.  
   
 ### Install process
-1. Make a Brunch USB flashdrive using the above "Install Brunch to a USB drive" guide.
+1. Make a Brunch USB flashdrive using the above "Install Brunch to a USB drive" guide.  
   
-2. Boot the ChromeOS USB drive, and switch to the TTY2 terminal with **Ctrl + Alt + F2**, then login as `chronos`.
+2. Boot the ChromeOS USB drive, and switch to the TTY2 terminal with **Ctrl + Alt + F2**, then login as `chronos`.  
   
-3. Before continuing, you will need to know what disk you want to install to. Be absolutely sure **before** you continue, this installation will erase **everything** on that disk, including other partitions. The disk must be at least 16 GB, or the installation will fail. There are several ways to determine which disk is your target, in this example we will use `lsblk`.
+3. Before continuing, you will need to know what disk you want to install to. Be absolutely sure **before** you continue, this installation will erase **everything** on that disk, including other partitions. The disk must be at least 16 GB, or the installation will fail. There are several ways to determine which disk is your target, in this example we will use `lsblk`.  
   
-`lsblk -e7`
+`lsblk -e7`  
   
-4. Once you've determined your target disk, you're ready to install Brunch.
-  * Replace `disk` in the below command with your target disk. (Such as `sdb`, `mmcblk0` or `nvme0n1` for example)
+4. Once you've determined your target disk, you're ready to install Brunch.  
+  * Replace `disk` in the below command with your target disk. (Such as `sdb`, `mmcblk0` or `nvme0n1` for example)  
   
-`sudo chromeos-install -dst /dev/disk`
+`sudo chromeos-install -dst /dev/disk`  
   
-The script will ask for confirmation. If you're ready to install, type `yes` into the prompt.
+The script will ask for confirmation. If you're ready to install, type `yes` into the prompt.  
   
-5. Reboot your computer and select your HDD/SDD in the boot menu.
+5. Reboot your computer and select your HDD/SDD in the boot menu.  
   
 ### Next Steps
-It is normal for the first boot to take a very long time, please be patient.
+It is normal for the first boot to take a very long time, please be patient.  
   
-* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option. 
-* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.
+* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option.  
+* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.  
   
   
 </details>
@@ -109,51 +109,51 @@ It is normal for the first boot to take a very long time, please be patient.
   <summary>Install Brunch as a disk image (dualboot)</summary>
   
 ### Requirements
-- x86_64 based computer with UEFI boot support
-- Root access.
-- 8 GB available in your home directory.
-- An unencrypted partition with 14 GB available (in ext4, btrfs, ntfs or exfat format).
-- GRUB as bootloader.
+- x86_64 based computer with UEFI boot support  
+- Root access.  
+- 8 GB available in your home directory.  
+- An unencrypted partition with 14 GB available (in ext4, btrfs, ntfs or exfat format).  
+- GRUB as bootloader.  
   
 ### Install process
-1. Identify the recovery suitable for your CPU:
+1. Identify the recovery suitable for your CPU:  
   
 #### Intel
-* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.
-* 10th gen: "[jinlon][recovery-jinlon]".
-* 11th gen & above: "[voxel][recovery-voxel]".
+* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+* 10th gen: "[jinlon][recovery-jinlon]".  
+* 11th gen & above: "[voxel][recovery-voxel]".  
 #### AMD
-* Ryzen: "[gumboz][recovery-gumboz]".
+* Ryzen: "[gumboz][recovery-gumboz]".  
   
-2. Install the zenity package for your distro:
+2. Install the zenity package for your distro:  
   
-Debian-based distro: sudo apt install zenity
-Arch-based distro: sudo pacman -S zenity
-Fedora-based distro: sudo dnf install zenity
+Debian-based distro: sudo apt install zenity  
+Arch-based distro: sudo pacman -S zenity  
+Fedora-based distro: sudo dnf install zenity  
   
-3. Download the linuxloops script.
+3. Download the linuxloops script.  
   
-`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`
+`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`  
   
-4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.
+4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.  
   
-`sudo bash ~/linuxloops`
+`sudo bash ~/linuxloops`  
   
-Choose "image" at the install type prompt, place the image on an unencrypted parition and define the disk image size.
+Choose "image" at the install type prompt, place the image on an unencrypted parition and define the disk image size.  
   
-5. At the end of the install process, the GUI installer will provide you with a command that will generate the needed GRUB configuration. Run it in a terminal.
+5. At the end of the install process, the GUI installer will provide you with a command that will generate the needed GRUB configuration. Run it in a terminal.  
   
-6. (secure boot enabled) Once install is finished, run:
+6. (secure boot enabled) Once install is finished, run:  
   
-`sudo mokutil --import <image_path>/<image_name>.img.der`
+`sudo mokutil --import <image_path>/<image_name>.img.der`  
 
-7. Reboot your computer and launch Brunch from GRUB.
+7. Reboot your computer and launch Brunch from GRUB.  
   
 ### Next Steps
-It is normal for the first boot to take a very long time, please be patient.
+It is normal for the first boot to take a very long time, please be patient.  
   
-* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option. 
-* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.
+* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option.  
+* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.  
   
   
 </details>
@@ -165,47 +165,47 @@ It is normal for the first boot to take a very long time, please be patient.
   <summary>Install Brunch to a USB drive</summary>
   
 ### Requirements
-- x86_64 based computer with UEFI boot support
-- Microsoft Windows 10/11 with WSL2
-- 22 GB available (8 GB for the install process, 14 GB for the USB image).
-- Target USB must be 16 GB minimum.
+- x86_64 based computer with UEFI boot support  
+- Microsoft Windows 10/11 with WSL2  
+- 22 GB available (8 GB for the install process, 14 GB for the USB image).  
+- Target USB must be 16 GB minimum.  
   
 ### Install process
-1. Identify the recovery suitable for your CPU:
+1. Identify the recovery suitable for your CPU:  
   
 #### Intel
-* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.
-* 10th gen: "[jinlon][recovery-jinlon]".
-* 11th gen & above: "[voxel][recovery-voxel]".
+* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+* 10th gen: "[jinlon][recovery-jinlon]".  
+* 11th gen & above: "[voxel][recovery-voxel]".  
 #### AMD
-* Ryzen: "[gumboz][recovery-gumboz]".
+* Ryzen: "[gumboz][recovery-gumboz]".  
   
-2. Launch WSL2 and install the zenity package:
+2. Launch WSL2 and install the zenity package:  
   
-`sudo apt update && sudo apt install zenity`
+`sudo apt update && sudo apt install zenity`  
   
-3. Download the linuxloops script.
+3. Download the linuxloops script.  
   
-`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`
+`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`  
   
-4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.
+4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.  
   
-`sudo bash ~/linuxloops`
+`sudo bash ~/linuxloops`  
   
-Choose "image" at the install type prompt, place the image outside of WSL2 (e.g. /mnt/c/Users/"username"/Downloads) and define the disk image size as 14GB.
+Choose "image" at the install type prompt, place the image outside of WSL2 (e.g. /mnt/c/Users/"username"/Downloads) and define the disk image size as 14GB.  
   
-5. Once the install process is finished, use a software like Rufus or Etcher to write the image you have just create to an USB drive.
+5. Once the install process is finished, use a software like Rufus or Etcher to write the image you have just create to an USB drive.  
   
-6. Reboot your computer and select your USB drive as boot device.
+6. Reboot your computer and select your USB drive as boot device.  
   
-7. (secure boot enabled) A blue screen saying `Verification failed: (15) Access Denied` may appear upon boot. 
-  * To enroll the key directly from a USB, select OK -> Enroll key from disk -> EFI-SYSTEM -> brunch.der -> Continue and reboot.
+7. (secure boot enabled) A blue screen saying `Verification failed: (15) Access Denied` may appear upon boot.  
+  * To enroll the key directly from a USB, select OK -> Enroll key from disk -> EFI-SYSTEM -> brunch.der -> Continue and reboot.  
   
 ### Next Steps
-It is normal for the first boot to take a very long time, please be patient.
+It is normal for the first boot to take a very long time, please be patient.  
   
-* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option. 
-* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.
+* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option.  
+* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.  
   
   
 </details>
@@ -214,35 +214,35 @@ It is normal for the first boot to take a very long time, please be patient.
   <summary>Install Brunch to a HDD/SSD</summary>
   
 ### Requirements
-- x86_64 based computer with UEFI boot support
-- Microsoft Windows 10/11 with WSL2
-- 22 GB available (8 GB for the install process, 14 GB for the USB image).
-- A USB drive that must be 16 GB minimum.
-- A HDD/SSD drive that must also be 16 GB minimum.
+- x86_64 based computer with UEFI boot support  
+- Microsoft Windows 10/11 with WSL2  
+- 22 GB available (8 GB for the install process, 14 GB for the USB image).  
+- A USB drive that must be 16 GB minimum.  
+- A HDD/SSD drive that must also be 16 GB minimum.  
   
 ### Install process
-1. Make a Brunch USB flashdrive using the above "Install Brunch to a USB drive" guide.
+1. Make a Brunch USB flashdrive using the above "Install Brunch to a USB drive" guide.  
   
-2. Boot the ChromeOS USB drive, and switch to the TTY2 terminal with **Ctrl + Alt + F2**, then login as `chronos`.
+2. Boot the ChromeOS USB drive, and switch to the TTY2 terminal with **Ctrl + Alt + F2**, then login as `chronos`.  
   
-3. Before continuing, you will need to know what disk you want to install to. Be absolutely sure **before** you continue, this installation will erase **everything** on that disk, including other partitions. The disk must be at least 16 GB, or the installation will fail. There are several ways to determine which disk is your target, in this example we will use `lsblk`.
+3. Before continuing, you will need to know what disk you want to install to. Be absolutely sure **before** you continue, this installation will erase **everything** on that disk, including other partitions. The disk must be at least 16 GB, or the installation will fail. There are several ways to determine which disk is your target, in this example we will use `lsblk`.  
   
-`lsblk -e7`
+`lsblk -e7`  
   
-4. Once you've determined your target disk, you're ready to install Brunch.
-  * Replace `disk` in the below command with your target disk. (Such as `sdb`, `mmcblk0` or `nvme0n1` for example)
+4. Once you've determined your target disk, you're ready to install Brunch.  
+  * Replace `disk` in the below command with your target disk. (Such as `sdb`, `mmcblk0` or `nvme0n1` for example)  
   
-`sudo chromeos-install -dst /dev/disk`
+`sudo chromeos-install -dst /dev/disk`  
   
-The script will ask for confirmation. If you're ready to install, type `yes` into the prompt.
+The script will ask for confirmation. If you're ready to install, type `yes` into the prompt.  
   
-5. Reboot your computer and select your HDD/SDD in the boot menu.
+5. Reboot your computer and select your HDD/SDD in the boot menu.  
   
 ### Next Steps
-It is normal for the first boot to take a very long time, please be patient.
+It is normal for the first boot to take a very long time, please be patient.  
   
-* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option. 
-* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.
+* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option.  
+* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.  
   
   
 </details>
@@ -251,58 +251,58 @@ It is normal for the first boot to take a very long time, please be patient.
   <summary>Install Brunch as a disk image (dualboot)</summary>
   
 ### Requirements
-- x86_64 based computer with UEFI boot support
-- Microsoft Windows 10/11 with WSL2
-- 8 GB available.
-- An unencrypted partition with 14 GB available (in ntfs or exfat format).
-- Secure boot disabled.
+- x86_64 based computer with UEFI boot support  
+- Microsoft Windows 10/11 with WSL2  
+- 8 GB available.  
+- An unencrypted partition with 14 GB available (in ntfs or exfat format).  
+- Secure boot disabled.  
   
 ### Install process
-1. Identify the recovery suitable for your CPU:
+1. Identify the recovery suitable for your CPU:  
   
 #### Intel
-* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.
-* 10th gen: "[jinlon][recovery-jinlon]".
-* 11th gen & above: "[voxel][recovery-voxel]".
+* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+* 10th gen: "[jinlon][recovery-jinlon]".  
+* 11th gen & above: "[voxel][recovery-voxel]".  
 #### AMD
-* Ryzen: "[gumboz][recovery-gumboz]".
+* Ryzen: "[gumboz][recovery-gumboz]".  
   
-2. Launch WSL2 and install the zenity package:
+2. Launch WSL2 and install the zenity package:  
   
-`sudo apt update && sudo apt install zenity`
+`sudo apt update && sudo apt install zenity`  
   
-3. Download the linuxloops script.
+3. Download the linuxloops script.  
   
-`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`
+`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`  
   
-4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.
+4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.  
   
-`sudo bash ~/linuxloops`
+`sudo bash ~/linuxloops`  
   
-Choose "image" at the install type prompt, place the image on your unencrypted parition and define the disk image size.
+Choose "image" at the install type prompt, place the image on your unencrypted parition and define the disk image size.  
   
-5. Install [Grub2win][grub2win] and launch the program.
+5. Install [Grub2win][grub2win] and launch the program.  
   
-6. Click on the `Manage Boot Menu` button, then click `Chrome` under 'Import Configuration File'.
+6. Click on the `Manage Boot Menu` button, then click `Chrome` under 'Import Configuration File'.  
   
-  * Select the .grub.txt file in the brunch image folder.
-  * Click `Import Selected Items`
-    * Your entry will not be saved unless you click `Apply`.
+  * Select the .grub.txt file in the brunch image folder.  
+  * Click `Import Selected Items`  
+    * Your entry will not be saved unless you click `Apply`.  
   
-7. Prevent Windows from locking the NTFS partition.
+7. Prevent Windows from locking the NTFS partition.  
   
-ChromeOS will not be bootable and / or stable if you do not perform the below actions (Refer to Windows online resources if needed):
-  - Ensure that bitlocker is disabled on the drive which contains the ChromeOS image or disable it.
-  - Disable fast startup.
-  - Disable hibernation.
+ChromeOS will not be bootable and / or stable if you do not perform the below actions (Refer to Windows online resources if needed):  
+  - Ensure that bitlocker is disabled on the drive which contains the ChromeOS image or disable it.  
+  - Disable fast startup.  
+  - Disable hibernation.  
   
-At this point, you are ready to reboot and you'll be greeted by the Grub2win menu instead, select Brunch in the boot menu.
+At this point, you are ready to reboot and you'll be greeted by the Grub2win menu instead, select Brunch in the boot menu.  
   
 ### Next Steps
-It is normal for the first boot to take a very long time, please be patient.
+It is normal for the first boot to take a very long time, please be patient.  
   
-* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option. 
-* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.
+* The first boot is the best time to setup anything important such as [changing kernels][changing-kernels] or [framework options][framework-options] by selecting the "ChromeOS (Settings)" boot option.   
+* If you have any issues, it is strongly advised to check out the [Brunch Configuration Menu][edit-brunch-config] for possible patches or solutions.  
   
   
 </details>
@@ -310,24 +310,21 @@ It is normal for the first boot to take a very long time, please be patient.
   
 # [Troubleshooting and Support][troubleshooting-and-faqs]
   
-See the full [Troubleshooting and Support][troubleshooting-and-faqs] page if you're having issues.
+See the full [Troubleshooting and Support][troubleshooting-and-faqs] page if you're having issues.  
   
 ### Additional Tips
-* If you're having trouble booting a Brunch USB, make sure that UEFI is enabled in the BIOS.
-* Some PCs require a key to be held when booting to boot from USB or that USB booting is enabled in the BIOS
-* The first boot can take up to an hour on some hardware. Brunch does not typically freeze on the Brunch logo. If you are seeing the Brunch logo, the system is _probably_ still booting.
-* If your PC is stuck on the ChromeOS logo (White background), it is likely that you've got an incompatible dedicated GPU.
-* If you get a blue screen saying "Verification failed" you can either disable secure boot in your bios settings, or [enroll the secure boot key][secure-boot].
-  * To enroll the key directly from a USB, select OK -> Enroll key from disk -> EFI-SYSTEM -> brunch.der -> Continue and reboot.
-* If the system reboots _itself_ when booting normally, then Brunch has run into an error and you may need to do some advanced troubleshooting.
+* If you're having trouble booting a Brunch USB, make sure that UEFI is enabled in the BIOS.  
+* Some PCs require a key to be held when booting to boot from USB or that USB booting is enabled in the BIOS.  
+* The first boot can take up to an hour on some hardware. Brunch does not typically freeze on the Brunch logo. If you are seeing the Brunch logo, the system is _probably_ still booting.  
+* If your PC is stuck on the ChromeOS logo (White background), it is likely that you've got an incompatible dedicated GPU.  
+* If you get a blue screen saying "Verification failed" you can either disable secure boot in your bios settings, or [enroll the secure boot key][secure-boot].  
+  * To enroll the key directly from a USB, select OK -> Enroll key from disk -> EFI-SYSTEM -> brunch.der -> Continue and reboot.  
+* If the system reboots _itself_ when booting normally, then Brunch has run into an error and you may need to do some advanced troubleshooting.  
   
-In case you run into issues while installing or using Brunch, you can find support on Discord:
+In case you run into issues while installing or using Brunch, you can find support on Discord:  
   
 [![Discord][discord-shield]][discord-url]
   
-<!-- Alternate Guide -->
-## Looking for the Windows guide?
-### [![Install with Windows][windows-img]][windows-guide]  [Install with Windows][windows-guide]
 
 <!-- Reference Links -->
 <!-- Badges -->

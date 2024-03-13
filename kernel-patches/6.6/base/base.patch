@@ -36981,7 +36981,7 @@ diff -ruN a/kernel/cpu.c b/kernel/cpu.c
 +	CORE_SCHED_ON,
 +};
 +
-+static enum coresched_cmds coresched_cmd __ro_after_init = CORE_SCHED_SECURE;
++static enum coresched_cmds coresched_cmd __ro_after_init = CORE_SCHED_OFF; // was CORE_SCHED_SECURE
 +
 +static int __init coresched_parse_cmdline(char *arg)
 +{
@@ -37009,7 +37009,7 @@ diff -ruN a/kernel/cpu.c b/kernel/cpu.c
 +/* coresched=secure */
 +bool coresched_cmd_secure(void)
 +{
-+	return coresched_cmd == CORE_SCHED_OFF; //return coresched_cmd == CORE_SCHED_SECURE;
++	return coresched_cmd == CORE_SCHED_SECURE;
 +}
 +EXPORT_SYMBOL_GPL(coresched_cmd_secure);
 +#endif

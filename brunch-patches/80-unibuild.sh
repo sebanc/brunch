@@ -77,6 +77,17 @@ if [ "$native_chromebook_image" -eq 1 ]; then
 			mv /roota/usr/share/alsa/ucm/"$sndcard"/"$sndcard"."$device".conf /roota/usr/share/alsa/ucm/"$sndcard"/"$sndcard".conf
 		fi
 	done
+	if [ "$ucm" == "" ]; then
+		for ucm in $(ls /roota/usr/share/alsa/ucm/ | grep "\.base$"); do
+			sndcard=$(echo $ucm | cut -d'.' -f1)
+			device=$(echo $ucm | cut -d'.' -f2)
+			if [ ! -z "sndcard" ] && [ ! -z "device" ] && [ -f /roota/usr/share/alsa/ucm/"$sndcard"."$device"/"$sndcard"."$device".conf ]; then
+				if [ -d /roota/usr/share/alsa/ucm/"$sndcard" ]; then rm -r /roota/usr/share/alsa/ucm/"$sndcard"; fi
+				cp -r /roota/usr/share/alsa/ucm/"$sndcard"."$device" /roota/usr/share/alsa/ucm/"$sndcard"
+				mv /roota/usr/share/alsa/ucm/"$sndcard"/"$sndcard"."$device".conf /roota/usr/share/alsa/ucm/"$sndcard"/"$sndcard".conf
+			fi
+		done
+	fi
 fi
 
 if [ -f /roota/usr/share/chromeos-config/config.json ]; then

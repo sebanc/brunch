@@ -12,29 +12,29 @@ do
 done
 
 ret=0
-if [ "$ipts_touchscreen" -eq 1 ]; then
-	echo "brunch: $0 ipts enabled" > /dev/kmsg
-	cat >/roota/etc/init/ipts.conf <<IPTS
-start on stopped udev-trigger
-script
-	insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/ipts.ko
-	iptsd
-end script
-IPTS
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
-	tar zxf /rootc/packages/ipts.tar.gz -C /roota
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
-fi
-
 if [ "$ithc_touchscreen" -eq 1 ]; then
 	echo "brunch: $0 ithc enabled" > /dev/kmsg
 	cat >/roota/etc/init/ithc.conf <<ITHC
 start on stopped udev-trigger
 script
 	insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/ithc.ko
+	sleep 2
 	iptsd \$(iptsd-find-hidraw)
 end script
 ITHC
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
+	tar zxf /rootc/packages/ipts.tar.gz -C /roota
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
+elif [ "$ipts_touchscreen" -eq 1 ]; then
+	echo "brunch: $0 ipts enabled" > /dev/kmsg
+	cat >/roota/etc/init/ipts.conf <<IPTS
+start on stopped udev-trigger
+script
+	insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/ipts.ko
+	sleep 2
+	iptsd \$(iptsd-find-hidraw)
+end script
+IPTS
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 	tar zxf /rootc/packages/ipts.tar.gz -C /roota
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi

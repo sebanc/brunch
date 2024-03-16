@@ -318,6 +318,7 @@ curl -L https://archlinux.org/packages/extra/any/intel-ucode/download/ -o /tmp/i
 tar -C ../rootc/lib/firmware/ -xf /tmp/intel-ucode.tar.zst boot/intel-ucode.img --strip 1 || { echo "Failed to extract intel ucode"; exit 1; }
 rm /tmp/intel-ucode.tar.zst || { echo "Failed to cleanup intel ucode"; exit 1; }
 cd ./out || { echo "Failed to enter the final firmware directory"; exit 1; }
+find . -type f -not -name '*.xz' -exec xz '{}' \;
 tar zcf ../../rootc/packages/firmwares.tar.gz * --owner=0 --group=0 || { echo "Failed to create the firmwares archive"; exit 1; }
 cd ../.. || { echo "Failed to cleanup firmwares directory"; exit 1; }
 rm -r ./linux-firmware || { echo "Failed to cleanup firmwares directory"; exit 1; }

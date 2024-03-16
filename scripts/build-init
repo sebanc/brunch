@@ -234,7 +234,7 @@ tar zcvf ../rootc/packages/nano.tar.gz * --owner=0 --group=0 || { echo "Failed t
 cd .. || { echo "Failed to make nano"; exit 1; }
 rm -rf ./ncurses-pkg ./nano ./nano-pkg || { echo "Failed to make nano"; exit 1; }
 
-git clone --depth=1 -b master https://github.com/plougher/squashfs-tools.git || { echo "Failed to make squashfs-tools"; exit 1; }
+git clone --depth=1 -b 4.6.1 https://github.com/plougher/squashfs-tools.git || { echo "Failed to make squashfs-tools"; exit 1; }
 cd squashfs-tools/squashfs-tools || { echo "Failed to make squashfs-tools"; exit 1; }
 sed "s/#XZ_SUPPORT/XZ_SUPPORT/" -i Makefile || { echo "Failed to make squashfs-tools"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make squashfs-tools"; exit 1; }

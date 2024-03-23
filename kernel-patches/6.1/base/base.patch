@@ -34538,43 +34538,6 @@ diff -ruN a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
  	} while (0)
  
  #define hci_dev_le_state_simultaneous(hdev) \
-@@ -1915,6 +1925,36 @@
- 	return hci_find_irk_by_rpa(hdev, bdaddr);
- }
- 
-+/* Erratum 5412 which has been fixed in 4.2 changed the validation of
-+ * connection parameters.  For backwards compatibility reasons, the old
-+ * calculation must be tolerated.
-+ * For further details :
-+ * https://www.bluetooth.org/errata/errata_view.cfm?errata_id=5419
-+ */
-+static inline int hci_check_conn_params_legacy(u16 min, u16 max, u16 latency,
-+					u16 to_multiplier)
-+{
-+	u16 max_latency;
-+
-+	if (min > max || min < 6 || max > 3200)
-+		return -EINVAL;
-+
-+	if (to_multiplier < 10 || to_multiplier > 3200)
-+		return -EINVAL;
-+
-+	if (max >= to_multiplier * 8)
-+		return -EINVAL;
-+
-+	max_latency = (to_multiplier * 8 / max) - 1;
-+	if (latency > 499 || latency > max_latency)
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+/* Connection Parameter Validation Helper.
-+ * See Vol 6, Part B, section 4.5.1.
-+ */
- static inline int hci_check_conn_params(u16 min, u16 max, u16 latency,
- 					u16 to_multiplier)
- {
 @@ -1969,6 +2009,7 @@
  #define HCI_MGMT_UNTRUSTED	BIT(2)
  #define HCI_MGMT_UNCONFIGURED	BIT(3)
@@ -40286,28 +40249,6 @@ diff -ruN a/net/bluetooth/Kconfig b/net/bluetooth/Kconfig
 +	  prefix which may help identify the source code references.
 +
  source "drivers/bluetooth/Kconfig"
-diff -ruN a/net/bluetooth/l2cap_core.c b/net/bluetooth/l2cap_core.c
---- a/net/bluetooth/l2cap_core.c	2023-01-24 07:24:44.000000000 +0100
-+++ b/net/bluetooth/l2cap_core.c	2023-01-30 08:33:16.000000000 +0100
-@@ -5599,6 +5599,18 @@
- 	memset(&rsp, 0, sizeof(rsp));
- 
- 	err = hci_check_conn_params(min, max, latency, to_multiplier);
-+	if (err) {
-+		BT_WARN("Invalid conn params min 0x%4.4x max 0x%4.4x latency: 0x%4.4x TO: 0x%4.4x",
-+			min, max, latency, to_multiplier);
-+
-+		err = hci_check_conn_params_legacy(min, max, latency,
-+						   to_multiplier);
-+		if (!err) {
-+			/* latency is invalid, cap it to the max allowed */
-+			latency = min(499, (to_multiplier * 4 / max) - 1);
-+		}
-+	}
-+
- 	if (err)
- 		rsp.result = cpu_to_le16(L2CAP_CONN_PARAM_REJECTED);
- 	else
 diff -ruN a/net/bluetooth/Makefile b/net/bluetooth/Makefile
 --- a/net/bluetooth/Makefile	2023-01-24 07:24:44.000000000 +0100
 +++ b/net/bluetooth/Makefile	2023-01-30 08:33:16.000000000 +0100

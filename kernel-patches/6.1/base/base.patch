@@ -38005,6 +38005,26 @@ diff -ruN a/kernel/time/time.c b/kernel/time/time.c
  #endif
  
  /*
+diff -ruN a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
+--- a/kernel/time/timekeeping.c	2023-11-08 11:56:25.000000000 +0100
++++ b/kernel/time/timekeeping.c	2024-01-24 07:43:54.000000000 +0100
+@@ -639,6 +639,16 @@
+ }
+ 
+ /**
++ * ktime_get_offs_boot_ns - boottime offset to monotonic.
++ * Return: boottime offset in nanoseconds.
++ */
++u64 ktime_get_offs_boot_ns(void)
++{
++	return ktime_to_ns(tk_core.timekeeper.offs_boot);
++}
++EXPORT_SYMBOL_GPL(ktime_get_offs_boot_ns);
++
++/**
+  * halt_fast_timekeeper - Prevent fast timekeeper from accessing clocksource.
+  * @tk: Timekeeper to snapshot.
+  *
 diff -ruN a/kernel/watchdog_buddy_cpu.c b/kernel/watchdog_buddy_cpu.c
 --- a/kernel/watchdog_buddy_cpu.c	1970-01-01 01:00:00.000000000 +0100
 +++ b/kernel/watchdog_buddy_cpu.c	2023-01-30 08:33:15.000000000 +0100

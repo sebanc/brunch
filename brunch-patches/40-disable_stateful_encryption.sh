@@ -7,7 +7,7 @@ cat >/roota/usr/sbin/mount-encrypted <<'MOUNTS'
 #!/bin/bash
 #touch /test
 #echo "mount-encrypted called with args \"$@\"" >> /test
-if [ $# -eq 0 ] && [ ! -c /dev/tpm0 ]; then
+if [ $# -eq 0 ] && [ ! -c /dev/tpm0 ] && [ ! -f /mnt/stateful_partition/factory_install_reset ]; then
 	mkdir -p /mnt/stateful_partition/brunch/swtpm
 	/usr/bin/swtpm chardev --daemon --vtpm-proxy --tpm2 --tpmstate dir=/mnt/stateful_partition/brunch/swtpm --ctrl type=tcp,port=10001 --flags not-need-init
 	until [ -c /dev/tpm0 ]; do sleep 1; done

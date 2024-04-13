@@ -66,6 +66,9 @@ if [[ ! -z "$framework" ]]; then
 	pv /mnt/stateful_partition/unencrypted/brunch_updater/rootc.img > "$partition"7
 	if [ ! -z $update_efi ]; then pv /mnt/stateful_partition/unencrypted/brunch_updater/efi_secure.img > "$partition"12; fi
 	rm -r /mnt/stateful_partition/unencrypted/brunch_updater
+	cgpt add -i 2 -S 0 -T 15 -P 0 "$destination"
+	cgpt add -i 4 -S 0 -T 15 -P 15 "$destination"
+	sync
 	echo "Brunch updated."
 fi
 
@@ -75,6 +78,7 @@ if [[ ! -z "$recovery" ]]; then
 	losetup -d "$loopdevice"
 	cgpt add -i 2 -S 0 -T 15 -P 0 "$destination"
 	cgpt add -i 4 -S 0 -T 15 -P 15 "$destination"
+	sync
 	echo "ChromeOS updated."
 fi
 UPDATE

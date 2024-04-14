@@ -7,6 +7,7 @@
 
 acpi_power_button=0
 acpi_power_button_sleep=0
+enable_crosh_sudo=0
 for i in $(echo "$1" | sed 's#,# #g')
 do
 	if [ "$i" == "acpi_power_button" ]; then acpi_power_button=1; fi

@@ -134,6 +134,7 @@ rm -rf ./iptsd || { echo "Failed to make iptsd"; exit 1; }
 cd ./ipts-pkg || { echo "Failed to make iptsd"; exit 1; }
 mkdir -p ./usr/lib64 || { echo "Failed to make iptsd"; exit 1; }
 for i in $(ldd ../ipts-pkg/usr/bin/iptsd | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../ipts-pkg/usr/lib64/ || { echo "Failed to make iptsd"; exit 1; }; fi; done
+rm -rf ./usr/include ./usr/lib64/pkgconfig ./usr/share/pkgconfig || { echo "Failed to make iptsd"; exit 1; }
 tar zcvf ../rootc/packages/ipts.tar.gz * --owner=0 --group=0 || { echo "Failed to make iptsd"; exit 1; }
 cd .. || { echo "Failed to make iptsd"; exit 1; }
 rm -rf ./fmt-pkg ./ipts-pkg || { echo "Failed to make iptsd"; exit 1; }
@@ -178,7 +179,8 @@ cd .. || { echo "Failed to make efibootmgr"; exit 1; }
 rm -rf ./efibootmgr || { echo "Failed to make efibootmgr"; exit 1; }
 
 cd ./efibootmgr-pkg || { echo "Failed to make efibootmgr package"; exit 1; }
-sed -i "s#/home/chronos/efibootmgr-pkg/usr#/usr#g" /home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig/* || { echo "Failed to make efibootmgr package"; exit 1; }
+#sed -i "s#/home/chronos/efibootmgr-pkg/usr#/usr#g" ./usr/lib64/pkgconfig/* || { echo "Failed to make efibootmgr package"; exit 1; }
+rm -rf ./usr/include ./usr/lib64/pkgconfig ./usr/share/pkgconfig || { echo "Failed to make efibootmgr package"; exit 1; }
 tar zcvf ../rootc/packages/efibootmgr.tar.gz * --owner=0 --group=0 || { echo "Failed to make efibootmgr package"; exit 1; }
 cd .. || { echo "Failed to make efibootmgr package"; exit 1; }
 rm -rf ./efibootmgr-pkg || { echo "Failed to make efibootmgr package"; exit 1; }
@@ -206,7 +208,7 @@ cd ./swtpm-pkg/usr/lib64 || { echo "Failed to make swtpm package"; exit 1; }
 mv ./swtpm/* ./ || { echo "Failed to make swtpm package"; exit 1; }
 rm -r `ls | grep -v '.so'` || { echo "Failed to make swtpm package"; exit 1; }
 cd ../.. || { echo "Failed to make swtpm package"; exit 1; }
-rm -r ./etc ./var || { echo "Failed to make swtpm package"; exit 1; }
+rm -rf ./etc ./var ./usr/include ./usr/lib64/pkgconfig ./usr/share/pkgconfig || { echo "Failed to make swtpm package"; exit 1; }
 tar zcvf ../rootc/packages/swtpm.tar.gz * --owner=0 --group=0 || { echo "Failed to make swtpm package"; exit 1; }
 cd .. || { echo "Failed to make swtpm package"; exit 1; }
 rm -rf ./swtpm-pkg || { echo "Failed to make swtpm package"; exit 1; }
@@ -230,6 +232,7 @@ mkdir -p ../nano-pkg/usr/lib64 || { echo "Failed to make nano"; exit 1; }
 for i in $(ldd ../nano-pkg/usr/bin/nano | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../nano-pkg/usr/lib64/ || { echo "Failed to make nano"; exit 1; }; fi; done
 cd ../nano-pkg || { echo "Failed to make nano"; exit 1; }
 cp -r ../ncurses-pkg/usr/share/terminfo ./usr/share/ || { echo "Failed to make nano"; exit 1; }
+rm -rf ./usr/include ./usr/lib64/pkgconfig ./usr/share/pkgconfig || { echo "Failed to make nano"; exit 1; }
 tar zcvf ../rootc/packages/nano.tar.gz * --owner=0 --group=0 || { echo "Failed to make nano"; exit 1; }
 cd .. || { echo "Failed to make nano"; exit 1; }
 rm -rf ./ncurses-pkg ./nano ./nano-pkg || { echo "Failed to make nano"; exit 1; }

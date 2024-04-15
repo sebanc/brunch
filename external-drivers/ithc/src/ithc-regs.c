@@ -22,46 +22,104 @@ void bitsb(__iomem u8 *reg, u8 mask, u8 val)
 
 int waitl(struct ithc *ithc, __iomem u32 *reg, u32 mask, u32 val)
 {
+	ithc_log_regs(ithc);
 	pci_dbg(ithc->pci, "waiting for reg 0x%04x mask 0x%08x val 0x%08x\n",
 		reg_num(reg), mask, val);
 	u32 x;
 	if (readl_poll_timeout(reg, x, (x & mask) == val, 200, 1000*1000)) {
+		ithc_log_regs(ithc);
 		pci_err(ithc->pci, "timed out waiting for reg 0x%04x mask 0x%08x val 0x%08x\n",
 			reg_num(reg), mask, val);
 		return -ETIMEDOUT;
 	}
+	ithc_log_regs(ithc);
 	pci_dbg(ithc->pci, "done waiting\n");
 	return 0;
 }
 
 int waitb(struct ithc *ithc, __iomem u8 *reg, u8 mask, u8 val)
 {
+	ithc_log_regs(ithc);
 	pci_dbg(ithc->pci, "waiting for reg 0x%04x mask 0x%02x val 0x%02x\n",
 		reg_num(reg), mask, val);
 	u8 x;
 	if (readb_poll_timeout(reg, x, (x & mask) == val, 200, 1000*1000)) {
+		ithc_log_regs(ithc);
 		pci_err(ithc->pci, "timed out waiting for reg 0x%04x mask 0x%02x val 0x%02x\n",
 			reg_num(reg), mask, val);
 		return -ETIMEDOUT;
 	}
+	ithc_log_regs(ithc);
 	pci_dbg(ithc->pci, "done waiting\n");
 	return 0;
 }
 
-int ithc_set_spi_config(struct ithc *ithc, u8 speed, u8 mode)
+static void calc_ltr(u64 *ns, unsigned int *val, unsigned int *scale)
 {
-	pci_dbg(ithc->pci, "setting SPI speed to %i, mode %i\n", speed, mode);
-	if (mode == 3)
-		mode = 2;
+	unsigned int s = 0;
+	u64 v = *ns;
+	while (v > 0x3ff) {
+		s++;
+		v >>= 5;
+	}
+	if (s > 5) {
+		s = 5;
+		v = 0x3ff;
+	}
+	*val = v;
+	*scale = s;
+	*ns = v << (5 * s);
+}
+
+void ithc_set_ltr_config(struct ithc *ithc, u64 active_ltr_ns, u64 idle_ltr_ns)
+{
+	unsigned int active_val, active_scale, idle_val, idle_scale;
+	calc_ltr(&active_ltr_ns, &active_val, &active_scale);
+	calc_ltr(&idle_ltr_ns, &idle_val, &idle_scale);
+	pci_dbg(ithc->pci, "setting active LTR value to %llu ns, idle LTR value to %llu ns\n",
+		active_ltr_ns, idle_ltr_ns);
+	writel(LTR_CONFIG_ENABLE_ACTIVE | LTR_CONFIG_ENABLE_IDLE | LTR_CONFIG_APPLY |
+		LTR_CONFIG_ACTIVE_LTR_SCALE(active_scale) | LTR_CONFIG_ACTIVE_LTR_VALUE(active_val) |
+		LTR_CONFIG_IDLE_LTR_SCALE(idle_scale) | LTR_CONFIG_IDLE_LTR_VALUE(idle_val),
+		&ithc->regs->ltr_config);
+}
+
+void ithc_set_ltr_idle(struct ithc *ithc)
+{
+	u32 ltr = readl(&ithc->regs->ltr_config);
+	switch (ltr & (LTR_CONFIG_STATUS_ACTIVE | LTR_CONFIG_STATUS_IDLE)) {
+	case LTR_CONFIG_STATUS_IDLE:
+		break;
+	case LTR_CONFIG_STATUS_ACTIVE:
+		writel(ltr | LTR_CONFIG_TOGGLE | LTR_CONFIG_APPLY, &ithc->regs->ltr_config);
+		break;
+	default:
+		pci_err(ithc->pci, "invalid LTR state 0x%08x\n", ltr);
+		break;
+	}
+}
+
+int ithc_set_spi_config(struct ithc *ithc, u8 clkdiv, bool clkdiv8, u8 read_mode, u8 write_mode)
+{
+	if (clkdiv == 0 || clkdiv > 7 || read_mode > SPI_MODE_QUAD || write_mode > SPI_MODE_QUAD)
+		return -EINVAL;
+	static const char * const modes[] = { "single", "dual", "quad" };
+	pci_dbg(ithc->pci, "setting SPI frequency to %i Hz, %s read, %s write\n",
+		SPI_CLK_FREQ_BASE / (clkdiv * (clkdiv8 ? 8 : 1)),
+		modes[read_mode], modes[write_mode]);
 	bitsl(&ithc->regs->spi_config,
-		SPI_CONFIG_MODE(0xff) | SPI_CONFIG_SPEED(0xff) | SPI_CONFIG_UNKNOWN_18(0xff) | SPI_CONFIG_SPEED2(0xff),
-		SPI_CONFIG_MODE(mode) | SPI_CONFIG_SPEED(speed) | SPI_CONFIG_UNKNOWN_18(0) | SPI_CONFIG_SPEED2(speed));
+		SPI_CONFIG_READ_MODE(0xff) | SPI_CONFIG_READ_CLKDIV(0xff) |
+		SPI_CONFIG_WRITE_MODE(0xff) | SPI_CONFIG_WRITE_CLKDIV(0xff) |
+		SPI_CONFIG_CLKDIV_8,
+		SPI_CONFIG_READ_MODE(read_mode) | SPI_CONFIG_READ_CLKDIV(clkdiv) |
+		SPI_CONFIG_WRITE_MODE(write_mode) | SPI_CONFIG_WRITE_CLKDIV(clkdiv) |
+		(clkdiv8 ? SPI_CONFIG_CLKDIV_8 : 0));
 	return 0;
 }
 
 int ithc_spi_command(struct ithc *ithc, u8 command, u32 offset, u32 size, void *data)
 {
-	pci_dbg(ithc->pci, "SPI command %u, size %u, offset %u\n", command, size, offset);
+	pci_dbg(ithc->pci, "SPI command %u, size %u, offset 0x%x\n", command, size, offset);
 	if (size > sizeof(ithc->regs->spi_cmd.data))
 		return -EINVAL;
 

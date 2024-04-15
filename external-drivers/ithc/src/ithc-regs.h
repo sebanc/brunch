@@ -1,14 +1,34 @@
 /* SPDX-License-Identifier: GPL-2.0 OR BSD-2-Clause */
 
+#define LTR_CONFIG_ENABLE_ACTIVE            BIT(0)
+#define LTR_CONFIG_TOGGLE                   BIT(1)
+#define LTR_CONFIG_ENABLE_IDLE              BIT(2)
+#define LTR_CONFIG_APPLY                    BIT(3)
+#define LTR_CONFIG_IDLE_LTR_SCALE(x)        (((x) & 7) << 4)
+#define LTR_CONFIG_IDLE_LTR_VALUE(x)        (((x) & 0x3ff) << 7)
+#define LTR_CONFIG_ACTIVE_LTR_SCALE(x)      (((x) & 7) << 17)
+#define LTR_CONFIG_ACTIVE_LTR_VALUE(x)      (((x) & 0x3ff) << 20)
+#define LTR_CONFIG_STATUS_ACTIVE            BIT(30)
+#define LTR_CONFIG_STATUS_IDLE              BIT(31)
+
 #define CONTROL_QUIESCE                     BIT(1)
 #define CONTROL_IS_QUIESCED                 BIT(2)
 #define CONTROL_NRESET                      BIT(3)
+#define CONTROL_UNKNOWN_24(x)               (((x) & 3) << 24)
 #define CONTROL_READY                       BIT(29)
 
-#define SPI_CONFIG_MODE(x)                  (((x) & 3) << 2)
-#define SPI_CONFIG_SPEED(x)                 (((x) & 7) << 4)
-#define SPI_CONFIG_UNKNOWN_18(x)            (((x) & 3) << 18)
-#define SPI_CONFIG_SPEED2(x)                (((x) & 0xf) << 20) // high bit = high speed mode?
+#define SPI_CONFIG_READ_MODE(x)             (((x) & 3) << 2)
+#define SPI_CONFIG_READ_CLKDIV(x)           (((x) & 7) << 4)
+#define SPI_CONFIG_READ_PACKET_SIZE(x)      (((x) & 0x1ff) << 7)
+#define SPI_CONFIG_WRITE_MODE(x)            (((x) & 3) << 18)
+#define SPI_CONFIG_WRITE_CLKDIV(x)          (((x) & 7) << 20)
+#define SPI_CONFIG_CLKDIV_8                 BIT(23) // additionally divide clk by 8, for both read and write
+#define SPI_CONFIG_WRITE_PACKET_SIZE(x)     (((x) & 0xff) << 24)
+
+#define SPI_CLK_FREQ_BASE                   125000000
+#define SPI_MODE_SINGLE                     0
+#define SPI_MODE_DUAL                       1
+#define SPI_MODE_QUAD                       2
 
 #define ERROR_CONTROL_UNKNOWN_0             BIT(0)
 #define ERROR_CONTROL_DISABLE_DMA           BIT(1) // clears DMA_RX_CONTROL_ENABLE when a DMA error occurs
@@ -26,7 +46,7 @@
 
 #define ERROR_FLAG_DMA_UNKNOWN_9            BIT(9)
 #define ERROR_FLAG_DMA_UNKNOWN_10           BIT(10)
-#define ERROR_FLAG_DMA_UNKNOWN_12           BIT(12) // set when we receive a truncated DMA message
+#define ERROR_FLAG_DMA_RX_TIMEOUT           BIT(12) // set when we receive a truncated DMA message
 #define ERROR_FLAG_DMA_UNKNOWN_13           BIT(13)
 #define ERROR_FLAG_SPI_BUS_TURNAROUND       BIT(16)
 #define ERROR_FLAG_SPI_RESPONSE_TIMEOUT     BIT(17)
@@ -53,33 +73,71 @@
 #define DMA_TX_STATUS_UNKNOWN_2             BIT(2)
 #define DMA_TX_STATUS_UNKNOWN_3             BIT(3) // busy?
 
+#define INPUT_HEADER_VERSION(x)             ((x) & 0xf)
+#define INPUT_HEADER_REPORT_LENGTH(x)       (((x) >> 8) & 0x3fff)
+#define INPUT_HEADER_SYNC(x)                ((x) >> 24)
+#define INPUT_HEADER_VERSION_VALUE          3
+#define INPUT_HEADER_SYNC_VALUE             0x5a
+
+#define QUICKSPI_CONFIG1_UNKNOWN_0(x)       (((x) & 0x1f) << 0)
+#define QUICKSPI_CONFIG1_UNKNOWN_5(x)       (((x) & 0x1f) << 5)
+#define QUICKSPI_CONFIG1_UNKNOWN_10(x)      (((x) & 0x1f) << 10)
+#define QUICKSPI_CONFIG1_UNKNOWN_16(x)      (((x) & 0xffff) << 16)
+
+#define QUICKSPI_CONFIG2_UNKNOWN_0(x)       (((x) & 0x1f) << 0)
+#define QUICKSPI_CONFIG2_UNKNOWN_5(x)       (((x) & 0x1f) << 5)
+#define QUICKSPI_CONFIG2_UNKNOWN_12(x)      (((x) & 0xf) << 12)
+#define QUICKSPI_CONFIG2_UNKNOWN_16         BIT(16)
+#define QUICKSPI_CONFIG2_UNKNOWN_17         BIT(17)
+#define QUICKSPI_CONFIG2_DISABLE_READ_ADDRESS_INCREMENT  BIT(24)
+#define QUICKSPI_CONFIG2_DISABLE_WRITE_ADDRESS_INCREMENT BIT(25)
+#define QUICKSPI_CONFIG2_ENABLE_WRITE_STREAMING_MODE     BIT(27)
+#define QUICKSPI_CONFIG2_IRQ_POLARITY       BIT(28)
+
 #define DMA_RX_CONTROL_ENABLE               BIT(0)
 #define DMA_RX_CONTROL_IRQ_UNKNOWN_1        BIT(1) // rx1 only?
 #define DMA_RX_CONTROL_IRQ_ERROR            BIT(3) // rx1 only?
-#define DMA_RX_CONTROL_IRQ_UNKNOWN_4        BIT(4) // rx0 only?
+#define DMA_RX_CONTROL_IRQ_READY            BIT(4) // rx0 only
 #define DMA_RX_CONTROL_IRQ_DATA             BIT(5)
 
+#define DMA_RX_CONTROL2_UNKNOWN_4           BIT(4) // rx1 only?
 #define DMA_RX_CONTROL2_UNKNOWN_5           BIT(5) // rx0 only?
 #define DMA_RX_CONTROL2_RESET               BIT(7) // resets ringbuffer indices
 
 #define DMA_RX_WRAP_FLAG                    BIT(7)
 
 #define DMA_RX_STATUS_ERROR                 BIT(3)
-#define DMA_RX_STATUS_UNKNOWN_4             BIT(4) // set in rx0 after using CONTROL_NRESET when it becomes possible to read config (can take >100ms)
+#define DMA_RX_STATUS_READY                 BIT(4) // set in rx0 after using CONTROL_NRESET when it becomes possible to read config (can take >100ms)
 #define DMA_RX_STATUS_HAVE_DATA             BIT(5)
 #define DMA_RX_STATUS_ENABLED               BIT(8)
+
+#define INIT_UNKNOWN_GUC_2                  BIT(2)
+#define INIT_UNKNOWN_3                      BIT(3)
+#define INIT_UNKNOWN_GUC_4                  BIT(4)
+#define INIT_UNKNOWN_5                      BIT(5)
+#define INIT_UNKNOWN_31                     BIT(31)
 
 // COUNTER_RESET can be written to counter registers to reset them to zero. However, in some cases this can mess up the THC.
 #define COUNTER_RESET                       BIT(31)
 
 struct ithc_registers {
-	/* 0000 */ u32 _unknown_0000[1024];
+	/* 0000 */ u32 _unknown_0000[5];
+	/* 0014 */ u32 ltr_config;
+	/* 0018 */ u32 _unknown_0018[1018];
 	/* 1000 */ u32 _unknown_1000;
 	/* 1004 */ u32 _unknown_1004;
 	/* 1008 */ u32 control_bits;
 	/* 100c */ u32 _unknown_100c;
 	/* 1010 */ u32 spi_config;
-	/* 1014 */ u32 _unknown_1014[3];
+	/* 1014 */ u8 read_opcode; // maybe for header?
+	/* 1015 */ u8 read_opcode_quad;
+	/* 1016 */ u8 read_opcode_dual;
+	/* 1017 */ u8 read_opcode_single;
+	/* 1018 */ u8 write_opcode; // not used?
+	/* 1019 */ u8 write_opcode_quad;
+	/* 101a */ u8 write_opcode_dual;
+	/* 101b */ u8 write_opcode_single;
+	/* 101c */ u32 _unknown_101c;
 	/* 1020 */ u32 error_control;
 	/* 1024 */ u32 error_status; // write to clear
 	/* 1028 */ u32 error_flags; // write to clear
@@ -100,12 +158,19 @@ struct ithc_registers {
 		/* 109a */ u8 _unknown_109a;
 		/* 109b */ u8 num_prds;
 		/* 109c */ u32 status; // write to clear
+		/* 10a0 */ u32 _unknown_10a0[5];
+		/* 10b4 */ u32 spi_addr;
 	} dma_tx;
-	/* 10a0 */ u32 _unknown_10a0[7];
-	/* 10bc */ u32 state; // is 0xe0000402 (dev config val 0) after CONTROL_NRESET, 0xe0000461 after first touch, 0xe0000401 after DMA_RX_CODE_RESET
+	/* 10b8 */ u32 spi_header_addr;
+	union {
+		/* 10bc */ u32 irq_cause; // in legacy THC mode
+		/* 10bc */ u32 input_header; // in QuickSPI mode (see HIDSPI spec)
+	};
 	/* 10c0 */ u32 _unknown_10c0[8];
 	/* 10e0 */ u32 _unknown_10e0_counters[3];
-	/* 10ec */ u32 _unknown_10ec[5];
+	/* 10ec */ u32 quickspi_config1;
+	/* 10f0 */ u32 quickspi_config2;
+	/* 10f4 */ u32 _unknown_10f4[3];
 	struct {
 		/* 1100/1200 */ u64 addr; // cannot be written with writeq(), must use lo_hi_writeq()
 		/* 1108/1208 */ u8 num_bufs;
@@ -120,63 +185,20 @@ struct ithc_registers {
 		/* 1118/1218 */ u64 _unknown_1118_guc_addr;
 		/* 1120/1220 */ u32 _unknown_1120_guc;
 		/* 1124/1224 */ u32 _unknown_1124_guc;
-		/* 1128/1228 */ u32 unknown_init_bits; // bit 2 = guc related, bit 3 = rx1 related, bit 4 = guc related
+		/* 1128/1228 */ u32 init_unknown;
 		/* 112c/122c */ u32 _unknown_112c;
 		/* 1130/1230 */ u64 _unknown_1130_guc_addr;
 		/* 1138/1238 */ u32 _unknown_1138_guc;
 		/* 113c/123c */ u32 _unknown_113c;
 		/* 1140/1240 */ u32 _unknown_1140_guc;
-		/* 1144/1244 */ u32 _unknown_1144[23];
+		/* 1144/1244 */ u32 _unknown_1144[11];
+		/* 1170/1270 */ u32 spi_addr;
+		/* 1174/1274 */ u32 _unknown_1174[11];
 		/* 11a0/12a0 */ u32 _unknown_11a0_counters[6];
 		/* 11b8/12b8 */ u32 _unknown_11b8[18];
 	} dma_rx[2];
 };
 static_assert(sizeof(struct ithc_registers) == 0x1300);
-
-#define DEVCFG_DMA_RX_SIZE(x)          ((((x) & 0x3fff) + 1) << 6)
-#define DEVCFG_DMA_TX_SIZE(x)          (((((x) >> 14) & 0x3ff) + 1) << 6)
-
-#define DEVCFG_TOUCH_MASK              0x3f
-#define DEVCFG_TOUCH_ENABLE            BIT(0)
-#define DEVCFG_TOUCH_UNKNOWN_1         BIT(1)
-#define DEVCFG_TOUCH_UNKNOWN_2         BIT(2)
-#define DEVCFG_TOUCH_UNKNOWN_3         BIT(3)
-#define DEVCFG_TOUCH_UNKNOWN_4         BIT(4)
-#define DEVCFG_TOUCH_UNKNOWN_5         BIT(5)
-#define DEVCFG_TOUCH_UNKNOWN_6         BIT(6)
-
-#define DEVCFG_DEVICE_ID_TIC           0x43495424 // "$TIC"
-
-#define DEVCFG_SPI_MAX_FREQ(x)         (((x) >> 1) & 0xf) // high bit = use high speed mode?
-#define DEVCFG_SPI_MODE(x)             (((x) >> 6) & 3)
-#define DEVCFG_SPI_UNKNOWN_8(x)        (((x) >> 8) & 0x3f)
-#define DEVCFG_SPI_NEEDS_HEARTBEAT     BIT(20) // TODO implement heartbeat
-#define DEVCFG_SPI_HEARTBEAT_INTERVAL(x) (((x) >> 21) & 7)
-#define DEVCFG_SPI_UNKNOWN_25          BIT(25)
-#define DEVCFG_SPI_UNKNOWN_26          BIT(26)
-#define DEVCFG_SPI_UNKNOWN_27          BIT(27)
-#define DEVCFG_SPI_DELAY(x)            (((x) >> 28) & 7) // TODO use this
-#define DEVCFG_SPI_USE_EXT_READ_CFG    BIT(31) // TODO use this?
-
-struct ithc_device_config { // (Example values are from an SP7+.)
-	u32 _unknown_00;      // 00 = 0xe0000402 (0xe0000401 after DMA_RX_CODE_RESET)
-	u32 _unknown_04;      // 04 = 0x00000000
-	u32 dma_buf_sizes;    // 08 = 0x000a00ff
-	u32 touch_cfg;        // 0c = 0x0000001c
-	u32 _unknown_10;      // 10 = 0x0000001c
-	u32 device_id;        // 14 = 0x43495424 = "$TIC"
-	u32 spi_config;       // 18 = 0xfda00a2e
-	u16 vendor_id;        // 1c = 0x045e = Microsoft Corp.
-	u16 product_id;       // 1e = 0x0c1a
-	u32 revision;         // 20 = 0x00000001
-	u32 fw_version;       // 24 = 0x05008a8b = 5.0.138.139 (this value looks more random on newer devices)
-	u32 _unknown_28;      // 28 = 0x00000000
-	u32 fw_mode;          // 2c = 0x00000000 (for fw update?)
-	u32 _unknown_30;      // 30 = 0x00000000
-	u32 _unknown_34;      // 34 = 0x0404035e (u8,u8,u8,u8 = version?)
-	u32 _unknown_38;      // 38 = 0x000001c0 (0x000001c1 after DMA_RX_CODE_RESET)
-	u32 _unknown_3c;      // 3c = 0x00000002
-};
 
 void bitsl(__iomem u32 *reg, u32 mask, u32 val);
 void bitsb(__iomem u8 *reg, u8 mask, u8 val);
@@ -184,6 +206,9 @@ void bitsb(__iomem u8 *reg, u8 mask, u8 val);
 #define bitsb_set(reg, x) bitsb(reg, x, x)
 int waitl(struct ithc *ithc, __iomem u32 *reg, u32 mask, u32 val);
 int waitb(struct ithc *ithc, __iomem u8 *reg, u8 mask, u8 val);
-int ithc_set_spi_config(struct ithc *ithc, u8 speed, u8 mode);
+
+void ithc_set_ltr_config(struct ithc *ithc, u64 active_ltr_ns, u64 idle_ltr_ns);
+void ithc_set_ltr_idle(struct ithc *ithc);
+int ithc_set_spi_config(struct ithc *ithc, u8 clkdiv, bool clkdiv8, u8 read_mode, u8 write_mode);
 int ithc_spi_command(struct ithc *ithc, u8 command, u32 offset, u32 size, void *data);
 

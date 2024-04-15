@@ -11,27 +11,6 @@ struct ithc_phys_region_desc {
 	u32 unused;
 };
 
-#define DMA_RX_CODE_INPUT_REPORT          3
-#define DMA_RX_CODE_FEATURE_REPORT        4
-#define DMA_RX_CODE_REPORT_DESCRIPTOR     5
-#define DMA_RX_CODE_RESET                 7
-
-struct ithc_dma_rx_header {
-	u32 code;
-	u32 data_size;
-	u32 _unknown[14];
-};
-
-#define DMA_TX_CODE_SET_FEATURE           3
-#define DMA_TX_CODE_GET_FEATURE           4
-#define DMA_TX_CODE_OUTPUT_REPORT         5
-#define DMA_TX_CODE_GET_REPORT_DESCRIPTOR 7
-
-struct ithc_dma_tx_header {
-	u32 code;
-	u32 data_size;
-};
-
 struct ithc_dma_prd_buffer {
 	void *addr;
 	dma_addr_t dma_addr;
@@ -49,7 +28,6 @@ struct ithc_dma_data_buffer {
 
 struct ithc_dma_tx {
 	struct mutex mutex;
-	u32 max_size;
 	struct ithc_dma_prd_buffer prds;
 	struct ithc_dma_data_buffer buf;
 };
@@ -65,5 +43,5 @@ int ithc_dma_rx_init(struct ithc *ithc, u8 channel);
 void ithc_dma_rx_enable(struct ithc *ithc, u8 channel);
 int ithc_dma_tx_init(struct ithc *ithc);
 int ithc_dma_rx(struct ithc *ithc, u8 channel);
-int ithc_dma_tx(struct ithc *ithc, u32 cmdcode, u32 datasize, void *cmddata);
+int ithc_dma_tx(struct ithc *ithc, const struct ithc_data *data);
 

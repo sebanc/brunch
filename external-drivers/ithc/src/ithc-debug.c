@@ -85,10 +85,11 @@ static ssize_t ithc_debugfs_cmd_write(struct file *f, const char __user *buf, si
 	case 'd': // dma command: cmd len data...
 		// get report descriptor: d 7 8 0 0
 		// enable multitouch: d 3 2 0x0105
-		if (n < 2 || a[1] > (n - 2) * 4)
+		if (n < 1)
 			return -EINVAL;
-		pci_info(ithc->pci, "debug dma command %u with %u bytes of data\n", a[0], a[1]);
-		if (ithc_dma_tx(ithc, a[0], a[1], a + 2))
+		pci_info(ithc->pci, "debug dma command with %u bytes of data\n", n * 4);
+		struct ithc_data data = { .type = ITHC_DATA_RAW, .size = n * 4, .data = a };
+		if (ithc_dma_tx(ithc, &data))
 			pci_err(ithc->pci, "dma tx failed\n");
 		break;
 	default:
@@ -96,6 +97,23 @@ static ssize_t ithc_debugfs_cmd_write(struct file *f, const char __user *buf, si
 	}
 	ithc_log_regs(ithc);
 	return len;
+}
+
+static struct dentry *dbg_dir;
+
+void __init ithc_debug_init_module(void)
+{
+	struct dentry *d = debugfs_create_dir(DEVNAME, NULL);
+	if (IS_ERR(d))
+		pr_warn("failed to create debugfs dir (%li)\n", PTR_ERR(d));
+	else
+		dbg_dir = d;
+}
+
+void __exit ithc_debug_exit_module(void)
+{
+	debugfs_remove_recursive(dbg_dir);
+	dbg_dir = NULL;
 }
 
 static const struct file_operations ithc_debugfops_cmd = {
@@ -106,17 +124,18 @@ static const struct file_operations ithc_debugfops_cmd = {
 static void ithc_debugfs_devres_release(struct device *dev, void *res)
 {
 	struct dentry **dbgm = res;
-	if (*dbgm)
-		debugfs_remove_recursive(*dbgm);
+	debugfs_remove_recursive(*dbgm);
 }
 
-int ithc_debug_init(struct ithc *ithc)
+int ithc_debug_init_device(struct ithc *ithc)
 {
+	if (!dbg_dir)
+		return -ENOENT;
 	struct dentry **dbgm = devres_alloc(ithc_debugfs_devres_release, sizeof(*dbgm), GFP_KERNEL);
 	if (!dbgm)
 		return -ENOMEM;
 	devres_add(&ithc->pci->dev, dbgm);
-	struct dentry *dbg = debugfs_create_dir(DEVNAME, NULL);
+	struct dentry *dbg = debugfs_create_dir(pci_name(ithc->pci), dbg_dir);
 	if (IS_ERR(dbg))
 		return PTR_ERR(dbg);
 	*dbgm = dbg;

@@ -66,50 +66,44 @@ static bool ithc_use_rx1 = true;
 module_param_named(rx1, ithc_use_rx1, bool, 0);
 MODULE_PARM_DESC(rx1, "Use DMA RX channel 1");
 
+static int ithc_active_ltr_us = -1;
+module_param_named(activeltr, ithc_active_ltr_us, int, 0);
+MODULE_PARM_DESC(activeltr, "Active LTR value override (in microseconds)");
+
+static int ithc_idle_ltr_us = -1;
+module_param_named(idleltr, ithc_idle_ltr_us, int, 0);
+MODULE_PARM_DESC(idleltr, "Idle LTR value override (in microseconds)");
+
 static bool ithc_log_regs_enabled = false;
 module_param_named(logregs, ithc_log_regs_enabled, bool, 0);
 MODULE_PARM_DESC(logregs, "Log changes in register values (for debugging)");
 
 // Sysfs attributes
 
-static bool ithc_is_config_valid(struct ithc *ithc)
-{
-	return ithc->config.device_id == DEVCFG_DEVICE_ID_TIC;
-}
-
 static ssize_t vendor_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct ithc *ithc = dev_get_drvdata(dev);
-	if (!ithc || !ithc_is_config_valid(ithc))
+	if (!ithc || !ithc->have_config)
 		return -ENODEV;
-	return sprintf(buf, "0x%04x", ithc->config.vendor_id);
+	return sprintf(buf, "0x%04x", ithc->vendor_id);
 }
 static DEVICE_ATTR_RO(vendor);
 static ssize_t product_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct ithc *ithc = dev_get_drvdata(dev);
-	if (!ithc || !ithc_is_config_valid(ithc))
+	if (!ithc || !ithc->have_config)
 		return -ENODEV;
-	return sprintf(buf, "0x%04x", ithc->config.product_id);
+	return sprintf(buf, "0x%04x", ithc->product_id);
 }
 static DEVICE_ATTR_RO(product);
 static ssize_t revision_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct ithc *ithc = dev_get_drvdata(dev);
-	if (!ithc || !ithc_is_config_valid(ithc))
+	if (!ithc || !ithc->have_config)
 		return -ENODEV;
-	return sprintf(buf, "%u", ithc->config.revision);
+	return sprintf(buf, "%u", ithc->product_rev);
 }
 static DEVICE_ATTR_RO(revision);
-static ssize_t fw_version_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct ithc *ithc = dev_get_drvdata(dev);
-	if (!ithc || !ithc_is_config_valid(ithc))
-		return -ENODEV;
-	u32 v = ithc->config.fw_version;
-	return sprintf(buf, "%i.%i.%i.%i", v >> 24, v >> 16 & 0xff, v >> 8 & 0xff, v & 0xff);
-}
-static DEVICE_ATTR_RO(fw_version);
 
 static const struct attribute_group *ithc_attribute_groups[] = {
 	&(const struct attribute_group){
@@ -118,168 +112,26 @@ static const struct attribute_group *ithc_attribute_groups[] = {
 			&dev_attr_vendor.attr,
 			&dev_attr_product.attr,
 			&dev_attr_revision.attr,
-			&dev_attr_fw_version.attr,
 			NULL
 		},
 	},
 	NULL
 };
 
-// HID setup
-
-static int ithc_hid_start(struct hid_device *hdev) { return 0; }
-static void ithc_hid_stop(struct hid_device *hdev) { }
-static int ithc_hid_open(struct hid_device *hdev) { return 0; }
-static void ithc_hid_close(struct hid_device *hdev) { }
-
-static int ithc_hid_parse(struct hid_device *hdev)
-{
-	struct ithc *ithc = hdev->driver_data;
-	u64 val = 0;
-	WRITE_ONCE(ithc->hid_parse_done, false);
-	CHECK_RET(ithc_dma_tx, ithc, DMA_TX_CODE_GET_REPORT_DESCRIPTOR, sizeof(val), &val);
-	if (!wait_event_timeout(ithc->wait_hid_parse, READ_ONCE(ithc->hid_parse_done),
-			msecs_to_jiffies(1000)))
-		return -ETIMEDOUT;
-	return 0;
-}
-
-static int ithc_hid_raw_request(struct hid_device *hdev, unsigned char reportnum, __u8 *buf,
-	size_t len, unsigned char rtype, int reqtype)
-{
-	struct ithc *ithc = hdev->driver_data;
-	if (!buf || !len)
-		return -EINVAL;
-	u32 code;
-	if (rtype == HID_OUTPUT_REPORT && reqtype == HID_REQ_SET_REPORT) {
-		code = DMA_TX_CODE_OUTPUT_REPORT;
-	} else if (rtype == HID_FEATURE_REPORT && reqtype == HID_REQ_SET_REPORT) {
-		code = DMA_TX_CODE_SET_FEATURE;
-	} else if (rtype == HID_FEATURE_REPORT && reqtype == HID_REQ_GET_REPORT) {
-		code = DMA_TX_CODE_GET_FEATURE;
-	} else {
-		pci_err(ithc->pci, "unhandled hid request %i %i for report id %i\n",
-			rtype, reqtype, reportnum);
-		return -EINVAL;
-	}
-	buf[0] = reportnum;
-
-	if (reqtype == HID_REQ_GET_REPORT) {
-		// Prepare for response.
-		mutex_lock(&ithc->hid_get_feature_mutex);
-		ithc->hid_get_feature_buf = buf;
-		ithc->hid_get_feature_size = len;
-		mutex_unlock(&ithc->hid_get_feature_mutex);
-
-		// Transmit 'get feature' request.
-		int r = CHECK(ithc_dma_tx, ithc, code, 1, buf);
-		if (!r) {
-			r = wait_event_interruptible_timeout(ithc->wait_hid_get_feature,
-				!ithc->hid_get_feature_buf, msecs_to_jiffies(1000));
-			if (!r)
-				r = -ETIMEDOUT;
-			else if (r < 0)
-				r = -EINTR;
-			else
-				r = 0;
-		}
-
-		// If everything went ok, the buffer has been filled with the response data.
-		// Return the response size.
-		mutex_lock(&ithc->hid_get_feature_mutex);
-		ithc->hid_get_feature_buf = NULL;
-		if (!r)
-			r = ithc->hid_get_feature_size;
-		mutex_unlock(&ithc->hid_get_feature_mutex);
-		return r;
-	}
-
-	// 'Set feature', or 'output report'. These don't have a response.
-	CHECK_RET(ithc_dma_tx, ithc, code, len, buf);
-	return 0;
-}
-
-static struct hid_ll_driver ithc_ll_driver = {
-	.start = ithc_hid_start,
-	.stop = ithc_hid_stop,
-	.open = ithc_hid_open,
-	.close = ithc_hid_close,
-	.parse = ithc_hid_parse,
-	.raw_request = ithc_hid_raw_request,
-};
-
-static void ithc_hid_devres_release(struct device *dev, void *res)
-{
-	struct hid_device **hidm = res;
-	if (*hidm)
-		hid_destroy_device(*hidm);
-}
-
-static int ithc_hid_init(struct ithc *ithc)
-{
-	struct hid_device **hidm = devres_alloc(ithc_hid_devres_release, sizeof(*hidm), GFP_KERNEL);
-	if (!hidm)
-		return -ENOMEM;
-	devres_add(&ithc->pci->dev, hidm);
-	struct hid_device *hid = hid_allocate_device();
-	if (IS_ERR(hid))
-		return PTR_ERR(hid);
-	*hidm = hid;
-
-	strscpy(hid->name, DEVFULLNAME, sizeof(hid->name));
-	strscpy(hid->phys, ithc->phys, sizeof(hid->phys));
-	hid->ll_driver = &ithc_ll_driver;
-	hid->bus = BUS_PCI;
-	hid->vendor = ithc->config.vendor_id;
-	hid->product = ithc->config.product_id;
-	hid->version = 0x100;
-	hid->dev.parent = &ithc->pci->dev;
-	hid->driver_data = ithc;
-
-	ithc->hid = hid;
-	return 0;
-}
-
 // Interrupts/polling
-
-static void ithc_activity_timer_callback(struct timer_list *t)
-{
-	struct ithc *ithc = container_of(t, struct ithc, activity_timer);
-	cpu_latency_qos_update_request(&ithc->activity_qos, PM_QOS_DEFAULT_VALUE);
-}
-
-void ithc_set_active(struct ithc *ithc)
-{
-	// When CPU usage is very low, the CPU can enter various low power states (C2-C10).
-	// This disrupts DMA, causing truncated DMA messages. ERROR_FLAG_DMA_UNKNOWN_12 will be
-	// set when this happens. The amount of truncated messages can become very high, resulting
-	// in user-visible effects (laggy/stuttering cursor). To avoid this, we use a CPU latency
-	// QoS request to prevent the CPU from entering low power states during touch interactions.
-	cpu_latency_qos_update_request(&ithc->activity_qos, 0);
-	mod_timer(&ithc->activity_timer, jiffies + msecs_to_jiffies(1000));
-}
-
-static int ithc_set_device_enabled(struct ithc *ithc, bool enable)
-{
-	u32 x = ithc->config.touch_cfg =
-		(ithc->config.touch_cfg & ~(u32)DEVCFG_TOUCH_MASK) | DEVCFG_TOUCH_UNKNOWN_2 |
-		(enable ? DEVCFG_TOUCH_ENABLE | DEVCFG_TOUCH_UNKNOWN_3 | DEVCFG_TOUCH_UNKNOWN_4 : 0);
-	return ithc_spi_command(ithc, SPI_CMD_CODE_WRITE,
-		offsetof(struct ithc_device_config, touch_cfg), sizeof(x), &x);
-}
 
 static void ithc_disable_interrupts(struct ithc *ithc)
 {
 	writel(0, &ithc->regs->error_control);
 	bitsb(&ithc->regs->spi_cmd.control, SPI_CMD_CONTROL_IRQ, 0);
-	bitsb(&ithc->regs->dma_rx[0].control, DMA_RX_CONTROL_IRQ_UNKNOWN_1 | DMA_RX_CONTROL_IRQ_ERROR | DMA_RX_CONTROL_IRQ_UNKNOWN_4 | DMA_RX_CONTROL_IRQ_DATA, 0);
-	bitsb(&ithc->regs->dma_rx[1].control, DMA_RX_CONTROL_IRQ_UNKNOWN_1 | DMA_RX_CONTROL_IRQ_ERROR | DMA_RX_CONTROL_IRQ_UNKNOWN_4 | DMA_RX_CONTROL_IRQ_DATA, 0);
+	bitsb(&ithc->regs->dma_rx[0].control, DMA_RX_CONTROL_IRQ_UNKNOWN_1 | DMA_RX_CONTROL_IRQ_ERROR | DMA_RX_CONTROL_IRQ_READY | DMA_RX_CONTROL_IRQ_DATA, 0);
+	bitsb(&ithc->regs->dma_rx[1].control, DMA_RX_CONTROL_IRQ_UNKNOWN_1 | DMA_RX_CONTROL_IRQ_ERROR | DMA_RX_CONTROL_IRQ_READY | DMA_RX_CONTROL_IRQ_DATA, 0);
 	bitsb(&ithc->regs->dma_tx.control, DMA_TX_CONTROL_IRQ, 0);
 }
 
 static void ithc_clear_dma_rx_interrupts(struct ithc *ithc, unsigned int channel)
 {
-	writel(DMA_RX_STATUS_ERROR | DMA_RX_STATUS_UNKNOWN_4 | DMA_RX_STATUS_HAVE_DATA,
+	writel(DMA_RX_STATUS_ERROR | DMA_RX_STATUS_READY | DMA_RX_STATUS_HAVE_DATA,
 		&ithc->regs->dma_rx[channel].status);
 }
 
@@ -298,22 +150,34 @@ static void ithc_process(struct ithc *ithc)
 {
 	ithc_log_regs(ithc);
 
-	// read and clear error bits
+	// The THC automatically transitions from LTR idle to active at the start of a DMA transfer.
+	// It does not appear to automatically go back to idle, so we switch it back here, since
+	// the DMA transfer should be complete.
+	ithc_set_ltr_idle(ithc);
+
+	bool rx0 = ithc_use_rx0 && (readl(&ithc->regs->dma_rx[0].status) & (DMA_RX_STATUS_ERROR | DMA_RX_STATUS_HAVE_DATA)) != 0;
+	bool rx1 = ithc_use_rx1 && (readl(&ithc->regs->dma_rx[1].status) & (DMA_RX_STATUS_ERROR | DMA_RX_STATUS_HAVE_DATA)) != 0;
+
+	// Read and clear error bits
 	u32 err = readl(&ithc->regs->error_flags);
 	if (err) {
-		if (err & ~ERROR_FLAG_DMA_UNKNOWN_12)
-			pci_err(ithc->pci, "error flags: 0x%08x\n", err);
 		writel(err, &ithc->regs->error_flags);
+		if (err & ~ERROR_FLAG_DMA_RX_TIMEOUT)
+			pci_err(ithc->pci, "error flags: 0x%08x\n", err);
+		if (err & ERROR_FLAG_DMA_RX_TIMEOUT)
+			pci_err(ithc->pci, "DMA RX timeout/error (try decreasing activeltr/idleltr if this happens frequently)\n");
 	}
 
-	// process DMA rx
+	// Process DMA rx
 	if (ithc_use_rx0) {
 		ithc_clear_dma_rx_interrupts(ithc, 0);
-		ithc_dma_rx(ithc, 0);
+		if (rx0)
+			ithc_dma_rx(ithc, 0);
 	}
 	if (ithc_use_rx1) {
 		ithc_clear_dma_rx_interrupts(ithc, 1);
-		ithc_dma_rx(ithc, 1);
+		if (rx1)
+			ithc_dma_rx(ithc, 1);
 	}
 
 	ithc_log_regs(ithc);
@@ -341,10 +205,8 @@ static int ithc_poll_thread(void *arg)
 		ithc_process(ithc);
 		// Decrease polling interval to 20ms if we received data, otherwise slowly
 		// increase it up to 200ms.
-		if (n != ithc->dma_rx[1].num_received)
-			sleep = 20;
-		else
-			sleep = min(200u, sleep + (sleep >> 4) + 1);
+		sleep = n != ithc->dma_rx[1].num_received ? 20
+			: min(200u, sleep + (sleep >> 4) + 1);
 		msleep_interruptible(sleep);
 	}
 	return 0;
@@ -367,73 +229,44 @@ static void ithc_disable(struct ithc *ithc)
 
 static int ithc_init_device(struct ithc *ithc)
 {
+	// Read ACPI config for QuickSPI mode
+	struct ithc_acpi_config cfg = { 0 };
+	CHECK_RET(ithc_read_acpi_config, ithc, &cfg);
+	if (!cfg.has_config)
+		pci_info(ithc->pci, "no ACPI config, using legacy mode\n");
+	else
+		ithc_print_acpi_config(ithc, &cfg);
+	ithc->use_quickspi = cfg.has_config;
+
+	// Shut down device
 	ithc_log_regs(ithc);
 	bool was_enabled = (readl(&ithc->regs->control_bits) & CONTROL_NRESET) != 0;
 	ithc_disable(ithc);
 	CHECK_RET(waitl, ithc, &ithc->regs->control_bits, CONTROL_READY, CONTROL_READY);
-
-	// Since we don't yet know which SPI config the device wants, use default speed and mode
-	// initially for reading config data.
-	ithc_set_spi_config(ithc, 10, 0);
-
-	// Setting the following bit seems to make reading the config more reliable.
-	bitsl_set(&ithc->regs->dma_rx[0].unknown_init_bits, 0x80000000);
+	ithc_log_regs(ithc);
 
 	// If the device was previously enabled, wait a bit to make sure it's fully shut down.
 	if (was_enabled)
 		if (msleep_interruptible(100))
 			return -EINTR;
 
-	// Take the touch device out of reset.
-	bitsl(&ithc->regs->control_bits, CONTROL_QUIESCE, 0);
-	CHECK_RET(waitl, ithc, &ithc->regs->control_bits, CONTROL_IS_QUIESCED, 0);
-	for (int retries = 0; ; retries++) {
-		ithc_log_regs(ithc);
-		bitsl_set(&ithc->regs->control_bits, CONTROL_NRESET);
-		if (!waitl(ithc, &ithc->regs->state, 0xf, 2))
-			break;
-		if (retries > 5) {
-			pci_err(ithc->pci, "too many retries, failed to reset device\n");
-			return -ETIMEDOUT;
-		}
-		pci_err(ithc->pci, "invalid state, retrying reset\n");
-		bitsl(&ithc->regs->control_bits, CONTROL_NRESET, 0);
-		if (msleep_interruptible(1000))
-			return -EINTR;
-	}
-	ithc_log_regs(ithc);
+	// Set Latency Tolerance Reporting config. The device will automatically
+	// apply these values depending on whether it is active or idle.
+	// If active value is too high, DMA buffer data can become truncated.
+	// By default, we set the active LTR value to 100us, and idle to 100ms.
+	u64 active_ltr_ns = ithc_active_ltr_us >= 0 ? (u64)ithc_active_ltr_us * 1000
+		: cfg.has_config && cfg.has_active_ltr ? (u64)cfg.active_ltr << 10
+		: 100 * 1000;
+	u64 idle_ltr_ns = ithc_idle_ltr_us >= 0 ? (u64)ithc_idle_ltr_us * 1000
+		: cfg.has_config && cfg.has_idle_ltr ? (u64)cfg.idle_ltr << 10
+		: 100 * 1000 * 1000;
+	ithc_set_ltr_config(ithc, active_ltr_ns, idle_ltr_ns);
 
-	// Waiting for the following status bit makes reading config much more reliable,
-	// however the official driver does not seem to do this...
-	CHECK(waitl, ithc, &ithc->regs->dma_rx[0].status, DMA_RX_STATUS_UNKNOWN_4, DMA_RX_STATUS_UNKNOWN_4);
+	if (ithc->use_quickspi)
+		CHECK_RET(ithc_quickspi_init, ithc, &cfg);
+	else
+		CHECK_RET(ithc_legacy_init, ithc);
 
-	// Read configuration data.
-	for (int retries = 0; ; retries++) {
-		ithc_log_regs(ithc);
-		memset(&ithc->config, 0, sizeof(ithc->config));
-		CHECK_RET(ithc_spi_command, ithc, SPI_CMD_CODE_READ, 0, sizeof(ithc->config), &ithc->config);
-		u32 *p = (void *)&ithc->config;
-		pci_info(ithc->pci, "config: %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x\n",
-			p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
-		if (ithc_is_config_valid(ithc))
-			break;
-		if (retries > 10) {
-			pci_err(ithc->pci, "failed to read config, unknown device ID 0x%08x\n",
-				ithc->config.device_id);
-			return -EIO;
-		}
-		pci_err(ithc->pci, "failed to read config, retrying\n");
-		if (msleep_interruptible(100))
-			return -EINTR;
-	}
-	ithc_log_regs(ithc);
-
-	// Apply SPI config and enable touch device.
-	CHECK_RET(ithc_set_spi_config, ithc,
-		DEVCFG_SPI_MAX_FREQ(ithc->config.spi_config),
-		DEVCFG_SPI_MODE(ithc->config.spi_config));
-	CHECK_RET(ithc_set_device_enabled, ithc, true);
-	ithc_log_regs(ithc);
 	return 0;
 }
 
@@ -463,10 +296,11 @@ static void ithc_stop(void *res)
 		CHECK(kthread_stop, ithc->poll_thread);
 	if (ithc->irq >= 0)
 		disable_irq(ithc->irq);
-	CHECK(ithc_set_device_enabled, ithc, false);
+	if (ithc->use_quickspi)
+		ithc_quickspi_exit(ithc);
+	else
+		ithc_legacy_exit(ithc);
 	ithc_disable(ithc);
-	del_timer_sync(&ithc->activity_timer);
-	cpu_latency_qos_remove_request(&ithc->activity_qos);
 
 	// Clear DMA config.
 	for (unsigned int i = 0; i < 2; i++) {
@@ -505,9 +339,6 @@ static int ithc_start(struct pci_dev *pci)
 	ithc->irq = -1;
 	ithc->pci = pci;
 	snprintf(ithc->phys, sizeof(ithc->phys), "pci-%s/" DEVNAME, pci_name(pci));
-	init_waitqueue_head(&ithc->wait_hid_parse);
-	init_waitqueue_head(&ithc->wait_hid_get_feature);
-	mutex_init(&ithc->hid_get_feature_mutex);
 	pci_set_drvdata(pci, ithc);
 	CHECK_RET(devm_add_action_or_reset, &pci->dev, ithc_clear_drvdata, pci);
 	if (ithc_log_regs_enabled)
@@ -531,17 +362,15 @@ static int ithc_start(struct pci_dev *pci)
 
 	// Initialize THC and touch device.
 	CHECK_RET(ithc_init_device, ithc);
+
+	// Initialize HID and DMA.
+	CHECK_RET(ithc_hid_init, ithc);
 	CHECK(devm_device_add_groups, &pci->dev, ithc_attribute_groups);
 	if (ithc_use_rx0)
 		CHECK_RET(ithc_dma_rx_init, ithc, 0);
 	if (ithc_use_rx1)
 		CHECK_RET(ithc_dma_rx_init, ithc, 1);
 	CHECK_RET(ithc_dma_tx_init, ithc);
-
-	CHECK_RET(ithc_hid_init, ithc);
-
-	cpu_latency_qos_add_request(&ithc->activity_qos, PM_QOS_DEFAULT_VALUE);
-	timer_setup(&ithc->activity_timer, ithc_activity_timer_callback, 0);
 
 	// Add ithc_stop() callback AFTER setting up DMA buffers, so that polling/irqs/DMA are
 	// disabled BEFORE the buffers are freed.
@@ -569,9 +398,11 @@ static int ithc_start(struct pci_dev *pci)
 
 	// hid_add_device() can only be called after irq/polling is started and DMA is enabled,
 	// because it calls ithc_hid_parse() which reads the report descriptor via DMA.
-	CHECK_RET(hid_add_device, ithc->hid);
+	CHECK_RET(hid_add_device, ithc->hid.dev);
 
-	CHECK(ithc_debug_init, ithc);
+	CHECK(ithc_debug_init_device, ithc);
+
+	ithc_set_ltr_idle(ithc);
 
 	pci_dbg(pci, "started\n");
 	return 0;
@@ -642,17 +473,20 @@ static struct pci_driver ithc_driver = {
 		.thaw = ithc_thaw,
 		.restore = ithc_restore,
 	},
+	.driver.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	//.dev_groups = ithc_attribute_groups, // could use this (since 5.14), however the attributes won't have valid values until config has been read anyway
 };
 
 static int __init ithc_init(void)
 {
+	ithc_debug_init_module();
 	return pci_register_driver(&ithc_driver);
 }
 
 static void __exit ithc_exit(void)
 {
 	pci_unregister_driver(&ithc_driver);
+	ithc_debug_exit_module();
 }
 
 module_init(ithc_init);

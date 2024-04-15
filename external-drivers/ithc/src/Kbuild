@@ -1,6 +1,6 @@
 obj-$(CONFIG_HID_ITHC) := ithc.o
 
-ithc-objs := ithc-main.o ithc-regs.o ithc-dma.o ithc-debug.o
+ithc-objs := ithc-main.o ithc-regs.o ithc-dma.o ithc-hid.o ithc-legacy.o ithc-quickspi.o ithc-debug.o
 
 ccflags-y := -std=gnu11 -Wno-declaration-after-statement
 

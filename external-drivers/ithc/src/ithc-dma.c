@@ -173,10 +173,9 @@ int ithc_dma_rx_init(struct ithc *ithc, u8 channel)
 	mutex_init(&rx->mutex);
 
 	// Allocate buffers.
-	u32 buf_size = DEVCFG_DMA_RX_SIZE(ithc->config.dma_buf_sizes);
-	unsigned int num_pages = (buf_size + PAGE_SIZE - 1) / PAGE_SIZE;
+	unsigned int num_pages = (ithc->max_rx_size + PAGE_SIZE - 1) / PAGE_SIZE;
 	pci_dbg(ithc->pci, "allocating rx buffers: num = %u, size = %u, pages = %u\n",
-		NUM_RX_BUF, buf_size, num_pages);
+		NUM_RX_BUF, ithc->max_rx_size, num_pages);
 	CHECK_RET(ithc_dma_prd_alloc, ithc, &rx->prds, NUM_RX_BUF, num_pages, DMA_FROM_DEVICE);
 	for (unsigned int i = 0; i < NUM_RX_BUF; i++)
 		CHECK_RET(ithc_dma_data_alloc, ithc, &rx->prds, &rx->bufs[i]);
@@ -204,7 +203,7 @@ void ithc_dma_rx_enable(struct ithc *ithc, u8 channel)
 {
 	bitsb_set(&ithc->regs->dma_rx[channel].control,
 		DMA_RX_CONTROL_ENABLE | DMA_RX_CONTROL_IRQ_ERROR | DMA_RX_CONTROL_IRQ_DATA);
-	CHECK(waitl, ithc, &ithc->regs->dma_rx[1].status,
+	CHECK(waitl, ithc, &ithc->regs->dma_rx[channel].status,
 		DMA_RX_STATUS_ENABLED, DMA_RX_STATUS_ENABLED);
 }
 
@@ -214,10 +213,9 @@ int ithc_dma_tx_init(struct ithc *ithc)
 	mutex_init(&tx->mutex);
 
 	// Allocate buffers.
-	tx->max_size = DEVCFG_DMA_TX_SIZE(ithc->config.dma_buf_sizes);
-	unsigned int num_pages = (tx->max_size + PAGE_SIZE - 1) / PAGE_SIZE;
+	unsigned int num_pages = (ithc->max_tx_size + PAGE_SIZE - 1) / PAGE_SIZE;
 	pci_dbg(ithc->pci, "allocating tx buffers: size = %u, pages = %u\n",
-		tx->max_size, num_pages);
+		ithc->max_tx_size, num_pages);
 	CHECK_RET(ithc_dma_prd_alloc, ithc, &tx->prds, 1, num_pages, DMA_TO_DEVICE);
 	CHECK_RET(ithc_dma_data_alloc, ithc, &tx->prds, &tx->buf);
 
@@ -227,72 +225,6 @@ int ithc_dma_tx_init(struct ithc *ithc)
 
 	// Init buffers.
 	CHECK_RET(ithc_dma_data_buffer_put, ithc, &ithc->dma_tx.prds, &ithc->dma_tx.buf, 0);
-	return 0;
-}
-
-static int ithc_dma_rx_process_buf(struct ithc *ithc, struct ithc_dma_data_buffer *data,
-	u8 channel, u8 buf)
-{
-	if (buf >= NUM_RX_BUF) {
-		pci_err(ithc->pci, "invalid dma ringbuffer index\n");
-		return -EINVAL;
-	}
-	ithc_set_active(ithc);
-	u32 len = data->data_size;
-	struct ithc_dma_rx_header *hdr = data->addr;
-	u8 *hiddata = (void *)(hdr + 1);
-	if (len >= sizeof(*hdr) && hdr->code == DMA_RX_CODE_RESET) {
-		// The THC sends a reset request when we need to reinitialize the device.
-		// This usually only happens if we send an invalid command or put the device
-		// in a bad state.
-		CHECK(ithc_reset, ithc);
-	} else if (len < sizeof(*hdr) || len != sizeof(*hdr) + hdr->data_size) {
-		if (hdr->code == DMA_RX_CODE_INPUT_REPORT) {
-			// When the CPU enters a low power state during DMA, we can get truncated
-			// messages. For Surface devices, this will typically be a single touch
-			// report that is only 1 byte, or a multitouch report that is 257 bytes.
-			// See also ithc_set_active().
-		} else {
-			pci_err(ithc->pci, "invalid dma rx data! channel %u, buffer %u, size %u, code %u, data size %u\n",
-				channel, buf, len, hdr->code, hdr->data_size);
-			print_hex_dump_debug(DEVNAME " data: ", DUMP_PREFIX_OFFSET, 32, 1,
-				hdr, min(len, 0x400u), 0);
-		}
-	} else if (hdr->code == DMA_RX_CODE_REPORT_DESCRIPTOR && hdr->data_size > 8) {
-		// Response to a 'get report descriptor' request.
-		// The actual descriptor is preceded by 8 nul bytes.
-		CHECK(hid_parse_report, ithc->hid, hiddata + 8, hdr->data_size - 8);
-		WRITE_ONCE(ithc->hid_parse_done, true);
-		wake_up(&ithc->wait_hid_parse);
-	} else if (hdr->code == DMA_RX_CODE_INPUT_REPORT) {
-		// Standard HID input report containing touch data.
-		CHECK(hid_input_report, ithc->hid, HID_INPUT_REPORT, hiddata, hdr->data_size, 1);
-	} else if (hdr->code == DMA_RX_CODE_FEATURE_REPORT) {
-		// Response to a 'get feature' request.
-		bool done = false;
-		mutex_lock(&ithc->hid_get_feature_mutex);
-		if (ithc->hid_get_feature_buf) {
-			if (hdr->data_size < ithc->hid_get_feature_size)
-				ithc->hid_get_feature_size = hdr->data_size;
-			memcpy(ithc->hid_get_feature_buf, hiddata, ithc->hid_get_feature_size);
-			ithc->hid_get_feature_buf = NULL;
-			done = true;
-		}
-		mutex_unlock(&ithc->hid_get_feature_mutex);
-		if (done) {
-			wake_up(&ithc->wait_hid_get_feature);
-		} else {
-			// Received data without a matching request, or the request already
-			// timed out. (XXX What's the correct thing to do here?)
-			CHECK(hid_input_report, ithc->hid, HID_FEATURE_REPORT,
-				hiddata, hdr->data_size, 1);
-		}
-	} else {
-		pci_dbg(ithc->pci, "unhandled dma rx data! channel %u, buffer %u, size %u, code %u\n",
-			channel, buf, len, hdr->code);
-		print_hex_dump_debug(DEVNAME " data: ", DUMP_PREFIX_OFFSET, 32, 1,
-			hdr, min(len, 0x400u), 0);
-	}
 	return 0;
 }
 
@@ -317,7 +249,16 @@ static int ithc_dma_rx_unlocked(struct ithc *ithc, u8 channel)
 		rx->num_received = ++n;
 
 		// process data
-		CHECK(ithc_dma_rx_process_buf, ithc, b, channel, tail);
+		struct ithc_data d;
+		if ((ithc->use_quickspi ? ithc_quickspi_decode_rx : ithc_legacy_decode_rx)
+			(ithc, b->addr, b->data_size, &d) < 0) {
+			pci_err(ithc->pci, "invalid dma rx data! channel %u, buffer %u, size %u: %*ph\n",
+				channel, tail, b->data_size, min((int)b->data_size, 64), b->addr);
+			print_hex_dump_debug(DEVNAME " data: ", DUMP_PREFIX_OFFSET, 32, 1,
+				b->addr, min(b->data_size, 0x400u), 0);
+		} else {
+			ithc_hid_process_data(ithc, &d);
+		}
 
 		// give the buffer back to the device
 		CHECK_RET(ithc_dma_data_buffer_put, ithc, &rx->prds, b, tail);
@@ -332,29 +273,28 @@ int ithc_dma_rx(struct ithc *ithc, u8 channel)
 	return ret;
 }
 
-static int ithc_dma_tx_unlocked(struct ithc *ithc, u32 cmdcode, u32 datasize, void *data)
+static int ithc_dma_tx_unlocked(struct ithc *ithc, const struct ithc_data *data)
 {
 	// Send a single TX buffer to the THC.
-	pci_dbg(ithc->pci, "dma tx command %u, size %u\n", cmdcode, datasize);
-	struct ithc_dma_tx_header *hdr;
-	// Data must be padded to next 4-byte boundary.
-	u8 padding = datasize & 3 ? 4 - (datasize & 3) : 0;
-	unsigned int fullsize = sizeof(*hdr) + datasize + padding;
-	if (fullsize > ithc->dma_tx.max_size || fullsize > PAGE_SIZE)
-		return -EINVAL;
+	pci_dbg(ithc->pci, "dma tx data type %u, size %u\n", data->type, data->size);
 	CHECK_RET(ithc_dma_data_buffer_get, ithc, &ithc->dma_tx.prds, &ithc->dma_tx.buf, 0);
 
 	// Fill the TX buffer with header and data.
-	ithc->dma_tx.buf.data_size = fullsize;
-	hdr = ithc->dma_tx.buf.addr;
-	hdr->code = cmdcode;
-	hdr->data_size = datasize;
-	u8 *dest = (void *)(hdr + 1);
-	memcpy(dest, data, datasize);
-	dest += datasize;
-	for (u8 p = 0; p < padding; p++)
-		*dest++ = 0;
+	ssize_t sz;
+	if (data->type == ITHC_DATA_RAW) {
+		sz = min(data->size, ithc->max_tx_size);
+		memcpy(ithc->dma_tx.buf.addr, data->data, sz);
+	} else {
+		sz = (ithc->use_quickspi ? ithc_quickspi_encode_tx : ithc_legacy_encode_tx)
+			(ithc, data, ithc->dma_tx.buf.addr, ithc->max_tx_size);
+	}
+	ithc->dma_tx.buf.data_size = sz < 0 ? 0 : sz;
 	CHECK_RET(ithc_dma_data_buffer_put, ithc, &ithc->dma_tx.prds, &ithc->dma_tx.buf, 0);
+	if (sz < 0) {
+		pci_err(ithc->pci, "failed to encode tx data type %i, size %u, error %i\n",
+			data->type, data->size, (int)sz);
+		return -EINVAL;
+	}
 
 	// Let the THC process the buffer.
 	bitsb_set(&ithc->regs->dma_tx.control, DMA_TX_CONTROL_SEND);
@@ -362,10 +302,10 @@ static int ithc_dma_tx_unlocked(struct ithc *ithc, u32 cmdcode, u32 datasize, vo
 	writel(DMA_TX_STATUS_DONE, &ithc->regs->dma_tx.status);
 	return 0;
 }
-int ithc_dma_tx(struct ithc *ithc, u32 cmdcode, u32 datasize, void *data)
+int ithc_dma_tx(struct ithc *ithc, const struct ithc_data *data)
 {
 	mutex_lock(&ithc->dma_tx.mutex);
-	int ret = ithc_dma_tx_unlocked(ithc, cmdcode, datasize, data);
+	int ret = ithc_dma_tx_unlocked(ithc, data);
 	mutex_unlock(&ithc->dma_tx.mutex);
 	return ret;
 }

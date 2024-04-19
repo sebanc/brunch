@@ -1,7 +1,7 @@
 diff -ruN a/arch/x86/entry/common.c b/arch/x86/entry/common.c
---- a/arch/x86/entry/common.c	2023-01-24 07:24:44.000000000 +0100
-+++ b/arch/x86/entry/common.c	2023-01-30 08:32:14.000000000 +0100
-@@ -44,13 +44,26 @@
+--- a/arch/x86/entry/common.c	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/entry/common.c	2024-04-18 07:32:56.067000000 +0200
+@@ -45,13 +45,26 @@
  	 * numbers for comparisons.
  	 */
  	unsigned int unr = nr;
@@ -20,7 +20,8 @@ diff -ruN a/arch/x86/entry/common.c b/arch/x86/entry/common.c
 +#else
  	if (likely(unr < NR_syscalls)) {
  		unr = array_index_nospec(unr, NR_syscalls);
- 		regs->ax = sys_call_table[unr](regs);
+-		regs->ax = x64_sys_call(regs, unr);
++		regs->ax = sys_call_table[unr](regs);
  		return true;
  	}
  	return false;
@@ -28,7 +29,16 @@ diff -ruN a/arch/x86/entry/common.c b/arch/x86/entry/common.c
  }
  
  static __always_inline bool do_syscall_x32(struct pt_regs *regs, int nr)
-@@ -106,13 +119,20 @@
+@@ -65,7 +78,7 @@
+ 
+ 	if (IS_ENABLED(CONFIG_X86_X32_ABI) && likely(xnr < X32_NR_syscalls)) {
+ 		xnr = array_index_nospec(xnr, X32_NR_syscalls);
+-		regs->ax = x32_sys_call(regs, xnr);
++		regs->ax = x32_sys_call_table[xnr](regs);
+ 		return true;
+ 	}
+ 	return false;
+@@ -111,13 +124,20 @@
  	 * numbers for comparisons.
  	 */
  	unsigned int unr = nr;
@@ -42,14 +52,94 @@ diff -ruN a/arch/x86/entry/common.c b/arch/x86/entry/common.c
 +#else
  	if (likely(unr < IA32_NR_syscalls)) {
  		unr = array_index_nospec(unr, IA32_NR_syscalls);
- 		regs->ax = ia32_sys_call_table[unr](regs);
+-		regs->ax = ia32_sys_call(regs, unr);
++		regs->ax = ia32_sys_call_table[unr](regs);
  	} else if (nr != -1) {
  		regs->ax = __ia32_sys_ni_syscall(regs);
  	}
 +#endif
  }
  
- /* Handles int $0x80 */
+ #ifdef CONFIG_IA32_EMULATION
+diff -ruN a/arch/x86/entry/syscall_32.c b/arch/x86/entry/syscall_32.c
+--- a/arch/x86/entry/syscall_32.c	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/entry/syscall_32.c	2024-04-18 07:32:56.077000000 +0200
+@@ -18,25 +18,8 @@
+ #include <asm/syscalls_32.h>
+ #undef __SYSCALL
+ 
+-/*
+- * The sys_call_table[] is no longer used for system calls, but
+- * kernel/trace/trace_syscalls.c still wants to know the system
+- * call address.
+- */
+-#ifdef CONFIG_X86_32
+ #define __SYSCALL(nr, sym) __ia32_##sym,
+-const sys_call_ptr_t sys_call_table[] = {
+-#include <asm/syscalls_32.h>
+-};
+-#undef __SYSCALL
+-#endif
+ 
+-#define __SYSCALL(nr, sym) case nr: return __ia32_##sym(regs);
+-
+-long ia32_sys_call(const struct pt_regs *regs, unsigned int nr)
+-{
+-	switch (nr) {
+-	#include <asm/syscalls_32.h>
+-	default: return __ia32_sys_ni_syscall(regs);
+-	}
++__visible const sys_call_ptr_t ia32_sys_call_table[] = {
++#include <asm/syscalls_32.h>
+ };
+diff -ruN a/arch/x86/entry/syscall_64.c b/arch/x86/entry/syscall_64.c
+--- a/arch/x86/entry/syscall_64.c	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/entry/syscall_64.c	2024-04-18 07:32:56.077000000 +0200
+@@ -11,23 +11,8 @@
+ #include <asm/syscalls_64.h>
+ #undef __SYSCALL
+ 
+-/*
+- * The sys_call_table[] is no longer used for system calls, but
+- * kernel/trace/trace_syscalls.c still wants to know the system
+- * call address.
+- */
+ #define __SYSCALL(nr, sym) __x64_##sym,
+-const sys_call_ptr_t sys_call_table[] = {
+-#include <asm/syscalls_64.h>
+-};
+-#undef __SYSCALL
+ 
+-#define __SYSCALL(nr, sym) case nr: return __x64_##sym(regs);
+-
+-long x64_sys_call(const struct pt_regs *regs, unsigned int nr)
+-{
+-	switch (nr) {
+-	#include <asm/syscalls_64.h>
+-	default: return __x64_sys_ni_syscall(regs);
+-	}
++asmlinkage const sys_call_ptr_t sys_call_table[] = {
++#include <asm/syscalls_64.h>
+ };
+diff -ruN a/arch/x86/entry/syscall_x32.c b/arch/x86/entry/syscall_x32.c
+--- a/arch/x86/entry/syscall_x32.c	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/entry/syscall_x32.c	2024-04-18 07:32:56.077000000 +0200
+@@ -11,12 +11,8 @@
+ #include <asm/syscalls_x32.h>
+ #undef __SYSCALL
+ 
+-#define __SYSCALL(nr, sym) case nr: return __x64_##sym(regs);
++#define __SYSCALL(nr, sym) __x64_##sym,
+ 
+-long x32_sys_call(const struct pt_regs *regs, unsigned int nr)
+-{
+-	switch (nr) {
+-	#include <asm/syscalls_x32.h>
+-	default: return __x64_sys_ni_syscall(regs);
+-	}
++asmlinkage const sys_call_ptr_t x32_sys_call_table[] = {
++#include <asm/syscalls_x32.h>
+ };
 diff -ruN a/arch/x86/include/asm/amd_nb.h b/arch/x86/include/asm/amd_nb.h
 --- a/arch/x86/include/asm/amd_nb.h	2023-01-24 07:24:44.000000000 +0100
 +++ b/arch/x86/include/asm/amd_nb.h	2023-01-30 08:32:15.000000000 +0100
@@ -86,19 +176,35 @@ diff -ruN a/arch/x86/include/asm/perf_event_p4.h b/arch/x86/include/asm/perf_eve
  #endif
  	return 0;
 diff -ruN a/arch/x86/include/asm/syscall.h b/arch/x86/include/asm/syscall.h
---- a/arch/x86/include/asm/syscall.h	2023-01-24 07:24:44.000000000 +0100
-+++ b/arch/x86/include/asm/syscall.h	2023-01-30 08:32:15.000000000 +0100
-@@ -21,6 +21,7 @@
+--- a/arch/x86/include/asm/syscall.h	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/include/asm/syscall.h	2024-04-18 07:32:56.236000000 +0200
+@@ -16,17 +16,19 @@
+ #include <asm/thread_info.h>	/* for TS_COMPAT */
+ #include <asm/unistd.h>
  
- #if defined(CONFIG_X86_32)
- #define ia32_sys_call_table sys_call_table
-+#define ia32_nr_syscalls nr_syscalls
- #else
+-/* This is used purely for kernel/trace/trace_syscalls.c */
+ typedef long (*sys_call_ptr_t)(const struct pt_regs *);
+ extern const sys_call_ptr_t sys_call_table[];
+ 
++#if defined(CONFIG_X86_32)
++#define ia32_sys_call_table sys_call_table
++#else
  /*
   * These may not exist, but still put the prototypes in so we
+  * can use IS_ENABLED().
+  */
+-extern long ia32_sys_call(const struct pt_regs *, unsigned int nr);
+-extern long x32_sys_call(const struct pt_regs *, unsigned int nr);
+-extern long x64_sys_call(const struct pt_regs *, unsigned int nr);
++extern const sys_call_ptr_t ia32_sys_call_table[];
++extern const sys_call_ptr_t x32_sys_call_table[];
++#endif
+ 
+ /*
+  * Only the low 32 bits of orig_ax are meaningful, so we return int.
 diff -ruN a/arch/x86/include/asm/thread_info.h b/arch/x86/include/asm/thread_info.h
---- a/arch/x86/include/asm/thread_info.h	2023-01-24 07:24:44.000000000 +0100
-+++ b/arch/x86/include/asm/thread_info.h	2023-01-30 08:32:15.000000000 +0100
+--- a/arch/x86/include/asm/thread_info.h	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/include/asm/thread_info.h	2024-04-18 07:32:56.238000000 +0200
 @@ -50,6 +50,10 @@
   */
  #ifndef __ASSEMBLY__
@@ -34479,14 +34585,6 @@ diff -ruN a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
  
  /* HCI priority */
  #define HCI_PRIO_MAX	7
-@@ -208,6 +209,7 @@
- 	struct list_head list;
- 	struct rcu_head rcu;
- 	bdaddr_t rpa;
-+	__u32 rpa_timestamp;
- 	bdaddr_t bdaddr;
- 	u8 addr_type;
- 	u8 val[16];
 @@ -362,6 +364,7 @@
  	__u8		dev_name[HCI_MAX_NAME_LENGTH];
  	__u8		short_name[HCI_MAX_SHORT_NAME_LENGTH];
@@ -39958,90 +40056,9 @@ diff -ruN a/net/bluetooth/hci_conn.c b/net/bluetooth/hci_conn.c
  
  	set_bit(HCI_CONN_POWER_SAVE, &conn->flags);
  	conn->disc_timeout = HCI_DISCONN_TIMEOUT;
-@@ -1490,6 +1489,7 @@
- 				     enum conn_reasons conn_reason)
- {
- 	struct hci_conn *conn;
-+	struct smp_irk *irk;
- 
- 	/* Let's make sure that le is enabled.*/
- 	if (!hci_dev_test_flag(hdev, HCI_LE_ENABLED)) {
-@@ -1515,6 +1515,20 @@
- 		goto done;
- 	}
- 
-+	/* If we don't have an Irk or that we have a recent rpa, skip the extra
-+	 * scan and try to connect immediately.
-+	 */
-+	irk = hci_find_irk_by_addr(hdev, dst, dst_type);
-+	if (!irk ||
-+	    time_before(jiffies, irk->rpa_timestamp + msecs_to_jiffies(2000))) {
-+		bt_dev_info(hdev, "Skipping le scan before connect");
-+
-+		return hci_connect_le(hdev, dst, dst_type,
-+				sec_level, false,
-+				HCI_LE_CONN_TIMEOUT,
-+				HCI_ROLE_MASTER);
-+	}
-+
- 	BT_DBG("requesting refresh of dst_addr");
- 
- 	conn = hci_conn_add(hdev, LE_LINK, dst, HCI_ROLE_MASTER);
 diff -ruN a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
 --- a/net/bluetooth/hci_core.c	2023-01-24 07:24:44.000000000 +0100
 +++ b/net/bluetooth/hci_core.c	2023-01-30 08:33:16.000000000 +0100
-@@ -1248,6 +1248,7 @@
- 	list_for_each_entry_rcu(irk, &hdev->identity_resolving_keys, list) {
- 		if (smp_irk_matches(hdev, irk->val, rpa)) {
- 			bacpy(&irk->rpa, rpa);
-+			irk->rpa_timestamp = jiffies;
- 			irk_to_return = irk;
- 			goto done;
- 		}
-@@ -1394,6 +1395,7 @@
- 
- 	memcpy(irk->val, val, 16);
- 	bacpy(&irk->rpa, rpa);
-+	irk->rpa_timestamp = jiffies;
- 
- 	return irk;
- }
-@@ -1490,18 +1492,26 @@
- 	struct hci_dev *hdev = container_of(work, struct hci_dev,
- 					    cmd_timer.work);
- 
--	if (hdev->sent_cmd) {
--		struct hci_command_hdr *sent = (void *) hdev->sent_cmd->data;
--		u16 opcode = __le16_to_cpu(sent->opcode);
-+	/* Don't trigger the timeout behavior if it happens while we're in
-+	 * userchannel mode. Userspace is responsible for handling any command
-+	 * timeouts.
-+	 */
-+	if (!(hci_dev_test_flag(hdev, HCI_USER_CHANNEL) &&
-+	      test_bit(HCI_UP, &hdev->flags))) {
-+		if (hdev->sent_cmd) {
-+			struct hci_command_hdr *sent =
-+				(void *)hdev->sent_cmd->data;
-+			u16 opcode = __le16_to_cpu(sent->opcode);
-+
-+			bt_dev_err(hdev, "command 0x%4.4x tx timeout", opcode);
-+		} else {
-+			bt_dev_err(hdev, "command tx timeout");
-+		}
- 
--		bt_dev_err(hdev, "command 0x%4.4x tx timeout", opcode);
--	} else {
--		bt_dev_err(hdev, "command tx timeout");
-+		if (hdev->cmd_timeout)
-+			hdev->cmd_timeout(hdev);
- 	}
- 
--	if (hdev->cmd_timeout)
--		hdev->cmd_timeout(hdev);
--
- 	atomic_set(&hdev->cmd_cnt, 1);
- 	queue_work(hdev->workqueue, &hdev->cmd_work);
- }
 @@ -2449,6 +2459,7 @@
  	hdev->adv_instance_cnt = 0;
  	hdev->cur_adv_instance = 0x00;
@@ -49260,79 +49277,6 @@ diff -ruN a/sound/soc/sof/intel/hda-loader.c b/sound/soc/sof/intel/hda-loader.c
  					      &dmab_bdl, SNDRV_PCM_STREAM_CAPTURE);
  	if (IS_ERR(iccmax_stream)) {
  		dev_err(sdev->dev, "error: dma prepare for ICCMAX stream failed\n");
-diff -ruN a/sound/soc/sof/ipc3-loader.c b/sound/soc/sof/ipc3-loader.c
---- a/sound/soc/sof/ipc3-loader.c	2023-01-24 07:24:44.000000000 +0100
-+++ b/sound/soc/sof/ipc3-loader.c	2023-01-30 08:33:21.000000000 +0100
-@@ -138,8 +138,7 @@
- 
- static size_t sof_ipc3_fw_parse_ext_man(struct snd_sof_dev *sdev)
- {
--	struct snd_sof_pdata *plat_data = sdev->pdata;
--	const struct firmware *fw = plat_data->fw;
-+	const struct firmware *fw = sdev->basefw.fw;
- 	const struct sof_ext_man_elem_header *elem_hdr;
- 	const struct sof_ext_man_header *head;
- 	ssize_t ext_man_size;
-@@ -310,18 +309,18 @@
- 
- static int sof_ipc3_load_fw_to_dsp(struct snd_sof_dev *sdev)
- {
--	struct snd_sof_pdata *plat_data = sdev->pdata;
--	const struct firmware *fw = plat_data->fw;
-+	u32 payload_offset = sdev->basefw.payload_offset;
-+	const struct firmware *fw = sdev->basefw.fw;
- 	struct snd_sof_fw_header *header;
- 	struct snd_sof_mod_hdr *module;
- 	int (*load_module)(struct snd_sof_dev *sof_dev, struct snd_sof_mod_hdr *hdr);
- 	size_t remaining;
- 	int ret, count;
- 
--	if (!plat_data->fw)
-+	if (!fw)
- 		return -EINVAL;
- 
--	header = (struct snd_sof_fw_header *)(fw->data + plat_data->fw_offset);
-+	header = (struct snd_sof_fw_header *)(fw->data + payload_offset);
- 	load_module = sof_ops(sdev)->load_module;
- 	if (!load_module) {
- 		dev_dbg(sdev->dev, "Using generic module loading\n");
-@@ -331,9 +330,8 @@
- 	}
- 
- 	/* parse each module */
--	module = (struct snd_sof_mod_hdr *)(fw->data + plat_data->fw_offset +
--					    sizeof(*header));
--	remaining = fw->size - sizeof(*header) - plat_data->fw_offset;
-+	module = (struct snd_sof_mod_hdr *)(fw->data + payload_offset + sizeof(*header));
-+	remaining = fw->size - sizeof(*header) - payload_offset;
- 	/* check for wrap */
- 	if (remaining > fw->size) {
- 		dev_err(sdev->dev, "%s: fw size smaller than header size\n", __func__);
-@@ -374,19 +372,19 @@
- 
- static int sof_ipc3_validate_firmware(struct snd_sof_dev *sdev)
- {
--	struct snd_sof_pdata *plat_data = sdev->pdata;
--	const struct firmware *fw = plat_data->fw;
-+	u32 payload_offset = sdev->basefw.payload_offset;
-+	const struct firmware *fw = sdev->basefw.fw;
- 	struct snd_sof_fw_header *header;
--	size_t fw_size = fw->size - plat_data->fw_offset;
-+	size_t fw_size = fw->size - payload_offset;
- 
--	if (fw->size <= plat_data->fw_offset) {
-+	if (fw->size <= payload_offset) {
- 		dev_err(sdev->dev,
- 			"firmware size must be greater than firmware offset\n");
- 		return -EINVAL;
- 	}
- 
- 	/* Read the header information from the data pointer */
--	header = (struct snd_sof_fw_header *)(fw->data + plat_data->fw_offset);
-+	header = (struct snd_sof_fw_header *)(fw->data + payload_offset);
- 
- 	/* verify FW sig */
- 	if (strncmp(header->sig, SND_SOF_FW_SIG, SND_SOF_FW_SIG_SIZE) != 0) {
 diff -ruN a/sound/soc/sof/ipc3-pcm.c b/sound/soc/sof/ipc3-pcm.c
 --- a/sound/soc/sof/ipc3-pcm.c	2023-01-24 07:24:44.000000000 +0100
 +++ b/sound/soc/sof/ipc3-pcm.c	2023-01-30 08:33:21.000000000 +0100
@@ -49447,94 +49391,6 @@ diff -ruN a/sound/soc/sof/ipc3-topology.c b/sound/soc/sof/ipc3-topology.c
  			ret = sof_link_acp_hs_load(scomp, slink, config, dai);
  			break;
  		case SOF_DAI_AMD_DMIC:
-diff -ruN a/sound/soc/sof/ipc4-loader.c b/sound/soc/sof/ipc4-loader.c
---- a/sound/soc/sof/ipc4-loader.c	2023-01-24 07:24:44.000000000 +0100
-+++ b/sound/soc/sof/ipc4-loader.c	2023-01-30 08:33:21.000000000 +0100
-@@ -17,9 +17,8 @@
- static size_t sof_ipc4_fw_parse_ext_man(struct snd_sof_dev *sdev)
- {
- 	struct sof_ipc4_fw_data *ipc4_data = sdev->private;
--	struct snd_sof_pdata *plat_data = sdev->pdata;
- 	struct sof_man4_fw_binary_header *fw_header;
--	const struct firmware *fw = plat_data->fw;
-+	const struct firmware *fw = sdev->basefw.fw;
- 	struct sof_ext_manifest4_hdr *ext_man_hdr;
- 	struct sof_man4_module_config *fm_config;
- 	struct sof_ipc4_fw_module *fw_module;
-@@ -138,9 +137,8 @@
- {
- 	struct sof_ipc4_fw_data *ipc4_data = sdev->private;
- 	u32 fw_hdr_offset = ipc4_data->manifest_fw_hdr_offset;
--	struct snd_sof_pdata *plat_data = sdev->pdata;
- 	struct sof_man4_fw_binary_header *fw_header;
--	const struct firmware *fw = plat_data->fw;
-+	const struct firmware *fw = sdev->basefw.fw;
- 	struct sof_ext_manifest4_hdr *ext_man_hdr;
- 
- 	ext_man_hdr = (struct sof_ext_manifest4_hdr *)fw->data;
-diff -ruN a/sound/soc/sof/loader.c b/sound/soc/sof/loader.c
---- a/sound/soc/sof/loader.c	2023-01-24 07:24:44.000000000 +0100
-+++ b/sound/soc/sof/loader.c	2023-01-30 08:33:21.000000000 +0100
-@@ -22,7 +22,7 @@
- 	int ret;
- 
- 	/* Don't request firmware again if firmware is already requested */
--	if (plat_data->fw)
-+	if (sdev->basefw.fw)
- 		return 0;
- 
- 	fw_filename = kasprintf(GFP_KERNEL, "%s/%s",
-@@ -31,7 +31,7 @@
- 	if (!fw_filename)
- 		return -ENOMEM;
- 
--	ret = request_firmware(&plat_data->fw, fw_filename, sdev->dev);
-+	ret = request_firmware(&sdev->basefw.fw, fw_filename, sdev->dev);
- 
- 	if (ret < 0) {
- 		dev_err(sdev->dev,
-@@ -48,7 +48,7 @@
- 	ext_man_size = sdev->ipc->ops->fw_loader->parse_ext_manifest(sdev);
- 	if (ext_man_size > 0) {
- 		/* when no error occurred, drop extended manifest */
--		plat_data->fw_offset = ext_man_size;
-+		sdev->basefw.payload_offset = ext_man_size;
- 	} else if (!ext_man_size) {
- 		/* No extended manifest, so nothing to skip during FW load */
- 		dev_dbg(sdev->dev, "firmware doesn't contain extended manifest\n");
-@@ -58,6 +58,12 @@
- 			fw_filename, ret);
- 	}
- 
-+	/*
-+	 * Until the platform code is switched to use the new container the fw
-+	 * and payload offset must be set in plat_data
-+	 */
-+	plat_data->fw = sdev->basefw.fw;
-+	plat_data->fw_offset = sdev->basefw.payload_offset;
- err:
- 	kfree(fw_filename);
- 
-@@ -100,7 +106,8 @@
- 	return 0;
- 
- error:
--	release_firmware(plat_data->fw);
-+	release_firmware(sdev->basefw.fw);
-+	sdev->basefw.fw = NULL;
- 	plat_data->fw = NULL;
- 	return ret;
- 
-@@ -185,7 +192,8 @@
- void snd_sof_fw_unload(struct snd_sof_dev *sdev)
- {
- 	/* TODO: support module unloading at runtime */
--	release_firmware(sdev->pdata->fw);
-+	release_firmware(sdev->basefw.fw);
-+	sdev->basefw.fw = NULL;
- 	sdev->pdata->fw = NULL;
- }
- EXPORT_SYMBOL(snd_sof_fw_unload);
 diff -ruN a/sound/soc/sof/sof-audio.h b/sound/soc/sof/sof-audio.h
 --- a/sound/soc/sof/sof-audio.h	2023-01-24 07:24:44.000000000 +0100
 +++ b/sound/soc/sof/sof-audio.h	2023-01-30 08:33:21.000000000 +0100
@@ -49546,37 +49402,6 @@ diff -ruN a/sound/soc/sof/sof-audio.h b/sound/soc/sof/sof-audio.h
  
  	/* this should be the last */
  	SOF_TOKEN_COUNT,
-diff -ruN a/sound/soc/sof/sof-priv.h b/sound/soc/sof/sof-priv.h
---- a/sound/soc/sof/sof-priv.h	2023-01-24 07:24:44.000000000 +0100
-+++ b/sound/soc/sof/sof-priv.h	2023-01-30 08:33:21.000000000 +0100
-@@ -136,6 +136,17 @@
- 	bool cont_update_posn;
- };
- 
-+/**
-+ * struct sof_firmware - Container struct for SOF firmware
-+ * @fw:			Pointer to the firmware
-+ * @payload_offset:	Offset of the data within the loaded firmware image to be
-+ *			loaded to the DSP (skipping for example ext_manifest section)
-+ */
-+struct sof_firmware {
-+	const struct firmware *fw;
-+	u32 payload_offset;
-+};
-+
- /*
-  * SOF DSP HW abstraction operations.
-  * Used to abstract DSP HW architecture and any IO busses between host CPU
-@@ -487,6 +498,9 @@
- 	spinlock_t ipc_lock;	/* lock for IPC users */
- 	spinlock_t hw_lock;	/* lock for HW IO access */
- 
-+	/* Main, Base firmware image */
-+	struct sof_firmware basefw;
-+
- 	/*
- 	 * ASoC components. plat_drv fields are set dynamically so
- 	 * can't use const
 diff -ruN a/sound/soc/sof/topology.c b/sound/soc/sof/topology.c
 --- a/sound/soc/sof/topology.c	2023-01-24 07:24:44.000000000 +0100
 +++ b/sound/soc/sof/topology.c	2023-01-30 08:33:21.000000000 +0100

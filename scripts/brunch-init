@@ -187,6 +187,9 @@ if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
 		mkfs.ext4 -F -b 4096 -L "H-STATE" "$partpath"1
 	fi
 	umount /roota
+	if [ "$current_debug" == "" ]; then
+		printf '\fff' | dd of="$partpath"3 seek=$((0x464 + 3)) conv=notrunc count=1 bs=1 status=none
+	fi
 	cgpt add -i 2 -P 15 -T 15 -S 0 "$bootdevice"
 	cgpt add -i 4 -P 0 -T 15 -S 0 "$bootdevice"
 	echo "$(grep -o cros_debug /proc/cmdline)" > /rootc/debug
@@ -195,6 +198,8 @@ if [ "$rebuild" -eq 1 ] && [ "$rootb_is_valid" -eq 1 ]; then
 	md5sum=$(ls --full-time -lR /rootc/* | md5sum)
 	echo "$md5sum" > /rootc/.md5sum
 fi
+
+umount /rootc
 
 if [ ! -z "$chromeos_bootsplash" ]; then
 	mount "$partpath"1 /data
@@ -206,9 +211,12 @@ if [ ! -z "$chromeos_bootsplash" ]; then
 	umount /data
 fi
 
-umount /rootc
-e2fsck -y "$partpath"3
-mount "$partpath"3 /roota
+if [ "$current_debug" == "" ]; then
+	mount -o ro "$partpath"3 /roota
+else
+	e2fsck -y "$partpath"3
+	mount "$partpath"3 /roota
+fi
 
 touch /dev/cros_ec
 

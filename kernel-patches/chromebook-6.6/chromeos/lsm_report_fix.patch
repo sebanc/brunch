@@ -1,0 +1,11 @@
+--- a/security/chromiumos/lsm.c	2024-04-19 08:40:32.020624366 +0200
++++ b/security/chromiumos/lsm.c	2024-04-19 08:47:43.607299422 +0200
+@@ -84,6 +84,8 @@
+ 	kfree(cmdline);
+ 	kfree(alloced);
+ }
++#else
++static void report(const char *origin, const struct path *path, char *operation) {}
+ #endif
+ 
+ static int chromiumos_security_sb_mount(const char *dev_name,

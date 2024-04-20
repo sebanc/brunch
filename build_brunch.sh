@@ -319,7 +319,7 @@ tar -C ../rootc/lib/firmware/ -xf /tmp/intel-ucode.tar.zst boot/intel-ucode.img 
 rm /tmp/intel-ucode.tar.zst || { echo "Failed to cleanup intel ucode"; exit 1; }
 cd ./out || { echo "Failed to enter the final firmware directory"; exit 1; }
 find . -type l -not -name '*.xz' -exec bash -c 't=$(readlink "{}"); echo -n "link found "{}""; if [ ! -d "$(realpath "{}")" ]; then echo -n " - modifying symlink"; ln -sf "${t}".xz "{}".xz; rm "{}"; fi; echo ""' \;
-find . -type f -not -name '*.xz' -exec xz -C crc32 '{}' \;
+find . -type f -not -name '*.xz' -exec xz -C crc32 --lzma2=dict=1MiB '{}' \;
 echo "Broken symlinks:"
 find . -type l ! -exec test -e {} \; -print
 tar zcf ../../rootc/packages/firmwares.tar.gz * --owner=0 --group=0 || { echo "Failed to create the firmwares archive"; exit 1; }

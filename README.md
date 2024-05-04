@@ -41,7 +41,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 
 
 ✔ CPU Compatibility:
-- [Intel CPUs][intel-cpus] from Skylake (6th Gen) / [Celeron CPUs][celeron-cpus] from Goldmont
+- [Intel CPUs][intel-cpus] from 8th Gen / [Celeron CPUs][celeron-cpus] from Goldmont
 - [AMD Ryzen][amd-ry-list]
 
 

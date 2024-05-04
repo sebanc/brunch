@@ -32,7 +32,7 @@ Linuxloops will perform automatically most of the brunch install steps (notably 
 1. Identify the recovery suitable for your CPU:  
   
 #### Intel
-* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+* 8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
 * 10th gen: "[jinlon][recovery-jinlon]".  
 * 11th gen & above: "[voxel][recovery-voxel]".  
 #### AMD
@@ -119,7 +119,7 @@ It is normal for the first boot to take a very long time, please be patient.
 1. Identify the recovery suitable for your CPU:  
   
 #### Intel
-* 6th gen -> 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+* 8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
 * 10th gen: "[jinlon][recovery-jinlon]".  
 * 11th gen & above: "[voxel][recovery-voxel]".  
 #### AMD

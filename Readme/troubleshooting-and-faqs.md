@@ -95,14 +95,14 @@ The first two pages of the Brunch Configuration Menu are for selecting Framework
 
 Some device specific options can be enabled through brunch configuration menu:
 - "enable_updates": allow native ChromeOS updates (use at your own risk: ChromeOS will be updated but not the Brunch framework/kernel which might render your ChromeOS install unstable or even unbootable),
-- "pwa": use this option to enable the brunch PWA 
-  - You can install the original one from https://sebanc.github.io/brunch-pwa/ (see a preview [on the wiki][brunch-pwa-info]) or the ITESaurabh version available at: https://itesaurabh.github.io/brunch-pwa,
+- "pwa": use this option to enable the brunch PWA:
+  - You can install the original one from https://sebanc.github.io/brunch-pwa/ or the ITESaurabh version available at: https://itesaurabh.github.io/brunch-pwa,
 - "android_init_fix": alternative init to support devices on which the android container fails to start with the standard init,
-- "mount_internal_drives": allows automatic mounting of HDD partitions in ChromeOS 
+- "mount_internal_drives": allows automatic mounting of HDD partitions in ChromeOS:
   - Android media server will scan those drives which will cause high CPU usage until it has finished, it might take hours depending on your data,
   - Partition label will be used if it exists,
 - "chromebook_audio": enable audio on EOL chromebook devices using the brunch recommended recovery image,
-- "native_chromebook_image": enable it to use brunch on a non-EOL chromebook using its official recovery image, make sure to also select the chromebook kernel version used by your device in ChromeOS.
+- "native_chromebook_image": enable it to use brunch on a non-EOL chromebook using its official recovery image, make sure to also select the chromebook kernel version used by your device in ChromeOS,
 - "broadcom_wl": enable this option if you need the broadcom_wl module,
 - "iwlwifi_backport": enable this option if your intel wireless card is not supported natively in the kernel,
 - "rtl8188eu": enable this option if you have a rtl8188eu wireless card/adapter,
@@ -128,11 +128,11 @@ Some device specific options can be enabled through brunch configuration menu:
 - "alt_touchpad_config2": another option to try if you have touchpad issues,
 - "internal_mic_fix": fix for internal mic on some devices,
 - "internal_mic_fix2": alternative fix for internal mic on some devices,
-- "sysfs_tablet_mode": allow to control tablet mode from sysfs 
+- "sysfs_tablet_mode": allow to control tablet mode from sysfs:
   - `echo 1 | sudo tee /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode` to activate it or use 0 to disable it,
 - "force_tablet_mode": same as above except tablet mode is enabled by default on boot,
 - "suspend_s3": disable suspend to idle (S0ix) and use S3 suspend instead,
-- "advanced_als": [default ChromeOS auto-brightness][auto-brightness] is very basic, 
+- "advanced_als": [default ChromeOS auto-brightness][auto-brightness] is very basic:
   - This option activates more auto-brightness levels (based on the Pixel Slate implementation).
 
  </details>
@@ -440,7 +440,6 @@ It is currently recommended to only update ChromeOS when the matching version of
 [bs-nr2]: https://github.com/sebanc/brunch/blob/r97/bootsplashes/neon_red_light/main.png
 
 <!-- Internal Links -->
-[cpu-wiki]: https://github.com/sebanc/brunch/wiki/CPUs-&-Recoveries
 [windows-guide]: ./install-with-windows.md
 [linux-guide]: ./install-with-linux.md
 [troubleshooting-and-faqs]: ./troubleshooting-and-faqs.md
@@ -451,4 +450,3 @@ It is currently recommended to only update ChromeOS when the matching version of
 [latest-release]: https://github.com/sebanc/brunch/releases/latest
 [brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
 [secure-boot]: ./install-with-linux.md#secure-boot
-[brunch-pwa-info]: https://github.com/sebanc/brunch/wiki/Brunch-PWA-Guide

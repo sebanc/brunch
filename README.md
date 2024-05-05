@@ -130,5 +130,4 @@ Additional troubleshooting and support tips can be found at the following page:
 [latest-release]: https://github.com/sebanc/brunch/releases/latest
 [brunch-der]: https://github.com/sebanc/brunch/raw/master/brunch.der
 [secure-boot]: ./Readme/install-with-linux.md#secure-boot
-[brunch-pwa-info]: https://github.com/sebanc/brunch/wiki/Brunch-PWA-Guide
 

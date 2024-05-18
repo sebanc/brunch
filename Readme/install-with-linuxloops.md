@@ -51,6 +51,8 @@ Fedora-based distro: `sudo dnf install zenity`
 4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.  
   
 `sudo bash ~/linuxloops`  
+ 
+ If there is an error in the download process (especially in some areas where VPN is required, such as China), you can check the download address displayed in the window, use a third-party download tool to download "archlinux-rootfs.tar.xz", and copy it to ~ /.linuxloops directory, run sudo bash ~/linuxloops again
   
 Choose "disk" at the install type prompt and select your USB flashdrive as destination.  
   

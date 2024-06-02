@@ -1,7 +1,7 @@
 diff -ruN a/arch/x86/entry/common.c b/arch/x86/entry/common.c
---- a/arch/x86/entry/common.c	2023-11-08 11:56:25.000000000 +0100
-+++ b/arch/x86/entry/common.c	2024-01-24 07:43:04.000000000 +0100
-@@ -44,13 +44,26 @@
+--- a/arch/x86/entry/common.c	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/entry/common.c	2024-04-18 07:32:56.067000000 +0200
+@@ -45,13 +45,26 @@
  	 * numbers for comparisons.
  	 */
  	unsigned int unr = nr;
@@ -20,7 +20,8 @@ diff -ruN a/arch/x86/entry/common.c b/arch/x86/entry/common.c
 +#else
  	if (likely(unr < NR_syscalls)) {
  		unr = array_index_nospec(unr, NR_syscalls);
- 		regs->ax = sys_call_table[unr](regs);
+-		regs->ax = x64_sys_call(regs, unr);
++		regs->ax = sys_call_table[unr](regs);
  		return true;
  	}
  	return false;
@@ -28,7 +29,16 @@ diff -ruN a/arch/x86/entry/common.c b/arch/x86/entry/common.c
  }
  
  static __always_inline bool do_syscall_x32(struct pt_regs *regs, int nr)
-@@ -106,13 +119,20 @@
+@@ -65,7 +78,7 @@
+ 
+ 	if (IS_ENABLED(CONFIG_X86_X32_ABI) && likely(xnr < X32_NR_syscalls)) {
+ 		xnr = array_index_nospec(xnr, X32_NR_syscalls);
+-		regs->ax = x32_sys_call(regs, xnr);
++		regs->ax = x32_sys_call_table[xnr](regs);
+ 		return true;
+ 	}
+ 	return false;
+@@ -111,13 +124,20 @@
  	 * numbers for comparisons.
  	 */
  	unsigned int unr = nr;
@@ -42,14 +52,94 @@ diff -ruN a/arch/x86/entry/common.c b/arch/x86/entry/common.c
 +#else
  	if (likely(unr < IA32_NR_syscalls)) {
  		unr = array_index_nospec(unr, IA32_NR_syscalls);
- 		regs->ax = ia32_sys_call_table[unr](regs);
+-		regs->ax = ia32_sys_call(regs, unr);
++		regs->ax = ia32_sys_call_table[unr](regs);
  	} else if (nr != -1) {
  		regs->ax = __ia32_sys_ni_syscall(regs);
  	}
 +#endif
  }
  
- /* Handles int $0x80 */
+ #ifdef CONFIG_IA32_EMULATION
+diff -ruN a/arch/x86/entry/syscall_32.c b/arch/x86/entry/syscall_32.c
+--- a/arch/x86/entry/syscall_32.c	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/entry/syscall_32.c	2024-04-18 07:32:56.077000000 +0200
+@@ -18,25 +18,8 @@
+ #include <asm/syscalls_32.h>
+ #undef __SYSCALL
+ 
+-/*
+- * The sys_call_table[] is no longer used for system calls, but
+- * kernel/trace/trace_syscalls.c still wants to know the system
+- * call address.
+- */
+-#ifdef CONFIG_X86_32
+ #define __SYSCALL(nr, sym) __ia32_##sym,
+-const sys_call_ptr_t sys_call_table[] = {
+-#include <asm/syscalls_32.h>
+-};
+-#undef __SYSCALL
+-#endif
+ 
+-#define __SYSCALL(nr, sym) case nr: return __ia32_##sym(regs);
+-
+-long ia32_sys_call(const struct pt_regs *regs, unsigned int nr)
+-{
+-	switch (nr) {
+-	#include <asm/syscalls_32.h>
+-	default: return __ia32_sys_ni_syscall(regs);
+-	}
++__visible const sys_call_ptr_t ia32_sys_call_table[] = {
++#include <asm/syscalls_32.h>
+ };
+diff -ruN a/arch/x86/entry/syscall_64.c b/arch/x86/entry/syscall_64.c
+--- a/arch/x86/entry/syscall_64.c	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/entry/syscall_64.c	2024-04-18 07:32:56.077000000 +0200
+@@ -11,23 +11,8 @@
+ #include <asm/syscalls_64.h>
+ #undef __SYSCALL
+ 
+-/*
+- * The sys_call_table[] is no longer used for system calls, but
+- * kernel/trace/trace_syscalls.c still wants to know the system
+- * call address.
+- */
+ #define __SYSCALL(nr, sym) __x64_##sym,
+-const sys_call_ptr_t sys_call_table[] = {
+-#include <asm/syscalls_64.h>
+-};
+-#undef __SYSCALL
+ 
+-#define __SYSCALL(nr, sym) case nr: return __x64_##sym(regs);
+-
+-long x64_sys_call(const struct pt_regs *regs, unsigned int nr)
+-{
+-	switch (nr) {
+-	#include <asm/syscalls_64.h>
+-	default: return __x64_sys_ni_syscall(regs);
+-	}
++asmlinkage const sys_call_ptr_t sys_call_table[] = {
++#include <asm/syscalls_64.h>
+ };
+diff -ruN a/arch/x86/entry/syscall_x32.c b/arch/x86/entry/syscall_x32.c
+--- a/arch/x86/entry/syscall_x32.c	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/entry/syscall_x32.c	2024-04-18 07:32:56.077000000 +0200
+@@ -11,12 +11,8 @@
+ #include <asm/syscalls_x32.h>
+ #undef __SYSCALL
+ 
+-#define __SYSCALL(nr, sym) case nr: return __x64_##sym(regs);
++#define __SYSCALL(nr, sym) __x64_##sym,
+ 
+-long x32_sys_call(const struct pt_regs *regs, unsigned int nr)
+-{
+-	switch (nr) {
+-	#include <asm/syscalls_x32.h>
+-	default: return __x64_sys_ni_syscall(regs);
+-	}
++asmlinkage const sys_call_ptr_t x32_sys_call_table[] = {
++#include <asm/syscalls_x32.h>
+ };
 diff -ruN a/arch/x86/include/asm/perf_event_p4.h b/arch/x86/include/asm/perf_event_p4.h
 --- a/arch/x86/include/asm/perf_event_p4.h	2023-11-08 11:56:25.000000000 +0100
 +++ b/arch/x86/include/asm/perf_event_p4.h	2024-01-24 07:43:04.000000000 +0100
@@ -62,6 +152,33 @@ diff -ruN a/arch/x86/include/asm/perf_event_p4.h b/arch/x86/include/asm/perf_eve
  		return cpu != cpumask_first(this_cpu_cpumask_var_ptr(cpu_sibling_map));
  #endif
  	return 0;
+diff -ruN a/arch/x86/include/asm/syscall.h b/arch/x86/include/asm/syscall.h
+--- a/arch/x86/include/asm/syscall.h	2024-04-10 16:28:36.000000000 +0200
++++ b/arch/x86/include/asm/syscall.h	2024-04-18 07:32:56.236000000 +0200
+@@ -16,17 +16,19 @@
+ #include <asm/thread_info.h>	/* for TS_COMPAT */
+ #include <asm/unistd.h>
+ 
+-/* This is used purely for kernel/trace/trace_syscalls.c */
+ typedef long (*sys_call_ptr_t)(const struct pt_regs *);
+ extern const sys_call_ptr_t sys_call_table[];
+ 
++#if defined(CONFIG_X86_32)
++#define ia32_sys_call_table sys_call_table
++#else
+ /*
+  * These may not exist, but still put the prototypes in so we
+  * can use IS_ENABLED().
+  */
+-extern long ia32_sys_call(const struct pt_regs *, unsigned int nr);
+-extern long x32_sys_call(const struct pt_regs *, unsigned int nr);
+-extern long x64_sys_call(const struct pt_regs *, unsigned int nr);
++extern const sys_call_ptr_t ia32_sys_call_table[];
++extern const sys_call_ptr_t x32_sys_call_table[];
++#endif
+ 
+ /*
+  * Only the low 32 bits of orig_ax are meaningful, so we return int.
 diff -ruN a/arch/x86/include/asm/thread_info.h b/arch/x86/include/asm/thread_info.h
 --- a/arch/x86/include/asm/thread_info.h	2023-11-08 11:56:25.000000000 +0100
 +++ b/arch/x86/include/asm/thread_info.h	2024-01-24 07:43:04.000000000 +0100

@@ -80745,7 +80745,7 @@ diff -ruN a/security/chromiumos/inode_mark.c b/security/chromiumos/inode_mark.c
 +
 +	atomic_set(&sbm->refcnt, 1);
 +	sbm->sb = sb;
-+	sbm->fsn_group = fsnotify_alloc_group(&chromiumos_fsn_ops);
++	sbm->fsn_group = fsnotify_alloc_group(&chromiumos_fsn_ops, 0);
 +	if (IS_ERR(sbm->fsn_group)) {
 +		int ret = PTR_ERR(sbm->fsn_group);
 +
@@ -80878,7 +80878,7 @@ diff -ruN a/security/chromiumos/inode_mark.c b/security/chromiumos/inode_mark.c
 +	sbm = chromiumos_super_block_lookup(sb);
 +	if (sbm) {
 +		fsnotify_clear_marks_by_group(sbm->fsn_group,
-+					      FSNOTIFY_OBJ_ALL_TYPES_MASK);
++					      FSNOTIFY_OBJ_TYPE_ANY);
 +		chromiumos_super_block_put(sbm);
 +	}
 +

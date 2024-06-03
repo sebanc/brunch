@@ -5305,7 +5305,7 @@ index 000000000..ae6abcf76
 +    return 0;
 +}
 +
-+static int bce_vhci_address_device(struct usb_hcd *hcd, struct usb_device *udev)
++static int bce_vhci_address_device(struct usb_hcd *hcd, struct usb_device *udev, unsigned int timeout_ms) //TODO: follow timeout
 +{
 +    /* This is the same as enable_device, but instead in the old scheme */
 +    return bce_vhci_enable_device(hcd, udev);

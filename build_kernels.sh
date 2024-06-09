@@ -23,20 +23,25 @@ for kernel in $kernels; do
 	SRCARCH="x86"
 	KCONFIG_CONFIG="$objtree/.config"
 	destdir="$srctree/headers"
-	(cd $srctree; find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl) > "$objtree/hdrsrcfiles"
-	(cd $srctree; find arch/*/include include scripts -type f -o -type l) >> "$objtree/hdrsrcfiles"
-	(cd $srctree; find arch/$SRCARCH -name module.lds -o -name Kbuild.platforms -o -name Platform) >> "$objtree/hdrsrcfiles"
-	(cd $srctree; find $(find arch/$SRCARCH -name include -o -name scripts -type d) -type f) >> "$objtree/hdrsrcfiles"
-	if grep -q '^CONFIG_STACK_VALIDATION=y' $KCONFIG_CONFIG ; then
-		(cd $objtree; find tools/objtool -type f -executable) >> "$objtree/hdrobjfiles"
-	fi
-	(cd $objtree; find arch/$SRCARCH/include Module.symvers include scripts -type f) >> "$objtree/hdrobjfiles"
-	if grep -q '^CONFIG_GCC_PLUGINS=y' $KCONFIG_CONFIG ; then
-		(cd $objtree; find scripts/gcc-plugins -name \*.so -o -name gcc-common.h) >> "$objtree/hdrobjfiles"
-	fi
-	mkdir -p "$destdir"
-	(cd $srctree; tar -c -f - -T -) < "$objtree/hdrsrcfiles" | (cd $destdir; tar -xf -)
-	(cd $objtree; tar -c -f - -T -) < "$objtree/hdrobjfiles" | (cd $destdir; tar -xf -)
-	cp $objtree/.config $destdir/.config
+	mkdir -p "${destdir}"
+	(
+		cd "${srctree}"
+		echo Makefile
+		find "arch/${SRCARCH}" -maxdepth 1 -name 'Makefile*'
+		find include scripts -type f -o -type l
+		find "arch/${SRCARCH}" -name Kbuild.platforms -o -name Platform
+		find "arch/${SRCARCH}" -name include -o -name scripts -type d
+	) | tar -c -f - -C "${srctree}" -T - | tar -xf - -C "${destdir}"
+	{
+		cd "${objtree}"
+		if grep -q "^CONFIG_OBJTOOL=y" include/config/auto.conf; then
+			echo tools/objtool/objtool
+		fi
+		find "arch/${SRCARCH}/include" Module.symvers include scripts -type f
+		if grep -q "^CONFIG_GCC_PLUGINS=y" include/config/auto.conf; then
+			find scripts/gcc-plugins -name '*.so'
+		fi
+	} | tar -c -f - -C "${objtree}" -T - | tar -xf - -C "${destdir}"
+	cp "${KCONFIG_CONFIG}" "${destdir}/.config"
 done
 

@@ -122,6 +122,6 @@ done
 rm -rf ./kernels
 mkdir ./kernels
 
-chromeos_version="R126"
+chromeos_version="R127"
 download_and_patch_kernels
 

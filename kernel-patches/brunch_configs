@@ -12,6 +12,7 @@
 # CONFIG_FW_DEVLINK_SYNC_STATE_TIMEOUT is not set
 # CONFIG_INPUT_EVBUG is not set
 # CONFIG_LOCALVERSION_AUTO is not set
+# CONFIG_MODULE_SIG is not set
 # CONFIG_NUMA is not set
 # CONFIG_PANIC_ON_OOPS is not set
 # CONFIG_RT_GROUP_SCHED is not set

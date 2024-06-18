@@ -165,6 +165,8 @@ elif [ -f /roota/usr/share/chromeos-config/configfs.img ]; then
 	echo "true" > /tmp/configfs/v1/chromeos/configs/0/hardware-properties/has-touchscreen
 	echo "true" > /tmp/configfs/v1/chromeos/configs/0/hardware-properties/is-lid-convertible
 	echo "external" > /tmp/configfs/v1/chromeos/configs/0/hardware-properties/stylus-category
+	mkdir -p /tmp/configfs/v1/chromeos/configs/0/power
+	echo "1" > /tmp/configfs/v1/chromeos/configs/0/power/has-barreljack
 	mkdir -p /tmp/configfs/v1/chromeos/configs/0/identity
 	echo "${board}" > /tmp/configfs/v1/chromeos/configs/0/identity/platform-name
 	echo "Brunch" > /tmp/configfs/v1/chromeos/configs/0/identity/smbios-name-match

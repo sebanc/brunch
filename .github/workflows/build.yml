@@ -167,7 +167,7 @@ jobs:
           echo "RELEASE_FILE=brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz" >> $GITHUB_ENV
           echo "RELEASE_TAG=${RELEASE_VERSION}-${RELEASE_VERSION_TYPE}-${RELEASE_DATE}" >> $GITHUB_ENV
           echo "RELEASE_NAME=Brunch ${RELEASE_VERSION} ${RELEASE_VERSION_TYPE} ${RELEASE_DATE}" >> $GITHUB_ENV
-          echo "RELEASE_SHA256=$(sha256sum $RELEASE_FILE | cut -d' ' -f1)" >> $GITHUB_ENV
+          echo "RELEASE_SHA256=$(sha256sum brunch_${RELEASE_VERSION}_${RELEASE_VERSION_TYPE}_${RELEASE_DATE}.tar.gz | cut -d' ' -f1)" >> $GITHUB_ENV
       - name: Create a release and upload artifacts as assets
         uses: ncipollo/release-action@v1
         with:

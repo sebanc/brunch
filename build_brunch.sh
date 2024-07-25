@@ -95,17 +95,6 @@ if [ "$1" != "skip" ] && [ "$2" != "skip" ]; then
 
 if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
-cp -r ./external-drivers/rtbth ./chroot/tmp/ || { echo "Failed to build external rtbth module for kernel $kernel"; exit 1; }
-cd ./chroot/tmp/rtbth || { echo "Failed to build external rtbth module for kernel $kernel"; exit 1; }
-make -j"$NTHREADS" || { echo "Failed to build external rtbth module for kernel $kernel"; exit 1; }
-cp ./rtbth.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtbth.ko || { echo "Failed to build external rtbth module for kernel $kernel"; exit 1; }
-cd ../../.. || { echo "Failed to build external rtbth module for kernel $kernel"; exit 1; }
-rm -r ./chroot/tmp/rtbth || { echo "Failed to build external rtbth module for kernel $kernel"; exit 1; }
-
-fi
-
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
-
 cp -r ./external-drivers/rtl8188eu ./chroot/tmp/ || { echo "Failed to build external rtl8188eu module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8188eu || { echo "Failed to build external rtl8188eu module for kernel $kernel"; exit 1; }
 make -j"$NTHREADS" modules || { echo "Failed to build external rtl8188eu module for kernel $kernel"; exit 1; }

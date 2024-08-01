@@ -1,0 +1,52 @@
+From 3d4a4a3d62815f90fc65a827a3e2de96c4571350 Mon Sep 17 00:00:00 2001
+From: Orlando Chamberlain <orlandoch.dev@gmail.com>
+Date: Mon, 20 Nov 2023 10:32:23 +1100
+Subject: [PATCH 1/1] acpi video: force native for some T2 macbooks
+
+The intel backlight is needed for these.
+
+MacBookPro15,2/4 or MacBookPro16,3 or MacBookAir8,1/2 might also need
+this so I'm not going to be submitting this upstream  yet
+
+mbp16,3 was reported not to have this issue for 6.5.8 at least.
+---
+ drivers/acpi/video_detect.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/drivers/acpi/video_detect.c b/drivers/acpi/video_detect.c
+index 442396f6ed1f..baf7264d7b94 100644
+--- a/drivers/acpi/video_detect.c
++++ b/drivers/acpi/video_detect.c
+@@ -513,6 +513,14 @@ static const struct dmi_system_id video_detect_dmi_table[] = {
+ 		DMI_MATCH(DMI_PRODUCT_NAME, "iMac12,2"),
+ 		},
+ 	},
++	{
++	 .callback = video_detect_force_native,
++	 /* Apple MacBook Air 9,1 */
++	 .matches = {
++		DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
++		DMI_MATCH(DMI_PRODUCT_NAME, "MacBookAir9,1"),
++		},
++	},
+ 	{
+ 	 /* https://bugzilla.redhat.com/show_bug.cgi?id=1217249 */
+ 	 .callback = video_detect_force_native,
+@@ -522,6 +530,14 @@ static const struct dmi_system_id video_detect_dmi_table[] = {
+ 		DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro12,1"),
+ 		},
+ 	},
++	{
++	 .callback = video_detect_force_native,
++	 /* Apple MacBook Pro 16,2 */
++	 .matches = {
++		DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
++		DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro16,2"),
++		},
++	},
+ 	{
+ 	 .callback = video_detect_force_native,
+ 	 /* Dell Inspiron N4010 */
+-- 
+2.42.1
+

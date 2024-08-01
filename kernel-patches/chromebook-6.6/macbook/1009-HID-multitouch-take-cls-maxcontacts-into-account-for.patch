@@ -1,0 +1,42 @@
+From e923c6e1a5a508e341851ae020cdb3e7333ccd18 Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Wed, 19 Jul 2023 19:26:57 +0300
+Subject: [PATCH 06/12] HID: multitouch: take cls->maxcontacts into account for
+ devices without a HID_DG_CONTACTMAX field too
+
+This is needed for Apple Touch Bars, where no HID_DG_CONTACTMAX field is
+present and the maximum contact count is greater than the default.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/hid-multitouch.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/hid/hid-multitouch.c b/drivers/hid/hid-multitouch.c
+index dd5509eeb..624c1d3cc 100644
+--- a/drivers/hid/hid-multitouch.c
++++ b/drivers/hid/hid-multitouch.c
+@@ -491,9 +491,6 @@ static void mt_feature_mapping(struct hid_device *hdev,
+ 		if (!td->maxcontacts &&
+ 		    field->logical_maximum <= MT_MAX_MAXCONTACT)
+ 			td->maxcontacts = field->logical_maximum;
+-		if (td->mtclass.maxcontacts)
+-			/* check if the maxcontacts is given by the class */
+-			td->maxcontacts = td->mtclass.maxcontacts;
+ 
+ 		break;
+ 	case HID_DG_BUTTONTYPE:
+@@ -1310,6 +1307,10 @@ static int mt_touch_input_configured(struct hid_device *hdev,
+ 	struct input_dev *input = hi->input;
+ 	int ret;
+ 
++	/* check if the maxcontacts is given by the class */
++	if (cls->maxcontacts)
++		td->maxcontacts = cls->maxcontacts;
++
+ 	if (!td->maxcontacts)
+ 		td->maxcontacts = MT_DEFAULT_MAXCONTACT;
+ 
+-- 
+2.42.0
+

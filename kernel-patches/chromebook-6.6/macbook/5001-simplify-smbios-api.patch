@@ -1,0 +1,80 @@
+From 0dad9ee3c13930fe8122f2efc936fcd1c277a00d Mon Sep 17 00:00:00 2001
+From: Ard Biesheuvel <ardb@kernel.org>
+Date: Mon, 1 Jul 2024 18:29:59 +0200
+Subject: efistub/smbios: Simplify SMBIOS enumeration API
+
+Update the efi_get_smbios_string() macro to take a pointer to the entire
+record struct rather than the header. This removes the need to pass the
+type explicitly, as it can be inferred from the typed pointer. Also,
+drop 'type' from the prototype of __efi_get_smbios_string(), as it is
+never referenced.
+
+Signed-off-by: Ard Biesheuvel <ardb@kernel.org>
+---
+ drivers/firmware/efi/libstub/arm64.c   | 3 +--
+ drivers/firmware/efi/libstub/efistub.h | 9 ++++-----
+ drivers/firmware/efi/libstub/smbios.c  | 4 ++--
+ 3 files changed, 7 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/firmware/efi/libstub/arm64.c b/drivers/firmware/efi/libstub/arm64.c
+index 446e35eaf3d943..e57cd3de0a00f4 100644
+--- a/drivers/firmware/efi/libstub/arm64.c
++++ b/drivers/firmware/efi/libstub/arm64.c
+@@ -39,8 +39,7 @@ static bool system_needs_vamap(void)
+ 		static char const emag[] = "eMAG";
+ 
+ 	default:
+-		version = efi_get_smbios_string(&record->header, 4,
+-						processor_version);
++		version = efi_get_smbios_string(record, processor_version);
+ 		if (!version || (strncmp(version, altra, sizeof(altra) - 1) &&
+ 				 strncmp(version, emag, sizeof(emag) - 1)))
+ 			break;
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index 27abb4ce029173..d33ccbc4a2c630 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -1204,14 +1204,13 @@ struct efi_smbios_type4_record {
+ 	u16				thread_enabled;
+ };
+ 
+-#define efi_get_smbios_string(__record, __type, __name) ({		\
+-	int off = offsetof(struct efi_smbios_type ## __type ## _record,	\
+-			   __name);					\
+-	__efi_get_smbios_string((__record), __type, off);		\
++#define efi_get_smbios_string(__record, __field) ({			\
++	__typeof__(__record) __rec = __record;				\
++	__efi_get_smbios_string(&__rec->header, &__rec->__field);	\
+ })
+ 
+ const u8 *__efi_get_smbios_string(const struct efi_smbios_record *record,
+-				  u8 type, int offset);
++				  const u8 *offset);
+ 
+ void efi_remap_image(unsigned long image_base, unsigned alloc_size,
+ 		     unsigned long code_size);
+diff --git a/drivers/firmware/efi/libstub/smbios.c b/drivers/firmware/efi/libstub/smbios.c
+index c217de2cc8d56d..520c9079717a30 100644
+--- a/drivers/firmware/efi/libstub/smbios.c
++++ b/drivers/firmware/efi/libstub/smbios.c
+@@ -38,7 +38,7 @@ const struct efi_smbios_record *efi_get_smbios_record(u8 type)
+ }
+ 
+ const u8 *__efi_get_smbios_string(const struct efi_smbios_record *record,
+-				  u8 type, int offset)
++				  const u8 *offset)
+ {
+ 	const u8 *strtable;
+ 
+@@ -46,7 +46,7 @@ const u8 *__efi_get_smbios_string(const struct efi_smbios_record *record,
+ 		return NULL;
+ 
+ 	strtable = (u8 *)record + record->length;
+-	for (int i = 1; i < ((u8 *)record)[offset]; i++) {
++	for (int i = 1; i < *offset; i++) {
+ 		int len = strlen(strtable);
+ 
+ 		if (!len)
+-- 
+cgit 1.2.3-korg
+

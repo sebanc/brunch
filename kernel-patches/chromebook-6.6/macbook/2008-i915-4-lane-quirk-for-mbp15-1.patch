@@ -1,0 +1,76 @@
+From 12c7a3306a631a651464ef56318a218dc4cdb157 Mon Sep 17 00:00:00 2001
+From: Orlando Chamberlain <orlandoch.dev@gmail.com>
+Date: Sat, 18 Feb 2023 23:05:05 +1100
+Subject: [PATCH 8/9] i915: 4 lane quirk for mbp15,1
+
+Needed to use iGPU when dGPU was boot GPU
+
+Patch written by Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/gpu/drm/i915/display/intel_ddi.c    |  3 +++
+ drivers/gpu/drm/i915/display/intel_quirks.c | 15 +++++++++++++++
+ drivers/gpu/drm/i915/display/intel_quirks.h |  1 +
+ 3 files changed, 19 insertions(+)
+
+diff --git a/drivers/gpu/drm/i915/display/intel_ddi.c b/drivers/gpu/drm/i915/display/intel_ddi.c
+index 0f1ec2a98cc8..1ec67390f623 100644
+--- a/drivers/gpu/drm/i915/display/intel_ddi.c
++++ b/drivers/gpu/drm/i915/display/intel_ddi.c
+@@ -4097,6 +4097,9 @@ static bool intel_ddi_a_force_4_lanes(struct intel_digital_port *dig_port)
+ 	if (dig_port->saved_port_bits & DDI_A_4_LANES)
+ 		return false;
+ 
++	if (intel_has_quirk(dev_priv, QUIRK_DDI_A_FORCE_4_LANES))
++		return true;
++
+ 	/* Broxton/Geminilake: Bspec says that DDI_A_4_LANES is the only
+ 	 *                     supported configuration
+ 	 */
+diff --git a/drivers/gpu/drm/i915/display/intel_quirks.c b/drivers/gpu/drm/i915/display/intel_quirks.c
+index 6e48d3bcdfec..a8c55e165b46 100644
+--- a/drivers/gpu/drm/i915/display/intel_quirks.c
++++ b/drivers/gpu/drm/i915/display/intel_quirks.c
+@@ -59,6 +59,18 @@ static void quirk_increase_ddi_disabled_time(struct drm_i915_private *i915)
+ 	drm_info(&i915->drm, "Applying Increase DDI Disabled quirk\n");
+ }
+ 
++/*
++ * In some cases, the firmware might not set the lane count to 4 (for example,
++ * when booting in some dual GPU Macs with the dGPU as the default GPU), this
++ * quirk is used to force it as otherwise it might not be possible to compute a
++ * valid link configuration.
++ */
++static void quirk_ddi_a_force_4_lanes(struct drm_i915_private *i915)
++{
++	intel_set_quirk(i915, QUIRK_DDI_A_FORCE_4_LANES);
++	drm_info(&i915->drm, "Applying DDI A Forced 4 Lanes quirk\n");
++}
++
+ static void quirk_no_pps_backlight_power_hook(struct drm_i915_private *i915)
+ {
+ 	intel_set_quirk(i915, QUIRK_NO_PPS_BACKLIGHT_POWER_HOOK);
+@@ -199,6 +211,9 @@ static struct intel_quirk intel_quirks[] = {
+ 	{ 0x3184, 0x1019, 0xa94d, quirk_increase_ddi_disabled_time },
+ 	/* HP Notebook - 14-r206nv */
+ 	{ 0x0f31, 0x103c, 0x220f, quirk_invert_brightness },
++
++	/* Apple MacBookPro15,1 */
++	{ 0x3e9b, 0x106b, 0x0176, quirk_ddi_a_force_4_lanes },
+ };
+ 
+ void intel_init_quirks(struct drm_i915_private *i915)
+diff --git a/drivers/gpu/drm/i915/display/intel_quirks.h b/drivers/gpu/drm/i915/display/intel_quirks.h
+index 10a4d163149f..78aacf1f6f5c 100644
+--- a/drivers/gpu/drm/i915/display/intel_quirks.h
++++ b/drivers/gpu/drm/i915/display/intel_quirks.h
+@@ -17,6 +17,7 @@ enum intel_quirk_id {
+ 	QUIRK_INVERT_BRIGHTNESS,
+ 	QUIRK_LVDS_SSC_DISABLE,
+ 	QUIRK_NO_PPS_BACKLIGHT_POWER_HOOK,
++	QUIRK_DDI_A_FORCE_4_LANES,
+ };
+ 
+ void intel_init_quirks(struct drm_i915_private *i915);
+-- 
+2.39.1
+

@@ -17,7 +17,7 @@ make_config()
 sed -i -z 's@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool $(success,echo 0)\n\t#def_bool@g' ./kernels/$1/init/Kconfig
 if [ "x$1" == "xchromebook-4.19" ]; then config_subfolder=""; else config_subfolder="/chromeos"; fi
 case "$1" in
-	6.6|6.1|5.15)
+	6.6|6.1)
 		sed '/CONFIG_ATH\|CONFIG_BUILD\|CONFIG_EXTRA_FIRMWARE\|CONFIG_DEBUG_INFO\|CONFIG_IWL\|CONFIG_LSM\|CONFIG_MODULE_COMPRESS/d' ./kernel-patches/flex_configs > "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel $1 configuration failed"; exit 1; }
 		make -C "./kernels/$1" O=out allmodconfig || { echo "Kernel $1 configuration failed"; exit 1; }
 		sed '/CONFIG_ACPI\|CONFIG_AMD\|CONFIG_ATH\|CONFIG_AXP\|CONFIG_B4\|CONFIG_BACKLIGHT\|CONFIG_BATTERY\|CONFIG_BCM\|CONFIG_BN\|CONFIG_BRCM\|CONFIG_BT\|CONFIG_CEC\|CONFIG_CHARGER\|CONFIG_COMMON\|CONFIG_DRM_AMD\|CONFIG_DRM_GMA\|CONFIG_DRM_NOUVEAU\|CONFIG_DRM_RADEON\|CONFIG_DW_DMAC\|CONFIG_EXTCON\|CONFIG_FIREWIRE\|CONFIG_FRAMEBUFFER_CONSOLE\|CONFIG_GENERIC\|CONFIG_GPIO\|CONFIG_HID\|CONFIG_I2C\|CONFIG_I4\|CONFIG_IC\|CONFIG_IG\|CONFIG_INPUT\|CONFIG_INTEL\|CONFIG_IWL\|CONFIG_IX\|CONFIG_JOYSTICK\|CONFIG_KEYBOARD\|CONFIG_LEDS\|CONFIG_MANAGER\|CONFIG_MEDIA_CONTROLLER\|CONFIG_MFD\|CONFIG_MMC\|CONFIG_MOUSE\|CONFIG_MT7\|CONFIG_MW\|CONFIG_NFC\|CONFIG_NVME\|CONFIG_PATA\|CONFIG_POWER\|CONFIG_PWM\|CONFIG_REGULATOR\|CONFIG_RMI\|CONFIG_RT\|CONFIG_SATA\|CONFIG_SCSI\|CONFIG_SENSORS\|CONFIG_SND\|CONFIG_SOUNDWIRE\|CONFIG_SPI\|CONFIG_SSB\|CONFIG_TABLET\|CONFIG_THUNDERBOLT\|CONFIG_TOUCHSCREEN\|CONFIG_TPS68470\|CONFIG_TYPEC\|CONFIG_UCSI\|CONFIG_USB\|CONFIG_VIDEO\|CONFIG_W1\|CONFIG_WL/!d' "./kernels/$1/out/.config" >> "./kernels/$1/arch/x86/configs/chromeos_defconfig" || { echo "Kernel $1 configuration failed"; exit 1; }
@@ -89,22 +89,6 @@ for kernel in $kernels; do
 			rm -f "./kernels/mainline-$kernel.tar.gz"
 			apply_patches "6.1"
 			make_config "6.1"
-		;;
-		5.15)
-			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"
-			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
-			mkdir "./kernels/chromebook-5.15" "./kernels/5.15"
-			tar -C "./kernels/chromebook-5.15" -zxf "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel $kernel source extraction failed"; exit 1; }
-			tar -C "./kernels/5.15" -zxf "./kernels/chromiumos-$kernel.tar.gz" chromeos || { echo "Kernel $kernel source extraction failed"; exit 1; }
-			rm -f "./kernels/chromiumos-$kernel.tar.gz"
-			apply_patches "chromebook-5.15"
-			make_config "chromebook-5.15"
-			echo "Downloading Mainline kernel source for kernel $kernel version $kernel_version"
-			curl -L "https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-$kernel_version.tar.gz" -o "./kernels/mainline-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
-			tar -C "./kernels/5.15" -zxf "./kernels/mainline-$kernel.tar.gz" --strip 1 || { echo "Kernel $kernel source extraction failed"; exit 1; }
-			rm -f "./kernels/mainline-$kernel.tar.gz"
-			apply_patches "5.15"
-			make_config "5.15"
 		;;
 		*)
 			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"

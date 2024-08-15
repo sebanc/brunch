@@ -68,6 +68,7 @@ ln -s kernel-6.6 ./chroot/home/chronos/rootc/kernel || { echo "Failed to make th
 ln -s kernel ./chroot/home/chronos/rootc/kernel-4.19 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
 ln -s kernel ./chroot/home/chronos/rootc/kernel-5.4 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
 ln -s kernel ./chroot/home/chronos/rootc/kernel-5.10 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
+ln -s kernel ./chroot/home/chronos/rootc/kernel-5.15 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
 ln -s kernel-chromebook-6.6 ./chroot/home/chronos/rootc/kernel-macbook || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 ln -s kernel-chromebook-6.6 ./chroot/home/chronos/rootc/kernel-macbook-t2 || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 cp -r ./packages ./chroot/home/chronos/rootc/ || { echo "Failed to copy brunch packages"; exit 1; }
@@ -93,7 +94,7 @@ cd ../../..
 
 if [ "$1" != "skip" ] && [ "$2" != "skip" ]; then
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl8188eu ./chroot/tmp/ || { echo "Failed to build external rtl8188eu module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8188eu || { echo "Failed to build external rtl8188eu module for kernel $kernel"; exit 1; }
@@ -104,7 +105,7 @@ rm -r ./chroot/tmp/rtl8188eu || { echo "Failed to build external rtl8188eu modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl8192eu ./chroot/tmp/ || { echo "Failed to build external rtl8192eu module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8192eu || { echo "Failed to build external rtl8192eu module for kernel $kernel"; exit 1; }
@@ -126,7 +127,7 @@ rm -r ./chroot/tmp/rtl8723bs || { echo "Failed to build external rtl8723bs modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl8723bu ./chroot/tmp/ || { echo "Failed to build external rtl8723bu module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8723bu || { echo "Failed to build external rtl8723bu module for kernel $kernel"; exit 1; }
@@ -137,7 +138,7 @@ rm -r ./chroot/tmp/rtl8723bu || { echo "Failed to build external rtl8723bu modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [[ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl8723du ./chroot/tmp/ || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8723du || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }
@@ -148,7 +149,7 @@ rm -r ./chroot/tmp/rtl8723du || { echo "Failed to build external rtl8723du modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl8812au ./chroot/tmp/ || { echo "Failed to build external rtl8812au module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8812au || { echo "Failed to build external rtl8812au module for kernel $kernel"; exit 1; }
@@ -159,7 +160,7 @@ rm -r ./chroot/tmp/rtl8812au || { echo "Failed to build external rtl8812au modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl8814au ./chroot/tmp/ || { echo "Failed to build external rtl8814au module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8814au || { echo "Failed to build external rtl8814au module for kernel $kernel"; exit 1; }
@@ -170,7 +171,7 @@ rm -r ./chroot/tmp/rtl8814au || { echo "Failed to build external rtl8814au modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl8821ce ./chroot/tmp/ || { echo "Failed to build external rtl8821ce module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8821ce || { echo "Failed to build external rtl8821ce module for kernel $kernel"; exit 1; }
@@ -181,7 +182,7 @@ rm -r ./chroot/tmp/rtl8821ce || { echo "Failed to build external rtl8821ce modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl8821cu ./chroot/tmp/ || { echo "Failed to build external rtl8821cu module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8821cu || { echo "Failed to build external rtl8821cu module for kernel $kernel"; exit 1; }
@@ -192,7 +193,7 @@ rm -r ./chroot/tmp/rtl8821cu || { echo "Failed to build external rtl8821cu modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl88x2bu ./chroot/tmp/ || { echo "Failed to build external rtl88x2bu module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl88x2bu || { echo "Failed to build external rtl88x2bu module for kernel $kernel"; exit 1; }
@@ -203,7 +204,7 @@ rm -r ./chroot/tmp/rtl88x2bu || { echo "Failed to build external rtl88x2bu modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl885xxx ./chroot/tmp/ || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl885xxx || { echo "Failed to build external rtl8852ae module for kernel $kernel"; exit 1; }
@@ -222,7 +223,7 @@ rm -r ./chroot/tmp/rtl885xxx || { echo "Failed to build external rtl8852ae modul
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/broadcom-wl ./chroot/tmp/ || { echo "Failed to build external broadcom-wl module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/broadcom-wl || { echo "Failed to build external broadcom-wl module for kernel $kernel"; exit 1; }
@@ -233,7 +234,7 @@ rm -r ./chroot/tmp/broadcom-wl || { echo "Failed to build external broadcom-wl m
 
 fi
 
-if [ "$kernel" == "5.15" ] || [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/acpi_call ./chroot/tmp/ || { echo "Failed to build external acpi_call module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/acpi_call || { echo "Failed to build external acpi_call module for kernel $kernel"; exit 1; }

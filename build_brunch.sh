@@ -138,7 +138,7 @@ rm -r ./chroot/tmp/rtl8723bu || { echo "Failed to build external rtl8723bu modul
 
 fi
 
-if [[ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
+if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
 
 cp -r ./external-drivers/rtl8723du ./chroot/tmp/ || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }
 cd ./chroot/tmp/rtl8723du || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }

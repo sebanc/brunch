@@ -2462,33 +2462,6 @@ diff -ruN a/drivers/gpu/drm/ttm/ttm_bo_vm.c b/drivers/gpu/drm/ttm/ttm_bo_vm.c
  	ttm_bo_get(bo);
  }
  EXPORT_SYMBOL(ttm_bo_vm_open);
-diff -ruN a/drivers/gpu/drm/udl/udl_modeset.c b/drivers/gpu/drm/udl/udl_modeset.c
---- a/drivers/gpu/drm/udl/udl_modeset.c	2023-11-08 11:56:25.000000000 +0100
-+++ b/drivers/gpu/drm/udl/udl_modeset.c	2024-01-24 07:43:26.000000000 +0100
-@@ -409,8 +409,23 @@
- 	return 0;
- }
- 
-+static enum drm_mode_status udl_connector_helper_mode_valid(struct drm_connector *connector,
-+			  struct drm_display_mode *mode)
-+{
-+	int con_type = connector->connector_type;
-+
-+	if ((con_type == DRM_MODE_CONNECTOR_DVII ||
-+	     con_type == DRM_MODE_CONNECTOR_DVID ||
-+	     con_type == DRM_MODE_CONNECTOR_DVIA) &&
-+	    mode->clock > 165000)
-+		return MODE_CLOCK_HIGH;
-+
-+	return 0;
-+}
-+
- static const struct drm_connector_helper_funcs udl_connector_helper_funcs = {
- 	.get_modes = udl_connector_helper_get_modes,
-+	.mode_valid = udl_connector_helper_mode_valid,
- };
- 
- static int udl_get_edid_block(void *data, u8 *buf, unsigned int block, size_t len)
 diff -ruN a/drivers/gpu/drm/virtio/virtgpu_drv.h b/drivers/gpu/drm/virtio/virtgpu_drv.h
 --- a/drivers/gpu/drm/virtio/virtgpu_drv.h	2023-11-08 11:56:25.000000000 +0100
 +++ b/drivers/gpu/drm/virtio/virtgpu_drv.h	2024-01-24 07:43:26.000000000 +0100

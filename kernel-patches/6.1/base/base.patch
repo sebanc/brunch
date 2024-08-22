@@ -4394,24 +4394,6 @@ diff -ruN a/drivers/gpu/drm/drm_ioctl.c b/drivers/gpu/drm/drm_ioctl.c
  	DRM_IOCTL_DEF(DRM_IOCTL_MODE_OBJ_SETPROPERTY, drm_mode_obj_set_property_ioctl, DRM_MASTER),
  	DRM_IOCTL_DEF(DRM_IOCTL_MODE_CURSOR2, drm_mode_cursor2_ioctl, DRM_MASTER),
  	DRM_IOCTL_DEF(DRM_IOCTL_MODE_ATOMIC, drm_mode_atomic_ioctl, DRM_MASTER),
-diff -ruN a/drivers/gpu/drm/udl/udl_connector.c b/drivers/gpu/drm/udl/udl_connector.c
---- a/drivers/gpu/drm/udl/udl_connector.c	2023-01-24 07:24:44.000000000 +0100
-+++ b/drivers/gpu/drm/udl/udl_connector.c	2023-01-30 08:32:39.000000000 +0100
-@@ -61,6 +61,14 @@
- 			  struct drm_display_mode *mode)
- {
- 	struct udl_device *udl = to_udl(connector->dev);
-+	int con_type = connector->connector_type;
-+
-+	if ((con_type == DRM_MODE_CONNECTOR_DVII ||
-+	     con_type == DRM_MODE_CONNECTOR_DVID ||
-+	     con_type == DRM_MODE_CONNECTOR_DVIA) &&
-+	    mode->clock > 165000)
-+		return MODE_CLOCK_HIGH;
-+
- 	if (!udl->sku_pixel_limit)
- 		return 0;
- 
 diff -ruN a/drivers/gpu/drm/virtio/virtgpu_drv.h b/drivers/gpu/drm/virtio/virtgpu_drv.h
 --- a/drivers/gpu/drm/virtio/virtgpu_drv.h	2023-01-24 07:24:44.000000000 +0100
 +++ b/drivers/gpu/drm/virtio/virtgpu_drv.h	2023-01-30 08:32:39.000000000 +0100

@@ -188,7 +188,7 @@ rm -rf ./efibootmgr-pkg || { echo "Failed to make efibootmgr package"; exit 1; }
 git clone https://github.com/stefanberger/libtpms.git libtpms || { echo "Failed to make libtpms"; exit 1; }
 cd ./libtpms || { echo "Failed to make libtpms"; exit 1; }
 git checkout df1c3e98d697f3c1f09262d2ba161a7db784d6cc || { echo "Failed to make libtpms"; exit 1; }
-sed -iz 's@if(IS_ATTRIBUTE(attributes, TPMA_NV, WRITELOCKED))\n  return TPM_RC_NV_LOCKED;@@g' ./src/tpm2/NV_spt.c || { echo "Failed to make libtpms"; exit 1; }
+sed -iz 's@if(IS_ATTRIBUTE(attributes, TPMA_NV, WRITELOCKED))\n	return TPM_RC_NV_LOCKED;@@g' ./src/tpm2/NV_spt.c || { echo "Failed to make libtpms"; exit 1; }
 ./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib64 --with-openssl --with-tpm2 --enable-debug || { echo "Failed to make libtpms"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make libtpms"; exit 1; }
 make install || { echo "Failed to make libtpms"; exit 1; }

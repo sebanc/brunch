@@ -7,7 +7,7 @@ cat >/roota/usr/sbin/mount-encrypted <<'MOUNTS'
 #!/bin/bash
 #touch /test
 #echo "mount-encrypted called with args \"$@\"" >> /test
-if [ $# -eq 0 ] && [ ! -c /dev/tpm0 ] && [ ! -f /mnt/stateful_partition/factory_install_reset ]; then
+if [ $# -eq 0 ] && [ ! -f /mnt/stateful_partition/factory_install_reset ]; then
 	/usr/sbin/mount-encrypted.real
 	umount /home/chronos
 	umount /var

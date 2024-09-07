@@ -17,7 +17,7 @@ end script
 
 expect stop
 
-exec /usr/bin/swtpm chardev --daemon --vtpm-proxy --tpm2 --tpmstate dir=/mnt/stateful_partition/brunch/swtpm --ctrl type=tcp,port=10001 --flags not-need-init >> allout.txt 2>&1
+exec /usr/bin/swtpm chardev --daemon --vtpm-proxy --tpm2 --tpmstate dir=/mnt/stateful_partition/brunch/swtpm --ctrl type=tcp,port=10001 --flags not-need-init
 
 post-start exec bash -c "until [ -c /dev/tpm0 ]; do sleep 1; done"
 

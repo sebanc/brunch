@@ -13,11 +13,12 @@ pre-start script
   mkdir -p -m 755 /mnt/stateful_partition/brunch/swtpm
 end script
 
-expect stop
+expect fork
 
-exec /usr/bin/swtpm chardev --daemon --vtpm-proxy --tpm2 --tpmstate dir=/mnt/stateful_partition/brunch/swtpm --ctrl type=tcp,port=10001 --flags not-need-init
-
-post-start exec bash -c "until [ -c /dev/tpm0 ]; do sleep 1; done"
+script
+  swtpm chardev --daemon --vtpm-proxy --tpm2 --tpmstate dir=/mnt/stateful_partition/brunch/swtpm --ctrl type=tcp,port=10001 --flags not-need-init
+  until [ -c /dev/tpm0 ]; do sleep 1; done
+end script
 
 post-stop script
   pgrep swtpm | xargs -r kill

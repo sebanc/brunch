@@ -45,6 +45,7 @@ if [ "$enable_updates" -eq 1 ]; then
 #!/bin/bash
 if [ "\$EUID" -eq 0 ] && [ "\$1" == "." ] && [ "\$2" == "/usr/bin/cros_installer" ]; then
 	rm -rf /var/lib/ureadahead
+	touch /mnt/stateful_partition/.install_completed
 	exit 0
 else
 	chroot.orig "\$@"

@@ -29658,7 +29658,7 @@ diff -ruN a/fs/fuse/inode.c b/fs/fuse/inode.c
  	WARN_ON(!list_empty(&fc->devices));
 +	idr_for_each(&fc->passthrough_req, free_fuse_passthrough, NULL);
 +	idr_destroy(&fc->passthrough_req);
- 	kfree_rcu(fc, rcu);
+ 	kfree(fc);
  }
  EXPORT_SYMBOL_GPL(fuse_free_conn);
 diff -ruN a/fs/fuse/Makefile b/fs/fuse/Makefile
@@ -34171,9 +34171,9 @@ diff -ruN a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
  #define FUSE_SECURITY_CTX	(1ULL << 32)
  #define FUSE_HAS_INODE_DAX	(1ULL << 33)
 +#define FUSE_PASSTHROUGH	(1ULL << 34)
+ #define FUSE_HAS_EXPIRE_ONLY	(1ULL << 35)
  
  /**
-  * CUSE INIT request/reply flags
 @@ -548,6 +549,9 @@
  	/* Reserved opcodes: helpful to detect structure endian-ness */
  	CUSE_INIT_BSWAP_RESERVED	= 1048576,	/* CUSE_INIT << 8 */
@@ -40007,10 +40007,10 @@ diff -ruN a/net/bluetooth/sco.c b/net/bluetooth/sco.c
  
 +	sco_pi(sk)->wbs_pkt_len = hdev->wbs_pkt_len;
 +
- 	return err;
- }
+ 	release_sock(sk);
  
-@@ -1103,7 +1106,7 @@
+ unlock:
+@@ -1109,7 +1109,7 @@
  			break;
  		}
  

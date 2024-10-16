@@ -31,17 +31,17 @@ Linuxloops will perform automatically most of the brunch install steps (notably 
 ### Install process
 1. Identify the recovery suitable for your CPU:  
   
-#### Intel
-* 8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
-* 10th gen: "[jinlon][recovery-jinlon]".  
-* 11th gen & above: "[voxel][recovery-voxel]".  
-#### AMD
-* Ryzen: "[gumboz][recovery-gumboz]".  
+Intel
+  8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+  10th gen: "[jinlon][recovery-jinlon]".  
+  11th gen & above: "[voxel][recovery-voxel]".  
+AMD
+  Ryzen: "[gumboz][recovery-gumboz]".  
   
 2. Install the `PyQtWebEngine` package for your distribution:  
 Debian / Ubuntu derivatives:  
-- Debian 12 / Ubuntu 24.04 based distributions: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  
-- Older Debian / Ubuntu based distributions: `sudo apt install python3-venv python3-pyqt5.qtwebengine`  
+  Debian 12 / Ubuntu 24.04 based distributions: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  
+  Older Debian / Ubuntu based distributions: `sudo apt install python3-venv python3-pyqt5.qtwebengine`  
 Arch-based distributions: `sudo pacman -Syu python-pyqt6-webengine`  
 RHEL-based distributions: `sudo dnf install python3-pyqt6-webengine`  
 OpenSUSE: `sudo zypper in python3-PyQt6-WebEngine`  
@@ -120,17 +120,17 @@ It is normal for the first boot to take a very long time, please be patient.
 ### Install process
 1. Identify the recovery suitable for your CPU:  
   
-#### Intel
-* 8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
-* 10th gen: "[jinlon][recovery-jinlon]".  
-* 11th gen & above: "[voxel][recovery-voxel]".  
-#### AMD
-* Ryzen: "[gumboz][recovery-gumboz]".  
+Intel
+  8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+  10th gen: "[jinlon][recovery-jinlon]".  
+  11th gen & above: "[voxel][recovery-voxel]".  
+AMD
+  Ryzen: "[gumboz][recovery-gumboz]".  
   
 2. Install the `PyQtWebEngine` package for your distribution:  
 Debian / Ubuntu derivatives:  
-- Debian 12 / Ubuntu 24.04 based distributions: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  
-- Older Debian / Ubuntu based distributions: `sudo apt install python3-venv python3-pyqt5.qtwebengine`  
+  Debian 12 / Ubuntu 24.04 based distributions: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  
+  Older Debian / Ubuntu based distributions: `sudo apt install python3-venv python3-pyqt5.qtwebengine`  
 Arch-based distributions: `sudo pacman -Syu python-pyqt6-webengine`  
 RHEL-based distributions: `sudo dnf install python3-pyqt6-webengine`  
 OpenSUSE: `sudo zypper in python3-PyQt6-WebEngine`  
@@ -179,12 +179,12 @@ It is normal for the first boot to take a very long time, please be patient.
 ### Install process
 1. Identify the recovery suitable for your CPU:  
   
-#### Intel
-* 8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
-* 10th gen: "[jinlon][recovery-jinlon]".  
-* 11th gen & above: "[voxel][recovery-voxel]".  
-#### AMD
-* Ryzen: "[gumboz][recovery-gumboz]".  
+Intel
+  8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+  10th gen: "[jinlon][recovery-jinlon]".  
+  11th gen & above: "[voxel][recovery-voxel]".  
+AMD
+  Ryzen: "[gumboz][recovery-gumboz]".  
   
 2. Launch WSL2 and install the `PyQtWebEngine` package:  
 Ubuntu 24.04 and above: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  
@@ -266,12 +266,12 @@ It is normal for the first boot to take a very long time, please be patient.
 ### Install process
 1. Identify the recovery suitable for your CPU:  
   
-#### Intel
-* 8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
-* 10th gen: "[jinlon][recovery-jinlon]".  
-* 11th gen & above: "[voxel][recovery-voxel]".  
-#### AMD
-* Ryzen: "[gumboz][recovery-gumboz]".  
+Intel
+  8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.  
+  10th gen: "[jinlon][recovery-jinlon]".  
+  11th gen & above: "[voxel][recovery-voxel]".  
+AMD
+  Ryzen: "[gumboz][recovery-gumboz]".  
   
 2. Launch WSL2 and install the `PyQtWebEngine` package:  
 Ubuntu 24.04 and above: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  

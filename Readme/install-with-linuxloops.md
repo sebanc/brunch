@@ -38,21 +38,23 @@ Linuxloops will perform automatically most of the brunch install steps (notably 
 #### AMD
 * Ryzen: "[gumboz][recovery-gumboz]".  
   
-2. Install the zenity package for your distro:
-  
-Debian-based distro: `sudo apt install zenity`  
-Arch-based distro: `sudo pacman -S zenity`  
-Fedora-based distro: `sudo dnf install zenity`  
+2. Install the `PyQtWebEngine` package for your distribution:  
+Debian / Ubuntu derivatives:  
+- Debian 12 / Ubuntu 24.04 based distributions: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  
+- Older Debian / Ubuntu based distributions: `sudo apt install python3-venv python3-pyqt5.qtwebengine`  
+Arch-based distributions: `sudo pacman -Syu python-pyqt6-webengine`  
+RHEL-based distributions: `sudo dnf install python3-pyqt6-webengine`  
+OpenSUSE: `sudo zypper in python3-PyQt6-WebEngine`  
+Gentoo: `sudo emerge dev-python/PyQt6-WebEngine`  
+Void: `sudo xbps-install python3-pyqt6-webengine python3-pyqt6-gui python3-pyqt6-widgets python3-pyqt6-network python3-pyqt6-webchannel python3-pyqt6-printsupport`  
   
 3. Download the linuxloops script.  
   
-`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`  
+`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -O --create-dirs --output-dir ~/bin`  
   
 4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.  
   
-`sudo bash ~/linuxloops`  
-  
-Choose "disk" at the install type prompt and select your USB flashdrive as destination.  
+`sudo -E bash ~/bin/linuxloops`  
   
 5. Once the install process is finished, reboot your computer and select your USB drive as boot device.  
   
@@ -125,19 +127,23 @@ It is normal for the first boot to take a very long time, please be patient.
 #### AMD
 * Ryzen: "[gumboz][recovery-gumboz]".  
   
-2. Install the zenity package for your distro:  
-  
-Debian-based distro: `sudo apt install zenity`  
-Arch-based distro: `sudo pacman -S zenity`  
-Fedora-based distro: `sudo dnf install zenity`  
+2. Install the `PyQtWebEngine` package for your distribution:  
+Debian / Ubuntu derivatives:  
+- Debian 12 / Ubuntu 24.04 based distributions: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  
+- Older Debian / Ubuntu based distributions: `sudo apt install python3-venv python3-pyqt5.qtwebengine`  
+Arch-based distributions: `sudo pacman -Syu python-pyqt6-webengine`  
+RHEL-based distributions: `sudo dnf install python3-pyqt6-webengine`  
+OpenSUSE: `sudo zypper in python3-PyQt6-WebEngine`  
+Gentoo: `sudo emerge dev-python/PyQt6-WebEngine`  
+Void: `sudo xbps-install python3-pyqt6-webengine python3-pyqt6-gui python3-pyqt6-widgets python3-pyqt6-network python3-pyqt6-webchannel python3-pyqt6-printsupport`  
   
 3. Download the linuxloops script.  
   
-`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`  
+`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -O --create-dirs --output-dir ~/bin`  
   
 4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.  
   
-`sudo bash ~/linuxloops`  
+`sudo -E bash ~/bin/linuxloops`  
   
 Choose "image" at the install type prompt, place the image on an unencrypted parition and define the disk image size.  
   
@@ -146,7 +152,7 @@ Choose "image" at the install type prompt, place the image on an unencrypted par
 6. (secure boot enabled) Once install is finished, run:  
   
 `sudo mokutil --import <image_path>/<image_name>.img.der`  
-
+  
 7. Reboot your computer and launch Brunch from GRUB.  
   
 ### Next Steps
@@ -180,17 +186,17 @@ It is normal for the first boot to take a very long time, please be patient.
 #### AMD
 * Ryzen: "[gumboz][recovery-gumboz]".  
   
-2. Launch WSL2 and install the zenity package:  
-  
-`sudo apt update && sudo apt install zenity`  
+2. Launch WSL2 and install the `PyQtWebEngine` package:  
+Ubuntu 24.04 and above: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  
+Older Ubuntu versions: `sudo apt install python3-venv python3-pyqt5.qtwebengine`  
   
 3. Download the linuxloops script.  
   
-`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`  
+`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -O --create-dirs --output-dir ~/bin`  
   
 4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.  
   
-`sudo bash ~/linuxloops`  
+`sudo -E bash ~/bin/linuxloops`  
   
 Choose "image" at the install type prompt, place the image outside of WSL2 (e.g. /mnt/c/Users/"username"/Downloads) and define the disk image size as 14GB.  
   
@@ -267,17 +273,17 @@ It is normal for the first boot to take a very long time, please be patient.
 #### AMD
 * Ryzen: "[gumboz][recovery-gumboz]".  
   
-2. Launch WSL2 and install the zenity package:  
-  
-`sudo apt update && sudo apt install zenity`  
+2. Launch WSL2 and install the `PyQtWebEngine` package:  
+Ubuntu 24.04 and above: `sudo apt install python3-venv python3-pyqt6.qtwebengine`  
+Older Ubuntu versions: `sudo apt install python3-venv python3-pyqt5.qtwebengine`  
   
 3. Download the linuxloops script.  
   
-`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -o ~/linuxloops`  
+`curl -L https://raw.githubusercontent.com/sebanc/linuxloops/main/linuxloops -O --create-dirs --output-dir ~/bin`  
   
 4. Launch the linuxloops script and follow the GUI installer selecting "Brunch" as the distro and the recovery compatible with your CPU as the environment.  
   
-`sudo bash ~/linuxloops`  
+`sudo -E bash ~/bin/linuxloops`  
   
 Choose "image" at the install type prompt, place the image on your unencrypted parition and define the disk image size.  
   

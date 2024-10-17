@@ -1817,7 +1817,7 @@ diff -ruN a/drivers/gpu/drm/drm_drv.c b/drivers/gpu/drm/drm_drv.c
 -	debugfs_remove(drm_debugfs_root);
 +	debugfs_remove_recursive(drm_debugfs_root);
  	drm_sysfs_destroy();
- 	idr_destroy(&drm_minors_idr);
+ 	WARN_ON(!xa_empty(&drm_minors_xa));
  	drm_connector_ida_destroy();
 +	drm_trace_cleanup();
  }
@@ -23798,68 +23798,6 @@ diff -ruN a/fs/ecryptfs/crypto.c b/fs/ecryptfs/crypto.c
  	if (rc) {
  		/* metadata is not in the file header, so try xattrs */
  		memset(page_virt, 0, PAGE_SIZE);
-@@ -1949,16 +1953,6 @@
- 	return rc;
- }
- 
--static bool is_dot_dotdot(const char *name, size_t name_size)
--{
--	if (name_size == 1 && name[0] == '.')
--		return true;
--	else if (name_size == 2 && name[0] == '.' && name[1] == '.')
--		return true;
--
--	return false;
--}
--
- /**
-  * ecryptfs_decode_and_decrypt_filename - converts the encoded cipher text name to decoded plaintext
-  * @plaintext_name: The plaintext name
-@@ -1983,21 +1977,13 @@
- 	size_t packet_size;
- 	int rc = 0;
- 
--	if ((mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES) &&
--	    !(mount_crypt_stat->flags & ECRYPTFS_ENCRYPTED_VIEW_ENABLED)) {
--		if (is_dot_dotdot(name, name_size)) {
--			rc = ecryptfs_copy_filename(plaintext_name,
--						    plaintext_name_size,
--						    name, name_size);
--			goto out;
--		}
--
--		if (name_size <= ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE ||
--		    strncmp(name, ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX,
--			    ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE)) {
--			rc = -EINVAL;
--			goto out;
--		}
-+	if ((mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES)
-+	    && !(mount_crypt_stat->flags & ECRYPTFS_ENCRYPTED_VIEW_ENABLED)
-+	    && (name_size > ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE)
-+	    && (strncmp(name, ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX,
-+			ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE) == 0)) {
-+		const char *orig_name = name;
-+		size_t orig_name_size = name_size;
- 
- 		name += ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE;
- 		name_size -= ECRYPTFS_FNEK_ENCRYPTED_FILENAME_PREFIX_SIZE;
-@@ -2017,9 +2003,12 @@
- 						  decoded_name,
- 						  decoded_name_size);
- 		if (rc) {
--			ecryptfs_printk(KERN_DEBUG,
--					"%s: Could not parse tag 70 packet from filename\n",
--					__func__);
-+			printk(KERN_INFO "%s: Could not parse tag 70 packet "
-+			       "from filename; copying through filename "
-+			       "as-is\n", __func__);
-+			rc = ecryptfs_copy_filename(plaintext_name,
-+						    plaintext_name_size,
-+						    orig_name, orig_name_size);
- 			goto out_free;
- 		}
- 	} else {
 diff -ruN a/fs/ecryptfs/ecryptfs_kernel.h b/fs/ecryptfs/ecryptfs_kernel.h
 --- a/fs/ecryptfs/ecryptfs_kernel.h	2023-11-08 11:56:25.000000000 +0100
 +++ b/fs/ecryptfs/ecryptfs_kernel.h	2024-01-24 07:43:48.000000000 +0100
@@ -23871,39 +23809,6 @@ diff -ruN a/fs/ecryptfs/ecryptfs_kernel.h b/fs/ecryptfs/ecryptfs_kernel.h
  struct page *ecryptfs_get_locked_page(struct inode *inode, loff_t index);
  int ecryptfs_parse_packet_length(unsigned char *data, size_t *size,
  				 size_t *length_size);
-diff -ruN a/fs/ecryptfs/file.c b/fs/ecryptfs/file.c
---- a/fs/ecryptfs/file.c	2023-11-08 11:56:25.000000000 +0100
-+++ b/fs/ecryptfs/file.c	2024-01-24 07:43:48.000000000 +0100
-@@ -91,23 +91,13 @@
- 
- 	buf->filldir_called++;
- 	err = ecryptfs_decode_and_decrypt_filename(&name, &name_size,
--						   buf->sb, lower_name,
--						   lower_namelen);
-+						  buf->sb, lower_name,
-+						  lower_namelen);
- 	if (err) {
--		if (err != -EINVAL) {
--			ecryptfs_printk(KERN_DEBUG,
--					"%s: Error attempting to decode and decrypt filename [%s]; rc = [%d]\n",
--					__func__, lower_name, err);
--			return false;
--		}
--
--		/* Mask -EINVAL errors as these are most likely due a plaintext
--		 * filename present in the lower filesystem despite filename
--		 * encryption being enabled. One unavoidable example would be
--		 * the "lost+found" dentry in the root directory of an Ext4
--		 * filesystem.
--		 */
--		return true;
-+		printk(KERN_ERR "%s: Error attempting to decode and decrypt "
-+		       "filename [%s]; err = [%d]\n", __func__, lower_name,
-+		       err);
-+		return false;
- 	}
- 
- 	buf->caller->pos = buf->ctx.pos;
 diff -ruN a/fs/ecryptfs/inode.c b/fs/ecryptfs/inode.c
 --- a/fs/ecryptfs/inode.c	2023-11-08 11:56:25.000000000 +0100
 +++ b/fs/ecryptfs/inode.c	2024-01-24 07:43:48.000000000 +0100

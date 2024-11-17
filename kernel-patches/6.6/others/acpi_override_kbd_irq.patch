@@ -2,7 +2,7 @@ diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
 index 85ae394..59423fe 100644
 --- a/drivers/acpi/resource.c
 +++ b/drivers/acpi/resource.c
-@@ -385,62 +385,63 @@ unsigned int acpi_dev_get_irq_type(int triggering, int polarity)
+@@ -385,69 +385,70 @@ unsigned int acpi_dev_get_irq_type(int triggering, int polarity)
  }
  EXPORT_SYMBOL_GPL(acpi_dev_get_irq_type);
  
@@ -71,6 +71,13 @@ index 85ae394..59423fe 100644
  		.matches = {
  			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
  			DMI_MATCH(DMI_BOARD_NAME, "S5602ZA"),
+ 		},
+ 	},
+ 	{
+ 		/* Asus Vivobook X1704VAP */
+ 		.matches = {
+ 			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+ 			DMI_MATCH(DMI_BOARD_NAME, "X1704VAP"),
  		},
  	},
  	{

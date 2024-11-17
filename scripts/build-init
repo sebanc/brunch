@@ -125,15 +125,16 @@ make install || { echo "Failed to make libfmt"; exit 1; }
 cd ../.. || { echo "Failed to make libfmt"; exit 1; }
 rm -rf ./fmt || { echo "Failed to make libfmt"; exit 1; }
 
-git clone -b v2 https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
+git clone -b v3 https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
 cd iptsd || { echo "Failed to make iptsd"; exit 1; }
-meson --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" -Dsample_config=false build/ || { echo "Failed to make iptsd"; exit 1; }
+sed -i "s@'-Wconversion',@'-Wconversion', '-Wno-pedantic',@g" ./src/meson.build
+meson --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" build/ || { echo "Failed to make iptsd"; exit 1; }
 DESTDIR=/home/chronos/ipts-pkg ninja -j"$NTHREADS" -C build/ install || { echo "Failed to make iptsd"; exit 1; }
 cd .. || { echo "Failed to make iptsd"; exit 1; }
 rm -rf ./iptsd || { echo "Failed to make iptsd"; exit 1; }
 cd ./ipts-pkg || { echo "Failed to make iptsd"; exit 1; }
 mkdir -p ./usr/lib64 || { echo "Failed to make iptsd"; exit 1; }
-for i in $(ldd ../ipts-pkg/usr/bin/iptsd | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ../ipts-pkg/usr/lib64/ || { echo "Failed to make iptsd"; exit 1; }; fi; done
+for i in $(ldd ./usr/bin/iptsd | grep "/usr/local/lib" | grep -v ld-linux | cut -d' ' -f3); do if [ ! -f $(echo "$i" | sed "s#/local##g") ] && [ ! -f $(echo "$i" | sed "s#/usr/local##g") ]; then cp "$i" ./usr/lib64/ || { echo "Failed to make iptsd"; exit 1; }; fi; done
 rm -rf ./usr/include ./usr/lib64/pkgconfig ./usr/share/pkgconfig || { echo "Failed to make iptsd"; exit 1; }
 tar zcvf ../rootc/packages/ipts.tar.gz * --owner=0 --group=0 || { echo "Failed to make iptsd"; exit 1; }
 cd .. || { echo "Failed to make iptsd"; exit 1; }

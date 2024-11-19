@@ -53,7 +53,7 @@ index 000000000..fe92bc441
 +	      - VHCI (Virtual Host Controller Interface): Access to keyboard, mouse
 +	        and other system devices depend on this virtual USB host controller
 +	      - Audio: a driver for the T2 audio interface.
-+
++	 
 +	  If "M" is selected, the module will be called apple-bce.'
 diff --git a/drivers/staging/apple-bce/Makefile b/drivers/staging/apple-bce/Makefile
 index a6a656f06..8cfbd3f64 100644

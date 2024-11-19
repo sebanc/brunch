@@ -1,8 +1,8 @@
-From 05cd738ce1c0e1a930a1dab02528fd9f1c702c38 Mon Sep 17 00:00:00 2001
+From c1017aa85e76f3a5f549f56973ab895f8e22ad27 Mon Sep 17 00:00:00 2001
 From: Kerem Karabay <kekrby@gmail.com>
 Date: Sun, 5 Mar 2023 18:52:43 +0300
-Subject: [PATCH 02/12] HID: hid-appletb-bl: add driver for the backlight of
- Apple Touch Bars
+Subject: [PATCH] HID: hid-appletb-bl: add driver for the backlight of Apple
+ Touch Bars
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -14,34 +14,18 @@ This driver is based on previous work done by Ronald Tschalär
 <ronald@innovation.ch>.
 
 Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+Co-developed-by: Aditya Garg <gargaditya08@live.com>
+Signed-off-by: Aditya Garg <gargaditya08@live.com>
 ---
- MAINTAINERS                  |   6 ++
  drivers/hid/Kconfig          |  10 ++
  drivers/hid/Makefile         |   1 +
- drivers/hid/hid-appletb-bl.c | 193 +++++++++++++++++++++++++++++++++++
+ drivers/hid/hid-appletb-bl.c | 207 +++++++++++++++++++++++++++++++++++
  drivers/hid/hid-quirks.c     |   4 +-
- 5 files changed, 213 insertions(+), 1 deletion(-)
+ 4 files changed, 221 insertions(+), 1 deletion(-)
  create mode 100644 drivers/hid/hid-appletb-bl.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4cc6bf79f..519b3b736 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9157,6 +9157,12 @@ F:	include/linux/pm.h
- F:	include/linux/suspend.h
- F:	kernel/power/
- 
-+HID APPLE TOUCH BAR DRIVERS
-+M:	Kerem Karabay <kekrby@gmail.com>
-+L:	linux-input@vger.kernel.org
-+S:	Maintained
-+F:	drivers/hid/hid-appletb-*
-+
- HID CORE LAYER
- M:	Jiri Kosina <jikos@kernel.org>
- M:	Benjamin Tissoires <benjamin.tissoires@redhat.com>
 diff --git a/drivers/hid/Kconfig b/drivers/hid/Kconfig
-index e11c1c803..cf19a3b33 100644
+index 08446c89e..4988c1fb2 100644
 --- a/drivers/hid/Kconfig
 +++ b/drivers/hid/Kconfig
 @@ -148,6 +148,16 @@ config HID_APPLEIR
@@ -62,7 +46,7 @@ index e11c1c803..cf19a3b33 100644
  	tristate "Asus"
  	depends on USB_HID
 diff --git a/drivers/hid/Makefile b/drivers/hid/Makefile
-index 7a9e16015..bc86e38b2 100644
+index e40f1ddeb..1d825a474 100644
 --- a/drivers/hid/Makefile
 +++ b/drivers/hid/Makefile
 @@ -29,6 +29,7 @@ obj-$(CONFIG_HID_ALPS)		+= hid-alps.o
@@ -75,10 +59,10 @@ index 7a9e16015..bc86e38b2 100644
  obj-$(CONFIG_HID_AUREAL)	+= hid-aureal.o
 diff --git a/drivers/hid/hid-appletb-bl.c b/drivers/hid/hid-appletb-bl.c
 new file mode 100644
-index 000000000..0c5e4b776
+index 000000000..819157686
 --- /dev/null
 +++ b/drivers/hid/hid-appletb-bl.c
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,207 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Apple Touch Bar Backlight Driver
@@ -91,6 +75,7 @@ index 000000000..0c5e4b776
 +
 +#include <linux/hid.h>
 +#include <linux/backlight.h>
++#include <linux/device.h>
 +
 +#include "hid-ids.h"
 +
@@ -104,6 +89,13 @@ index 000000000..0c5e4b776
 +#define HID_USAGE_AUX1			0xff120020
 +#define HID_USAGE_BRIGHTNESS		0xff120021
 +
++static int appletb_bl_def_brightness = 2;
++module_param_named(brightness, appletb_bl_def_brightness, int, 0444);
++MODULE_PARM_DESC(brightness, "Default brightness:\n"
++			 "    0 - Touchbar is off\n"
++			 "    1 - Dim brightness\n"
++			 "    [2] - Full brightness");
++
 +struct appletb_bl {
 +	struct hid_field *aux1_field, *brightness_field;
 +	struct backlight_device *bdev;
@@ -111,10 +103,10 @@ index 000000000..0c5e4b776
 +	bool full_on;
 +};
 +
-+const u8 appletb_bl_brightness_map[] = {
++static const u8 appletb_bl_brightness_map[] = {
 +	APPLETB_BL_OFF,
 +	APPLETB_BL_DIM,
-+	APPLETB_BL_ON
++	APPLETB_BL_ON,
 +};
 +
 +static int appletb_bl_set_brightness(struct appletb_bl *bl, u8 brightness)
@@ -158,14 +150,14 @@ index 000000000..0c5e4b776
 +static int appletb_bl_update_status(struct backlight_device *bdev)
 +{
 +	struct appletb_bl *bl = bl_get_data(bdev);
-+	u16 brightness;
++	u8 brightness;
 +
-+	if (bdev->props.state & BL_CORE_SUSPENDED)
-+		brightness = 0;
++	if (backlight_is_blank(bdev))
++		brightness = APPLETB_BL_OFF;
 +	else
-+		brightness = backlight_get_brightness(bdev);
++		brightness = appletb_bl_brightness_map[backlight_get_brightness(bdev)];
 +
-+	return appletb_bl_set_brightness(bl, appletb_bl_brightness_map[brightness]);
++	return appletb_bl_set_brightness(bl, brightness);
 +}
 +
 +static const struct backlight_ops appletb_bl_backlight_ops = {
@@ -214,7 +206,13 @@ index 000000000..0c5e4b776
 +	bl->aux1_field = aux1_field;
 +	bl->brightness_field = brightness_field;
 +
-+	ret = appletb_bl_set_brightness(bl, APPLETB_BL_OFF);
++	if (appletb_bl_def_brightness == 0)
++		ret = appletb_bl_set_brightness(bl, APPLETB_BL_OFF);
++	else if (appletb_bl_def_brightness == 1)
++		ret = appletb_bl_set_brightness(bl, APPLETB_BL_DIM);
++	else
++		ret = appletb_bl_set_brightness(bl, APPLETB_BL_ON);
++
 +	if (ret) {
 +		dev_err_probe(dev, ret, "Failed to set touch bar brightness to off\n");
 +		goto close_hw;
@@ -273,10 +271,10 @@ index 000000000..0c5e4b776
 +MODULE_DESCRIPTION("MacBookPro Touch Bar Backlight Driver");
 +MODULE_LICENSE("GPL");
 diff --git a/drivers/hid/hid-quirks.c b/drivers/hid/hid-quirks.c
-index 3983b4f28..82e7a80c9 100644
+index e0bbf0c63..818d41a35 100644
 --- a/drivers/hid/hid-quirks.c
 +++ b/drivers/hid/hid-quirks.c
-@@ -325,7 +325,6 @@ static const struct hid_device_id hid_have_special_driver[] = {
+@@ -328,7 +328,6 @@ static const struct hid_device_id hid_have_special_driver[] = {
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_GEYSER1_TP_ONLY) },
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_MAGIC_KEYBOARD_2021) },
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_MAGIC_KEYBOARD_FINGERPRINT_2021) },
@@ -284,7 +282,7 @@ index 3983b4f28..82e7a80c9 100644
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_TOUCHBAR_DISPLAY) },
  #endif
  #if IS_ENABLED(CONFIG_HID_APPLEIR)
-@@ -335,6 +334,9 @@ static const struct hid_device_id hid_have_special_driver[] = {
+@@ -338,6 +337,9 @@ static const struct hid_device_id hid_have_special_driver[] = {
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_IRCONTROL4) },
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_IRCONTROL5) },
  #endif
@@ -295,5 +293,5 @@ index 3983b4f28..82e7a80c9 100644
  	{ HID_I2C_DEVICE(USB_VENDOR_ID_ASUSTEK, USB_DEVICE_ID_ASUSTEK_I2C_KEYBOARD) },
  	{ HID_I2C_DEVICE(USB_VENDOR_ID_ASUSTEK, USB_DEVICE_ID_ASUSTEK_I2C_TOUCHPAD) },
 -- 
-2.42.0
+2.43.0
 

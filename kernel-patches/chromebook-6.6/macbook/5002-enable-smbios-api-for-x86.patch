@@ -1,0 +1,100 @@
+From 84810a21ecab70568586217f185998bcf34b450e Mon Sep 17 00:00:00 2001
+From: Ard Biesheuvel <ardb@kernel.org>
+Date: Mon, 1 Jul 2024 09:35:33 +0200
+Subject: x86/efistub: Enable SMBIOS protocol handling for x86
+
+The smbios.c source file is not currently included in the x86 build, and
+before we can do so, it needs some tweaks to build correctly in
+combination with the EFI mixed mode support.
+
+Reviewed-by: Lukas Wunner <lukas@wunner.de>
+Signed-off-by: Ard Biesheuvel <ardb@kernel.org>
+---
+ drivers/firmware/efi/libstub/Makefile |  2 +-
+ drivers/firmware/efi/libstub/smbios.c | 39 ++++++++++++++++++++++-------------
+ include/linux/efi.h                   |  4 ++--
+ 3 files changed, 28 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index 06f0428a723cb8..1f32d6cf98d691 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -76,7 +76,7 @@ lib-$(CONFIG_EFI_GENERIC_STUB)	+= efi-stub.o string.o intrinsics.o systable.o \
+ 
+ lib-$(CONFIG_ARM)		+= arm32-stub.o
+ lib-$(CONFIG_ARM64)		+= kaslr.o arm64.o arm64-stub.o smbios.o
+-lib-$(CONFIG_X86)		+= x86-stub.o
++lib-$(CONFIG_X86)		+= x86-stub.o smbios.o
+ lib-$(CONFIG_X86_64)		+= x86-5lvl.o
+ lib-$(CONFIG_RISCV)		+= kaslr.o riscv.o riscv-stub.o
+ lib-$(CONFIG_LOONGARCH)		+= loongarch.o loongarch-stub.o
+diff --git a/drivers/firmware/efi/libstub/smbios.c b/drivers/firmware/efi/libstub/smbios.c
+index 520c9079717a30..f31410d7e7e180 100644
+--- a/drivers/firmware/efi/libstub/smbios.c
++++ b/drivers/firmware/efi/libstub/smbios.c
+@@ -6,20 +6,31 @@
+ 
+ #include "efistub.h"
+ 
+-typedef struct efi_smbios_protocol efi_smbios_protocol_t;
+-
+-struct efi_smbios_protocol {
+-	efi_status_t (__efiapi *add)(efi_smbios_protocol_t *, efi_handle_t,
+-				     u16 *, struct efi_smbios_record *);
+-	efi_status_t (__efiapi *update_string)(efi_smbios_protocol_t *, u16 *,
+-					       unsigned long *, u8 *);
+-	efi_status_t (__efiapi *remove)(efi_smbios_protocol_t *, u16);
+-	efi_status_t (__efiapi *get_next)(efi_smbios_protocol_t *, u16 *, u8 *,
+-					  struct efi_smbios_record **,
+-					  efi_handle_t *);
+-
+-	u8 major_version;
+-	u8 minor_version;
++typedef union efi_smbios_protocol efi_smbios_protocol_t;
++
++union efi_smbios_protocol {
++	struct {
++		efi_status_t (__efiapi *add)(efi_smbios_protocol_t *, efi_handle_t,
++					     u16 *, struct efi_smbios_record *);
++		efi_status_t (__efiapi *update_string)(efi_smbios_protocol_t *, u16 *,
++						       unsigned long *, u8 *);
++		efi_status_t (__efiapi *remove)(efi_smbios_protocol_t *, u16);
++		efi_status_t (__efiapi *get_next)(efi_smbios_protocol_t *, u16 *, u8 *,
++						  struct efi_smbios_record **,
++						  efi_handle_t *);
++
++		u8 major_version;
++		u8 minor_version;
++	};
++	struct {
++		u32 add;
++		u32 update_string;
++		u32 remove;
++		u32 get_next;
++
++		u8 major_version;
++		u8 minor_version;
++	} mixed_mode;
+ };
+ 
+ const struct efi_smbios_record *efi_get_smbios_record(u8 type)
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 418e555459da7c..2a539816a4362d 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -74,10 +74,10 @@ typedef void *efi_handle_t;
+  */
+ typedef guid_t efi_guid_t __aligned(__alignof__(u32));
+ 
+-#define EFI_GUID(a, b, c, d...) (efi_guid_t){ {					\
++#define EFI_GUID(a, b, c, d...) ((efi_guid_t){ {				\
+ 	(a) & 0xff, ((a) >> 8) & 0xff, ((a) >> 16) & 0xff, ((a) >> 24) & 0xff,	\
+ 	(b) & 0xff, ((b) >> 8) & 0xff,						\
+-	(c) & 0xff, ((c) >> 8) & 0xff, d } }
++	(c) & 0xff, ((c) >> 8) & 0xff, d } })
+ 
+ /*
+  * Generic EFI table header
+-- 
+cgit 1.2.3-korg
+

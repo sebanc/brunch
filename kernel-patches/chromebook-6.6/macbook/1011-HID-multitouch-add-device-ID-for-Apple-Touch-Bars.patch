@@ -1,0 +1,94 @@
+From a74de0b6f2e1b79d54e84dbeab1b310232275d6c Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Wed, 19 Jul 2023 19:46:02 +0300
+Subject: [PATCH 08/12] HID: multitouch: add device ID for Apple Touch Bars
+
+Note that this is device ID is for T2 Macs. Testing on T1 Macs would be
+appreciated.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/Kconfig          |  1 +
+ drivers/hid/hid-multitouch.c | 26 ++++++++++++++++++++++----
+ 2 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/hid/Kconfig b/drivers/hid/Kconfig
+index 852de13aa..4e238df87 100644
+--- a/drivers/hid/Kconfig
++++ b/drivers/hid/Kconfig
+@@ -737,6 +737,7 @@ config HID_MULTITOUCH
+ 	  Say Y here if you have one of the following devices:
+ 	  - 3M PCT touch screens
+ 	  - ActionStar dual touch panels
++	  - Touch Bars on x86 MacBook Pros
+ 	  - Atmel panels
+ 	  - Cando dual touch panels
+ 	  - Chunghwa panels
+diff --git a/drivers/hid/hid-multitouch.c b/drivers/hid/hid-multitouch.c
+index f98fb36ff..f881b19db 100644
+--- a/drivers/hid/hid-multitouch.c
++++ b/drivers/hid/hid-multitouch.c
+@@ -215,6 +215,7 @@ static void mt_post_parse(struct mt_device *td, struct mt_application *app);
+ #define MT_CLS_GOOGLE				0x0111
+ #define MT_CLS_RAZER_BLADE_STEALTH		0x0112
+ #define MT_CLS_SMART_TECH			0x0113
++#define MT_CLS_APPLE_TOUCHBAR			0x0114
+ 
+ #define MT_DEFAULT_MAXCONTACT	10
+ #define MT_MAX_MAXCONTACT	250
+@@ -399,6 +400,13 @@ static const struct mt_class mt_classes[] = {
+ 			MT_QUIRK_CONTACT_CNT_ACCURATE |
+ 			MT_QUIRK_SEPARATE_APP_REPORT,
+ 	},
++	{ .name = MT_CLS_APPLE_TOUCHBAR,
++		.quirks = MT_QUIRK_HOVERING |
++			MT_QUIRK_TOUCH_IS_TIPSTATE |
++			MT_QUIRK_SLOT_IS_CONTACTID_MINUS_ONE,
++		.is_direct = true,
++		.maxcontacts = 11,
++	},
+ 	{ }
+ };
+ 
+@@ -1755,6 +1763,15 @@ static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ 		}
+ 	}
+ 
++	ret = hid_parse(hdev);
++	if (ret != 0)
++		return ret;
++
++	if (mtclass->name == MT_CLS_APPLE_TOUCHBAR &&
++	    !hid_find_field(hdev, HID_INPUT_REPORT,
++			    HID_DG_TOUCHPAD, HID_DG_TRANSDUCER_INDEX))
++		return -ENODEV;
++
+ 	td = devm_kzalloc(&hdev->dev, sizeof(struct mt_device), GFP_KERNEL);
+ 	if (!td) {
+ 		dev_err(&hdev->dev, "cannot allocate multitouch data\n");
+@@ -1802,10 +1819,6 @@ static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ 
+ 	timer_setup(&td->release_timer, mt_expired_timeout, 0);
+ 
+-	ret = hid_parse(hdev);
+-	if (ret != 0)
+-		return ret;
+-
+ 	if (mtclass->quirks & MT_QUIRK_FIX_CONST_CONTACT_ID)
+ 		mt_fix_const_fields(hdev, HID_DG_CONTACTID);
+ 
+@@ -2240,6 +2253,11 @@ static const struct hid_device_id mt_devices[] = {
+ 		MT_USB_DEVICE(USB_VENDOR_ID_XIROKU,
+ 			USB_DEVICE_ID_XIROKU_CSR2) },
+ 
++	/* Apple Touch Bars */
++	{ .driver_data = MT_CLS_APPLE_TOUCHBAR,
++		HID_USB_DEVICE(USB_VENDOR_ID_APPLE,
++			       USB_DEVICE_ID_APPLE_TOUCHBAR_DISPLAY) },
++
+ 	/* Google MT devices */
+ 	{ .driver_data = MT_CLS_GOOGLE,
+ 		HID_DEVICE(HID_BUS_ANY, HID_GROUP_ANY, USB_VENDOR_ID_GOOGLE,
+-- 
+2.42.0
+

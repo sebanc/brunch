@@ -1,0 +1,40 @@
+From 2f9be28549307b4ac51e8d66bf3b8d5e0621466d Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Wed, 19 Jul 2023 19:37:14 +0300
+Subject: [PATCH 04/12] HID: multitouch: support getting the contact ID from
+ HID_DG_TRANSDUCER_INDEX fields
+
+This is needed to support Apple Touch Bars, where the contact ID is
+contained in fields with the HID_DG_TRANSDUCER_INDEX usage.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/hid-multitouch.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/hid/hid-multitouch.c b/drivers/hid/hid-multitouch.c
+index e31be0cb8..902a59928 100644
+--- a/drivers/hid/hid-multitouch.c
++++ b/drivers/hid/hid-multitouch.c
+@@ -636,7 +636,9 @@ static struct mt_report_data *mt_allocate_report_data(struct mt_device *td,
+ 
+ 		if (field->logical == HID_DG_FINGER || td->hdev->group != HID_GROUP_MULTITOUCH_WIN_8) {
+ 			for (n = 0; n < field->report_count; n++) {
+-				if (field->usage[n].hid == HID_DG_CONTACTID) {
++				unsigned int hid = field->usage[n].hid;
++
++				if (hid == HID_DG_CONTACTID || hid == HID_DG_TRANSDUCER_INDEX) {
+ 					rdata->is_mt_collection = true;
+ 					break;
+ 				}
+@@ -815,6 +817,7 @@ static int mt_touch_input_mapping(struct hid_device *hdev, struct hid_input *hi,
+ 			MT_STORE_FIELD(tip_state);
+ 			return 1;
+ 		case HID_DG_CONTACTID:
++		case HID_DG_TRANSDUCER_INDEX:
+ 			MT_STORE_FIELD(contactid);
+ 			app->touches_by_report++;
+ 			return 1;
+-- 
+2.42.0
+

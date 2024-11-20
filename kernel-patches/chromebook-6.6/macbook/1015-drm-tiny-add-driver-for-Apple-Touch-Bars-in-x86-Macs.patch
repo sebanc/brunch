@@ -1,0 +1,710 @@
+From 1f0b6c21c4d56f5be74c4d7d0665525862e307c3 Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Sat, 6 May 2023 17:30:09 +0300
+Subject: [PATCH 12/12] drm/tiny: add driver for Apple Touch Bars in x86 Macs
+
+The Touch Bars found on x86 Macs support two USB configurations: one
+where the device presents itself as a HID keyboard and can display
+predefined sets of keys, and one where the operating system has full
+control over what is displayed. This commit adds support for the display
+functionality of the second configuration.
+
+Note that this driver has only been tested on T2 Macs, and only includes
+the USB device ID for these devices. Testing on T1 Macs would be
+appreciated.
+
+Credit goes to @imbushuo on GitHub for reverse engineering most of the
+protocol.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ MAINTAINERS                       |   6 +
+ drivers/gpu/drm/tiny/Kconfig      |  12 +
+ drivers/gpu/drm/tiny/Makefile     |   1 +
+ drivers/gpu/drm/tiny/appletbdrm.c | 624 ++++++++++++++++++++++++++++++
+ 4 files changed, 643 insertions(+)
+ create mode 100644 drivers/gpu/drm/tiny/appletbdrm.c
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 519b3b736..dfc63d257 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6372,6 +6372,12 @@ S:	Supported
+ T:	git git://anongit.freedesktop.org/drm/drm-misc
+ F:	drivers/gpu/drm/sun4i/sun8i*
+ 
++DRM DRIVER FOR APPLE TOUCH BARS
++M:	Kerem Karabay <kekrby@gmail.com>
++L:	dri-devel@lists.freedesktop.org
++S:	Maintained
++F:	drivers/gpu/drm/tiny/appletbdrm.c
++
+ DRM DRIVER FOR ARM PL111 CLCD
+ M:	Emma Anholt <emma@anholt.net>
+ S:	Supported
+diff --git a/drivers/gpu/drm/tiny/Kconfig b/drivers/gpu/drm/tiny/Kconfig
+index f6889f649..559a97bce 100644
+--- a/drivers/gpu/drm/tiny/Kconfig
++++ b/drivers/gpu/drm/tiny/Kconfig
+@@ -1,5 +1,17 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
++config DRM_APPLETBDRM
++	tristate "DRM support for Apple Touch Bars"
++	depends on DRM && USB && MMU
++	select DRM_KMS_HELPER
++	select DRM_GEM_SHMEM_HELPER
++	help
++	  Say Y here if you want support for the display of Touch Bars on x86
++	  MacBook Pros.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called appletbdrm.
++
+ config DRM_ARCPGU
+ 	tristate "ARC PGU"
+ 	depends on DRM && OF
+diff --git a/drivers/gpu/drm/tiny/Makefile b/drivers/gpu/drm/tiny/Makefile
+index 76dde89a0..9a1b412e7 100644
+--- a/drivers/gpu/drm/tiny/Makefile
++++ b/drivers/gpu/drm/tiny/Makefile
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
++obj-$(CONFIG_DRM_APPLETBDRM)		+= appletbdrm.o
+ obj-$(CONFIG_DRM_ARCPGU)		+= arcpgu.o
+ obj-$(CONFIG_DRM_BOCHS)			+= bochs.o
+ obj-$(CONFIG_DRM_CIRRUS_QEMU)		+= cirrus.o
+diff --git a/drivers/gpu/drm/tiny/appletbdrm.c b/drivers/gpu/drm/tiny/appletbdrm.c
+new file mode 100644
+index 000000000..33a99436b
+--- /dev/null
++++ b/drivers/gpu/drm/tiny/appletbdrm.c
+@@ -0,0 +1,624 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Apple Touch Bar DRM Driver
++ *
++ * Copyright (c) 2023 Kerem Karabay <kekrby@gmail.com>
++ */
++
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++
++#include <asm/unaligned.h>
++
++#include <linux/usb.h>
++#include <linux/module.h>
++
++#include <drm/drm_drv.h>
++#include <drm/drm_fourcc.h>
++#include <drm/drm_probe_helper.h>
++#include <drm/drm_atomic_helper.h>
++#include <drm/drm_damage_helper.h>
++#include <drm/drm_format_helper.h>
++#include <drm/drm_gem_shmem_helper.h>
++#include <drm/drm_gem_atomic_helper.h>
++#include <drm/drm_simple_kms_helper.h>
++#include <drm/drm_gem_framebuffer_helper.h>
++
++#define _APPLETBDRM_FOURCC(s)		(((s)[0] << 24) | ((s)[1] << 16) | ((s)[2] << 8) | (s)[3])
++#define APPLETBDRM_FOURCC(s)		_APPLETBDRM_FOURCC(#s)
++
++#define APPLETBDRM_PIXEL_FORMAT		APPLETBDRM_FOURCC(RGBA) /* The actual format is BGR888 */
++#define APPLETBDRM_BITS_PER_PIXEL	24
++
++#define APPLETBDRM_MSG_CLEAR_DISPLAY	APPLETBDRM_FOURCC(CLRD)
++#define APPLETBDRM_MSG_GET_INFORMATION	APPLETBDRM_FOURCC(GINF)
++#define APPLETBDRM_MSG_UPDATE_COMPLETE	APPLETBDRM_FOURCC(UDCL)
++#define APPLETBDRM_MSG_SIGNAL_READINESS	APPLETBDRM_FOURCC(REDY)
++
++#define APPLETBDRM_BULK_MSG_TIMEOUT	1000
++
++#define drm_to_adev(_drm)		container_of(_drm, struct appletbdrm_device, drm)
++#define adev_to_udev(adev)		interface_to_usbdev(to_usb_interface(adev->dev))
++
++struct appletbdrm_device {
++	struct device *dev;
++
++	u8 in_ep;
++	u8 out_ep;
++
++	u32 width;
++	u32 height;
++
++	struct drm_device drm;
++	struct drm_display_mode mode;
++	struct drm_connector connector;
++	struct drm_simple_display_pipe pipe;
++
++	bool readiness_signal_received;
++};
++
++struct appletbdrm_request_header {
++	__le16 unk_00;
++	__le16 unk_02;
++	__le32 unk_04;
++	__le32 unk_08;
++	__le32 size;
++} __packed;
++
++struct appletbdrm_response_header {
++	u8 unk_00[16];
++	u32 msg;
++} __packed;
++
++struct appletbdrm_simple_request {
++	struct appletbdrm_request_header header;
++	u32 msg;
++	u8 unk_14[8];
++	__le32 size;
++} __packed;
++
++struct appletbdrm_information {
++	struct appletbdrm_response_header header;
++	u8 unk_14[12];
++	__le32 width;
++	__le32 height;
++	u8 bits_per_pixel;
++	__le32 bytes_per_row;
++	__le32 orientation;
++	__le32 bitmap_info;
++	u32 pixel_format;
++	__le32 width_inches;	/* floating point */
++	__le32 height_inches;	/* floating point */
++} __packed;
++
++struct appletbdrm_frame {
++	__le16 begin_x;
++	__le16 begin_y;
++	__le16 width;
++	__le16 height;
++	__le32 buf_size;
++	u8 buf[];
++} __packed;
++
++struct appletbdrm_fb_request_footer {
++	u8 unk_00[12];
++	__le32 unk_0c;
++	u8 unk_10[12];
++	__le32 unk_1c;
++	__le64 timestamp;
++	u8 unk_28[12];
++	__le32 unk_34;
++	u8 unk_38[20];
++	__le32 unk_4c;
++} __packed;
++
++struct appletbdrm_fb_request {
++	struct appletbdrm_request_header header;
++	__le16 unk_10;
++	u8 msg_id;
++	u8 unk_13[29];
++	/*
++	 * Contents of `data`:
++	 * - struct appletbdrm_frame frames[];
++	 * - struct appletbdrm_fb_request_footer footer;
++	 * - padding to make the total size a multiple of 16
++	 */
++	u8 data[];
++} __packed;
++
++struct appletbdrm_fb_request_response {
++	struct appletbdrm_response_header header;
++	u8 unk_14[12];
++	__le64 timestamp;
++} __packed;
++
++static int appletbdrm_send_request(struct appletbdrm_device *adev,
++				   struct appletbdrm_request_header *request, size_t size)
++{
++	struct usb_device *udev = adev_to_udev(adev);
++	struct drm_device *drm = &adev->drm;
++	int ret, actual_size;
++
++	ret = usb_bulk_msg(udev, usb_sndbulkpipe(udev, adev->out_ep),
++			   request, size, &actual_size, APPLETBDRM_BULK_MSG_TIMEOUT);
++	if (ret) {
++		drm_err(drm, "Failed to send message (%pe)\n", ERR_PTR(ret));
++		return ret;
++	}
++
++	if (actual_size != size) {
++		drm_err(drm, "Actual size (%d) doesn't match expected size (%lu)\n",
++			actual_size, size);
++		return -EIO;
++	}
++
++	return ret;
++}
++
++static int appletbdrm_read_response(struct appletbdrm_device *adev,
++				    struct appletbdrm_response_header *response,
++				    size_t size, u32 expected_response)
++{
++	struct usb_device *udev = adev_to_udev(adev);
++	struct drm_device *drm = &adev->drm;
++	int ret, actual_size;
++
++retry:
++	ret = usb_bulk_msg(udev, usb_rcvbulkpipe(udev, adev->in_ep),
++			   response, size, &actual_size, APPLETBDRM_BULK_MSG_TIMEOUT);
++	if (ret) {
++		drm_err(drm, "Failed to read response (%pe)\n", ERR_PTR(ret));
++		return ret;
++	}
++
++	/*
++	 * The device responds to the first request sent in a particular
++	 * timeframe after the USB device configuration is set with a readiness
++	 * signal, in which case the response should be read again
++	 */
++	if (response->msg == APPLETBDRM_MSG_SIGNAL_READINESS) {
++		if (!adev->readiness_signal_received) {
++			adev->readiness_signal_received = true;
++			goto retry;
++		}
++
++		drm_err(drm, "Encountered unexpected readiness signal\n");
++		return -EIO;
++	}
++
++	if (actual_size != size) {
++		drm_err(drm, "Actual size (%d) doesn't match expected size (%lu)\n",
++			actual_size, size);
++		return -EIO;
++	}
++
++	if (response->msg != expected_response) {
++		drm_err(drm, "Unexpected response from device (expected %p4ch found %p4ch)\n",
++			&expected_response, &response->msg);
++		return -EIO;
++	}
++
++	return 0;
++}
++
++static int appletbdrm_send_msg(struct appletbdrm_device *adev, u32 msg)
++{
++	struct appletbdrm_simple_request *request;
++	int ret;
++
++	request = kzalloc(sizeof(*request), GFP_KERNEL);
++	if (!request)
++		return -ENOMEM;
++
++	request->header.unk_00 = cpu_to_le16(2);
++	request->header.unk_02 = cpu_to_le16(0x1512);
++	request->header.size = cpu_to_le32(sizeof(*request) - sizeof(request->header));
++	request->msg = msg;
++	request->size = request->header.size;
++
++	ret = appletbdrm_send_request(adev, &request->header, sizeof(*request));
++
++	kfree(request);
++
++	return ret;
++}
++
++static int appletbdrm_clear_display(struct appletbdrm_device *adev)
++{
++	return appletbdrm_send_msg(adev, APPLETBDRM_MSG_CLEAR_DISPLAY);
++}
++
++static int appletbdrm_signal_readiness(struct appletbdrm_device *adev)
++{
++	return appletbdrm_send_msg(adev, APPLETBDRM_MSG_SIGNAL_READINESS);
++}
++
++static int appletbdrm_get_information(struct appletbdrm_device *adev)
++{
++	struct appletbdrm_information *info;
++	struct drm_device *drm = &adev->drm;
++	u8 bits_per_pixel;
++	u32 pixel_format;
++	int ret;
++
++	info = kzalloc(sizeof(*info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++
++	ret = appletbdrm_send_msg(adev, APPLETBDRM_MSG_GET_INFORMATION);
++	if (ret)
++		return ret;
++
++	ret = appletbdrm_read_response(adev, &info->header, sizeof(*info),
++				       APPLETBDRM_MSG_GET_INFORMATION);
++	if (ret)
++		goto free_info;
++
++	bits_per_pixel = info->bits_per_pixel;
++	pixel_format = get_unaligned(&info->pixel_format);
++
++	adev->width = get_unaligned_le32(&info->width);
++	adev->height = get_unaligned_le32(&info->height);
++
++	if (bits_per_pixel != APPLETBDRM_BITS_PER_PIXEL) {
++		drm_err(drm, "Encountered unexpected bits per pixel value (%d)\n", bits_per_pixel);
++		ret = -EINVAL;
++		goto free_info;
++	}
++
++	if (pixel_format != APPLETBDRM_PIXEL_FORMAT) {
++		drm_err(drm, "Encountered unknown pixel format (%p4ch)\n", &pixel_format);
++		ret = -EINVAL;
++		goto free_info;
++	}
++
++free_info:
++	kfree(info);
++
++	return ret;
++}
++
++static u32 rect_size(struct drm_rect *rect)
++{
++	return drm_rect_width(rect) * drm_rect_height(rect) * (APPLETBDRM_BITS_PER_PIXEL / 8);
++}
++
++static int appletbdrm_flush_damage(struct appletbdrm_device *adev,
++				   struct drm_plane_state *old_state,
++				   struct drm_plane_state *state)
++{
++	struct drm_shadow_plane_state *shadow_plane_state = to_drm_shadow_plane_state(state);
++	struct appletbdrm_fb_request_response *response;
++	struct appletbdrm_fb_request_footer *footer;
++	struct drm_atomic_helper_damage_iter iter;
++	struct drm_framebuffer *fb = state->fb;
++	struct appletbdrm_fb_request *request;
++	struct drm_device *drm = &adev->drm;
++	struct appletbdrm_frame *frame;
++	u64 timestamp = ktime_get_ns();
++	struct drm_rect damage;
++	size_t frames_size = 0;
++	size_t request_size;
++	int ret;
++
++	drm_atomic_helper_damage_iter_init(&iter, old_state, state);
++	drm_atomic_for_each_plane_damage(&iter, &damage) {
++		frames_size += struct_size(frame, buf, rect_size(&damage));
++	}
++
++	if (!frames_size)
++		return 0;
++
++	request_size = ALIGN(sizeof(*request) + frames_size + sizeof(*footer), 16);
++
++	request = kzalloc(request_size, GFP_KERNEL);
++	if (!request)
++		return -ENOMEM;
++
++	response = kzalloc(sizeof(*response), GFP_KERNEL);
++	if (!response) {
++		ret = -ENOMEM;
++		goto free_request;
++	}
++
++	ret = drm_gem_fb_begin_cpu_access(fb, DMA_FROM_DEVICE);
++	if (ret) {
++		drm_err(drm, "Failed to start CPU framebuffer access (%pe)\n", ERR_PTR(ret));
++		goto free_response;
++	}
++
++	request->header.unk_00 = cpu_to_le16(2);
++	request->header.unk_02 = cpu_to_le16(0x12);
++	request->header.unk_04 = cpu_to_le32(9);
++	request->header.size = cpu_to_le32(request_size - sizeof(request->header));
++	request->unk_10 = cpu_to_le16(1);
++	request->msg_id = timestamp & 0xff;
++
++	frame = (struct appletbdrm_frame *)request->data;
++
++	drm_atomic_helper_damage_iter_init(&iter, old_state, state);
++	drm_atomic_for_each_plane_damage(&iter, &damage) {
++		struct iosys_map dst = IOSYS_MAP_INIT_VADDR(frame->buf);
++		u32 buf_size = rect_size(&damage);
++
++		/*
++		 * The coordinates need to be translated to the coordinate
++		 * system the device expects, see the comment in
++		 * appletbdrm_setup_mode_config
++		 */
++		frame->begin_x = cpu_to_le16(damage.y1);
++		frame->begin_y = cpu_to_le16(adev->height - damage.x2);
++		frame->width = cpu_to_le16(drm_rect_height(&damage));
++		frame->height = cpu_to_le16(drm_rect_width(&damage));
++		frame->buf_size = cpu_to_le32(buf_size);
++
++		ret = drm_fb_blit(&dst, NULL, DRM_FORMAT_BGR888,
++				  &shadow_plane_state->data[0], fb, &damage);
++		if (ret) {
++			drm_err(drm, "Failed to copy damage clip (%pe)\n", ERR_PTR(ret));
++			goto end_fb_cpu_access;
++		}
++
++		frame = (void *)frame + struct_size(frame, buf, buf_size);
++	}
++
++	footer = (struct appletbdrm_fb_request_footer *)&request->data[frames_size];
++
++	footer->unk_0c = cpu_to_le32(0xfffe);
++	footer->unk_1c = cpu_to_le32(0x80001);
++	footer->unk_34 = cpu_to_le32(0x80002);
++	footer->unk_4c = cpu_to_le32(0xffff);
++	footer->timestamp = cpu_to_le64(timestamp);
++
++	ret = appletbdrm_send_request(adev, &request->header, request_size);
++	if (ret)
++		goto end_fb_cpu_access;
++
++	ret = appletbdrm_read_response(adev, &response->header, sizeof(*response),
++				       APPLETBDRM_MSG_UPDATE_COMPLETE);
++	if (ret)
++		goto end_fb_cpu_access;
++
++	if (response->timestamp != footer->timestamp) {
++		drm_err(drm, "Response timestamp (%llu) doesn't match request timestamp (%llu)\n",
++			le64_to_cpu(response->timestamp), timestamp);
++		goto end_fb_cpu_access;
++	}
++
++end_fb_cpu_access:
++	drm_gem_fb_end_cpu_access(fb, DMA_FROM_DEVICE);
++free_response:
++	kfree(response);
++free_request:
++	kfree(request);
++
++	return ret;
++}
++
++static int appletbdrm_connector_helper_get_modes(struct drm_connector *connector)
++{
++	struct appletbdrm_device *adev = drm_to_adev(connector->dev);
++
++	return drm_connector_helper_get_modes_fixed(connector, &adev->mode);
++}
++
++static enum drm_mode_status appletbdrm_pipe_mode_valid(struct drm_simple_display_pipe *pipe,
++						       const struct drm_display_mode *mode)
++{
++	struct drm_crtc *crtc = &pipe->crtc;
++	struct appletbdrm_device *adev = drm_to_adev(crtc->dev);
++
++	return drm_crtc_helper_mode_valid_fixed(crtc, mode, &adev->mode);
++}
++
++static void appletbdrm_pipe_disable(struct drm_simple_display_pipe *pipe)
++{
++	struct appletbdrm_device *adev = drm_to_adev(pipe->crtc.dev);
++	int idx;
++
++	if (!drm_dev_enter(&adev->drm, &idx))
++		return;
++
++	appletbdrm_clear_display(adev);
++
++	drm_dev_exit(idx);
++}
++
++static void appletbdrm_pipe_update(struct drm_simple_display_pipe *pipe,
++				   struct drm_plane_state *old_state)
++{
++	struct drm_crtc *crtc = &pipe->crtc;
++	struct appletbdrm_device *adev = drm_to_adev(crtc->dev);
++	int idx;
++
++	if (!crtc->state->active || !drm_dev_enter(&adev->drm, &idx))
++		return;
++
++	appletbdrm_flush_damage(adev, old_state, pipe->plane.state);
++
++	drm_dev_exit(idx);
++}
++
++static const u32 appletbdrm_formats[] = {
++	DRM_FORMAT_BGR888,
++	DRM_FORMAT_XRGB8888, /* emulated */
++};
++
++static const struct drm_mode_config_funcs appletbdrm_mode_config_funcs = {
++	.fb_create = drm_gem_fb_create_with_dirty,
++	.atomic_check = drm_atomic_helper_check,
++	.atomic_commit = drm_atomic_helper_commit,
++};
++
++static const struct drm_connector_funcs appletbdrm_connector_funcs = {
++	.reset = drm_atomic_helper_connector_reset,
++	.destroy = drm_connector_cleanup,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++};
++
++static const struct drm_connector_helper_funcs appletbdrm_connector_helper_funcs = {
++	.get_modes = appletbdrm_connector_helper_get_modes,
++};
++
++static const struct drm_simple_display_pipe_funcs appletbdrm_pipe_funcs = {
++	DRM_GEM_SIMPLE_DISPLAY_PIPE_SHADOW_PLANE_FUNCS,
++	.update = appletbdrm_pipe_update,
++	.disable = appletbdrm_pipe_disable,
++	.mode_valid = appletbdrm_pipe_mode_valid,
++};
++
++DEFINE_DRM_GEM_FOPS(appletbdrm_drm_fops);
++
++static const struct drm_driver appletbdrm_drm_driver = {
++	DRM_GEM_SHMEM_DRIVER_OPS,
++	.name			= "appletbdrm",
++	.desc			= "Apple Touch Bar DRM Driver",
++	.date			= "20230910",
++	.major			= 1,
++	.minor			= 0,
++	.driver_features	= DRIVER_MODESET | DRIVER_GEM | DRIVER_ATOMIC,
++	.fops			= &appletbdrm_drm_fops,
++};
++
++static int appletbdrm_setup_mode_config(struct appletbdrm_device *adev)
++{
++	struct drm_connector *connector = &adev->connector;
++	struct drm_device *drm = &adev->drm;
++	struct device *dev = adev->dev;
++	int ret;
++
++	ret = drmm_mode_config_init(drm);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to initialize mode configuration\n");
++
++	/*
++	 * The coordinate system used by the device is different from the
++	 * coordinate system of the framebuffer in that the x and y axes are
++	 * swapped, and that the y axis is inverted; so what the device reports
++	 * as the height is actually the width of the framebuffer and vice
++	 * versa
++	 */
++	drm->mode_config.min_width = 0;
++	drm->mode_config.min_height = 0;
++	drm->mode_config.max_width = max(adev->height, DRM_SHADOW_PLANE_MAX_WIDTH);
++	drm->mode_config.max_height = max(adev->width, DRM_SHADOW_PLANE_MAX_HEIGHT);
++	drm->mode_config.preferred_depth = APPLETBDRM_BITS_PER_PIXEL;
++	drm->mode_config.funcs = &appletbdrm_mode_config_funcs;
++
++	adev->mode = (struct drm_display_mode) {
++		DRM_MODE_INIT(60, adev->height, adev->width,
++			      DRM_MODE_RES_MM(adev->height, 218),
++			      DRM_MODE_RES_MM(adev->width, 218))
++	};
++
++	ret = drm_connector_init(drm, connector,
++				 &appletbdrm_connector_funcs, DRM_MODE_CONNECTOR_USB);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to initialize connector\n");
++
++	drm_connector_helper_add(connector, &appletbdrm_connector_helper_funcs);
++
++	ret = drm_connector_set_panel_orientation(connector,
++						  DRM_MODE_PANEL_ORIENTATION_RIGHT_UP);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to set panel orientation\n");
++
++	connector->display_info.non_desktop = true;
++	ret = drm_object_property_set_value(&connector->base,
++					    drm->mode_config.non_desktop_property, true);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to set non-desktop property\n");
++
++	ret = drm_simple_display_pipe_init(drm, &adev->pipe, &appletbdrm_pipe_funcs,
++					   appletbdrm_formats, ARRAY_SIZE(appletbdrm_formats),
++					   NULL, &adev->connector);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to initialize simple display pipe\n");
++
++	drm_plane_enable_fb_damage_clips(&adev->pipe.plane);
++
++	drm_mode_config_reset(drm);
++
++	ret = drm_dev_register(drm, 0);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to register DRM device\n");
++
++	return 0;
++}
++
++static int appletbdrm_probe(struct usb_interface *intf,
++			    const struct usb_device_id *id)
++{
++	struct usb_endpoint_descriptor *bulk_in, *bulk_out;
++	struct device *dev = &intf->dev;
++	struct appletbdrm_device *adev;
++	int ret;
++
++	ret = usb_find_common_endpoints(intf->cur_altsetting, &bulk_in, &bulk_out, NULL, NULL);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to find bulk endpoints\n");
++
++	adev = devm_drm_dev_alloc(dev, &appletbdrm_drm_driver, struct appletbdrm_device, drm);
++	if (IS_ERR(adev))
++		return PTR_ERR(adev);
++
++	adev->dev = dev;
++	adev->in_ep = bulk_in->bEndpointAddress;
++	adev->out_ep = bulk_out->bEndpointAddress;
++
++	usb_set_intfdata(intf, adev);
++
++	ret = appletbdrm_get_information(adev);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to get display information\n");
++
++	ret = appletbdrm_signal_readiness(adev);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to signal readiness\n");
++
++	ret = appletbdrm_clear_display(adev);
++	if (ret)
++		return dev_err_probe(dev, ret, "Failed to clear display\n");
++
++	return appletbdrm_setup_mode_config(adev);
++}
++
++static void appletbdrm_disconnect(struct usb_interface *intf)
++{
++	struct appletbdrm_device *adev = usb_get_intfdata(intf);
++	struct drm_device *drm = &adev->drm;
++
++	drm_dev_unplug(drm);
++	drm_atomic_helper_shutdown(drm);
++}
++
++static void appletbdrm_shutdown(struct usb_interface *intf)
++{
++	struct appletbdrm_device *adev = usb_get_intfdata(intf);
++
++	/*
++	 * The framebuffer needs to be cleared on shutdown since its content
++	 * persists across boots
++	 */
++	drm_atomic_helper_shutdown(&adev->drm);
++}
++
++static const struct usb_device_id appletbdrm_usb_id_table[] = {
++	{ USB_DEVICE_INTERFACE_CLASS(0x05ac, 0x8302, USB_CLASS_AUDIO_VIDEO) },
++	{}
++};
++MODULE_DEVICE_TABLE(usb, appletbdrm_usb_id_table);
++
++static struct usb_driver appletbdrm_usb_driver = {
++	.name		= "appletbdrm",
++	.probe		= appletbdrm_probe,
++	.disconnect	= appletbdrm_disconnect,
++	.shutdown	= appletbdrm_shutdown,
++	.id_table	= appletbdrm_usb_id_table,
++};
++module_usb_driver(appletbdrm_usb_driver);
++
++MODULE_AUTHOR("Kerem Karabay <kekrby@gmail.com>");
++MODULE_DESCRIPTION("Apple Touch Bar DRM Driver");
++MODULE_LICENSE("GPL");
+-- 
+2.42.0
+

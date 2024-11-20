@@ -1,0 +1,115 @@
+From 75ca57b64ce6846622d8aefac5a76fc638a2123d Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Sun, 5 Mar 2023 19:12:53 +0300
+Subject: [PATCH 01/12] HID: core: add helper for finding a field with a
+ certain usage
+
+This helper will allow HID drivers to easily determine if they should
+bind to a hid_device by checking for the prescence of a certain field
+when its ID is not enough, which can be the case on USB devices with
+multiple interfaces and/or configurations.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/hid-core.c          | 25 +++++++++++++++++++++++++
+ drivers/hid/hid-google-hammer.c | 27 ++-------------------------
+ include/linux/hid.h             |  2 ++
+ 3 files changed, 29 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/hid/hid-core.c b/drivers/hid/hid-core.c
+index 8992e3c1e..6395bdc2e 100644
+--- a/drivers/hid/hid-core.c
++++ b/drivers/hid/hid-core.c
+@@ -1906,6 +1906,31 @@ int hid_set_field(struct hid_field *field, unsigned offset, __s32 value)
+ }
+ EXPORT_SYMBOL_GPL(hid_set_field);
+ 
++struct hid_field *hid_find_field(struct hid_device *hdev, unsigned int report_type,
++				 unsigned int application, unsigned int usage)
++{
++	struct list_head *report_list = &hdev->report_enum[report_type].report_list;
++	struct hid_report *report;
++	int i, j;
++
++	list_for_each_entry(report, report_list, list) {
++		if (report->application != application)
++			continue;
++
++		for (i = 0; i < report->maxfield; i++) {
++			struct hid_field *field = report->field[i];
++
++			for (j = 0; j < field->maxusage; j++) {
++				if (field->usage[j].hid == usage)
++					return field;
++			}
++		}
++	}
++
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(hid_find_field);
++
+ static struct hid_report *hid_get_report(struct hid_report_enum *report_enum,
+ 		const u8 *data)
+ {
+diff --git a/drivers/hid/hid-google-hammer.c b/drivers/hid/hid-google-hammer.c
+index c6bdb9c4e..fba3652aa 100644
+--- a/drivers/hid/hid-google-hammer.c
++++ b/drivers/hid/hid-google-hammer.c
+@@ -419,38 +419,15 @@ static int hammer_event(struct hid_device *hid, struct hid_field *field,
+ 	return 0;
+ }
+ 
+-static bool hammer_has_usage(struct hid_device *hdev, unsigned int report_type,
+-			unsigned application, unsigned usage)
+-{
+-	struct hid_report_enum *re = &hdev->report_enum[report_type];
+-	struct hid_report *report;
+-	int i, j;
+-
+-	list_for_each_entry(report, &re->report_list, list) {
+-		if (report->application != application)
+-			continue;
+-
+-		for (i = 0; i < report->maxfield; i++) {
+-			struct hid_field *field = report->field[i];
+-
+-			for (j = 0; j < field->maxusage; j++)
+-				if (field->usage[j].hid == usage)
+-					return true;
+-		}
+-	}
+-
+-	return false;
+-}
+-
+ static bool hammer_has_folded_event(struct hid_device *hdev)
+ {
+-	return hammer_has_usage(hdev, HID_INPUT_REPORT,
++	return !!hid_find_field(hdev, HID_INPUT_REPORT,
+ 				HID_GD_KEYBOARD, HID_USAGE_KBD_FOLDED);
+ }
+ 
+ static bool hammer_has_backlight_control(struct hid_device *hdev)
+ {
+-	return hammer_has_usage(hdev, HID_OUTPUT_REPORT,
++	return !!hid_find_field(hdev, HID_OUTPUT_REPORT,
+ 				HID_GD_KEYBOARD, HID_AD_BRIGHTNESS);
+ }
+ 
+diff --git a/include/linux/hid.h b/include/linux/hid.h
+index 39e21e381..9520fdfdd 100644
+--- a/include/linux/hid.h
++++ b/include/linux/hid.h
+@@ -913,6 +913,8 @@ extern void hidinput_report_event(struct hid_device *hid, struct hid_report *rep
+ extern int hidinput_connect(struct hid_device *hid, unsigned int force);
+ extern void hidinput_disconnect(struct hid_device *);
+ 
++struct hid_field *hid_find_field(struct hid_device *hdev, unsigned int report_type,
++				 unsigned int application, unsigned int usage);
+ int hid_set_field(struct hid_field *, unsigned, __s32);
+ int hid_input_report(struct hid_device *hid, enum hid_report_type type, u8 *data, u32 size,
+ 		     int interrupt);
+-- 
+2.42.0
+

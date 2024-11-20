@@ -1,0 +1,94 @@
+From f893444f7c842f97f3707897ba29f2c8dd77c8df Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Mon, 7 Aug 2023 20:29:27 +0300
+Subject: [PATCH 10/12] USB: core: add 'shutdown' callback to usb_driver
+
+This simplifies running code on shutdown for USB drivers.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/usb/core/driver.c | 14 ++++++++++++++
+ drivers/usb/storage/uas.c |  5 ++---
+ include/linux/usb.h       |  3 +++
+ 3 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/core/driver.c b/drivers/usb/core/driver.c
+index f58a0299f..dc0f86376 100644
+--- a/drivers/usb/core/driver.c
++++ b/drivers/usb/core/driver.c
+@@ -514,6 +514,19 @@ static int usb_unbind_interface(struct device *dev)
+ 	return 0;
+ }
+ 
++static void usb_shutdown_interface(struct device *dev)
++{
++	struct usb_interface *intf = to_usb_interface(dev);
++	struct usb_driver *driver;
++
++	if (!dev->driver)
++		return;
++
++	driver = to_usb_driver(dev->driver);
++	if (driver->shutdown)
++		driver->shutdown(intf);
++}
++
+ /**
+  * usb_driver_claim_interface - bind a driver to an interface
+  * @driver: the driver to be bound
+@@ -1053,6 +1066,7 @@ int usb_register_driver(struct usb_driver *new_driver, struct module *owner,
+ 	new_driver->drvwrap.driver.bus = &usb_bus_type;
+ 	new_driver->drvwrap.driver.probe = usb_probe_interface;
+ 	new_driver->drvwrap.driver.remove = usb_unbind_interface;
++	new_driver->drvwrap.driver.shutdown = usb_shutdown_interface;
+ 	new_driver->drvwrap.driver.owner = owner;
+ 	new_driver->drvwrap.driver.mod_name = mod_name;
+ 	new_driver->drvwrap.driver.dev_groups = new_driver->dev_groups;
+diff --git a/drivers/usb/storage/uas.c b/drivers/usb/storage/uas.c
+index 2583ee981..591fa0379 100644
+--- a/drivers/usb/storage/uas.c
++++ b/drivers/usb/storage/uas.c
+@@ -1221,9 +1221,8 @@ static void uas_disconnect(struct usb_interface *intf)
+  * hang on reboot when the device is still in uas mode. Note the reset is
+  * necessary as some devices won't revert to usb-storage mode without it.
+  */
+-static void uas_shutdown(struct device *dev)
++static void uas_shutdown(struct usb_interface *intf)
+ {
+-	struct usb_interface *intf = to_usb_interface(dev);
+ 	struct usb_device *udev = interface_to_usbdev(intf);
+ 	struct Scsi_Host *shost = usb_get_intfdata(intf);
+ 	struct uas_dev_info *devinfo = (struct uas_dev_info *)shost->hostdata;
+@@ -1246,7 +1245,7 @@ static struct usb_driver uas_driver = {
+ 	.suspend = uas_suspend,
+ 	.resume = uas_resume,
+ 	.reset_resume = uas_reset_resume,
+-	.drvwrap.driver.shutdown = uas_shutdown,
++	.shutdown = uas_shutdown,
+ 	.id_table = uas_usb_ids,
+ };
+ 
+diff --git a/include/linux/usb.h b/include/linux/usb.h
+index 25f8e62a3..5f3ae2186 100644
+--- a/include/linux/usb.h
++++ b/include/linux/usb.h
+@@ -1194,6 +1194,7 @@ struct usbdrv_wrap {
+  *	post_reset method is called.
+  * @post_reset: Called by usb_reset_device() after the device
+  *	has been reset
++ * @shutdown: Called at shut-down time to quiesce the device.
+  * @id_table: USB drivers use ID table to support hotplugging.
+  *	Export this with MODULE_DEVICE_TABLE(usb,...).  This must be set
+  *	or your driver's probe function will never get called.
+@@ -1245,6 +1246,8 @@ struct usb_driver {
+ 	int (*pre_reset)(struct usb_interface *intf);
+ 	int (*post_reset)(struct usb_interface *intf);
+ 
++	void (*shutdown)(struct usb_interface *intf);
++
+ 	const struct usb_device_id *id_table;
+ 	const struct attribute_group **dev_groups;
+ 
+-- 
+2.42.0
+

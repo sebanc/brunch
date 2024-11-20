@@ -1,0 +1,57 @@
+From b9f7232d2696b91ae98fadd7b14c531aa8edceb5 Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Wed, 19 Jul 2023 19:39:53 +0300
+Subject: [PATCH 07/12] HID: multitouch: allow specifying if a device is direct
+ in a class
+
+Currently the driver determines the device type based on the
+application, but this value is not reliable on Apple Touch Bars, where
+the application is HID_DG_TOUCHPAD even though the devices are direct,
+so allow setting it in classes.
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/hid-multitouch.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/hid/hid-multitouch.c b/drivers/hid/hid-multitouch.c
+index 624c1d3cc..f98fb36ff 100644
+--- a/drivers/hid/hid-multitouch.c
++++ b/drivers/hid/hid-multitouch.c
+@@ -147,6 +147,7 @@ struct mt_class {
+ 	__s32 sn_height;	/* Signal/noise ratio for height events */
+ 	__s32 sn_pressure;	/* Signal/noise ratio for pressure events */
+ 	__u8 maxcontacts;
++	bool is_direct;	/* true for touchscreens */
+ 	bool is_indirect;	/* true for touchpads */
+ 	bool export_all_inputs;	/* do not ignore mouse, keyboards, etc... */
+ };
+@@ -564,13 +565,13 @@ static struct mt_application *mt_allocate_application(struct mt_device *td,
+ 	mt_application->application = application;
+ 	INIT_LIST_HEAD(&mt_application->mt_usages);
+ 
+-	if (application == HID_DG_TOUCHSCREEN)
++	if (application == HID_DG_TOUCHSCREEN && !td->mtclass.is_indirect)
+ 		mt_application->mt_flags |= INPUT_MT_DIRECT;
+ 
+ 	/*
+ 	 * Model touchscreens providing buttons as touchpads.
+ 	 */
+-	if (application == HID_DG_TOUCHPAD) {
++	if (application == HID_DG_TOUCHPAD && !td->mtclass.is_direct) {
+ 		mt_application->mt_flags |= INPUT_MT_POINTER;
+ 		td->inputmode_value = MT_INPUTMODE_TOUCHPAD;
+ 	}
+@@ -1318,6 +1319,9 @@ static int mt_touch_input_configured(struct hid_device *hdev,
+ 	if (td->serial_maybe)
+ 		mt_post_parse_default_settings(td, app);
+ 
++	if (cls->is_direct)
++		app->mt_flags |= INPUT_MT_DIRECT;
++
+ 	if (cls->is_indirect)
+ 		app->mt_flags |= INPUT_MT_POINTER;
+ 
+-- 
+2.42.0
+

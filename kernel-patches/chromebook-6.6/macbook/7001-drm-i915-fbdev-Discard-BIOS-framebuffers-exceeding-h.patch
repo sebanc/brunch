@@ -9,25 +9,21 @@ Signed-off-by: Ashish Arora <ashisharora.linux@outlook.com>
 ---
  drivers/gpu/drm/i915/display/intel_fbdev.c | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/gpu/drm/i915/display/intel_fbdev.c b/drivers/gpu/drm/i915/display/intel_fbdev.c
-index 112aa04..8fb8bcc 100644
+ 
+index 5ad0b4c8a0fd..79930ea66420 100644
 --- a/drivers/gpu/drm/i915/display/intel_fbdev.c
 +++ b/drivers/gpu/drm/i915/display/intel_fbdev.c
-@@ -217,10 +217,10 @@ static int intelfb_create(struct drm_fb_helper *helper,
- 		return ret;
+@@ -198,10 +198,10 @@ static int intelfb_create(struct drm_fb_helper *helper,
+ 	ifbdev->fb = NULL;
  
- 	if (intel_fb &&
--	    (sizes->fb_width > intel_fb->base.width ||
--	     sizes->fb_height > intel_fb->base.height)) {
-+	    (sizes->fb_width != intel_fb->base.width ||
-+	     sizes->fb_height != intel_fb->base.height)) {
+ 	if (fb &&
+-	    (sizes->fb_width > fb->base.width ||
+-	     sizes->fb_height > fb->base.height)) {
++	    (sizes->fb_width != fb->base.width ||
++	     sizes->fb_height != fb->base.height)) {
  		drm_dbg_kms(&dev_priv->drm,
 -			    "BIOS fb too small (%dx%d), we require (%dx%d),"
 +			    "BIOS fb not valid (%dx%d), we require (%dx%d),"
  			    " releasing it\n",
- 			    intel_fb->base.width, intel_fb->base.height,
+ 			    fb->base.width, fb->base.height,
  			    sizes->fb_width, sizes->fb_height);
--- 
-1.8.3.1
-

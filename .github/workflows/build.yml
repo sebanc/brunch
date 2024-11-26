@@ -11,7 +11,7 @@ concurrency:
 jobs:
   prepare-kernels:
     name: Prepare Kernels
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.kernels.outputs.matrix }}
     steps:
@@ -39,7 +39,7 @@ jobs:
   build-kernels:
     name: Build Kernels
     needs: prepare-kernels
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
         matrix:
             kernel: ${{ fromJson(needs.prepare-kernels.outputs.matrix) }}
@@ -85,7 +85,7 @@ jobs:
   build-brunch:
     name: Build Brunch
     needs: build-kernels
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
@@ -133,7 +133,7 @@ jobs:
     permissions:
       contents: write
     needs: build-brunch
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main

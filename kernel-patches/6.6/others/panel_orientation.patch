@@ -69,12 +69,12 @@ index 5b2506c65e95..d88ebdca1766 100644
  		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "Galaxy Book 10.6"),
  		},
  		.driver_data = (void *)&lcd1280x1920_rightside_up,
-+	}, { /* Valve Steam Deck with DeckHD */
++	}, {    /*Valve Steam Deck with DeckHD */
 +		.matches = {
 +		  DMI_EXACT_MATCH(DMI_SYS_VENDOR, "Valve"),
 +		  DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "Jupiter"),
 +		  DMI_EXACT_MATCH(DMI_PRODUCT_VERSION, "1"),
-+		}3,
++		},
 +		.driver_data = (void *)&lcd1200x1920_rightside_up,
  	}, {	/* Valve Steam Deck */
  		.matches = {

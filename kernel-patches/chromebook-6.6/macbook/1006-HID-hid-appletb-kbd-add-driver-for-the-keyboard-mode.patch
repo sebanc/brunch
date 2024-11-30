@@ -1,11 +1,4 @@
-From 514b4f088b7ed916c634ca6f61de72c5f86268dd Mon Sep 17 00:00:00 2001
 From: Kerem Karabay <kekrby@gmail.com>
-Date: Sun, 5 Mar 2023 18:17:23 +0300
-Subject: [PATCH 03/12] HID: hid-appletb-kbd: add driver for the keyboard mode
- of Apple Touch Bars
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
 
 The Touch Bars found on x86 Macs support two USB configurations: one
 where the device presents itself as a HID keyboard and can display
@@ -19,13 +12,15 @@ This driver is based on previous work done by Ronald Tschalär
 <ronald@innovation.ch>.
 
 Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+Co-developed-by: Aditya Garg <gargaditya08@live.com>
+Signed-off-by: Aditya Garg <gargaditya08@live.com>
 ---
  .../ABI/testing/sysfs-driver-hid-appletb-kbd  |  13 +
  drivers/hid/Kconfig                           |  11 +
  drivers/hid/Makefile                          |   1 +
- drivers/hid/hid-appletb-kbd.c                 | 289 ++++++++++++++++++
+ drivers/hid/hid-appletb-kbd.c                 | 304 ++++++++++++++++++
  drivers/hid/hid-quirks.c                      |   4 +-
- 5 files changed, 317 insertions(+), 1 deletion(-)
+ 5 files changed, 332 insertions(+), 1 deletion(-)
  create mode 100644 Documentation/ABI/testing/sysfs-driver-hid-appletb-kbd
  create mode 100644 drivers/hid/hid-appletb-kbd.c
 
@@ -49,7 +44,7 @@ index 000000000..2a19584d0
 +		3  None
 +		== =================
 diff --git a/drivers/hid/Kconfig b/drivers/hid/Kconfig
-index cf19a3b33..852de13aa 100644
+index 4988c1fb2..72b665eda 100644
 --- a/drivers/hid/Kconfig
 +++ b/drivers/hid/Kconfig
 @@ -158,6 +158,17 @@ config HID_APPLETB_BL
@@ -71,7 +66,7 @@ index cf19a3b33..852de13aa 100644
  	tristate "Asus"
  	depends on USB_HID
 diff --git a/drivers/hid/Makefile b/drivers/hid/Makefile
-index bc86e38b2..5b60015fd 100644
+index 1d825a474..d903c9a26 100644
 --- a/drivers/hid/Makefile
 +++ b/drivers/hid/Makefile
 @@ -30,6 +30,7 @@ obj-$(CONFIG_HID_ACRUX)		+= hid-axff.o
@@ -84,16 +79,17 @@ index bc86e38b2..5b60015fd 100644
  obj-$(CONFIG_HID_AUREAL)	+= hid-aureal.o
 diff --git a/drivers/hid/hid-appletb-kbd.c b/drivers/hid/hid-appletb-kbd.c
 new file mode 100644
-index 000000000..bc004c408
+index 000000000..ecac68fc7
 --- /dev/null
 +++ b/drivers/hid/hid-appletb-kbd.c
-@@ -0,0 +1,289 @@
+@@ -0,0 +1,304 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Apple Touch Bar Keyboard Mode Driver
 + *
 + * Copyright (c) 2017-2018 Ronald Tschalär
 + * Copyright (c) 2022-2023 Kerem Karabay <kekrby@gmail.com>
++ * Copyright (c) 2024 Aditya Garg <gargaditya08@live.com>
 + */
 +
 +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -116,6 +112,13 @@ index 000000000..bc004c408
 +#define APPLETB_KBD_MODE_MAX	APPLETB_KBD_MODE_OFF
 +
 +#define HID_USAGE_MODE		0x00ff0004
++
++static int appletb_tb_def_mode = APPLETB_KBD_MODE_SPCL;
++module_param_named(mode, appletb_tb_def_mode, int, 0444);
++MODULE_PARM_DESC(mode, "Default touchbar mode:\n"
++			 "    0 - escape key only\n"
++			 "    1 - function-keys\n"
++			 "    [2] - special keys");
 +
 +struct appletb_kbd {
 +	struct hid_field *mode_field;
@@ -256,6 +259,7 @@ index 000000000..bc004c408
 +
 +static int appletb_kbd_input_configured(struct hid_device *hdev, struct hid_input *hidinput)
 +{
++	int idx;
 +	struct input_dev *input = hidinput->input;
 +
 +	/*
@@ -268,7 +272,13 @@ index 000000000..bc004c408
 +
 +	__set_bit(EV_REP, input->evbit);
 +
-+	return sparse_keymap_setup(input, appletb_kbd_keymap, NULL);
++	sparse_keymap_setup(input, appletb_kbd_keymap, NULL);
++
++	for (idx = 0; appletb_kbd_keymap[idx].type != KE_END; idx++) {
++		input_set_capability(input, EV_KEY, appletb_kbd_keymap[idx].code);
++	}
++
++	return 0;
 +}
 +
 +static int appletb_kbd_probe(struct hid_device *hdev, const struct hid_device_id *id)
@@ -303,7 +313,7 @@ index 000000000..bc004c408
 +		goto stop_hw;
 +	}
 +
-+	ret = appletb_kbd_set_mode(kbd, APPLETB_KBD_MODE_OFF);
++	ret = appletb_kbd_set_mode(kbd, appletb_tb_def_mode);
 +	if (ret) {
 +		dev_err_probe(dev, ret, "Failed to set touchbar mode\n");
 +		goto close_hw;
@@ -378,10 +388,10 @@ index 000000000..bc004c408
 +MODULE_DESCRIPTION("MacBookPro Touch Bar Keyboard Mode Driver");
 +MODULE_LICENSE("GPL");
 diff --git a/drivers/hid/hid-quirks.c b/drivers/hid/hid-quirks.c
-index 82e7a80c9..82be9dfaf 100644
+index 818d41a35..7c576d654 100644
 --- a/drivers/hid/hid-quirks.c
 +++ b/drivers/hid/hid-quirks.c
-@@ -325,7 +325,6 @@ static const struct hid_device_id hid_have_special_driver[] = {
+@@ -328,7 +328,6 @@ static const struct hid_device_id hid_have_special_driver[] = {
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_GEYSER1_TP_ONLY) },
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_MAGIC_KEYBOARD_2021) },
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_MAGIC_KEYBOARD_FINGERPRINT_2021) },
@@ -389,7 +399,7 @@ index 82e7a80c9..82be9dfaf 100644
  #endif
  #if IS_ENABLED(CONFIG_HID_APPLEIR)
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_IRCONTROL) },
-@@ -337,6 +336,9 @@ static const struct hid_device_id hid_have_special_driver[] = {
+@@ -340,6 +339,9 @@ static const struct hid_device_id hid_have_special_driver[] = {
  #if IS_ENABLED(CONFIG_HID_APPLETB_BL)
  	{ HID_USB_DEVICE(USB_VENDOR_ID_APPLE, USB_DEVICE_ID_APPLE_TOUCHBAR_BACKLIGHT) },
  #endif
@@ -400,5 +410,5 @@ index 82e7a80c9..82be9dfaf 100644
  	{ HID_I2C_DEVICE(USB_VENDOR_ID_ASUSTEK, USB_DEVICE_ID_ASUSTEK_I2C_KEYBOARD) },
  	{ HID_I2C_DEVICE(USB_VENDOR_ID_ASUSTEK, USB_DEVICE_ID_ASUSTEK_I2C_TOUCHPAD) },
 -- 
-2.42.0
+2.43.0
 

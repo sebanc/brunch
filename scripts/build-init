@@ -30,8 +30,8 @@ tar zxf brunch_toolchain.tar.gz -C /usr/local || { echo "Failed to extract the b
 sudo rm -f /usr/lib64/libc.so /usr/lib64/libm.so /usr/lib64/libpthread.so
 
 # Temporary fixes
-if [ ! -f /lib64/libnsl.so.2 ]; then sudo ln -s libnsl.so.1 /lib64/libnsl.so.2; fi
-yes | perl -MCPAN -e 'install Autom4te::ChannelDefs'
+if [ ! -f /lib64/libnsl.so.2 ]; then sudo ln -sf libnsl.so.1 /lib64/libnsl.so.2; fi
+perl -MCPAN -e 'CPAN::HandleConfig->load; CPAN::HandleConfig->commit; CPAN::Shell->install("Autom4te::ChannelDefs")' < /dev/null || { echo "Failed to install Autom4te::ChannelDefs using CPAN"; exit 1; }
 
 mkdir -p ./version-pkg/etc || { echo "Failed to make the brunch version package"; exit 1; }
 echo "Brunch $version $(date +"%Y%m%d")" > ./version-pkg/etc/brunch_version || { echo "Failed to make the brunch version package"; exit 1; }

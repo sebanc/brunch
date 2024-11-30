@@ -1,5 +1,6 @@
 name: Build Brunch using Github Actions
 on:
+  workflow_dispatch:
   push:
     branches:
       - 'continuous-integration'

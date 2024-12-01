@@ -359,7 +359,7 @@ if [ "$type" == "Dualboot (create an image)" ]; then
 	else
 		img_uuid=$(blkid -s PARTUUID -o value "$(df "$fullpath" --output=source | sed 1d)")
 	fi
-	img_path=$(findmnt -n -o SOURCE $(findmnt -n -o TARGET -T "$fullpath") | cut -d"[" -f2 | cut -d"]" -f1)$(if [ $(findmnt -n -o TARGET -T "$fullpath") == "/" ]; then echo $(realpath "$fullpath"); else echo $(realpath "$fullpath") | sed "s#$(findmnt -n -o TARGET -T "$fullpath")##g"; fi)
+	img_path=$(if [ "$(findmnt -n -o FSTYPE $(findmnt -n -o TARGET -T $fullpath))" == "btrfs" ] && [ ! -b "$(findmnt -n -o SOURCE $(findmnt -n -o TARGET -T $fullpath))" ]; then echo "$(findmnt -n -o SOURCE $(findmnt -n -o TARGET -T $fullpath) | cut -d"[" -f2 | cut -d"]" -f1)"; fi)$(if [ "$(findmnt -n -o TARGET -T $fullpath)" == "/" ]; then echo "$(realpath $fullpath)"; else echo "$(realpath $fullpath)" | sed "s#$(findmnt -n -o TARGET -T $fullpath)##g"; fi)
 	if [ -z "$wsl" ] && ([ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "debian" ] || [ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "ubuntu" ] || [ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "linuxmint" ] || [ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "fedora" ] || [ "$(grep -o '^ID=[^,]\+' /etc/os-release | cut -d'=' -f2)" == "zorin" ]); then remove_tpm="\n	rmmod tpm"; fi
 	config="menuentry \"Brunch\" --class \"brunch\" {$remove_tpm
 	img_path="$img_path"

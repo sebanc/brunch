@@ -286,7 +286,7 @@ else
 	losetup -d "\$loopdevice"
 	echo "ChromeOS disk image created."
 	img_uuid=\$(blkid -s PARTUUID -o value "\$(df "\$destination" --output=source | sed 1d)")
-	img_path=\$(findmnt -n -o SOURCE \$(findmnt -n -o TARGET -T "\$destination") | cut -d"[" -f2 | cut -d"]" -f1)\$(if [ \$(findmnt -n -o TARGET -T "\$destination") == "/" ]; then echo \$(realpath "\$destination"); else echo \$(realpath "\$destination") | sed "s#\$(findmnt -n -o TARGET -T "\$destination")##g"; fi)
+	img_path=\$(if [ "\$(findmnt -n -o FSTYPE \$(findmnt -n -o TARGET -T \$destination))" == "btrfs" ] && [ ! -b "\$(findmnt -n -o SOURCE \$(findmnt -n -o TARGET -T \$destination))" ]; then echo "\$(findmnt -n -o SOURCE \$(findmnt -n -o TARGET -T \$destination) | cut -d"[" -f2 | cut -d"]" -f1)"; fi)\$(if [ "\$(findmnt -n -o TARGET -T \$destination)" == "/" ]; then echo "\$(realpath \$destination)"; else echo "\$(realpath \$destination)" | sed "s#\$(findmnt -n -o TARGET -T \$destination)##g"; fi)
 	cat <<GRUB | tee "\$destination".grub.txt
 To boot directly from this image file, add the lines between stars to either:
 - A brunch usb flashdrive grub config file (then boot from usb and choose boot from disk image in the menu),

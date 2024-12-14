@@ -55,7 +55,20 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 ## Install Instructions
 This guide has been split into seperate sections, please follow one of the links below for a guide suitable to your current operating system.
 
-### [New: Simplified install with Linuxloops][linuxloops-guide]
+### New: Simplified install with Linuxloops
+
+Linuxloops is a tool that allows the installation of Brunch with a GUI.
+
+First, identify the recovery image suitable for your CPU:  
+#### Intel
+* 8th gen & 9th gen: "[shyvana][recovery-shyvana]" for Intel / "[bobba][recovery-bobba]" for Celeron.
+* 10th gen: "[jinlon][recovery-jinlon]".
+* 11th gen & above: "[voxel][recovery-voxel]".
+#### AMD
+* Ryzen: "[gumboz][recovery-gumboz]".
+  
+Once you have identified the recovery image suitable for your CPU, follow the instructions in the [linuxloops][linuxloops] repository Readme.
+
 ### [![Install with Linux][linux-img]][linux-guide]  [Install with Linux][linux-guide]
 ### [![Install with Windows][windows-img]][windows-guide]  [Install with Windows][windows-guide]
 
@@ -87,6 +100,7 @@ Additional troubleshooting and support tips can be found at the following page:
 [discord-url]: https://discord.gg/x2EgK2M
 
 <!-- Outbound Links -->
+[linuxloops]: https://github.com/sebanc/linuxloops
 [croissant]: https://github.com/imperador/chromefy
 [swtpm]: https://github.com/stefanberger/swtpm
 [linux-surface]: https://github.com/linux-surface/linux-surface
@@ -119,7 +133,6 @@ Additional troubleshooting and support tips can be found at the following page:
 [linux-img]: https://img.icons8.com/color/24/000000/linux--v1.png
 
 <!-- Internal Links -->
-[linuxloops-guide]: ./Readme/install-with-linuxloops.md
 [linux-guide]: ./Readme/install-with-linux.md
 [windows-guide]: ./Readme/install-with-windows.md
 [troubleshooting-and-faqs]: ./Readme/troubleshooting-and-faqs.md

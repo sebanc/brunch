@@ -55,7 +55,7 @@ Hardware support is highly dependent on the general Linux kernel hardware compat
 ## Install Instructions
 This guide has been split into seperate sections, please follow one of the links below for a guide suitable to your current operating system.
 
-### New: Simplified install with Linuxloops
+### New: Simplified install with [linuxloops][linuxloops]
 
 Linuxloops is a tool that allows the installation of Brunch with a GUI.
 
@@ -68,6 +68,8 @@ First, identify the recovery image suitable for your CPU:
 * Ryzen: "[gumboz][recovery-gumboz]".
   
 Once you have identified the recovery image suitable for your CPU, follow the instructions in the [linuxloops][linuxloops] repository Readme.
+
+### Manual install instructions
 
 ### [![Install with Linux][linux-img]][linux-guide]  [Install with Linux][linux-guide]
 ### [![Install with Windows][windows-img]][windows-guide]  [Install with Windows][windows-guide]

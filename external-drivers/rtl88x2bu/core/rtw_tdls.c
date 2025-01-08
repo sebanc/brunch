@@ -1918,13 +1918,15 @@ sint On_TDLS_Setup_Req(_adapter *padapter, union recv_frame *precv_frame, struct
 
 			switch (pIE->ElementID) {
 			case _SUPPORTEDRATES_IE_:
-				_rtw_memcpy(supportRate, pIE->data, pIE->Length);
-				supportRateNum = pIE->Length;
+				if (pIE->Length <= sizeof(supportRate)) {
+					_rtw_memcpy(supportRate, pIE->data, pIE->Length);
+					supportRateNum = pIE->Length;
+				}
 				break;
 			case _COUNTRY_IE_:
 				break;
 			case _EXT_SUPPORTEDRATES_IE_:
-				if (supportRateNum < sizeof(supportRate)) {
+				if ((supportRateNum + pIE->Length) <= sizeof(supportRate)) {
 					_rtw_memcpy(supportRate + supportRateNum, pIE->data, pIE->Length);
 					supportRateNum += pIE->Length;
 				}
@@ -1935,17 +1937,19 @@ sint On_TDLS_Setup_Req(_adapter *padapter, union recv_frame *precv_frame, struct
 				rsnie_included = 1;
 				if (prx_pkt_attrib->encrypt) {
 					prsnie = (u8 *)pIE;
-					/* Check CCMP pairwise_cipher presence. */
-					ppairwise_cipher = prsnie + 10;
-					_rtw_memcpy(ptdls_sta->TDLS_RSNIE, pIE->data, pIE->Length);
-					pairwise_count = *(u16 *)(ppairwise_cipher - 2);
-					for (k = 0; k < pairwise_count; k++) {
-						if (_rtw_memcmp(ppairwise_cipher + 4 * k, RSN_CIPHER_SUITE_CCMP, 4) == _TRUE)
-							ccmp_included = 1;
-					}
+					if (pIE->Length <= sizeof(ptdls_sta->TDLS_RSNIE)) {
+						/* Check CCMP pairwise_cipher presence. */
+						ppairwise_cipher = prsnie + 10;
+						_rtw_memcpy(ptdls_sta->TDLS_RSNIE, pIE->data, pIE->Length);
+						pairwise_count = *(u16 *)(ppairwise_cipher - 2);
+						for (k = 0; k < pairwise_count; k++) {
+							if (_rtw_memcmp(ppairwise_cipher + 4 * k, RSN_CIPHER_SUITE_CCMP, 4) == _TRUE)
+								ccmp_included = 1;
+						}
 
-					if (ccmp_included == 0)
-						txmgmt.status_code = _STATS_INVALID_RSNIE_;
+						if (ccmp_included == 0)
+							txmgmt.status_code = _STATS_INVALID_RSNIE_;
+					}
 				}
 				break;
 			case _EXT_CAP_IE_:
@@ -2100,13 +2104,15 @@ int On_TDLS_Setup_Rsp(_adapter *padapter, union recv_frame *precv_frame, struct 
 
 		switch (pIE->ElementID) {
 		case _SUPPORTEDRATES_IE_:
-			_rtw_memcpy(supportRate, pIE->data, pIE->Length);
-			supportRateNum = pIE->Length;
+			if (pIE->Length <= sizeof(supportRate)) {
+				_rtw_memcpy(supportRate, pIE->data, pIE->Length);
+				supportRateNum = pIE->Length;
+			}
 			break;
 		case _COUNTRY_IE_:
 			break;
 		case _EXT_SUPPORTEDRATES_IE_:
-			if (supportRateNum < sizeof(supportRate)) {
+			if ((supportRateNum + pIE->Length) <= sizeof(supportRate)) {
 				_rtw_memcpy(supportRate + supportRateNum, pIE->data, pIE->Length);
 				supportRateNum += pIE->Length;
 			}

@@ -46,7 +46,7 @@ struct ht_priv {
 
 	u8 op_present:1; /* ht_op is present */
 
-	struct rtw_ieee80211_ht_cap ht_cap;
+	struct ieee80211_ht_cap ht_cap;
 	u8 ht_op[HT_OP_IE_LEN];
 
 };

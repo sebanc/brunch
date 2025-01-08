@@ -350,6 +350,15 @@ void rtw_phydm_priv_init(_adapter *adapter)
 	odm_cmn_info_init(phydm, ODM_CMNINFO_PLATFORM, ODM_CE);
 }
 
+#ifndef CONFIG_LITTLE_ENDIAN
+static u8 *convert_to_big_endian(void *value, int size)
+{
+	u8 *temp;
+	temp = (u8 *)value + size - 1;
+	return temp;
+}
+#endif
+
 void Init_ODM_ComInfo(_adapter *adapter)
 {
 	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
@@ -467,11 +476,9 @@ void Init_ODM_ComInfo(_adapter *adapter)
 	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_TX_UNI, &(dvobj->traffic_stat.tx_bytes));
 	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_RX_UNI, &(dvobj->traffic_stat.rx_bytes));
 
-	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_BAND, &(pHalData->current_band_type));
 	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_FORCED_RATE, &(pHalData->ForcedDataRate));
 
 	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_SEC_CHNL_OFFSET, &(pHalData->nCur40MhzPrimeSC));
-	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_SEC_MODE, &(adapter->securitypriv.dot11PrivacyAlgrthm));
 #ifdef CONFIG_NARROWBAND_SUPPORTING
 	if ((adapter->registrypriv.rtw_nb_config == RTW_NB_CONFIG_WIDTH_10)
 		|| (adapter->registrypriv.rtw_nb_config == RTW_NB_CONFIG_WIDTH_5)) {
@@ -479,9 +486,19 @@ void Init_ODM_ComInfo(_adapter *adapter)
 	}
 	else
 #endif
+
+#ifdef CONFIG_LITTLE_ENDIAN
+	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_BAND, &(pHalData->current_band_type));
+	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_SEC_MODE, &(adapter->securitypriv.dot11PrivacyAlgrthm));
 	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_BW, &(pHalData->current_channel_bw));
-	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_CHNL, &(pHalData->current_channel));
 	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_NET_CLOSED, &(adapter->net_closed));
+#else /* CONFIG_BIG_ENDIAN */
+	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_BAND, convert_to_big_endian(&(pHalData->current_band_type), sizeof(BAND_TYPE)));
+	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_SEC_MODE, convert_to_big_endian(&(adapter->securitypriv.dot11PrivacyAlgrthm), sizeof(u32)));
+	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_BW, convert_to_big_endian(&(pHalData->current_channel_bw), sizeof(enum channel_width)));
+	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_NET_CLOSED, convert_to_big_endian(&(adapter->net_closed), sizeof(int)));
+#endif
+	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_CHNL, &(pHalData->current_channel));
 
 	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_SCAN, &(pHalData->bScanInProcess));
 	odm_cmn_info_hook(pDM_Odm, ODM_CMNINFO_POWER_SAVING, &(pwrctl->bpower_saving));

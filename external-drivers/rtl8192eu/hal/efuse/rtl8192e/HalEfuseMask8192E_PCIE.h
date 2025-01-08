@@ -20,15 +20,15 @@
 ******************************************************************************/
 
 
-u16
-EFUSE_GetArrayLen_MP_8192E_MPCIE(void);
+u2Byte
+EFUSE_GetArrayLen_MP_8192E_MPCIE(VOID);
 
-void
+VOID
 EFUSE_GetMaskArray_MP_8192E_MPCIE(
-		u8 *Array
+	IN	OUT pu1Byte Array
 );
 
 BOOLEAN
 EFUSE_IsAddressMasked_MP_8192E_MPCIE(/* TC: Test Chip, MP: MP Chip */
-		u16 Offset
+	IN   u2Byte  Offset
 );

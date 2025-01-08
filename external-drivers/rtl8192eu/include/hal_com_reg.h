@@ -23,7 +23,6 @@
 /* 8188E PKT_BUFF_ACCESS_CTRL value */
 #define TXPKT_BUF_SELECT				0x69
 #define RXPKT_BUF_SELECT				0xA5
-#define TXREPORT_BUF_SELECT			0x7F
 #define DISABLE_TRXPKT_BUF_ACCESS		0x0
 
 #ifndef RTW_HALMAC
@@ -174,8 +173,6 @@
 #define REG_TXDMA_OFFSET_CHK			0x020C
 #define REG_TXDMA_STATUS				0x0210
 #define REG_RQPN_NPQ					0x0214
-#define REG_TQPNT1						0x0218
-#define REG_TQPNT2						0x021C
 #define REG_AUTO_LLT					0x0224
 
 
@@ -257,7 +254,7 @@
 #define REG_HWSEQ_CTRL					0x0423
 #define REG_BCNQ_BDNY					0x0424
 #define REG_MGQ_BDNY					0x0425
-#define REG_LIFETIME_EN					0x0426
+#define REG_LIFETIME_CTRL				0x0426
 #define REG_MULTI_BCNQ_OFFSET			0x0427
 #define REG_SPEC_SIFS					0x0428
 #define REG_RETRY_LIMIT					0x042A
@@ -292,9 +289,8 @@
 
 #define REG_POWER_STAGE1				0x04B4
 #define REG_POWER_STAGE2				0x04B8
-#define REG_PKT_LIFE_TIME			0x04C0
-#define REG_PKT_LIFE_TIME_VO_VI		0x04C0
-#define REG_PKT_LIFE_TIME_BE_BK		0x04C2
+#define REG_PKT_VO_VI_LIFE_TIME		0x04C0
+#define REG_PKT_BE_BK_LIFE_TIME		0x04C2
 #define REG_STBC_SETTING				0x04C4
 #define REG_QUEUE_CTRL					0x04C6
 #define REG_SINGLE_AMPDU_CTRL			0x04c7
@@ -511,12 +507,9 @@
 #define REG_WLAN_ACT_MASK_CTRL_1		0x076C
 
 /* GPIO Control */
-#define REG_SW_GPIO_SHARE_CTRL_0		0x1038
-#define REG_SW_GPIO_SHARE_CTRL_1		0x103C
+#define REG_SW_GPIO_SHARE_CTRL			0x1038
 #define REG_SW_GPIO_A_OUT				0x1040
 #define REG_SW_GPIO_A_OEN				0x1044
-#define REG_SW_GPIO_B_OEN				0x1058
-#define REG_SW_GPIO_B_OUT				0x105C
 
 /* Hardware Port 2 */
 #define REG_MACID2						0x1620
@@ -597,6 +590,16 @@
 /* Redifine MACID register, to compatible prior ICs. */
 #define IDR0						REG_MACID			/* MAC ID Register, Offset 0x0050-0x0053 */
 #define IDR4						(REG_MACID + 4)		/* MAC ID Register, Offset 0x0054-0x0055 */
+
+
+/*
+* 9. Security Control Registers	(Offset: )
+*   */
+#define RWCAM					REG_CAMCMD		/* IN 8190 Data Sheet is called CAMcmd */
+#define WCAMI					REG_CAMWRITE	/* Software write CAM input content */
+#define RCAMO					REG_CAMREAD		/* Software read/write CAM config */
+#define CAMDBG					REG_CAMDBG
+#define SECR						REG_SECCFG		/* Security Configuration Register */
 
 /* Unused register */
 #define UnusedRegister			0x1BF
@@ -686,23 +689,6 @@ Default: 00b.
 #define USB_INTR_CONTENT_HISRE_OFFSET		52
 #define USB_INTR_CONTENT_LENGTH				56
 
-
-/* WOL bit information */
-#define HAL92C_WOL_PTK_UPDATE_EVENT		BIT(0)
-#define HAL92C_WOL_GTK_UPDATE_EVENT		BIT(1)
-#define HAL92C_WOL_DISASSOC_EVENT		BIT(2)
-#define HAL92C_WOL_DEAUTH_EVENT			BIT(3)
-#define HAL92C_WOL_FW_DISCONNECT_EVENT	BIT(4)
-
-
-/*----------------------------------------------------------------------------
-**      REG_CCK_CHECK						(offset 0x454)
-------------------------------------------------------------------------------*/
-#define BIT_BCN_PORT_SEL		BIT(5)
-#define BIT_EN_BCN_PKT_REL		BIT(6)
-
-#endif /* RTW_HALMAC */
-
 /* ----------------------------------------------------------------------------
 * Response Rate Set Register	(offset 0x440, 24bits)
 * ---------------------------------------------------------------------------- */
@@ -729,6 +715,22 @@ Default: 00b.
 
 #define RRSR_CCK_RATES (RRSR_11M | RRSR_5_5M | RRSR_2M | RRSR_1M)
 #define RRSR_OFDM_RATES (RRSR_54M | RRSR_48M | RRSR_36M | RRSR_24M | RRSR_18M | RRSR_12M | RRSR_9M | RRSR_6M)
+
+/* WOL bit information */
+#define HAL92C_WOL_PTK_UPDATE_EVENT		BIT(0)
+#define HAL92C_WOL_GTK_UPDATE_EVENT		BIT(1)
+#define HAL92C_WOL_DISASSOC_EVENT		BIT(2)
+#define HAL92C_WOL_DEAUTH_EVENT			BIT(3)
+#define HAL92C_WOL_FW_DISCONNECT_EVENT	BIT(4)
+
+
+/*----------------------------------------------------------------------------
+**      REG_CCK_CHECK						(offset 0x454)
+------------------------------------------------------------------------------*/
+#define BIT_BCN_PORT_SEL		BIT(5)
+#define BIT_EN_BCN_PKT_REL		BIT(6)
+
+#endif /* RTW_HALMAC */
 
 /* ----------------------------------------------------------------------------
  * Rate Definition
@@ -1256,13 +1258,9 @@ Current IOREG MAP
 /* 2 REG_LED_CFG				(Offset 0x004C) */
 #define BIT_SW_SPDT_SEL			BIT(22)
 
-/* 2 REG_SW_GPIO_SHARE_CTRL_0	(Offset 0x1038) */
+/* 2 REG_SW_GPIO_SHARE_CTRL		(Offset 0x1038) */
 #define BIT_BTGP_WAKE_LOC		(BIT(10) | BIT(11))
 #define BIT_SW_GPIO_FUNC 		BIT(0)
-
-/* 2 REG_SW_GPIO_SHARE_CTRL_1	(Offset 0x103C) */
-#define 	BIT_WLMAC_DBG_LOC	(BIT(9) | BIT(10))
-#define 	BIT_WL_GPIO_SEL		(BIT(30) | BIT(31))
 
 /* 2 8051FWDL
  * 2 MCUFWDL */

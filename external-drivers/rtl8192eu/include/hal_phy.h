@@ -15,19 +15,6 @@
 #ifndef __HAL_PHY_H__
 #define __HAL_PHY_H__
 
-
-#if DISABLE_BB_RF
-	#define	HAL_FW_ENABLE				0
-	#define	HAL_MAC_ENABLE			0
-	#define	HAL_BB_ENABLE				0
-	#define	HAL_RF_ENABLE				0
-#else /* FPGA_PHY and ASIC */
-	#define	HAL_FW_ENABLE				1
-	#define	HAL_MAC_ENABLE			1
-	#define	HAL_BB_ENABLE				1
-	#define	HAL_RF_ENABLE				1
-#endif
-
 #define	RF6052_MAX_TX_PWR			0x3F
 #define	RF6052_MAX_REG_88E			0xFF
 #define	RF6052_MAX_REG_92C			0x7F
@@ -174,61 +161,61 @@ typedef struct RF_Shadow_Compare_Map {
 
 u32
 PHY_RFShadowRead(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset);
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset);
 
-void
+VOID
 PHY_RFShadowWrite(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset,
-		u32				Data);
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset,
+	IN	u32				Data);
 
 BOOLEAN
 PHY_RFShadowCompare(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset);
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset);
 
-void
+VOID
 PHY_RFShadowRecorver(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset);
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset);
 
-void
+VOID
 PHY_RFShadowCompareAll(
-		PADAPTER		Adapter);
+	IN	PADAPTER		Adapter);
 
-void
+VOID
 PHY_RFShadowRecorverAll(
-		PADAPTER		Adapter);
+	IN	PADAPTER		Adapter);
 
-void
+VOID
 PHY_RFShadowCompareFlagSet(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset,
-		u8				Type);
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset,
+	IN	u8				Type);
 
-void
+VOID
 PHY_RFShadowRecorverFlagSet(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset,
-		u8				Type);
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset,
+	IN	u8				Type);
 
-void
+VOID
 PHY_RFShadowCompareFlagSetAll(
-		PADAPTER		Adapter);
+	IN	PADAPTER		Adapter);
 
-void
+VOID
 PHY_RFShadowRecorverFlagSetAll(
-		PADAPTER		Adapter);
+	IN	PADAPTER		Adapter);
 
-void
+VOID
 PHY_RFShadowRefresh(
-		PADAPTER		Adapter);
+	IN	PADAPTER		Adapter);
 #endif /*#CONFIG_RF_SHADOW_RW*/
 #endif /* __HAL_COMMON_H__ */

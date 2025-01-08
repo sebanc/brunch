@@ -28,7 +28,7 @@ static const char *const glbt_info_src_8822b_2ant[] = {
 	"BT Info[bt scbd]"
 };
 
-u32 glcoex_ver_date_8822b_2ant = 20200302;
+u32 glcoex_ver_date_8822b_2ant = 20220812;
 u32 glcoex_ver_8822b_2ant = 0x7b;
 u32 glcoex_ver_btdesired_8822b_2ant = 0x79;
 
@@ -2012,6 +2012,11 @@ static void halbtc8822b2ant_table(struct btc_coexist *btc, boolean force_exec,
 					  0xffff55ff, break_table,
 					  select_table);
 		break;
+	case 19:
+		halbtc8822b2ant_set_table(btc, force_exec, 0x55555555,
+					  0x6a5a6a5a, break_table,
+					  select_table);
+		break;
 	default:
 		break;
 	}
@@ -3477,7 +3482,7 @@ halbtc8822b2ant_action_wifi_native_lps(struct btc_coexist *btc)
 				     BT_8822B_2ANT_PHASE_2G);
 
 	halbtc8822b2ant_table(btc, NM_EXCU, 8);
-	halbtc8822b2ant_tdma(btc, NM_EXCU, FALSE, 0);
+	halbtc8822b2ant_tdma(btc, NM_EXCU, TRUE, 19);
 }
 
 static void

@@ -25,37 +25,6 @@ struct pkt_file {
 	SIZE_T buf_len;
 };
 
-#ifdef PLATFORM_WINDOWS
-
-#ifdef PLATFORM_OS_XP
-#ifdef CONFIG_USB_HCI
-#include <usb.h>
-#include <usbdlib.h>
-#include <usbioctl.h>
-#endif
-#endif
-
-#ifdef CONFIG_GSPI_HCI
-	#define NR_XMITFRAME     64
-#else
-	#define NR_XMITFRAME     128
-#endif
-
-#define ETH_ALEN	6
-
-extern NDIS_STATUS rtw_xmit_entry(
-	_nic_hdl		cnxt,
-	NDIS_PACKET		*pkt,
-	u32				flags
-);
-
-#endif /* PLATFORM_WINDOWS */
-
-#ifdef PLATFORM_FREEBSD
-#define NR_XMITFRAME	256
-extern int rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev);
-extern void rtw_xmit_entry_wrap(struct ifnet *pifp);
-#endif /* PLATFORM_FREEBSD */
 
 #ifdef PLATFORM_LINUX
 
@@ -68,12 +37,7 @@ struct xmit_frame;
 struct xmit_buf;
 
 extern int _rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev);
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32))
-extern netdev_tx_t rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev);
-#else
 extern int rtw_xmit_entry(_pkt *pkt, _nic_hdl pnetdev);
-#endif
 
 #endif /* PLATFORM_LINUX */
 
@@ -92,8 +56,6 @@ extern sint rtw_endofpktfile(struct pkt_file *pfile);
 extern void rtw_os_pkt_complete(_adapter *padapter, _pkt *pkt);
 extern void rtw_os_xmit_complete(_adapter *padapter, struct xmit_frame *pxframe);
 
-void rtw_os_check_wakup_queue(_adapter *adapter, u16 os_qid);
-bool rtw_os_check_stop_queue(_adapter *adapter, u16 os_qid);
 void rtw_os_wake_queue_at_free_stainfo(_adapter *padapter, int *qcnt_freed);
 
 void dump_os_queue(void *sel, _adapter *padapter);

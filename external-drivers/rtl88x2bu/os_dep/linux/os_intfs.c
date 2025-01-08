@@ -22,6 +22,12 @@ MODULE_DESCRIPTION("Realtek Wireless Lan Driver");
 MODULE_AUTHOR("Realtek Semiconductor Corp.");
 MODULE_VERSION(DRIVERVERSION);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+	#define STRSCPY strscpy
+#else
+	#define STRSCPY strlcpy
+#endif
+
 /* module param defaults */
 int rtw_chip_version = 0x00;
 int rtw_rfintfs = HWPI;
@@ -427,17 +433,11 @@ int rtw_hwpwrp_detect = 1;
 int rtw_hwpwrp_detect = 0; /* HW power  ping detect 0:disable , 1:enable */
 #endif
 
-
-/*
-Causes excessive rescanning by nature of WPS, the "Push Button Configuration"
-	being something initialized on the access point by button due to the 
-	traditionally non-graphical nature of routers. This should only be enabled
-	during those events, otherwise the radio(s) will have to drop beam forming
-	capabilities to do a general scan for an access point emitting the unsecured
-	connection information.
-*/
+#ifdef CONFIG_USB_HCI
+int rtw_hw_wps_pbc = 1;
+#else
 int rtw_hw_wps_pbc = 0;
-
+#endif
 
 #ifdef CONFIG_80211D
 int rtw_80211d = 0;
@@ -2040,13 +2040,13 @@ static void rtw_ethtool_get_drvinfo(struct net_device *dev, struct ethtool_drvin
 
 	wdev = dev->ieee80211_ptr;
 	if (wdev) {
-		strlcpy(info->driver, wiphy_dev(wdev->wiphy)->driver->name,
+		STRSCPY(info->driver, wiphy_dev(wdev->wiphy)->driver->name,
 			sizeof(info->driver));
 	} else {
-		strlcpy(info->driver, "N/A", sizeof(info->driver));
+		STRSCPY(info->driver, "N/A", sizeof(info->driver));
 	}
 
-	strlcpy(info->version, DRIVERVERSION, sizeof(info->version));
+	STRSCPY(info->version, DRIVERVERSION, sizeof(info->version));
 
 	padapter = (_adapter *)rtw_netdev_priv(dev);
 	if (padapter) {
@@ -2057,10 +2057,10 @@ static void rtw_ethtool_get_drvinfo(struct net_device *dev, struct ethtool_drvin
 		scnprintf(info->fw_version, sizeof(info->fw_version), "%d.%d",
 			  hal_data->firmware_version, hal_data->firmware_sub_version);
 	} else {
-		strlcpy(info->fw_version, "N/A", sizeof(info->fw_version));
+		STRSCPY(info->fw_version, "N/A", sizeof(info->fw_version));
 	}
 
-	strlcpy(info->bus_info, dev_name(wiphy_dev(wdev->wiphy)),
+	STRSCPY(info->bus_info, dev_name(wiphy_dev(wdev->wiphy)),
 		sizeof(info->bus_info));
 }
 
@@ -2186,7 +2186,11 @@ int rtw_os_ndev_register(_adapter *adapter, const char *name)
 	if (rtnl_lock_needed)
 		ret = (register_netdev(ndev) == 0) ? _SUCCESS : _FAIL;
 	else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+		ret = (cfg80211_register_netdevice(ndev) == 0) ? _SUCCESS : _FAIL;
+#else
 		ret = (register_netdevice(ndev) == 0) ? _SUCCESS : _FAIL;
+#endif
 
 	if (ret == _SUCCESS)
 		adapter->registered = 1;
@@ -2235,7 +2239,11 @@ void rtw_os_ndev_unregister(_adapter *adapter)
 		if (rtnl_lock_needed)
 			unregister_netdev(netdev);
 		else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+			cfg80211_unregister_netdevice(netdev);
+#else
 			unregister_netdevice(netdev);
+#endif
 	}
 
 #if defined(CONFIG_IOCTL_CFG80211) && !defined(RTW_SINGLE_WIPHY)

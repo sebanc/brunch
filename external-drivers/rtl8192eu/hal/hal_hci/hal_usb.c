@@ -29,12 +29,6 @@ int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 		     (unsigned long)padapter);
 #endif /* PLATFORM_LINUX */
 
-#ifdef PLATFORM_FREEBSD
-#ifdef CONFIG_RX_INDICATE_QUEUE
-	TASK_INIT(&precvpriv->rx_indicate_tasklet, 0, rtw_rx_indicate_tasklet, padapter);
-#endif /* CONFIG_RX_INDICATE_QUEUE */
-#endif /* PLATFORM_FREEBSD */
-
 #ifdef CONFIG_USB_INTERRUPT_IN_PIPE
 #ifdef PLATFORM_LINUX
 	precvpriv->int_in_urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -93,7 +87,6 @@ int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 
 	precvpriv->free_recv_buf_queue_cnt = NR_RECVBUFF;
 
-#if defined(PLATFORM_LINUX) || defined(PLATFORM_FREEBSD)
 
 	skb_queue_head_init(&precvpriv->rx_skb_queue);
 
@@ -122,11 +115,6 @@ int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 #endif /* CONFIG_PREALLOC_RX_SKB_BUFFER */
 
 			if (pskb) {
-#ifdef PLATFORM_FREEBSD
-				pskb->dev = padapter->pifp;
-#else
-				pskb->dev = padapter->pnetdev;
-#endif /* PLATFORM_FREEBSD */
 
 #ifndef CONFIG_PREALLOC_RX_SKB_BUFFER
 				tmpaddr = (SIZE_PTR)pskb->data;
@@ -138,8 +126,6 @@ int	usb_init_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 		}
 	}
 #endif /* CONFIG_PREALLOC_RECV_SKB */
-
-#endif /* defined(PLATFORM_LINUX) || defined(PLATFORM_FREEBSD) */
 
 exit:
 
@@ -198,27 +184,6 @@ void usb_free_recv_priv(_adapter *padapter, u16 ini_in_buf_sz)
 
 #endif /* PLATFORM_LINUX */
 
-#ifdef PLATFORM_FREEBSD
-	struct sk_buff  *pskb;
-	while (NULL != (pskb = skb_dequeue(&precvpriv->rx_skb_queue)))
-		rtw_skb_free(pskb);
-
-#if !defined(CONFIG_USE_USB_BUFFER_ALLOC_RX)
-	rtw_skb_queue_purge(&precvpriv->free_recv_skb_queue);
-#endif
-
-#ifdef CONFIG_RX_INDICATE_QUEUE
-	struct mbuf *m;
-	for (;;) {
-		IF_DEQUEUE(&precvpriv->rx_indicate_queue, m);
-		if (m == NULL)
-			break;
-		rtw_os_pkt_free(m);
-	}
-	mtx_destroy(&precvpriv->rx_indicate_queue.ifq_mtx);
-#endif /* CONFIG_RX_INDICATE_QUEUE */
-
-#endif /* PLATFORM_FREEBSD */
 }
 
 #ifdef CONFIG_FW_C2H_REG
@@ -244,7 +209,7 @@ void usb_c2h_hisr_hdl(_adapter *adapter, u8 *buf)
 	} else {
 		c2h_evt = rtw_malloc(C2H_REG_LEN);
 		if (c2h_evt != NULL) {
-			_rtw_memcpy(c2h_evt, buf, C2H_REG_LEN);
+			memcpy(c2h_evt, buf, C2H_REG_LEN);
 			if (rtw_cbuf_push(adapter->evtpriv.c2h_queue, (void*)c2h_evt) != _SUCCESS)
 				RTW_ERR("%s rtw_cbuf_push fail\n", __func__);
 		} else {
@@ -261,18 +226,14 @@ void usb_c2h_hisr_hdl(_adapter *adapter, u8 *buf)
 int usb_write_async(struct usb_device *udev, u32 addr, void *pdata, u16 len)
 {
 	u8 request;
-	u8 requesttype;
 	u16 wvalue;
-	u16 index;
 	int ret;
 
-	requesttype = VENDOR_WRITE;/* write_out */
 	request = REALTEK_USB_VENQT_CMD_REQ;
-	index = REALTEK_USB_VENQT_CMD_IDX;/* n/a */
 
 	wvalue = (u16)(addr & 0x0000ffff);
 
-	ret = _usbctrl_vendorreq_async_write(udev, request, wvalue, index, pdata, len, requesttype);
+	ret = _usbctrl_vendorreq_async_write(udev, request, wvalue, pdata, len, REALTEK_USB_VENQT_WRITE);
 
 	return ret;
 }
@@ -319,20 +280,9 @@ int usb_async_write32(struct intf_hdl *pintfhdl, u32 addr, u32 val)
 
 u8 usb_read8(struct intf_hdl *pintfhdl, u32 addr)
 {
-	u8 request;
-	u8 requesttype;
-	u16 wvalue;
-	u16 index;
-	u16 len;
+	u16 wvalue = (u16)(addr & 0x0000ffff);
 	u8 data = 0;
 
-
-	request = 0x05;
-	requesttype = 0x01;/* read_in */
-	index = 0;/* n/a */
-
-	wvalue = (u16)(addr & 0x0000ffff);
-	len = 1;
 	
 /* WLANON PAGE0_REG needs to add an offset 0x8000 */
 #if defined(CONFIG_RTL8710B)
@@ -340,8 +290,7 @@ u8 usb_read8(struct intf_hdl *pintfhdl, u32 addr)
 		wvalue |= 0x8000;
 #endif
 
-	usbctrl_vendorreq(pintfhdl, request, wvalue, index,
-			  &data, len, requesttype);
+	usbctrl_vendorreq(pintfhdl, wvalue, &data, 1, REALTEK_USB_VENQT_READ);
 
 
 	return data;
@@ -349,29 +298,16 @@ u8 usb_read8(struct intf_hdl *pintfhdl, u32 addr)
 
 u16 usb_read16(struct intf_hdl *pintfhdl, u32 addr)
 {
-	u8 request;
-	u8 requesttype;
-	u16 wvalue;
-	u16 index;
-	u16 len;
-	u16 data = 0;
+	u16 wvalue = (u16)(addr & 0x0000ffff);
+	u16 data;
 
-
-	request = 0x05;
-	requesttype = 0x01;/* read_in */
-	index = 0;/* n/a */
-
-	wvalue = (u16)(addr & 0x0000ffff);
-	len = 2;
-	
 /* WLANON PAGE0_REG needs to add an offset 0x8000 */
 #if defined(CONFIG_RTL8710B)
 	if(wvalue >= 0x0000 && wvalue < 0x0100)
 		wvalue |= 0x8000;
 #endif
 
-	usbctrl_vendorreq(pintfhdl, request, wvalue, index,
-			  &data, len, requesttype);
+	usbctrl_vendorreq(pintfhdl, wvalue, &data, 2, REALTEK_USB_VENQT_READ);
 
 
 	return data;
@@ -380,20 +316,8 @@ u16 usb_read16(struct intf_hdl *pintfhdl, u32 addr)
 
 u32 usb_read32(struct intf_hdl *pintfhdl, u32 addr)
 {
-	u8 request;
-	u8 requesttype;
-	u16 wvalue;
-	u16 index;
-	u16 len;
-	u32 data = 0;
-
-
-	request = 0x05;
-	requesttype = 0x01;/* read_in */
-	index = 0;/* n/a */
-
-	wvalue = (u16)(addr & 0x0000ffff);
-	len = 4;
+	u16 wvalue = (u16)(addr & 0x0000ffff);
+	u32 data;
 	
 /* WLANON PAGE0_REG needs to add an offset 0x8000 */
 #if defined(CONFIG_RTL8710B)
@@ -401,8 +325,7 @@ u32 usb_read32(struct intf_hdl *pintfhdl, u32 addr)
 		wvalue |= 0x8000;
 #endif
 
-	usbctrl_vendorreq(pintfhdl, request, wvalue, index,
-			  &data, len, requesttype);
+	usbctrl_vendorreq(pintfhdl, wvalue, &data, 4, REALTEK_USB_VENQT_READ);
 
 
 	return data;
@@ -410,22 +333,7 @@ u32 usb_read32(struct intf_hdl *pintfhdl, u32 addr)
 
 int usb_write8(struct intf_hdl *pintfhdl, u32 addr, u8 val)
 {
-	u8 request;
-	u8 requesttype;
-	u16 wvalue;
-	u16 index;
-	u16 len;
-	u8 data;
-	int ret;
-
-
-	request = 0x05;
-	requesttype = 0x00;/* write_out */
-	index = 0;/* n/a */
-
-	wvalue = (u16)(addr & 0x0000ffff);
-	len = 1;
-	data = val;
+	u16 wvalue = (u16)(addr & 0x0000ffff);
 	
 /* WLANON PAGE0_REG needs to add an offset 0x8000 */
 #if defined(CONFIG_RTL8710B)
@@ -433,31 +341,13 @@ int usb_write8(struct intf_hdl *pintfhdl, u32 addr, u8 val)
 		wvalue |= 0x8000;
 #endif
 
-	ret = usbctrl_vendorreq(pintfhdl, request, wvalue, index,
-				&data, len, requesttype);
+	return usbctrl_vendorreq(pintfhdl, wvalue, &val, 1, REALTEK_USB_VENQT_WRITE);
 
-
-	return ret;
 }
 
 int usb_write16(struct intf_hdl *pintfhdl, u32 addr, u16 val)
 {
-	u8 request;
-	u8 requesttype;
-	u16 wvalue;
-	u16 index;
-	u16 len;
-	u16 data;
-	int ret;
-
-
-	request = 0x05;
-	requesttype = 0x00;/* write_out */
-	index = 0;/* n/a */
-
-	wvalue = (u16)(addr & 0x0000ffff);
-	len = 2;
-	data = val;
+	u16 wvalue = (u16)(addr & 0x0000ffff);
 
 /* WLANON PAGE0_REG needs to add an offset 0x8000 */
 #if defined(CONFIG_RTL8710B)
@@ -465,32 +355,13 @@ int usb_write16(struct intf_hdl *pintfhdl, u32 addr, u16 val)
 		wvalue |= 0x8000;
 #endif
 
-	ret = usbctrl_vendorreq(pintfhdl, request, wvalue, index,
-				&data, len, requesttype);
-
-
-	return ret;
+	return usbctrl_vendorreq(pintfhdl, wvalue, &val, 2, REALTEK_USB_VENQT_WRITE);
 
 }
 
 int usb_write32(struct intf_hdl *pintfhdl, u32 addr, u32 val)
 {
-	u8 request;
-	u8 requesttype;
-	u16 wvalue;
-	u16 index;
-	u16 len;
-	u32 data;
-	int ret;
-
-
-	request = 0x05;
-	requesttype = 0x00;/* write_out */
-	index = 0;/* n/a */
-
-	wvalue = (u16)(addr & 0x0000ffff);
-	len = 4;
-	data = val;
+	u16 wvalue = (u16)(addr & 0x0000ffff);
 
 /* WLANON PAGE0_REG needs to add an offset 0x8000 */
 #if defined(CONFIG_RTL8710B)
@@ -498,42 +369,26 @@ int usb_write32(struct intf_hdl *pintfhdl, u32 addr, u32 val)
 		wvalue |= 0x8000;
 #endif
 
-	ret = usbctrl_vendorreq(pintfhdl, request, wvalue, index,
-				&data, len, requesttype);
-
-
-	return ret;
+	return usbctrl_vendorreq(pintfhdl, wvalue, &val, 4, REALTEK_USB_VENQT_WRITE);
 
 }
 
 int usb_writeN(struct intf_hdl *pintfhdl, u32 addr, u32 length, u8 *pdata)
 {
-	u8 request;
-	u8 requesttype;
-	u16 wvalue;
-	u16 index;
-	u16 len;
+	u16 wvalue = (u16)(addr & 0x0000ffff);
 	u8 buf[VENDOR_CMD_MAX_DATA_LEN] = {0};
-	int ret;
 
+	if (length > VENDOR_CMD_MAX_DATA_LEN)
+		return -EINVAL;
 
-	request = 0x05;
-	requesttype = 0x00;/* write_out */
-	index = 0;/* n/a */
+	memcpy(buf, pdata, length);
+	return usbctrl_vendorreq(pintfhdl, wvalue, buf, (length & 0xffff), REALTEK_USB_VENQT_WRITE);
 
-	wvalue = (u16)(addr & 0x0000ffff);
-	len = length;
-	_rtw_memcpy(buf, pdata, len);
-	ret = usbctrl_vendorreq(pintfhdl, request, wvalue, index,
-				buf, len, requesttype);
-
-
-	return ret;
 }
 
 void usb_set_intf_ops(_adapter *padapter, struct _io_ops *pops)
 {
-	_rtw_memset((u8 *)pops, 0, sizeof(struct _io_ops));
+	memset((u8 *)pops, 0, sizeof(struct _io_ops));
 
 	pops->_read8 = &usb_read8;
 	pops->_read16 = &usb_read16;

@@ -151,7 +151,7 @@ enum h2c_cmd_8192F {
 #define SET_8192F_H2CCMD_BT_MPOPER_PARAM3(__pH2CCmd, __Value)							SET_BITS_TO_LE_1BYTE(__pH2CCmd+4, 0, 8, __Value)
 
 /* _BT_FW_PATCH_0x6A */
-#define SET_8192F_H2CCMD_BT_FW_PATCH_SIZE(__pH2CCmd, __Value)					SET_BITS_TO_LE_2BYTE((u8 *)(__pH2CCmd), 0, 16, __Value)
+#define SET_8192F_H2CCMD_BT_FW_PATCH_SIZE(__pH2CCmd, __Value)					SET_BITS_TO_LE_2BYTE((pu1Byte)(__pH2CCmd), 0, 16, __Value)
 #define SET_8192F_H2CCMD_BT_FW_PATCH_ADDR0(__pH2CCmd, __Value)					SET_BITS_TO_LE_1BYTE((__pH2CCmd)+2, 0, 8, __Value)
 #define SET_8192F_H2CCMD_BT_FW_PATCH_ADDR1(__pH2CCmd, __Value)					SET_BITS_TO_LE_1BYTE((__pH2CCmd)+3, 0, 8, __Value)
 #define SET_8192F_H2CCMD_BT_FW_PATCH_ADDR2(__pH2CCmd, __Value)					SET_BITS_TO_LE_1BYTE((__pH2CCmd)+4, 0, 8, __Value)
@@ -173,10 +173,10 @@ void rtl8192f_set_FwJoinBssRpt_cmd(PADAPTER padapter, u8 mstatus);
 void rtl8192f_set_FwPsTuneParam_cmd(PADAPTER padapter);
 void rtl8192f_download_rsvd_page(PADAPTER padapter, u8 mstatus);
 #ifdef CONFIG_BT_COEXIST
-void rtl8192f_download_BTCoex_AP_mode_rsvd_page(PADAPTER padapter);
+	void rtl8192f__download_BTCoex_AP_mode_rsvd_page(PADAPTER padapter);
 #endif /* CONFIG_BT_COEXIST */
 #ifdef CONFIG_P2P
-void rtl8192f_set_p2p_ps_offload_cmd(PADAPTER padapter, u8 p2p_ps_state);
+	void rtl8192f_set_p2p_ps_offload_cmd(PADAPTER padapter, u8 p2p_ps_state);
 #endif /* CONFIG_P2P */
 
 #ifdef CONFIG_TDLS
@@ -186,7 +186,7 @@ void rtl8192f_set_BcnEarly_C2H_Rpt_cmd(PADAPTER padapter, u8 enable);
 #endif
 
 #ifdef CONFIG_P2P_WOWLAN
-void rtl8192f_set_p2p_wowlan_offload_cmd(PADAPTER padapter);
+	void rtl8192f_set_p2p_wowlan_offload_cmd(PADAPTER padapter);
 #endif
 
 s32 FillH2CCmd8192F(PADAPTER padapter, u8 ElementID, u32 CmdLen, u8 *pCmdBuffer);

@@ -68,4 +68,7 @@ void rtl8710bu_set_hal_ops(_adapter *padapter);
 void rtl8192fu_set_hal_ops(_adapter *padapter);
 #endif /* CONFIG_RTL8192F */
 
+#ifdef CONFIG_INTEL_PROXIM
+extern _adapter  *rtw_usb_get_sw_pointer(void);
+#endif /* CONFIG_INTEL_PROXIM */
 #endif /* __USB_HAL_H__ */

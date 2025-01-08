@@ -94,8 +94,8 @@ struct rtw_wdev_invit_info {
 #define rtw_wdev_invit_info_init(invit_info) \
 	do { \
 		(invit_info)->state = 0xff; \
-		_rtw_memset((invit_info)->peer_mac, 0, ETH_ALEN); \
-		_rtw_memset((invit_info)->group_bssid, 0, ETH_ALEN); \
+		memset((invit_info)->peer_mac, 0, ETH_ALEN); \
+		memset((invit_info)->group_bssid, 0, ETH_ALEN); \
 		(invit_info)->active = 0xff; \
 		(invit_info)->token = 0; \
 		(invit_info)->flags = 0x00; \
@@ -123,9 +123,9 @@ struct rtw_wdev_nego_info {
 #define rtw_wdev_nego_info_init(nego_info) \
 	do { \
 		(nego_info)->state = 0xff; \
-		_rtw_memset((nego_info)->iface_addr, 0, ETH_ALEN); \
-		_rtw_memset((nego_info)->peer_mac, 0, ETH_ALEN); \
-		_rtw_memset((nego_info)->peer_iface_addr, 0, ETH_ALEN); \
+		memset((nego_info)->iface_addr, 0, ETH_ALEN); \
+		memset((nego_info)->peer_mac, 0, ETH_ALEN); \
+		memset((nego_info)->peer_iface_addr, 0, ETH_ALEN); \
 		(nego_info)->active = 0xff; \
 		(nego_info)->token = 0; \
 		(nego_info)->status = 0xff; \
@@ -167,10 +167,6 @@ struct rtw_wdev_priv {
 	bool block;
 	bool block_scan;
 	bool power_mgmt;
-	
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0)
-	u32 mgmt_mask;
-#endif	
 
 	/* report mgmt_frame registered */
 	u16 report_mgmt;
@@ -181,15 +177,15 @@ struct rtw_wdev_priv {
 	_mutex roch_mutex;
 
 #ifdef CONFIG_CONCURRENT_MODE
-	ATOMIC_T switch_ch_to;
+	atomic_t switch_ch_to;
 #endif
 
-#if defined(CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI) || defined(CONFIG_RTW_SCAN_RAND)
+#ifdef CONFIG_RTW_CFGVENDOR_RANDOM_MAC_OUI
 	u8 pno_mac_addr[ETH_ALEN];
 	u16 pno_scan_seq_num;
 #endif
 
-#ifdef CONFIG_RTW_CFGVENDOR_RSSIMONITOR
+#ifdef CONFIG_RTW_CFGVEDNOR_RSSIMONITOR
         s8 rssi_monitor_max;
         s8 rssi_monitor_min;
         u8 rssi_monitor_enable;
@@ -243,9 +239,6 @@ struct rtw_wiphy_data {
 #if defined(RTW_DEDICATED_P2P_DEVICE)
 	struct wireless_dev *pd_wdev; /* P2P device wdev */
 #endif
-
-	s16 txpwr_total_lmt_mbm;
-	s16 txpwr_total_target_mbm;
 };
 
 #define rtw_wiphy_priv(wiphy) ((struct rtw_wiphy_data *)wiphy_priv(wiphy))
@@ -289,10 +282,9 @@ int rtw_cfg80211_dev_res_alloc(struct dvobj_priv *dvobj);
 void rtw_cfg80211_dev_res_free(struct dvobj_priv *dvobj);
 int rtw_cfg80211_dev_res_register(struct dvobj_priv *dvobj);
 void rtw_cfg80211_dev_res_unregister(struct dvobj_priv *dvobj);
-s16 rtw_cfg80211_dev_get_total_txpwr_lmt_mbm(struct dvobj_priv *dvobj);
-s16 rtw_cfg80211_dev_get_total_txpwr_target_mbm(struct dvobj_priv *dvobj);
 
 void rtw_cfg80211_init_wdev_data(_adapter *padapter);
+void rtw_cfg80211_init_wiphy(_adapter *padapter);
 
 void rtw_cfg80211_unlink_bss(_adapter *padapter, struct wlan_network *pnetwork);
 void rtw_cfg80211_surveydone_event_callback(_adapter *padapter);
@@ -312,16 +304,15 @@ void rtw_cfg80211_indicate_scan_done_for_buddy(_adapter *padapter, bool bscan_ab
 #ifdef CONFIG_AP_MODE
 void rtw_cfg80211_indicate_sta_assoc(_adapter *padapter, u8 *pmgmt_frame, uint frame_len);
 void rtw_cfg80211_indicate_sta_disassoc(_adapter *padapter, const u8 *da, unsigned short reason);
-int rtw_cfg80211_set_mgnt_wpsp2pie(struct net_device *net, char *buf, int len, int type);
 #endif /* CONFIG_AP_MODE */
 
+#ifdef CONFIG_P2P
 void rtw_cfg80211_set_is_roch(_adapter *adapter, bool val);
 bool rtw_cfg80211_get_is_roch(_adapter *adapter);
 bool rtw_cfg80211_is_ro_ch_once(_adapter *adapter);
 void rtw_cfg80211_set_last_ro_ch_time(_adapter *adapter);
 s32 rtw_cfg80211_get_last_ro_ch_passing_ms(_adapter *adapter);
 
-#ifdef CONFIG_P2P
 int rtw_cfg80211_iface_has_p2p_group_cap(_adapter *adapter);
 int rtw_cfg80211_is_p2p_scan(_adapter *adapter);
 #if defined(RTW_DEDICATED_P2P_DEVICE)
@@ -347,6 +338,8 @@ void rtw_cfg80211_rx_probe_request(_adapter *padapter, union recv_frame *rframe)
 void rtw_cfg80211_external_auth_request(_adapter *padapter, union recv_frame *rframe);
 void rtw_cfg80211_external_auth_status(struct wiphy *wiphy, struct net_device *dev,
 	struct rtw_external_auth_params *params);
+
+int rtw_cfg80211_set_mgnt_wpsp2pie(struct net_device *net, char *buf, int len, int type);
 
 bool rtw_cfg80211_pwr_mgmt(_adapter *adapter);
 #ifdef CONFIG_RTW_80211K
@@ -409,10 +402,8 @@ void rtw_cfg80211_deinit_rfkill(struct wiphy *wiphy);
 #endif
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
-#define rtw_cfg80211_notify_new_peer_candidate(wdev, addr, ie, ie_len, sig_dbm, gfp) cfg80211_notify_new_peer_candidate(wdev_to_ndev(wdev), addr, ie, ie_len, sig_dbm, gfp)
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0))
-#define rtw_cfg80211_notify_new_peer_candidate(wdev, addr, ie, ie_len, sig_dbm, gfp) cfg80211_notify_new_peer_candidate(wdev_to_ndev(wdev), addr, ie, ie_len, gfp)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0))
+#define rtw_cfg80211_notify_new_peer_candidate(wdev, addr, ie, ie_len, gfp) cfg80211_notify_new_peer_candidate(wdev_to_ndev(wdev), addr, ie, ie_len, gfp)
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0))
@@ -432,13 +423,6 @@ u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter, u8 ch, u8 bw, u8 offset, u8 
 	(band == BAND_ON_2_4G) ? NL80211_BAND_2GHZ : \
 	(band == BAND_ON_5G) ? NL80211_BAND_5GHZ : NUM_NL80211_BANDS
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36))
-#define NL80211_TX_POWER_AUTOMATIC	TX_POWER_AUTOMATIC
-#define NL80211_TX_POWER_LIMITED	TX_POWER_LIMITED
-#define NL80211_TX_POWER_FIXED		TX_POWER_FIXED
-#endif
-
-#include "wifi_regd.h"
 #include "rtw_cfgvendor.h"
 
 #endif /* __IOCTL_CFG80211_H__ */

@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 
+#include "eds2.h"
 #include "context.h"
 #include "control.h"
 #include "resources.h"

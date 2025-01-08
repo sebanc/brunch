@@ -60,8 +60,8 @@ void rtw_acs_version_dump(void *sel, _adapter *adapter);
 extern void phydm_ccx_monitor_trigger(void *p_dm_void, u16 monitor_time);
 extern void phydm_ccx_monitor_result(void *p_dm_void);
 
-#define GET_ACS_STATE(padapter)					(ATOMIC_READ(&GET_HAL_DATA(padapter)->acs.state))
-#define SET_ACS_STATE(padapter, set_state)			(ATOMIC_SET(&GET_HAL_DATA(padapter)->acs.state, set_state))
+#define GET_ACS_STATE(padapter)					(atomic_read(&GET_HAL_DATA(padapter)->acs.state))
+#define SET_ACS_STATE(padapter, set_state)			(atomic_set(&GET_HAL_DATA(padapter)->acs.state, set_state))
 #define IS_ACS_ENABLE(padapter)					((GET_ACS_STATE(padapter) == ACS_ENABLE) ? _TRUE : _FALSE)
 
 enum ACS_STATE {
@@ -75,12 +75,11 @@ enum ACS_STATE {
 #define ACS_BW_160M	BIT(3)
 
 struct auto_chan_sel {
-	ATOMIC_T state;
+	atomic_t state;
 	u8 trigger_ch;
 	bool triggered;
 	u8 clm_ratio[MAX_CHANNEL_NUM];
 	u8 nhm_ratio[MAX_CHANNEL_NUM];
-	s8 env_mntr_rpt[MAX_CHANNEL_NUM];
 	#if (RTK_ACS_VERSION == 3)
 	u8 nhm[MAX_CHANNEL_NUM][NHM_RPT_NUM];
 	#endif
@@ -125,11 +124,7 @@ void rtw_acs_adv_reset(_adapter *adapter);
 u8 rtw_acs_get_clm_ratio_by_ch_num(_adapter *adapter, u8 chan);
 u8 rtw_acs_get_clm_ratio_by_ch_idx(_adapter *adapter, u8 ch_idx);
 u8 rtw_acs_get_nhm_ratio_by_ch_num(_adapter *adapter, u8 chan);
-u8 rtw_acs_get_nhm_noise_pwr_by_ch_idx(_adapter *adapter, u8 ch_idx);
 u8 rtw_acs_get_num_ratio_by_ch_idx(_adapter *adapter, u8 ch_idx);
-
-u8 rtw_phydm_clm_ratio(_adapter *adapter);
-u8 rtw_phydm_nhm_ratio(_adapter *adapter);
 
 void rtw_acs_reset(_adapter *adapter);
 void rtw_acs_trigger(_adapter *adapter, u16 scan_time_ms, u8 scan_chan, enum NHM_PID pid);
@@ -147,8 +142,8 @@ void rtw_acs_stop(_adapter *adapter);
 
 #ifdef CONFIG_BACKGROUND_NOISE_MONITOR
 #define RTK_NOISE_MONITOR_VERSION	3
-#define GET_NM_STATE(padapter)					(ATOMIC_READ(&GET_HAL_DATA(padapter)->nm.state))
-#define SET_NM_STATE(padapter, set_state)			(ATOMIC_SET(&GET_HAL_DATA(padapter)->nm.state, set_state))
+#define GET_NM_STATE(padapter)					(atomic_read(&GET_HAL_DATA(padapter)->nm.state))
+#define SET_NM_STATE(padapter, set_state)			(atomic_set(&GET_HAL_DATA(padapter)->nm.state, set_state))
 #define IS_NM_ENABLE(padapter)					((GET_NM_STATE(padapter) == NM_ENABLE) ? _TRUE : _FALSE)
 
 enum NM_STATE {
@@ -157,7 +152,7 @@ enum NM_STATE {
 };
 
 struct noise_monitor {
-	ATOMIC_T state;
+	atomic_t state;
 	s16 noise[MAX_CHANNEL_NUM];
 	u8 bss_nums[MAX_CHANNEL_NUM];
 };

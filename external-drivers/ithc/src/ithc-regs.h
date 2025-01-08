@@ -129,15 +129,12 @@ struct ithc_registers {
 	/* 1008 */ u32 control_bits;
 	/* 100c */ u32 _unknown_100c;
 	/* 1010 */ u32 spi_config;
-	/* 1014 */ u8 read_opcode; // maybe for header?
-	/* 1015 */ u8 read_opcode_quad;
-	/* 1016 */ u8 read_opcode_dual;
-	/* 1017 */ u8 read_opcode_single;
-	/* 1018 */ u8 write_opcode; // not used?
-	/* 1019 */ u8 write_opcode_quad;
-	/* 101a */ u8 write_opcode_dual;
-	/* 101b */ u8 write_opcode_single;
-	/* 101c */ u32 _unknown_101c;
+	struct {
+		/* 1014/1018/101c */ u8 header;
+		/* 1015/1019/101d */ u8 quad;
+		/* 1016/101a/101e */ u8 dual;
+		/* 1017/101b/101f */ u8 single;
+	} opcode[3];
 	/* 1020 */ u32 error_control;
 	/* 1024 */ u32 error_status; // write to clear
 	/* 1028 */ u32 error_flags; // write to clear

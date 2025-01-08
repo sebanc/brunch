@@ -12,9 +12,11 @@
  * more details.
  *
  *****************************************************************************/
+/* ***** temporarily flag ******* */
 #define CONFIG_SINGLE_IMG
 /* #define CONFIG_DISABLE_ODM */
 
+/* ***** temporarily flag ******* */
 /*
  * Public  General Config
  */
@@ -65,7 +67,6 @@
 #endif
 
 #ifdef CONFIG_80211AC_VHT
-	/* nrm - activates beamforming */
 	#define CONFIG_BEAMFORMING
 #endif
 

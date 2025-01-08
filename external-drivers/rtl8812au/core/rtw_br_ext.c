@@ -17,6 +17,10 @@
 #ifdef __KERNEL__
 	#include <linux/if_arp.h>
 	#include <net/ip.h>
+	#include <linux/version.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+	#include <net/ipx.h>
+#endif
 	#include <linux/atalk.h>
 	#include <linux/udp.h>
 	#include <linux/if_pppox.h>
@@ -80,7 +84,7 @@
 
 
 /* Find a tag in pppoe frame and return the pointer */
-static unsigned char *__nat25_find_pppoe_tag(struct pppoe_hdr *ph, unsigned short type)
+static __inline__ unsigned char *__nat25_find_pppoe_tag(struct pppoe_hdr *ph, unsigned short type)
 {
 	unsigned char *cur_ptr, *start_ptr;
 	unsigned short tagLen, tagType;
@@ -98,7 +102,7 @@ static unsigned char *__nat25_find_pppoe_tag(struct pppoe_hdr *ph, unsigned shor
 }
 
 
-static int __nat25_add_pppoe_tag(struct sk_buff *skb, struct pppoe_tag *tag)
+static __inline__ int __nat25_add_pppoe_tag(struct sk_buff *skb, struct pppoe_tag *tag)
 {
 	struct pppoe_hdr *ph = (struct pppoe_hdr *)(skb->data + ETH_HLEN);
 	int data_len;
@@ -138,7 +142,7 @@ static int skb_pull_and_merge(struct sk_buff *skb, unsigned char *src, int len)
 	return 0;
 }
 
-static unsigned long __nat25_timeout(_adapter *priv)
+static __inline__ unsigned long __nat25_timeout(_adapter *priv)
 {
 	unsigned long timeout;
 
@@ -148,7 +152,7 @@ static unsigned long __nat25_timeout(_adapter *priv)
 }
 
 
-static int  __nat25_has_expired(_adapter *priv,
+static __inline__ int  __nat25_has_expired(_adapter *priv,
 		struct nat25_network_db_entry *fdb)
 {
 	if (time_before_eq(fdb->ageing_timer, __nat25_timeout(priv)))
@@ -158,7 +162,7 @@ static int  __nat25_has_expired(_adapter *priv,
 }
 
 
-static void __nat25_generate_ipv4_network_addr(unsigned char *networkAddr,
+static __inline__ void __nat25_generate_ipv4_network_addr(unsigned char *networkAddr,
 		unsigned int *ipAddr)
 {
 	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
@@ -168,7 +172,42 @@ static void __nat25_generate_ipv4_network_addr(unsigned char *networkAddr,
 }
 
 
-static void __nat25_generate_pppoe_network_addr(unsigned char *networkAddr,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+static __inline__ void __nat25_generate_ipx_network_addr_with_node(unsigned char *networkAddr,
+		unsigned int *ipxNetAddr, unsigned char *ipxNodeAddr)
+{
+	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
+
+	networkAddr[0] = NAT25_IPX;
+	memcpy(networkAddr + 1, (unsigned char *)ipxNetAddr, 4);
+	memcpy(networkAddr + 5, ipxNodeAddr, 6);
+}
+
+
+static __inline__ void __nat25_generate_ipx_network_addr_with_socket(unsigned char *networkAddr,
+		unsigned int *ipxNetAddr, unsigned short *ipxSocketAddr)
+{
+	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
+
+	networkAddr[0] = NAT25_IPX;
+	memcpy(networkAddr + 1, (unsigned char *)ipxNetAddr, 4);
+	memcpy(networkAddr + 5, (unsigned char *)ipxSocketAddr, 2);
+}
+
+
+static __inline__ void __nat25_generate_apple_network_addr(unsigned char *networkAddr,
+		unsigned short *network, unsigned char *node)
+{
+	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
+
+	networkAddr[0] = NAT25_APPLE;
+	memcpy(networkAddr + 1, (unsigned char *)network, 2);
+	networkAddr[3] = *node;
+}
+#endif
+
+
+static __inline__ void __nat25_generate_pppoe_network_addr(unsigned char *networkAddr,
 		unsigned char *ac_mac, unsigned short *sid)
 {
 	memset(networkAddr, 0, MAX_NETWORK_ADDR_LEN);
@@ -288,7 +327,7 @@ static void convert_ipv6_mac_to_mc(struct sk_buff *skb)
 #endif /* SUPPORT_RX_UNI2MCAST */
 
 
-static int __nat25_network_hash(unsigned char *networkAddr)
+static __inline__ int __nat25_network_hash(unsigned char *networkAddr)
 {
 	if (networkAddr[0] == NAT25_IPV4) {
 		unsigned long x;
@@ -296,6 +335,7 @@ static int __nat25_network_hash(unsigned char *networkAddr)
 		x = networkAddr[7] ^ networkAddr[8] ^ networkAddr[9] ^ networkAddr[10];
 
 		return x & (NAT25_HASH_SIZE - 1);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 	} else if (networkAddr[0] == NAT25_IPX) {
 		unsigned long x;
 
@@ -309,6 +349,7 @@ static int __nat25_network_hash(unsigned char *networkAddr)
 		x = networkAddr[1] ^ networkAddr[2] ^ networkAddr[3];
 
 		return x & (NAT25_HASH_SIZE - 1);
+#endif
 	} else if (networkAddr[0] == NAT25_PPPOE) {
 		unsigned long x;
 
@@ -340,7 +381,7 @@ static int __nat25_network_hash(unsigned char *networkAddr)
 }
 
 
-static void __network_hash_link(_adapter *priv,
+static __inline__ void __network_hash_link(_adapter *priv,
 		struct nat25_network_db_entry *ent, int hash)
 {
 	/* Caller must _enter_critical_bh already! */
@@ -357,7 +398,7 @@ static void __network_hash_link(_adapter *priv,
 }
 
 
-static void __network_hash_unlink(struct nat25_network_db_entry *ent)
+static __inline__ void __network_hash_unlink(struct nat25_network_db_entry *ent)
 {
 	/* Caller must _enter_critical_bh already! */
 	/* _irqL irqL; */
@@ -854,6 +895,229 @@ int nat25_db_handle(_adapter *priv, struct sk_buff *skb, int method)
 			return -1;
 		}
 	}
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
+	/*---------------------------------------------------*/
+	/*         Handle IPX and Apple Talk frame          */
+	/*---------------------------------------------------*/
+	else if ((protocol == __constant_htons(ETH_P_IPX)) ||
+		 (protocol == __constant_htons(ETH_P_ATALK)) ||
+		 (protocol == __constant_htons(ETH_P_AARP))) {
+		unsigned char ipx_header[2] = {0xFF, 0xFF};
+		struct ipxhdr	*ipx = NULL;
+		struct elapaarp	*ea = NULL;
+		struct ddpehdr	*ddp = NULL;
+		unsigned char *framePtr = skb->data + ETH_HLEN;
+
+		if (protocol == __constant_htons(ETH_P_IPX)) {
+			RTW_INFO("NAT25: Protocol=IPX (Ethernet II)\n");
+			ipx = (struct ipxhdr *)framePtr;
+		} else { /* if(protocol <= __constant_htons(ETH_FRAME_LEN)) */
+			if (!memcmp(ipx_header, framePtr, 2)) {
+				RTW_INFO("NAT25: Protocol=IPX (Ethernet 802.3)\n");
+				ipx = (struct ipxhdr *)framePtr;
+			} else {
+				unsigned char ipx_8022_type =  0xE0;
+				unsigned char snap_8022_type = 0xAA;
+
+				if (*framePtr == snap_8022_type) {
+					unsigned char ipx_snap_id[5] = {0x0, 0x0, 0x0, 0x81, 0x37};		/* IPX SNAP ID */
+					unsigned char aarp_snap_id[5] = {0x00, 0x00, 0x00, 0x80, 0xF3};	/* Apple Talk AARP SNAP ID */
+					unsigned char ddp_snap_id[5] = {0x08, 0x00, 0x07, 0x80, 0x9B};	/* Apple Talk DDP SNAP ID */
+
+					framePtr += 3;	/* eliminate the 802.2 header */
+
+					if (!memcmp(ipx_snap_id, framePtr, 5)) {
+						framePtr += 5;	/* eliminate the SNAP header */
+
+						RTW_INFO("NAT25: Protocol=IPX (Ethernet SNAP)\n");
+						ipx = (struct ipxhdr *)framePtr;
+					} else if (!memcmp(aarp_snap_id, framePtr, 5)) {
+						framePtr += 5;	/* eliminate the SNAP header */
+
+						ea = (struct elapaarp *)framePtr;
+					} else if (!memcmp(ddp_snap_id, framePtr, 5)) {
+						framePtr += 5;	/* eliminate the SNAP header */
+
+						ddp = (struct ddpehdr *)framePtr;
+					} else {
+						DEBUG_WARN("NAT25: Protocol=Ethernet SNAP %02x%02x%02x%02x%02x\n", framePtr[0],
+							framePtr[1], framePtr[2], framePtr[3], framePtr[4]);
+						return -1;
+					}
+				} else if (*framePtr == ipx_8022_type) {
+					framePtr += 3;	/* eliminate the 802.2 header */
+
+					if (!memcmp(ipx_header, framePtr, 2)) {
+						RTW_INFO("NAT25: Protocol=IPX (Ethernet 802.2)\n");
+						ipx = (struct ipxhdr *)framePtr;
+					} else
+						return -1;
+				}
+			}
+		}
+
+		/*   IPX  */
+		if (ipx != NULL) {
+			switch (method) {
+			case NAT25_CHECK:
+				if (!memcmp(skb->data + ETH_ALEN, ipx->ipx_source.node, ETH_ALEN)) {
+					RTW_INFO("NAT25: Check IPX skb_copy\n");
+					return 0;
+				}
+				return -1;
+
+			case NAT25_INSERT: {
+				RTW_INFO("NAT25: Insert IPX, Dest=%08x,%02x%02x%02x%02x%02x%02x,%04x Source=%08x,%02x%02x%02x%02x%02x%02x,%04x\n",
+					 ipx->ipx_dest.net,
+					 ipx->ipx_dest.node[0],
+					 ipx->ipx_dest.node[1],
+					 ipx->ipx_dest.node[2],
+					 ipx->ipx_dest.node[3],
+					 ipx->ipx_dest.node[4],
+					 ipx->ipx_dest.node[5],
+					 ipx->ipx_dest.sock,
+					 ipx->ipx_source.net,
+					 ipx->ipx_source.node[0],
+					 ipx->ipx_source.node[1],
+					 ipx->ipx_source.node[2],
+					 ipx->ipx_source.node[3],
+					 ipx->ipx_source.node[4],
+					 ipx->ipx_source.node[5],
+					 ipx->ipx_source.sock);
+
+				if (!memcmp(skb->data + ETH_ALEN, ipx->ipx_source.node, ETH_ALEN)) {
+					RTW_INFO("NAT25: Use IPX Net, and Socket as network addr\n");
+
+					__nat25_generate_ipx_network_addr_with_socket(networkAddr, &ipx->ipx_source.net, &ipx->ipx_source.sock);
+
+					/* change IPX source node addr to wlan STA address */
+					memcpy(ipx->ipx_source.node, GET_MY_HWADDR(priv), ETH_ALEN);
+				} else
+					__nat25_generate_ipx_network_addr_with_node(networkAddr, &ipx->ipx_source.net, ipx->ipx_source.node);
+
+				__nat25_db_network_insert(priv, skb->data + ETH_ALEN, networkAddr);
+
+				__nat25_db_print(priv);
+			}
+			return 0;
+
+			case NAT25_LOOKUP: {
+				if (!memcmp(GET_MY_HWADDR(priv), ipx->ipx_dest.node, ETH_ALEN)) {
+					RTW_INFO("NAT25: Lookup IPX, Modify Destination IPX Node addr\n");
+
+					__nat25_generate_ipx_network_addr_with_socket(networkAddr, &ipx->ipx_dest.net, &ipx->ipx_dest.sock);
+
+					__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
+
+					/* replace IPX destination node addr with Lookup destination MAC addr */
+					memcpy(ipx->ipx_dest.node, skb->data, ETH_ALEN);
+				} else {
+					__nat25_generate_ipx_network_addr_with_node(networkAddr, &ipx->ipx_dest.net, ipx->ipx_dest.node);
+
+					__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
+				}
+			}
+			return 0;
+
+			default:
+				return -1;
+			}
+		}
+
+		/*   AARP  */
+		else if (ea != NULL) {
+			/* Sanity check fields. */
+			if (ea->hw_len != ETH_ALEN || ea->pa_len != AARP_PA_ALEN) {
+				DEBUG_WARN("NAT25: Appletalk AARP Sanity check fail!\n");
+				return -1;
+			}
+
+			switch (method) {
+			case NAT25_CHECK:
+				return 0;
+
+			case NAT25_INSERT: {
+				/* change to AARP source mac address to wlan STA address */
+				memcpy(ea->hw_src, GET_MY_HWADDR(priv), ETH_ALEN);
+
+				RTW_INFO("NAT25: Insert AARP, Source=%d,%d Destination=%d,%d\n",
+					 ea->pa_src_net,
+					 ea->pa_src_node,
+					 ea->pa_dst_net,
+					 ea->pa_dst_node);
+
+				__nat25_generate_apple_network_addr(networkAddr, &ea->pa_src_net, &ea->pa_src_node);
+
+				__nat25_db_network_insert(priv, skb->data + ETH_ALEN, networkAddr);
+
+				__nat25_db_print(priv);
+			}
+			return 0;
+
+			case NAT25_LOOKUP: {
+				RTW_INFO("NAT25: Lookup AARP, Source=%d,%d Destination=%d,%d\n",
+					 ea->pa_src_net,
+					 ea->pa_src_node,
+					 ea->pa_dst_net,
+					 ea->pa_dst_node);
+
+				__nat25_generate_apple_network_addr(networkAddr, &ea->pa_dst_net, &ea->pa_dst_node);
+
+				__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
+
+				/* change to AARP destination mac address to Lookup result */
+				memcpy(ea->hw_dst, skb->data, ETH_ALEN);
+			}
+			return 0;
+
+			default:
+				return -1;
+			}
+		}
+
+		/*   DDP  */
+		else if (ddp != NULL) {
+			switch (method) {
+			case NAT25_CHECK:
+				return -1;
+
+			case NAT25_INSERT: {
+				RTW_INFO("NAT25: Insert DDP, Source=%d,%d Destination=%d,%d\n",
+					 ddp->deh_snet,
+					 ddp->deh_snode,
+					 ddp->deh_dnet,
+					 ddp->deh_dnode);
+
+				__nat25_generate_apple_network_addr(networkAddr, &ddp->deh_snet, &ddp->deh_snode);
+
+				__nat25_db_network_insert(priv, skb->data + ETH_ALEN, networkAddr);
+
+				__nat25_db_print(priv);
+			}
+			return 0;
+
+			case NAT25_LOOKUP: {
+				RTW_INFO("NAT25: Lookup DDP, Source=%d,%d Destination=%d,%d\n",
+					 ddp->deh_snet,
+					 ddp->deh_snode,
+					 ddp->deh_dnet,
+					 ddp->deh_dnode);
+
+				__nat25_generate_apple_network_addr(networkAddr, &ddp->deh_dnet, &ddp->deh_dnode);
+
+				__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
+			}
+			return 0;
+
+			default:
+				return -1;
+			}
+		}
+
+		return -1;
+	}
+#endif
 
 	/*---------------------------------------------------*/
 	/*                Handle PPPoE frame                */

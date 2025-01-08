@@ -54,7 +54,7 @@ void beamforming_gid_paid(
 
 		/* VHT SU PPDU carrying one or more group addressed MPDUs or */
 		/* Transmitting a VHT NDP intended for multiple recipients */
-		if (MacAddr_isBcst(RA) || MacAddr_isMulticast(RA) || tcb->macId == MAC_ID_STATIC_FOR_BROADCAST_MULTICAST) {
+		if (is_broadcast_ether_addr(RA) || MacAddr_isMulticast(RA) || tcb->macId == MAC_ID_STATIC_FOR_BROADCAST_MULTICAST) {
 			tcb->G_ID = 63;
 			tcb->P_AID = 0;
 		} else if (ACTING_AS_AP(adapter)) {
@@ -1011,7 +1011,7 @@ send_fw_ht_ndpa_packet(
 	struct _ADAPTER *adapter = dm->adapter;
 	struct xmit_frame *pmgntframe;
 	struct pkt_attrib *pattrib;
-	struct rtw_ieee80211_hdr *pwlanhdr;
+	struct ieee80211_hdr *pwlanhdr;
 	struct xmit_priv *pxmitpriv = &(adapter->xmitpriv);
 	struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
 	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
@@ -1044,21 +1044,21 @@ send_fw_ht_ndpa_packet(
 	pattrib->order = 1;
 	pattrib->subtype = WIFI_ACTION_NOACK;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
-	fctrl = &pwlanhdr->frame_ctl;
+	fctrl =&pwlanhdr->frame_control;
 	*(fctrl) = 0;
 
 	set_order_bit(pframe);
 	set_frame_sub_type(pframe, WIFI_ACTION_NOACK);
 
-	_rtw_memcpy(pwlanhdr->addr1, RA, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr2, beamform_entry->my_mac_addr, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr3, get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+	memcpy(pwlanhdr->addr1, RA, ETH_ALEN);
+	memcpy(pwlanhdr->addr2, beamform_entry->my_mac_addr, ETH_ALEN);
+	memcpy(pwlanhdr->addr3, get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
 
 	if (pmlmeext->cur_wireless_mode == WIRELESS_11B)
 		a_sifs_time = 10;
@@ -1078,7 +1078,7 @@ send_fw_ht_ndpa_packet(
 	SET_HT_CTRL_CSI_STEERING(pframe + 24, 3);
 	SET_HT_CTRL_NDP_ANNOUNCEMENT(pframe + 24, 1);
 
-	_rtw_memcpy(pframe + 28, action_hdr, 4);
+	memcpy(pframe + 28, action_hdr, 4);
 
 	pattrib->pktlen = 32;
 
@@ -1099,7 +1099,7 @@ send_sw_ht_ndpa_packet(
 	struct _ADAPTER *adapter = dm->adapter;
 	struct xmit_frame *pmgntframe;
 	struct pkt_attrib *pattrib;
-	struct rtw_ieee80211_hdr *pwlanhdr;
+	struct ieee80211_hdr *pwlanhdr;
 	struct xmit_priv *pxmitpriv = &(adapter->xmitpriv);
 	struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
 	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
@@ -1130,21 +1130,21 @@ send_sw_ht_ndpa_packet(
 	pattrib->order = 1;
 	pattrib->subtype = WIFI_ACTION_NOACK;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
-	fctrl = &pwlanhdr->frame_ctl;
+	fctrl =&pwlanhdr->frame_control;
 	*(fctrl) = 0;
 
 	set_order_bit(pframe);
 	set_frame_sub_type(pframe, WIFI_ACTION_NOACK);
 
-	_rtw_memcpy(pwlanhdr->addr1, RA, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr2, beamform_entry->my_mac_addr, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr3, get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
+	memcpy(pwlanhdr->addr1, RA, ETH_ALEN);
+	memcpy(pwlanhdr->addr2, beamform_entry->my_mac_addr, ETH_ALEN);
+	memcpy(pwlanhdr->addr3, get_my_bssid(&(pmlmeinfo->network)), ETH_ALEN);
 
 	if (pmlmeext->cur_wireless_mode == WIRELESS_11B)
 		a_sifs_time = 10;
@@ -1164,7 +1164,7 @@ send_sw_ht_ndpa_packet(
 	SET_HT_CTRL_CSI_STEERING(pframe + 24, 3);
 	SET_HT_CTRL_NDP_ANNOUNCEMENT(pframe + 24, 1);
 
-	_rtw_memcpy(pframe + 28, action_hdr, 4);
+	memcpy(pframe + 28, action_hdr, 4);
 
 	pattrib->pktlen = 32;
 
@@ -1186,7 +1186,7 @@ send_fw_vht_ndpa_packet(
 	struct _ADAPTER *adapter = dm->adapter;
 	struct xmit_frame *pmgntframe;
 	struct pkt_attrib *pattrib;
-	struct rtw_ieee80211_hdr *pwlanhdr;
+	struct ieee80211_hdr *pwlanhdr;
 	struct xmit_priv *pxmitpriv = &(adapter->xmitpriv);
 	struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
 	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
@@ -1209,7 +1209,7 @@ send_fw_vht_ndpa_packet(
 
 	/* update attribute */
 	pattrib = &pmgntframe->attrib;
-	_rtw_memcpy(pattrib->ra, RA, ETH_ALEN);
+	memcpy(pattrib->ra, RA, ETH_ALEN);
 	update_mgntframe_attrib(adapter, pattrib);
 
 	pattrib->qsel = QSLT_BEACON;
@@ -1220,19 +1220,19 @@ send_fw_vht_ndpa_packet(
 	pattrib->bwmode = BW;
 	pattrib->subtype = WIFI_NDPA;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
-	fctrl = &pwlanhdr->frame_ctl;
+	fctrl =&pwlanhdr->frame_control;
 	*(fctrl) = 0;
 
 	set_frame_sub_type(pframe, WIFI_NDPA);
 
-	_rtw_memcpy(pwlanhdr->addr1, RA, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr2, beamform_entry->my_mac_addr, ETH_ALEN);
+	memcpy(pwlanhdr->addr1, RA, ETH_ALEN);
+	memcpy(pwlanhdr->addr2, beamform_entry->my_mac_addr, ETH_ALEN);
 
 	if (is_supported_5g(pmlmeext->cur_wireless_mode) || is_supported_ht(pmlmeext->cur_wireless_mode))
 		a_sifs_time = 16;
@@ -1256,7 +1256,7 @@ send_fw_vht_ndpa_packet(
 	else
 		beam_info->sounding_sequence++;
 
-	_rtw_memcpy(pframe + 16, &sequence, 1);
+	memcpy(pframe + 16, &sequence, 1);
 
 	if (((pmlmeinfo->state & 0x03) == WIFI_FW_ADHOC_STATE) || ((pmlmeinfo->state & 0x03) == WIFI_FW_AP_STATE))
 		AID = 0;
@@ -1265,7 +1265,7 @@ send_fw_vht_ndpa_packet(
 	sta_info.feedback_type = 0;
 	sta_info.nc_index = 0;
 
-	_rtw_memcpy(pframe + 17, (u8 *)&sta_info, 2);
+	memcpy(pframe + 17, (u8 *)&sta_info, 2);
 
 	pattrib->pktlen = 19;
 
@@ -1287,7 +1287,7 @@ send_sw_vht_ndpa_packet(
 	struct _ADAPTER *adapter = dm->adapter;
 	struct xmit_frame *pmgntframe;
 	struct pkt_attrib *pattrib;
-	struct rtw_ieee80211_hdr *pwlanhdr;
+	struct ieee80211_hdr *pwlanhdr;
 	struct xmit_priv *pxmitpriv = &(adapter->xmitpriv);
 	struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
 	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
@@ -1314,26 +1314,26 @@ send_sw_vht_ndpa_packet(
 
 	/*update attribute*/
 	pattrib = &pmgntframe->attrib;
-	_rtw_memcpy(pattrib->ra, RA, ETH_ALEN);
+	memcpy(pattrib->ra, RA, ETH_ALEN);
 	update_mgntframe_attrib(adapter, pattrib);
 	pattrib->qsel = QSLT_MGNT;
 	pattrib->rate = ndp_tx_rate;
 	pattrib->bwmode = BW;
 	pattrib->subtype = WIFI_NDPA;
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
 
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
-	fctrl = &pwlanhdr->frame_ctl;
+	fctrl =&pwlanhdr->frame_control;
 	*(fctrl) = 0;
 
 	set_frame_sub_type(pframe, WIFI_NDPA);
 
-	_rtw_memcpy(pwlanhdr->addr1, RA, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr2, beamform_entry->my_mac_addr, ETH_ALEN);
+	memcpy(pwlanhdr->addr1, RA, ETH_ALEN);
+	memcpy(pwlanhdr->addr2, beamform_entry->my_mac_addr, ETH_ALEN);
 
 	if (is_supported_5g(pmlmeext->cur_wireless_mode) || is_supported_ht(pmlmeext->cur_wireless_mode))
 		a_sifs_time = 16;
@@ -1357,7 +1357,7 @@ send_sw_vht_ndpa_packet(
 	else
 		beam_info->sounding_sequence++;
 
-	_rtw_memcpy(pframe + 16, &sequence, 1);
+	memcpy(pframe + 16, &sequence, 1);
 	if (((pmlmeinfo->state & 0x03) == WIFI_FW_ADHOC_STATE) || ((pmlmeinfo->state & 0x03) == WIFI_FW_AP_STATE))
 		AID = 0;
 
@@ -1365,7 +1365,7 @@ send_sw_vht_ndpa_packet(
 	ndpa_sta_info.feedback_type = 0;
 	ndpa_sta_info.nc_index = 0;
 
-	_rtw_memcpy(pframe + 17, (u8 *)&ndpa_sta_info, 2);
+	memcpy(pframe + 17, (u8 *)&ndpa_sta_info, 2);
 
 	pattrib->pktlen = 19;
 

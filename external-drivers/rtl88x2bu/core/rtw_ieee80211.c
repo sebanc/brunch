@@ -1273,6 +1273,7 @@ u8 *rtw_get_wps_attr(u8 *wps_ie, uint wps_ielen, u16 target_attr_id , u8 *buf_at
  * @wps_ielen: Length limit from wps_ie
  * @target_attr_id: The attribute ID of WPS attribute to search
  * @buf_content: If not NULL and the WPS attribute is found, WPS attribute content will be copied to the buf starting from buf_content
+ *               If len_content is NULL, only copy one byte.
  * @len_content: If not NULL and the WPS attribute is found, will set to the length of the WPS attribute content
  *
  * Returns: the address of the specific WPS attribute content found, or NULL
@@ -1282,20 +1283,25 @@ u8 *rtw_get_wps_attr_content(u8 *wps_ie, uint wps_ielen, u16 target_attr_id , u8
 	u8 *attr_ptr;
 	u32 attr_len;
 
-	if (len_content)
-		*len_content = 0;
-
 	attr_ptr = rtw_get_wps_attr(wps_ie, wps_ielen, target_attr_id, NULL, &attr_len);
 
 	if (attr_ptr && attr_len) {
-		if (buf_content)
-			_rtw_memcpy(buf_content, attr_ptr + 4, attr_len - 4);
+		if (len_content) {
+			if ((buf_content && (*len_content > (attr_len - 4))) || !buf_content)
+				*len_content = attr_len - 4;
+		}
 
-		if (len_content)
-			*len_content = attr_len - 4;
+		if (len_content && buf_content) {
+			_rtw_memcpy(buf_content, attr_ptr + 4, *len_content);
+		} else if (buf_content) {
+			_rtw_memcpy(buf_content, attr_ptr + 4, 1);
+		}
 
 		return attr_ptr + 4;
 	}
+
+	if (len_content)
+		*len_content = 0;
 
 	return NULL;
 }
@@ -2316,6 +2322,7 @@ u8 *rtw_get_p2p_attr(u8 *p2p_ie, uint p2p_ielen, u8 target_attr_id , u8 *buf_att
  * @p2p_ielen: Length limit from p2p_ie
  * @target_attr_id: The attribute ID of P2P attribute to search
  * @buf_content: If not NULL and the P2P attribute is found, P2P attribute content will be copied to the buf starting from buf_content
+ *               If len_content is NULL, only copy one byte.
  * @len_content: If not NULL and the P2P attribute is found, will set to the length of the P2P attribute content
  *
  * Returns: the address of the specific P2P attribute content found, or NULL
@@ -2325,20 +2332,25 @@ u8 *rtw_get_p2p_attr_content(u8 *p2p_ie, uint p2p_ielen, u8 target_attr_id , u8 
 	u8 *attr_ptr;
 	u32 attr_len;
 
-	if (len_content)
-		*len_content = 0;
-
 	attr_ptr = rtw_get_p2p_attr(p2p_ie, p2p_ielen, target_attr_id, NULL, &attr_len);
 
 	if (attr_ptr && attr_len) {
-		if (buf_content)
-			_rtw_memcpy(buf_content, attr_ptr + 3, attr_len - 3);
+		if (len_content) {
+			if ((buf_content && (*len_content > (attr_len - 3))) || !buf_content)
+				*len_content = attr_len - 3;
+		}
 
-		if (len_content)
-			*len_content = attr_len - 3;
+		if (len_content && buf_content) {
+			_rtw_memcpy(buf_content, attr_ptr + 3, *len_content);
+		} else if (buf_content) {
+			_rtw_memcpy(buf_content, attr_ptr + 3, 1);
+		}
 
 		return attr_ptr + 3;
 	}
+
+	if (len_content)
+		*len_content = 0;
 
 	return NULL;
 }

@@ -26,8 +26,7 @@
 #ifndef __PHYDMRAINFO_H__
 #define __PHYDMRAINFO_H__
 
-/* 2019.12.24 Add ra mask c2h & h2c API*/
-#define RAINFO_VERSION "8.6"
+#define RAINFO_VERSION "8.0"
 
 #define	FORCED_UPDATE_RAMASK_PERIOD	5
 
@@ -40,9 +39,6 @@
 #define	RA_RETRY_DESCEND_NUM	2
 #define	RA_RETRY_LIMIT_LOW	4
 #define	RA_RETRY_LIMIT_HIGH	32
-
-#define PHYDM_IS_LEGACY_RATE(rate) ((rate <= ODM_RATE54M) ? true : false)
-#define PHYDM_IS_CCK_RATE(rate) ((rate <= ODM_RATE11M) ? true : false)
 
 #if (DM_ODM_SUPPORT_TYPE == ODM_AP)
 	#define	FIRST_MACID	1
@@ -110,15 +106,6 @@ enum phydm_rateid_idx {
 	PHYDM_ARFR6_AC_4SS	= 16
 };
 
-enum phydm_qam_order {
-	PHYDM_QAM_CCK	= 0,
-	PHYDM_QAM_BPSK	= 1,
-	PHYDM_QAM_QPSK	= 2,
-	PHYDM_QAM_16QAM	= 3,
-	PHYDM_QAM_64QAM	= 4,
-	PHYDM_QAM_256QAM = 5
-};
-
 #if (RATE_ADAPTIVE_SUPPORT == 1)/* @88E RA */
 
 struct _phydm_txstatistic_ {
@@ -179,9 +166,9 @@ struct _odm_ra_info_ {
 
 
 struct ra_table {
-	#ifdef MU_EX_MACID
-	u8	mu1_rate[MU_EX_MACID];
-	#endif
+	u8	firstconnect;
+	/*@u8	link_tx_rate[ODM_ASSOCIATE_ENTRY_NUM];*/
+	u8	mu1_rate[30];
 	u8	highest_client_tx_order;
 	u16	highest_client_tx_rate_order;
 	u8	power_tracking_flag;
@@ -189,14 +176,9 @@ struct ra_table {
 	u8	ra_ofst_direc; /*RA_offset_direction*/
 	u8	up_ramask_cnt; /*@force update_ra_mask counter*/
 	u8	up_ramask_cnt_tmp; /*@Just for debug, should be removed latter*/
-	u32	rrsr_val_init; /*0x440*/
-	u32	rrsr_val_curr; /*0x440*/
-	boolean dynamic_rrsr_en;
-	u8	ra_trigger_mode; /*0: pkt RA, 1: TBTT RA*/
-	u8	ra_tx_cls_th;	 /*255: auto, xx: in dB*/
 #if 0	/*@CONFIG_RA_DYNAMIC_RTY_LIMIT*/
-	u8	per_rate_retrylimit_20M[PHY_NUM_RATE_IDX];
-	u8	per_rate_retrylimit_40M[PHY_NUM_RATE_IDX];
+	u8	per_rate_retrylimit_20M[ODM_NUM_RATE_IDX];
+	u8	per_rate_retrylimit_40M[ODM_NUM_RATE_IDX];
 	u8	retry_descend_num;
 	u8	retrylimit_low;
 	u8	retrylimit_high;
@@ -204,18 +186,6 @@ struct ra_table {
 	u8	ldpc_thres; /* @if RSSI > ldpc_th => switch from LPDC to BCC */
 	void (*record_ra_info)(void *dm_void, u8 macid,
 			       struct cmn_sta_info *sta, u64 ra_mask);
-	u8	ra_mask_rpt_stamp;
-	u8 	ra_mask_buf[8];
-};
-
-struct ra_mask_rpt_trig {
-	u8			ra_mask_rpt_stamp;
-	u8			macid;
-};
-
-struct ra_mask_rpt {
-	u8			ra_mask_rpt_stamp;
-	u8 			ra_mask_buf[8];
 };
 
 /* @1 ============================================================
@@ -230,10 +200,6 @@ boolean phydm_is_ht_rate(void *dm_void, u8 rate);
 
 boolean phydm_is_vht_rate(void *dm_void, u8 rate);
 
-u8 phydm_legacy_rate_2_spec_rate(void *dm_void, u8 rate);
-
-u8 phydm_rate_2_rate_digit(void *dm_void, u8 rate);
-
 u8 phydm_rate_type_2_num_ss(void *dm_void, enum PDM_RATE_TYPE type);
 
 u8 phydm_rate_to_num_ss(void *dm_void, u8 data_rate);
@@ -244,12 +210,10 @@ void phydm_h2C_debug(void *dm_void, char input[][16], u32 *_used,
 void phydm_ra_debug(void *dm_void, char input[][16], u32 *_used, char *output,
 		    u32 *_out_len);
 
-void phydm_ra_mask_report_h2c_trigger(void *dm_void,
-				      struct ra_mask_rpt_trig *trig_rpt);
-
-void phydm_ra_mask_report_c2h_result(void *dm_void, struct ra_mask_rpt *rpt);
-
 void odm_c2h_ra_para_report_handler(void *dm_void, u8 *cmd_buf, u8 cmd_len);
+
+void phydm_ra_dynamic_retry_count(void *dm_void);
+
 
 void phydm_print_rate(void *dm_void, u8 rate, u32 dbg_component);
 
@@ -259,11 +223,7 @@ void phydm_c2h_ra_report_handler(void *dm_void, u8 *cmd_buf, u8 cmd_len);
 
 u8 phydm_rate_order_compute(void *dm_void, u8 rate_idx);
 
-void phydm_rrsr_set_register(void *dm_void, u32 rrsr_val);
-
 void phydm_ra_info_watchdog(void *dm_void);
-
-void phydm_rrsr_en(void *dm_void, boolean en_rrsr);
 
 void phydm_ra_info_init(void *dm_void);
 
@@ -292,8 +252,6 @@ u8 phydm_get_plcp(void *dm_void, u16 macid);
 
 void phydm_refresh_rate_adaptive_mask(void *dm_void);
 
-u8 phydm_get_rx_stream_num(void *dm_void, enum rf_type type);
-
 u8 phydm_rssi_lv_dec(void *dm_void, u32 rssi, u8 ratr_state);
 
 void odm_ra_post_action_on_assoc(void *dm);
@@ -315,9 +273,4 @@ void phydm_ra_mask_watchdog(void *dm_void);
 void odm_refresh_basic_rate_mask(
 	void *dm_void);
 #endif
-
-#ifdef PHYDM_IC_JGR3_SERIES_SUPPORT
-void phydm_ra_mode_selection(void *dm_void, u8 mode);
-#endif
-
 #endif /*@#ifndef __PHYDMRAINFO_H__*/

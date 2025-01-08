@@ -25,6 +25,7 @@
 #include <sdio_ops_linux.h>
 #endif
 
+
 extern void sdio_set_intf_ops(_adapter *padapter, struct _io_ops *pops);
 void dump_sdio_card_info(void *sel, struct dvobj_priv *dvobj);
 
@@ -32,7 +33,6 @@ u32 sdio_init(struct dvobj_priv *dvobj);
 void sdio_deinit(struct dvobj_priv *dvobj);
 int sdio_alloc_irq(struct dvobj_priv *dvobj);
 void sdio_free_irq(struct dvobj_priv *dvobj);
-u8 sdio_get_num_of_func(struct dvobj_priv *dvobj);
 
 #if 0
 extern void sdio_func1cmd52_read(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *rmem);
@@ -73,7 +73,7 @@ void ClearInterrupt8821AS(PADAPTER padapter);
 #endif /* CONFIG_RTL8821A */
 
 #if defined(CONFIG_WOWLAN) || defined(CONFIG_AP_WOWLAN)
-#if defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8822C)
+#if defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8822B)
 u8 rtw_hal_enable_cpwm2(_adapter *adapter);
 #endif
 extern u8 RecvOnePkt(PADAPTER padapter);

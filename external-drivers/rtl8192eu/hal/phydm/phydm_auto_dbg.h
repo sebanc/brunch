@@ -99,8 +99,6 @@ struct phydm_auto_dbg_struct {
  * 1 ============================================================
  */
 
-void phydm_dbg_port_dump(void *dm_void, u32 *used, char *output, u32 *out_len);
-
 void phydm_auto_dbg_console(
 	void *dm_void,
 	char input[][16],

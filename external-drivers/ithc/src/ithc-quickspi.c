@@ -257,6 +257,14 @@ void ithc_print_acpi_config(struct ithc *ithc, const struct ithc_acpi_config *cf
 		spi_frequency, limit_packet_size, tx_delay, active_ltr, idle_ltr);
 }
 
+static void set_opcode(struct ithc *ithc, size_t i, u8 opcode)
+{
+	writeb(opcode, &ithc->regs->opcode[i].header);
+	writeb(opcode, &ithc->regs->opcode[i].single);
+	writeb(opcode, &ithc->regs->opcode[i].dual);
+	writeb(opcode, &ithc->regs->opcode[i].quad);
+}
+
 static int ithc_quickspi_init_regs(struct ithc *ithc, const struct ithc_acpi_config *cfg)
 {
 	pci_dbg(ithc->pci, "initializing QuickSPI registers\n");
@@ -279,26 +287,47 @@ static int ithc_quickspi_init_regs(struct ithc *ithc, const struct ithc_acpi_con
 	// SPI addresses and opcodes
 	if (cfg->has_input_report_header_address)
 		writel(cfg->input_report_header_address, &ithc->regs->spi_header_addr);
-	if (cfg->has_input_report_body_address)
+	if (cfg->has_input_report_body_address) {
 		writel(cfg->input_report_body_address, &ithc->regs->dma_rx[0].spi_addr);
+		writel(cfg->input_report_body_address, &ithc->regs->dma_rx[1].spi_addr);
+	}
 	if (cfg->has_output_report_body_address)
 		writel(cfg->output_report_body_address, &ithc->regs->dma_tx.spi_addr);
 
-	if (cfg->has_read_opcode) {
-		writeb(cfg->read_opcode, &ithc->regs->read_opcode);
-		writeb(cfg->read_opcode, &ithc->regs->read_opcode_single);
-		writeb(cfg->read_opcode, &ithc->regs->read_opcode_dual);
-		writeb(cfg->read_opcode, &ithc->regs->read_opcode_quad);
+	switch (ithc->pci->device) {
+	// LKF/TGL don't support QuickSPI.
+	// For ADL, opcode layout is RX/TX/unused.
+	case PCI_DEVICE_ID_INTEL_THC_ADL_S_PORT1:
+	case PCI_DEVICE_ID_INTEL_THC_ADL_S_PORT2:
+	case PCI_DEVICE_ID_INTEL_THC_ADL_P_PORT1:
+	case PCI_DEVICE_ID_INTEL_THC_ADL_P_PORT2:
+	case PCI_DEVICE_ID_INTEL_THC_ADL_M_PORT1:
+	case PCI_DEVICE_ID_INTEL_THC_ADL_M_PORT2:
+		if (cfg->has_read_opcode) {
+			set_opcode(ithc, 0, cfg->read_opcode);
+		}
+		if (cfg->has_write_opcode) {
+			set_opcode(ithc, 1, cfg->write_opcode);
+		}
+		break;
+	// For MTL, opcode layout was changed to RX/RX/TX.
+	// (RPL layout is unknown.)
+	default:
+		if (cfg->has_read_opcode) {
+			set_opcode(ithc, 0, cfg->read_opcode);
+			set_opcode(ithc, 1, cfg->read_opcode);
+		}
+		if (cfg->has_write_opcode) {
+			set_opcode(ithc, 2, cfg->write_opcode);
+		}
+		break;
 	}
-	if (cfg->has_write_opcode) {
-		writeb(cfg->write_opcode, &ithc->regs->write_opcode);
-		writeb(cfg->write_opcode, &ithc->regs->write_opcode_single);
-		writeb(cfg->write_opcode, &ithc->regs->write_opcode_dual);
-		writeb(cfg->write_opcode, &ithc->regs->write_opcode_quad);
-	}
+
 	ithc_log_regs(ithc);
 
 	// The rest...
+	bitsl_set(&ithc->regs->dma_rx[0].init_unknown, INIT_UNKNOWN_31);
+
 	bitsl(&ithc->regs->quickspi_config1,
 		QUICKSPI_CONFIG1_UNKNOWN_0(0xff) | QUICKSPI_CONFIG1_UNKNOWN_5(0xff) |
 		QUICKSPI_CONFIG1_UNKNOWN_10(0xff) | QUICKSPI_CONFIG1_UNKNOWN_16(0xffff),

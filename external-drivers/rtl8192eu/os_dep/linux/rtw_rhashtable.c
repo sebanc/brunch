@@ -13,16 +13,13 @@
  *
  *****************************************************************************/
 
-#include <drv_types.h>
+#ifdef CONFIG_RTW_MESH /* for now, only promised for kernel versions we support mesh */
 
-#if defined(CONFIG_RTW_WDS) || defined(CONFIG_RTW_MESH) /* for now, only promised for kernel versions we support mesh */
+#include <drv_types.h>
 
 int rtw_rhashtable_walk_enter(rtw_rhashtable *ht, rtw_rhashtable_iter *iter)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
-	rhashtable_walk_enter((ht), (iter));
-	return 0;
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
 	return rhashtable_walk_init((ht), (iter), GFP_ATOMIC);
 #else
 	/* kernel >= 4.4.0 rhashtable_walk_init use GFP_KERNEL to alloc, spin_lock for assignment */
@@ -73,5 +70,5 @@ void kvfree(const void *addr)
 
 #endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)) */
 
-#endif /* defined(CONFIG_RTW_WDS) || defined(CONFIG_RTW_MESH) */
+#endif /* CONFIG_RTW_MESH */
 

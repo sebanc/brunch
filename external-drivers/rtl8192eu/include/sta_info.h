@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2019 Realtek Corporation.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -21,11 +21,7 @@
 #define NUM_STA MACID_NUM_SW_LIMIT
 
 #ifndef CONFIG_RTW_MACADDR_ACL
-	#ifdef CONFIG_AP_MODE
 	#define CONFIG_RTW_MACADDR_ACL 1
-	#else
-	#define CONFIG_RTW_MACADDR_ACL 0
-	#endif
 #endif
 
 #ifndef CONFIG_RTW_PRE_LINK_STA
@@ -292,7 +288,6 @@ struct sta_info {
 	u8 rm_diag_token;
 #endif /* CONFIG_RTW_80211K */
 
-	systime	resp_nonenc_eapol_key_starttime;
 	uint	ieee8021x_blocked;	/* 0: allowed, 1:blocked */
 	uint	dot118021XPrivacy; /* aes, tkip... */
 	union Keytype	dot11tkiptxmickey;
@@ -300,7 +295,6 @@ struct sta_info {
 	union Keytype	dot118021x_UncstKey;
 	union pn48		dot11txpn;			/* PN48 used for Unicast xmit */
 	union pn48		dot11rxpn;			/* PN48 used for Unicast recv. */
-	ATOMIC_T	keytrack;
 #ifdef CONFIG_RTW_MESH
 	/* peer's GTK, RX only */
 	u8 group_privacy;
@@ -309,7 +303,6 @@ struct sta_info {
 	union pn48 gtk_pn;
 	#ifdef CONFIG_IEEE80211W
 	/* peer's IGTK, RX only */
-	enum security_type dot11wCipher;
 	u8 igtk_bmp;
 	u8 igtk_id;
 	union Keytype igtk;
@@ -364,7 +357,7 @@ struct sta_info {
 
 	/* for A-MPDU Rx reordering buffer control */
 	struct recv_reorder_ctrl recvreorder_ctrl[TID_NUM];
-	ATOMIC_T continual_no_rx_packet[TID_NUM];
+	atomic_t continual_no_rx_packet[TID_NUM];
 	/* for A-MPDU Tx */
 	/* unsigned char		ampdu_txen_bitmap; */
 	u16	BA_starting_seqctrl[16];
@@ -389,10 +382,6 @@ struct sta_info {
 
 	unsigned int expire_to;
 
-	int flags;
-
-	u8 bpairwise_key_installed;
-
 #ifdef CONFIG_AP_MODE
 
 	_list asoc_list;
@@ -403,6 +392,7 @@ struct sta_info {
 	unsigned char chg_txt[128];
 
 	u16 capability;
+	int flags;
 
 	int dot8021xalg;/* 0:disable, 1:psk, 2:802.1x */
 	int wpa_psk;/* 0:disable, bit(0): WPA, bit(1):WPA2 */
@@ -413,6 +403,7 @@ struct sta_info {
 
 	u32 akm_suite_type;
 
+	u8 bpairwise_key_installed;
 #ifdef CONFIG_RTW_80211R
 	u8 ft_pairwise_key_installed;
 #endif
@@ -465,9 +456,9 @@ struct sta_info {
 	u8 op_wfd_mode;
 #endif
 
-#if !defined(CONFIG_ACTIVE_KEEP_ALIVE_CHECK) && defined(CONFIG_80211N_HT)
+#ifdef CONFIG_TX_MCAST2UNI
 	u8 under_exist_checking;
-#endif
+#endif /* CONFIG_TX_MCAST2UNI */
 
 	u8 keep_alive_trycnt;
 
@@ -486,8 +477,6 @@ struct sta_info {
 	u8 nonpeer_mps;
 
 	struct rtw_atlm_param metrics;
-	/* The reference for nexthop_lookup */
-	BOOLEAN alive;
 #endif
 
 #ifdef CONFIG_IOCTL_CFG80211
@@ -512,19 +501,6 @@ struct sta_info {
 #ifdef CONFIG_RTS_FULL_BW
 	bool vendor_8812;
 #endif
-
-#ifdef CONFIG_RTW_TOKEN_BASED_XMIT
-	u8 tbtx_enable;			/* Does this sta_info support & enable TBTX function? */
-//	u8 tbtx_timeslot;		/* This sta_info belong to which time slot.	*/
-#endif
-
-	/*
-	 * Vaiables for queuing TX pkt a short period of time
-	 * to wait something ready.
-	 */
-	u8 tx_q_enable;
-	struct __queue tx_queue;
-	_workitem tx_q_work;
 };
 
 #ifdef CONFIG_RTW_MESH
@@ -672,8 +648,6 @@ struct	sta_priv {
 
 	u32 adhoc_expire_to;
 
-	int rx_chk_limit;
-
 #ifdef CONFIG_AP_MODE
 	_list asoc_list;
 	_list auth_list;
@@ -707,12 +681,7 @@ struct	sta_priv {
 	#if CONFIG_RTW_PRE_LINK_STA
 	struct pre_link_sta_ctl_t pre_link_sta_ctl;
 	#endif
-#ifdef CONFIG_RTW_TOKEN_BASED_XMIT
-	u8 tbtx_asoc_list_cnt;
-	struct sta_info *token_holder[NR_MAXSTA_INSLOT];
-	struct sta_info *last_token_holder;
-	ATOMIC_T nr_token_keeper;
-#endif
+
 #endif /* CONFIG_AP_MODE */
 
 #ifdef CONFIG_ATMEL_RC_PATCH

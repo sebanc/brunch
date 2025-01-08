@@ -1454,7 +1454,7 @@ _phy_lc_calibrate_8192e(
 )
 {
 	u8	tmp_reg, bb_clk;
-	u32	rf_amode = 0, rf_bmode = 0, lc_cal, cnt;
+	u32	rf_amode = 0, rf_bmode = 0, lc_cal;
 	/* Check continuous TX and Packet TX */
 	tmp_reg = odm_read_1byte(dm, 0xd03);
 	if ((tmp_reg & 0x70) != 0)			/*Deal with contisuous TX case*/
@@ -1485,16 +1485,6 @@ _phy_lc_calibrate_8192e(
 	/* 4. Set LC calibration begin	bit15 */
 	odm_set_rf_reg(dm, RF_PATH_A, RF_CHNLBW, MASK12BITS, lc_cal | 0x08000);
 	ODM_delay_ms(100);
-	for (cnt = 0; cnt < 5; cnt++) {
-		if (odm_get_rf_reg(dm, RF_PATH_A, RF_CHNLBW, 0x8000) != 0x1)
-			break;
-		ODM_delay_ms(10);
-	}
-	if (cnt == 5)
-		RF_DBG(dm, DBG_RF_LCK, "LCK time out\n");
-	/*recover channel number*/
-	odm_set_rf_reg(dm, RF_PATH_A, RF_CHNLBW, MASK20BITS, lc_cal);
-
 	/* Restore original situation */
 	odm_write_1byte(dm, 0xce7, bb_clk);
 	if ((tmp_reg & 0x70) != 0) {	/*Deal with contisuous TX case*/
@@ -1762,10 +1752,6 @@ void phy_set_rf_path_switch_8192e(
 {
 #if !(DM_ODM_SUPPORT_TYPE & ODM_AP)
 	HAL_DATA_TYPE	*hal_data = GET_HAL_DATA(adapter);
-#endif
-
-#ifdef DISABLE_BB_RF
-	return;
 #endif
 
 #if !(DM_ODM_SUPPORT_TYPE & ODM_AP)

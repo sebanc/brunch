@@ -38,6 +38,4 @@ void halrf_update_init_rate_work_item_callback(
 	void *context);
 #endif
 
-void halrf_set_pwr_track(void *dm_void, u8 enable);
-
 #endif /*#ifndef __HALRF_POWERTRACKING_H__*/

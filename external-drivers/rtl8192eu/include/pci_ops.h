@@ -106,11 +106,4 @@
 	void rtl8821ce_set_intf_ops(struct _io_ops *pops);
 #endif
 
-#ifdef CONFIG_RTL8822C
-	void rtl8822ce_set_intf_ops(struct _io_ops *pops);
-#endif
-
-#ifdef CONFIG_RTL8814B
-	void rtl8814be_set_intf_ops(struct _io_ops *pops);
-#endif
 #endif

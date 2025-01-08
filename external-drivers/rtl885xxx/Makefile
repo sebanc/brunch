@@ -30,30 +30,24 @@ KEY_FILE ?= MOK.der
 
 obj-m += rtw89core.o
 rtw89core-y +=  core.o \
-		chan.o \
 		mac80211.o \
 		mac.o \
+		mac_be.o \
 		phy.o \
+		phy_be.o \
 		fw.o \
 		cam.o \
 		efuse.o \
+		efuse_be.o \
 		regd.o \
 		sar.o \
-		acpi.o \
 		coex.o \
 		ps.o \
+		chan.o \
 		debug.o \
 		ser.o \
-		wow.o
-
-obj-m += rtw_8852a.o
-rtw_8852a-y := rtw8852a.o \
-		    rtw8852a_table.o \
-		    rtw8852a_rfk.o \
-		    rtw8852a_rfk_table.o
-
-obj-m += rtw_8852ae.o
-rtw_8852ae-y := rtw8852ae.o
+		wow.o \
+		acpi.o
 
 obj-m += rtw_8851b.o
 rtw_8851b-y := rtw8851b.o \
@@ -63,6 +57,15 @@ rtw_8851b-y := rtw8851b.o \
 
 obj-m += rtw_8851be.o
 rtw_8851be-y := rtw8851be.o
+
+obj-m += rtw_8852a.o
+rtw_8852a-y := rtw8852a.o \
+		    rtw8852a_table.o \
+		    rtw8852a_rfk.o \
+		    rtw8852a_rfk_table.o
+
+obj-m += rtw_8852ae.o
+rtw_8852ae-y := rtw8852ae.o
 
 obj-m += rtw_8852b.o
 rtw_8852b-y := rtw8852b.o \
@@ -82,11 +85,16 @@ rtw_8852c-y := rtw8852c.o \
 obj-m += rtw_8852ce.o
 rtw_8852ce-y := rtw8852ce.o
 
-#obj-m += rtw89debug.o
-#rtw89debug-y := debug.o
+obj-m += rtw_8922a.o 
+rtw_8922a-y := rtw8922a.o \
+	       rtw8922a_rfk.o
+
+obj-m += rtw_8922ae.o
+rtw_8922ae-y := rtw8922ae.o
 
 obj-m += rtw89pci.o
-rtw89pci-y := pci.o
+rtw89pci-y := pci.o \
+	      pci_be.o
 
 ccflags-y += -D__CHECK_ENDIAN__
 
@@ -133,6 +141,8 @@ else
 endif
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89core.ko
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw89pci.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8851b.ko
+	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8851be.ko
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852a.ko
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852ae.ko
 	@$(KSRC)/scripts/sign-file sha256 MOK.priv MOK.der rtw_8852b.ko

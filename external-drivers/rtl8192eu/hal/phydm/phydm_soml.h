@@ -44,9 +44,6 @@
 #define HT_ORDER_TYPE		3
 #define VHT_ORDER_TYPE		4
 
-#define CRC_FAIL	1
-#define CRC_OK		0
-
 #if 0
 #define CFO_QPSK_TH			20
 #define CFO_QAM16_TH		20
@@ -67,9 +64,8 @@
 #ifdef CONFIG_ADAPTIVE_SOML
 
 struct adaptive_soml {
-	u32			rvrt_val; /*all rvrt_val for pause API must set to u32*/
+	u8			rvrt_val;
 	boolean			is_soml_method_enable;
-	boolean			get_stats;
 	u8			soml_on_off;
 	u8			soml_state_cnt;
 	u8			soml_delay_time;
@@ -98,14 +94,6 @@ struct adaptive_soml {
 	u16			pre_ht_cnt[HT_RATE_IDX];
 	u16			ht_cnt_on[HT_RATE_IDX];
 	u16			ht_cnt_off[HT_RATE_IDX];
-	u16			ht_crc_ok_cnt_on[HT_RATE_IDX];
-	u16			ht_crc_fail_cnt_on[HT_RATE_IDX];
-	u16			ht_crc_ok_cnt_off[HT_RATE_IDX];
-	u16			ht_crc_fail_cnt_off[HT_RATE_IDX];
-	u16			vht_crc_ok_cnt_on[VHT_RATE_IDX];
-	u16			vht_crc_fail_cnt_on[VHT_RATE_IDX];
-	u16			vht_crc_ok_cnt_off[VHT_RATE_IDX];
-	u16			vht_crc_fail_cnt_off[VHT_RATE_IDX];
 
 	u16			vht_cnt[VHT_RATE_IDX];
 	u16			pre_vht_cnt[VHT_RATE_IDX];
@@ -177,8 +165,6 @@ void phydm_adsl(void *dm_void);
 void phydm_adaptive_soml_reset(void *dm_void);
 
 void phydm_set_adsl_val(void *dm_void, u32 *val_buf, u8 val_len);
-
-void phydm_soml_crc_acq(void *dm_void, u8 rate_id, boolean crc32, u32 length);
 
 void phydm_soml_bytes_acq(void *dm_void, u8 rate_id, u32 length);
 

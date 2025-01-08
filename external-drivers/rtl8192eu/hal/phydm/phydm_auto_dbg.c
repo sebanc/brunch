@@ -64,7 +64,7 @@ void phydm_auto_check_hang_engine_n(
 	struct n_dbgport_803 dbgport_803 = {0};
 	u32 value32_tmp = 0, value32_tmp_2 = 0;
 	u8 i;
-	u32 curr_dbg_port_val[DBGPORT_CHK_NUM] = {0, 0, 0, 0, 0, 0};
+	u32 curr_dbg_port_val[DBGPORT_CHK_NUM];
 	u16 curr_ofdm_t_cnt;
 	u16 curr_ofdm_r_cnt;
 	u16 curr_cck_t_cnt;
@@ -564,7 +564,7 @@ void phydm_dbg_port_dump_jgr3(void *dm_void, u32 *_used, char *output,
 	struct dm_struct *dm = (struct dm_struct *)dm_void;
 	u32 used = *_used;
 	u32 out_len = *_out_len;
-	/*u32 dbg_port_idx_all[3] = {0x000, 0x001, 0x002};*/
+	u32 dbg_port_idx_all[3] = {0x000, 0x001, 0x002};
 	u32 val = 0;
 	u32 dbg_port_idx = 0;
 	u32 i = 0;
@@ -572,10 +572,9 @@ void phydm_dbg_port_dump_jgr3(void *dm_void, u32 *_used, char *output,
 	if (!(dm->support_ic_type & ODM_IC_JGR3_SERIES))
 		return;
 
-	PDM_VAST_SNPF(out_len, used, output + used, out_len - used,
-		      "%-17s = %s\n", "DbgPort index", "Value");
+	PDM_SNPF(out_len, used, output + used, out_len - used,
+		 "%-16s = %s\n", "DbgPort index", "Value");
 
-#if 0
 	/*0x000/0x001/0x002*/
 	for (i = 0; i < 3; i++) {
 		dbg_port_idx = dbg_port_idx_all[i];
@@ -586,13 +585,13 @@ void phydm_dbg_port_dump_jgr3(void *dm_void, u32 *_used, char *output,
 			phydm_release_bb_dbg_port(dm);
 		}
 	}
-#endif
-	for (dbg_port_idx = 0x0; dbg_port_idx <= 0xfff; dbg_port_idx++) {
+
+	/*0x3a0/0x3a1/.../0x3ab/0x3ac*/
+	for (dbg_port_idx = 0x3a0; dbg_port_idx <= 0x3ac; dbg_port_idx++) {
 		if (phydm_set_bb_dbg_port(dm, DBGPORT_PRI_3, dbg_port_idx)) {
 			val = phydm_get_bb_dbg_port_val(dm);
-			PDM_VAST_SNPF(out_len, used, output + used,
-				      out_len - used,
-				      "0x%-15x = 0x%x\n", dbg_port_idx, val);
+			PDM_SNPF(out_len, used, output + used, out_len - used,
+				 "0x%-15x = 0x%x\n", dbg_port_idx, val);
 			phydm_release_bb_dbg_port(dm);
 		}
 	}
@@ -600,42 +599,6 @@ void phydm_dbg_port_dump_jgr3(void *dm_void, u32 *_used, char *output,
 	*_out_len = out_len;
 }
 #endif
-
-void phydm_dbg_port_dump(void *dm_void, u32 *_used, char *output, u32 *_out_len)
-{
-	struct dm_struct *dm = (struct dm_struct *)dm_void;
-	u32 used = *_used;
-	u32 out_len = *_out_len;
-
-	PDM_VAST_SNPF(out_len, used, output + used, out_len - used,
-		      "------ BB debug port start ------\n");
-
-	switch (dm->ic_ip_series) {
-	#ifdef PHYDM_IC_JGR3_SERIES_SUPPORT
-	case PHYDM_IC_JGR3:
-		phydm_dbg_port_dump_jgr3(dm, &used, output, &out_len);
-		break;
-	#endif
-
-	#if (ODM_IC_11AC_SERIES_SUPPORT == 1)
-	case PHYDM_IC_AC:
-		phydm_dbg_port_dump_ac(dm, &used, output, &out_len);
-		break;
-	#endif
-
-	#if (ODM_IC_11N_SERIES_SUPPORT == 1)
-	case PHYDM_IC_N:
-		phydm_dbg_port_dump_n(dm, &used, output, &out_len);
-		break;
-	#endif
-
-	default:
-		break;
-	}
-	*_used = used;
-	*_out_len = out_len;
-}
-
 void phydm_auto_dbg_console(
 	void *dm_void,
 	char input[][16],
@@ -658,7 +621,32 @@ void phydm_auto_dbg_console(
 	} else if (var1[0] == 1) {
 		PHYDM_SSCANF(input[2], DCMD_DECIMAL, &var1[1]);
 		if (var1[1] == 1) {
-			phydm_dbg_port_dump(dm, &used, output, &out_len);
+			switch (dm->ic_ip_series) {
+			#ifdef PHYDM_IC_JGR3_SERIES_SUPPORT
+			case PHYDM_IC_JGR3:
+				phydm_dbg_port_dump_jgr3(dm, &used, output,
+							 &out_len);
+				break;
+			#endif
+
+			#if (ODM_IC_11AC_SERIES_SUPPORT == 1)
+			case PHYDM_IC_AC:
+				phydm_dbg_port_dump_ac(dm, &used, output,
+						       &out_len);
+				break;
+			#endif
+
+			#if (ODM_IC_11N_SERIES_SUPPORT == 1)
+			case PHYDM_IC_N:
+				phydm_dbg_port_dump_n(dm, &used, output,
+						      &out_len);
+				break;
+			#endif
+
+			default:
+				break;
+
+			}
 		} else if (var1[1] == 2) {
 			if (dm->support_ic_type & ODM_IC_11AC_SERIES) {
 				PDM_SNPF(out_len, used, output + used,
@@ -715,7 +703,7 @@ void phydm_auto_dbg_engine_init(void *dm_void)
 	u16 dbg_port_table[DBGPORT_CHK_NUM] = {0x0, 0x803, 0x208, 0xab0,
 					       0xab1, 0xab2};
 
-	PHYDM_DBG(dm, ODM_COMP_API, "%s ======>\n", __func__);
+	PHYDM_DBG(dm, ODM_COMP_API, "%s ======>n", __func__);
 
 	odm_move_memory(dm, &atd_t->dbg_port_table[0],
 			&dbg_port_table[0], (DBGPORT_CHK_NUM * 2));

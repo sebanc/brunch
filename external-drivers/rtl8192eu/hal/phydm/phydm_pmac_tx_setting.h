@@ -26,29 +26,34 @@
 #ifndef __PHYDM_PMAC_TX_SETTING_H__
 #define __PHYDM_PMAC_TX_SETTING_H__
 
-/*2019.08.02 Modify pmac_tx echo cmd to prevent from hang*/
-#define PMAC_TX_SETTING_VERSION "2.0"
+#define PMAC_TX_SETTING_VERSION "1.0"
 
-/* 1 ============================================================
+/* @1 ============================================================
  * 1  Definition
  * 1 ============================================================
  */
-
-/* 1 ============================================================
+#define RANDOM_BY_PN32 0x12
+/* @1 ============================================================
  * 1  structure
  * 1 ============================================================
  */
 struct phydm_pmac_info {
-	u8 en_pmac_tx:1; /*0: disable pmac 1: enable pmac */
-	u8 mode:3; /*0: Packet TX 3:Continuous TX */
-	u8 tx_rate; /*should be HW rate*/
+	u8 en_pmac_tx:1; /*@ disable pmac 1: enable pmac */
+	u8 mode:3; /*@ 0: Packet TX 3:Continuous TX */
+	/* @u8 Ntx:4; */
+	u8 tx_rate; /* @should be HW rate*/
+	/* @u8 TX_RATE_HEX; */
 	u8 tx_sc;
+	/* @u8 bSGI:1; */
 	u8 is_short_preamble:1;
+	/* @u8 bSTBC:1; */
+	/* @u8 bLDPC:1; */
 	u8 ndp_sound:1;
-	u8 bw:3; /* 0:20 1:40 2:80Mhz */
-	u8 m_stbc; /* bSTBC + 1 for WIN/CE, bSTBC for others*/
+	u8 bw:3; /* @0:20 1:40 2:80Mhz */
+	u8 m_stbc; /* @bSTBC + 1 */
 	u16 packet_period;
 	u32 packet_count;
+	/* @u32 PacketLength; */
 	u8 packet_pattern;
 	u16 sfd;
 	u8 signal_field;
@@ -61,6 +66,7 @@ struct phydm_pmac_info {
 	u8 vht_sig_b[4];
 	u8 vht_sig_b_crc;
 	u8 vht_delimiter[4];
+	/* @u8 mac_addr[6]; */
 };
 
 struct phydm_pmac_tx {
@@ -71,9 +77,10 @@ struct phydm_pmac_tx {
 	boolean cck_cont_tx;
 	boolean ofdm_cont_tx;
 	u8 path;
+	u32 tx_scailing;
 };
 
-/* 1 ============================================================
+/* @1 ============================================================
  * 1  enumeration
  * 1 ============================================================
  */
@@ -87,10 +94,45 @@ enum phydm_pmac_mode {
 	CCK_CARRIER_SIPPRESSION_TX
 };
 
-/* 1 ============================================================
+/* @1 ============================================================
  * 1  function prototype
  * 1 ============================================================
  */
+#ifdef PHYDM_IC_JGR3_SERIES_SUPPORT
+void phydm_start_cck_cont_tx_jgr3(void *dm_void,
+				  struct phydm_pmac_info *tx_info);
+
+void phydm_stop_cck_cont_tx_jgr3(void *dm_void);
+
+void phydm_start_ofdm_cont_tx_jgr3(void *dm_void);
+
+void phydm_stop_ofdm_cont_tx_jgr3(void *dm_void);
+
+void phydm_set_single_tone_jgr3(void *dm_void, boolean is_single_tone,
+				boolean en_pmac_tx, u8 path);
+
+void phydm_stop_pmac_tx_jgr3(void *dm_void, struct phydm_pmac_info *tx_info);
+
+void phydm_set_mac_phy_txinfo_jgr3(void *dm_void,
+				   struct phydm_pmac_info *tx_info);
+
+
+void phydm_set_sig_jgr3(void *dm_void, struct phydm_pmac_info *tx_info);
+
+void phydm_set_cck_preamble_hdr_jgr3(void *dm_void,
+				     struct phydm_pmac_info *tx_info);
+
+void phydm_set_mode_jgr3(void *dm_void, struct phydm_pmac_info *tx_info,
+			 enum phydm_pmac_mode mode);
+
+void phydm_set_pmac_txon_jgr3(void *dm_void, struct phydm_pmac_info *tx_info);
+
+void phydm_set_pmac_tx_jgr3(void *dm_void, struct phydm_pmac_info *tx_info,
+			    enum rf_path mpt_rf_path);
+
+void phydm_set_tmac_tx_jgr3(void *dm_void);
+#endif
+
 void phydm_start_cck_cont_tx(void *dm_void, struct phydm_pmac_info *tx_info);
 
 void phydm_stop_cck_cont_tx(void *dm_void);
@@ -99,11 +141,12 @@ void phydm_start_ofdm_cont_tx(void *dm_void);
 
 void phydm_stop_ofdm_cont_tx(void *dm_void);
 
+void phydm_set_single_tone(void *dm_void, boolean is_single_tone,
+			   boolean en_pmac_tx, u8 path);
+
 void phydm_set_pmac_tx(void *dm_void, struct phydm_pmac_info *tx_info,
 		       enum rf_path mpt_rf_path);
 
 void phydm_set_tmac_tx(void *dm_void);
 
-void phydm_pmac_tx_dbg(void *dm_void, char input[][16], u32 *_used,
-		       char *output, u32 *_out_len);
 #endif

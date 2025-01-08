@@ -19,17 +19,10 @@
 #include <hal_data.h>
 
 /* Define the ICs that support wifi only cfg in coex. codes */
-#if defined(CONFIG_RTL8723B) || defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C) || defined(CONFIG_RTL8822C) || defined(CONFIG_RTL8814B)
+#if defined(CONFIG_RTL8723B) || defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C)
 #define CONFIG_BTCOEX_SUPPORT_WIFI_ONLY_CFG 1
 #else
 #define CONFIG_BTCOEX_SUPPORT_WIFI_ONLY_CFG 0
-#endif
-
-/* Define the ICs that support hal btc common file structure */
-#if defined(CONFIG_RTL8822C) || (defined(CONFIG_RTL8192F) && defined(CONFIG_BT_COEXIST))
-#define CONFIG_BTCOEX_SUPPORT_BTC_CMN 1
-#else
-#define CONFIG_BTCOEX_SUPPORT_BTC_CMN 0
 #endif
 
 #if (CONFIG_BTCOEX_SUPPORT_WIFI_ONLY_CFG == 1)
@@ -56,20 +49,20 @@ struct wifi_only_haldata {
 };
 
 struct wifi_only_cfg {
-	void *Adapter;
-	struct wifi_only_haldata	haldata_info;
+	PVOID						Adapter;
+	struct	wifi_only_haldata		haldata_info;
 	WIFIONLY_CHIP_INTERFACE	chip_interface;
 };
 
-void halwifionly_write1byte(void *pwifionlyContext, u32 RegAddr, u8 Data);
-void halwifionly_write2byte(void *pwifionlyContext, u32 RegAddr, u16 Data);
-void halwifionly_write4byte(void *pwifionlyContext, u32 RegAddr, u32 Data);
-u8 halwifionly_read1byte(void *pwifionlyContext, u32 RegAddr);
-u16 halwifionly_read2byte(void *pwifionlyContext, u32 RegAddr);
-u32 halwifionly_read4byte(void *pwifionlyContext, u32 RegAddr);
-void halwifionly_bitmaskwrite1byte(void *pwifionlyContext, u32 regAddr, u8 bitMask, u8 data);
-void halwifionly_phy_set_rf_reg(void *pwifionlyContext, enum rf_path eRFPath, u32 RegAddr, u32 BitMask, u32 Data);
-void halwifionly_phy_set_bb_reg(void *pwifionlyContext, u32 RegAddr, u32 BitMask, u32 Data);
+void halwifionly_write1byte(PVOID pwifionlyContext, u32 RegAddr, u8 Data);
+void halwifionly_write2byte(PVOID pwifionlyContext, u32 RegAddr, u16 Data);
+void halwifionly_write4byte(PVOID pwifionlyContext, u32 RegAddr, u32 Data);
+u8 halwifionly_read1byte(PVOID pwifionlyContext, u32 RegAddr);
+u16 halwifionly_read2byte(PVOID pwifionlyContext, u32 RegAddr);
+u32 halwifionly_read4byte(PVOID pwifionlyContext, u32 RegAddr);
+void halwifionly_bitmaskwrite1byte(PVOID pwifionlyContext, u32 regAddr, u8 bitMask, u8 data);
+void halwifionly_phy_set_rf_reg(PVOID pwifionlyContext, enum rf_path eRFPath, u32 RegAddr, u32 BitMask, u32 Data);
+void halwifionly_phy_set_bb_reg(PVOID pwifionlyContext, u32 RegAddr, u32 BitMask, u32 Data);
 void hal_btcoex_wifionly_switchband_notify(PADAPTER padapter);
 void hal_btcoex_wifionly_scan_notify(PADAPTER padapter);
 void hal_btcoex_wifionly_connect_notify(PADAPTER padapter);

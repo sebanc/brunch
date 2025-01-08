@@ -38,7 +38,7 @@ void rtl8192e_sreset_xmit_status_check(_adapter *padapter)
 	/* total xmit irp = 4 */
 	/* RTW_INFO("==>%s free_xmitbuf_cnt(%d),txirp_cnt(%d)\n",__FUNCTION__,pxmitpriv->free_xmitbuf_cnt,pxmitpriv->txirp_cnt); */
 	/* if(pxmitpriv->txirp_cnt == NR_XMITBUFF+1) */
-	current_time = rtw_get_current_time();
+	current_time = jiffies;
 
 	if (0 == pxmitpriv->free_xmitbuf_cnt || 0 == pxmitpriv->free_xmit_extbuf_cnt) {
 
@@ -50,11 +50,15 @@ void rtl8192e_sreset_xmit_status_check(_adapter *padapter)
 			else {
 				diff_time = rtw_get_passing_time_ms(psrtpriv->last_tx_complete_time);
 				if (diff_time > 4000) {
-					/* padapter->Wifi_Error_Status = WIFI_TX_HANG; */
-					RTW_INFO("%s tx hang %s\n", __FUNCTION__,
-						(rtw_odm_adaptivity_needed(padapter)) ? "ODM_BB_ADAPTIVITY" : "");
+					u32 ability = 0;
 
-					if (!rtw_odm_adaptivity_needed(padapter))
+					/* padapter->Wifi_Error_Status = WIFI_TX_HANG; */
+					ability = rtw_phydm_ability_get(padapter);
+
+					RTW_INFO("%s tx hang %s\n", __FUNCTION__,
+						(ability & ODM_BB_ADAPTIVITY) ? "ODM_BB_ADAPTIVITY" : "");
+
+					if (!(ability & ODM_BB_ADAPTIVITY))
 						rtw_hal_sreset_reset(padapter);
 				}
 			}

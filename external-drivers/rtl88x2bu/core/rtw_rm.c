@@ -36,6 +36,20 @@ u8 rm_post_event_hdl(_adapter *padapter, u8 *pbuf)
 	return H2C_SUCCESS;
 }
 
+void rm_update_cap(u8 *frame_head, _adapter *pa, u32 pktlen, int offset)
+{
+#ifdef CONFIG_RTW_80211K
+	u8 *res;
+	sint len;
+
+	res = rtw_get_ie(frame_head + offset, _EID_RRM_EN_CAP_IE_, &len,
+			 pktlen - offset);
+	if (res != NULL)
+		_rtw_memcpy((void *)pa->rmpriv.rm_en_cap_def, (res + 2),
+			    MIN(len, sizeof(pa->rmpriv.rm_en_cap_def)));
+#endif
+}
+
 #ifdef CONFIG_RTW_80211K
 struct cmd_meas_type_ {
 	u8 id;
@@ -528,13 +542,13 @@ static int rm_parse_bcn_req_s_elem(struct rm_obj *prm, u8 *pbody, int req_len)
 			RTW_INFO("DBG set ssid to %s\n",DBG_BCN_REQ_SSID_NAME);
 			i = strlen(DBG_BCN_REQ_SSID_NAME);
 			prm->q.opt.bcn.ssid.SsidLength = i;
-			_rtw_memcpy(&(prm->q.opt.bcn.ssid.Ssid),
-				DBG_BCN_REQ_SSID_NAME, i);
+			_rtw_memcpy(&(prm->q.opt.bcn.ssid.Ssid), DBG_BCN_REQ_SSID_NAME,
+				MIN(i, sizeof(prm->q.opt.bcn.ssid.Ssid)-1));
 
 #else /* original */
 			prm->q.opt.bcn.ssid.SsidLength = pbody[p+1];
-			_rtw_memcpy(&(prm->q.opt.bcn.ssid.Ssid),
-				&pbody[p+2], pbody[p+1]);
+			_rtw_memcpy(&(prm->q.opt.bcn.ssid.Ssid), &pbody[p+2],
+				MIN(pbody[p+1], sizeof(prm->q.opt.bcn.ssid.Ssid)-1));
 #endif
 #endif
 			RTW_INFO("RM: bcn_req_ssid=%s\n",
@@ -2194,8 +2208,9 @@ void rtw_ap_parse_sta_rm_en_cap(_adapter *padapter,
 	if (elem->rm_en_cap) {
 		RTW_INFO("assoc.rm_en_cap="RM_CAP_FMT"\n",
 			RM_CAP_ARG(elem->rm_en_cap));
-		_rtw_memcpy(psta->rm_en_cap,
-			(elem->rm_en_cap), elem->rm_en_cap_len);
+
+		_rtw_memcpy(psta->rm_en_cap, (elem->rm_en_cap),
+			MIN(elem->rm_en_cap_len, sizeof(psta->rm_en_cap)));
 	}
 }
 
@@ -2203,7 +2218,8 @@ void RM_IE_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE)
 {
 	int i;
 
-	_rtw_memcpy(&padapter->rmpriv.rm_en_cap_assoc, pIE->data, pIE->Length);
+	_rtw_memcpy(&padapter->rmpriv.rm_en_cap_assoc, pIE->data,
+		    MIN(pIE->Length, sizeof(padapter->rmpriv.rm_en_cap_assoc)));
 	RTW_INFO("assoc.rm_en_cap="RM_CAP_FMT"\n", RM_CAP_ARG(pIE->data));
 }
 

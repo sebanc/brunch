@@ -2227,11 +2227,7 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len)
 	}
 	psecuritypriv->mfp_opt = mfp_opt;
 
-#ifdef CONFIG_RTW_80211K
-	/* RRM */
-	update_rm_cap(pbuf, padapter, len, _BEACON_IE_OFFSET_);
-
-#endif /* CONFIG_RTW_80211K */
+	rm_update_cap(pbuf, padapter, len, _BEACON_IE_OFFSET_);
 
 	/* wmm */
 	ie_len = 0;

@@ -22,10 +22,10 @@
 * OverView:	Get shifted position of the BitMask
 *
 * Input:
-*			u32		BitMask,
+*			u4Byte		BitMask,
 *
 * Output:	none
-* Return:		u32		Return the shift bit bit position of the mask
+* Return:		u4Byte		Return the shift bit bit position of the mask
 */
 u32
 PHY_CalculateBitShift(
@@ -80,21 +80,21 @@ static RF_SHADOW_T RF_Shadow[RF6052_MAX_PATH][RF6052_MAX_REG];
  *---------------------------------------------------------------------------*/
 u32
 PHY_RFShadowRead(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset)
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset)
 {
 	return	RF_Shadow[eRFPath][Offset].Value;
 
 }	/* PHY_RFShadowRead */
 
 
-void
+VOID
 PHY_RFShadowWrite(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset,
-		u32				Data)
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset,
+	IN	u32				Data)
 {
 	RF_Shadow[eRFPath][Offset].Value = (Data & bRFRegOffsetMask);
 	RF_Shadow[eRFPath][Offset].Driver_Write = _TRUE;
@@ -104,9 +104,9 @@ PHY_RFShadowWrite(
 
 BOOLEAN
 PHY_RFShadowCompare(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset)
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset)
 {
 	u32	reg;
 	/* Check if we need to check the register */
@@ -123,11 +123,11 @@ PHY_RFShadowCompare(
 }	/* PHY_RFShadowCompare */
 
 
-void
+VOID
 PHY_RFShadowRecorver(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset)
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset)
 {
 	/* Check if the address is error */
 	if (RF_Shadow[eRFPath][Offset].ErrorOrNot == _TRUE) {
@@ -141,9 +141,9 @@ PHY_RFShadowRecorver(
 }	/* PHY_RFShadowRecorver */
 
 
-void
+VOID
 PHY_RFShadowCompareAll(
-		PADAPTER			Adapter)
+	IN	PADAPTER			Adapter)
 {
 	enum rf_path	eRFPath = RF_PATH_A;
 	u32		Offset = 0, maxReg = GET_RF6052_REAL_MAX_REG(Adapter);
@@ -156,9 +156,9 @@ PHY_RFShadowCompareAll(
 }	/* PHY_RFShadowCompareAll */
 
 
-void
+VOID
 PHY_RFShadowRecorverAll(
-		PADAPTER			Adapter)
+	IN	PADAPTER			Adapter)
 {
 	enum rf_path		eRFPath = RF_PATH_A;
 	u32		Offset = 0, maxReg = GET_RF6052_REAL_MAX_REG(Adapter);
@@ -171,12 +171,12 @@ PHY_RFShadowRecorverAll(
 }	/* PHY_RFShadowRecorverAll */
 
 
-void
+VOID
 PHY_RFShadowCompareFlagSet(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset,
-		u8				Type)
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset,
+	IN	u8				Type)
 {
 	/* Set True or False!!! */
 	RF_Shadow[eRFPath][Offset].Compare = Type;
@@ -184,12 +184,12 @@ PHY_RFShadowCompareFlagSet(
 }	/* PHY_RFShadowCompareFlagSet */
 
 
-void
+VOID
 PHY_RFShadowRecorverFlagSet(
-		PADAPTER		Adapter,
-		enum rf_path		eRFPath,
-		u32				Offset,
-		u8				Type)
+	IN	PADAPTER		Adapter,
+	IN	enum rf_path		eRFPath,
+	IN	u32				Offset,
+	IN	u8				Type)
 {
 	/* Set True or False!!! */
 	RF_Shadow[eRFPath][Offset].Recorver = Type;
@@ -197,9 +197,9 @@ PHY_RFShadowRecorverFlagSet(
 }	/* PHY_RFShadowRecorverFlagSet */
 
 
-void
+VOID
 PHY_RFShadowCompareFlagSetAll(
-		PADAPTER			Adapter)
+	IN	PADAPTER			Adapter)
 {
 	enum rf_path	eRFPath = RF_PATH_A;
 	u32		Offset = 0, maxReg = GET_RF6052_REAL_MAX_REG(Adapter);
@@ -217,9 +217,9 @@ PHY_RFShadowCompareFlagSetAll(
 }	/* PHY_RFShadowCompareFlagSetAll */
 
 
-void
+VOID
 PHY_RFShadowRecorverFlagSetAll(
-		PADAPTER			Adapter)
+	IN	PADAPTER			Adapter)
 {
 	enum rf_path		eRFPath = RF_PATH_A;
 	u32		Offset = 0, maxReg = GET_RF6052_REAL_MAX_REG(Adapter);
@@ -236,9 +236,9 @@ PHY_RFShadowRecorverFlagSetAll(
 
 }	/* PHY_RFShadowCompareFlagSetAll */
 
-void
+VOID
 PHY_RFShadowRefresh(
-		PADAPTER			Adapter)
+	IN	PADAPTER			Adapter)
 {
 	enum rf_path		eRFPath = RF_PATH_A;
 	u32		Offset = 0, maxReg = GET_RF6052_REAL_MAX_REG(Adapter);

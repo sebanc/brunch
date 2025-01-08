@@ -139,7 +139,6 @@ int rtw_os_alloc_recvframe(_adapter *padapter, union recv_frame *precvframe, u8 
 
 		precvframe->u.hdr.pkt = rtw_skb_clone(pskb);
 		if (precvframe->u.hdr.pkt) {
-			RTW_INFO("%s: rtw_skb_clone success, RX throughput may be low!\n", __FUNCTION__);
 			precvframe->u.hdr.pkt->dev = padapter->pnetdev;
 			precvframe->u.hdr.rx_head = precvframe->u.hdr.rx_data = precvframe->u.hdr.rx_tail = pdata;
 			precvframe->u.hdr.rx_end =  pdata + alloc_sz;

@@ -287,7 +287,9 @@
 
 void rtl8188f_update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem);
 void rtl8188f_fill_fake_txdesc(PADAPTER padapter, u8 *pDesc, u32 BufferLen, u8 IsPsPoll, u8 IsBTQosNull, u8 bDataFrame);
+#if defined(CONFIG_CONCURRENT_MODE)
 void fill_txdesc_force_bmc_camid(struct pkt_attrib *pattrib, u8 *ptxdesc);
+#endif
 
 #if defined(CONFIG_SDIO_HCI) || defined(CONFIG_GSPI_HCI)
 s32 rtl8188fs_init_xmit_priv(PADAPTER padapter);

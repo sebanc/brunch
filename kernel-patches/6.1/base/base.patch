@@ -35829,9 +35829,9 @@ diff -ruN a/kernel/fork.c b/kernel/fork.c
 --- a/kernel/fork.c	2023-01-24 07:24:44.000000000 +0100
 +++ b/kernel/fork.c	2023-01-30 08:33:14.000000000 +0100
 @@ -97,6 +97,7 @@
- #include <linux/scs.h>
  #include <linux/io_uring.h>
  #include <linux/bpf.h>
+ #include <linux/tick.h>
 +#include <linux/cpufreq_times.h>
  
  #include <asm/pgalloc.h>

@@ -26,7 +26,7 @@
 		#else
 			#ifdef CONFIG_PLATFORM_MSTAR
 				#define MAX_RECVBUF_SZ (8192) /* 8K */
-				#elif defined(CONFIG_PLATFORM_HISILICON)
+			#elif defined(CONFIG_PLATFORM_HISILICON)
 				#define MAX_RECVBUF_SZ (16384) /* 16k */
 			#else
 				#define MAX_RECVBUF_SZ (15360) /* 15k < 16k */

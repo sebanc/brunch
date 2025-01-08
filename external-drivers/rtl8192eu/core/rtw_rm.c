@@ -15,10 +15,7 @@
 
 #include <drv_types.h>
 #include <hal_data.h>
-#ifdef CONFIG_RTW_80211K
 #include "rtw_rm_fsm.h"
-#include "rtw_rm_util.h"
-#endif
 
 #define pstr(s) s+strlen(s)
 
@@ -34,6 +31,19 @@ u8 rm_post_event_hdl(_adapter *padapter, u8 *pbuf)
 }
 
 #ifdef CONFIG_RTW_80211K
+
+/* 802.11-2012 Table E-1 Operationg classes in United States */
+static RT_OPERATING_CLASS RTW_OP_CLASS_US[] = {
+	/* 0, OP_CLASS_NULL */	{  0,  0, {}},
+	/* 1, OP_CLASS_1 */	{115,  4, {36, 40, 44, 48}},
+	/* 2, OP_CLASS_2 */	{118,  4, {52, 56, 60, 64}},
+	/* 3, OP_CLASS_3 */	{124,  4, {149, 153, 157, 161}},
+	/* 4, OP_CLASS_4 */	{121, 11, {100, 104, 108, 112, 116, 120, 124,
+						128, 132, 136, 140}},
+	/* 5, OP_CLASS_5 */	{125,  5, {149, 153, 157, 161, 165}},
+	/* 6, OP_CLASS_12 */	{ 81, 11, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}}
+};
+
 struct cmd_meas_type_ {
 	u8 id;
 	char *name;
@@ -188,6 +198,74 @@ int rm_en_cap_chk_and_set(struct rm_obj *prm, enum rm_cap_en en)
 	return _SUCCESS;
 }
 
+static u8 rm_get_oper_class_via_ch(u8 ch)
+{
+	int i,j,sz;
+
+
+	sz = sizeof(RTW_OP_CLASS_US)/sizeof(struct _RT_OPERATING_CLASS);
+
+	for (i = 0; i < sz; i++) {
+		for (j = 0; j < RTW_OP_CLASS_US[i].Len; j++) {
+			if ( ch == RTW_OP_CLASS_US[i].Channel[j]) {
+				RTW_INFO("RM: ch %u in oper_calss %u\n",
+					ch, RTW_OP_CLASS_US[i].global_op_class);
+				return RTW_OP_CLASS_US[i].global_op_class;
+				break;
+			}
+		}
+	}
+	return 0;
+}
+
+static u8 rm_get_ch_set(
+	struct rtw_ieee80211_channel *pch_set, u8 op_class, u8 ch_num)
+{
+	int i,j,sz;
+	u8 ch_amount = 0;
+
+
+	sz = sizeof(RTW_OP_CLASS_US)/sizeof(struct _RT_OPERATING_CLASS);
+
+	if (ch_num != 0) {
+		pch_set[0].hw_value = ch_num;
+		ch_amount = 1;
+		RTW_INFO("RM: meas_ch->hw_value = %u\n", pch_set->hw_value);
+		goto done;
+	}
+
+	for (i = 0; i < sz; i++) {
+
+		if (RTW_OP_CLASS_US[i].global_op_class == op_class) {
+
+			for (j = 0; j < RTW_OP_CLASS_US[i].Len; j++) {
+				pch_set[j].hw_value =
+					RTW_OP_CLASS_US[i].Channel[j];
+				RTW_INFO("RM: meas_ch[%d].hw_value = %u\n",
+					j, pch_set[j].hw_value);
+			}
+			ch_amount = RTW_OP_CLASS_US[i].Len;
+			break;
+		}
+	}
+done:
+	return ch_amount;
+}
+
+static int is_wildcard_bssid(u8 *bssid)
+{
+	int i;
+	u8 val8 = 0xff;
+
+
+	for (i=0;i<6;i++)
+		val8 &= bssid[i];
+
+	if (val8 == 0xff)
+		return _SUCCESS;
+	return _FALSE;
+}
+
 /* for caller outside rm */
 u8 rm_add_nb_req(_adapter *padapter, struct sta_info *psta)
 {
@@ -204,12 +282,8 @@ u8 rm_add_nb_req(_adapter *padapter, struct sta_info *psta)
 	}
 
 	prm->psta = psta;
-	prm->q.category = RTW_WLAN_CATEGORY_RADIO_MEAS;
-	do {
-		pmlmeinfo->dialogToken++;
-	} while (pmlmeinfo->dialogToken == 0);
-
-	prm->q.diag_token = pmlmeinfo->dialogToken;
+	prm->q.category = WLAN_CATEGORY_RADIO_MEASUREMENT;
+	prm->q.diag_token = pmlmeinfo->dialogToken++;
 	prm->q.m_token = 1;
 
 	prm->rmid = psta->cmn.aid << 16
@@ -238,13 +312,14 @@ u8 rm_add_nb_req(_adapter *padapter, struct sta_info *psta)
 	return _SUCCESS;
 }
 
+
 static u8 *build_wlan_hdr(_adapter *padapter, struct xmit_frame *pmgntframe,
 	struct sta_info *psta, u16 frame_type)
 {
 	u8 *pframe;
 	u16 *fctrl;
 	struct pkt_attrib *pattr;
-	struct rtw_ieee80211_hdr *pwlanhdr;
+	struct ieee80211_hdr *pwlanhdr;
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 
@@ -253,17 +328,17 @@ static u8 *build_wlan_hdr(_adapter *padapter, struct xmit_frame *pmgntframe,
 	pattr = &pmgntframe->attrib;
 	update_mgntframe_attrib(padapter, pattr);
 
-	_rtw_memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
+	memset(pmgntframe->buf_addr, 0, WLANHDR_OFFSET + TXDESC_OFFSET);
 
 	pframe = (u8 *)(pmgntframe->buf_addr) + TXDESC_OFFSET;
-	pwlanhdr = (struct rtw_ieee80211_hdr *)pframe;
+	pwlanhdr = (struct ieee80211_hdr *)pframe;
 
-	fctrl = &(pwlanhdr->frame_ctl);
+	fctrl =&pwlanhdr->frame_control;
 	*(fctrl) = 0;
 
-	_rtw_memcpy(pwlanhdr->addr1, psta->cmn.mac_addr, ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr2, adapter_mac_addr(padapter), ETH_ALEN);
-	_rtw_memcpy(pwlanhdr->addr3,
+	memcpy(pwlanhdr->addr1, psta->cmn.mac_addr, ETH_ALEN);
+	memcpy(pwlanhdr->addr2, adapter_mac_addr(padapter), ETH_ALEN);
+	memcpy(pwlanhdr->addr3,
 		get_my_bssid(&(pmlmeinfo->network)),ETH_ALEN);
 
 	RTW_INFO("RM: dst = " MAC_FMT "\n", MAC_ARG(pwlanhdr->addr1));
@@ -272,10 +347,10 @@ static u8 *build_wlan_hdr(_adapter *padapter, struct xmit_frame *pmgntframe,
 	pmlmeext->mgnt_seq++;
 	SetFragNum(pframe, 0);
 
-	set_frame_sub_type(pframe, WIFI_ACTION);
+	set_frame_sub_type(pframe, IEEE80211_STYPE_ACTION);
 
-	pframe += sizeof(struct rtw_ieee80211_hdr_3addr);
-	pattr->pktlen = sizeof(struct rtw_ieee80211_hdr_3addr);
+	pframe += sizeof(struct ieee80211_hdr_3addr);
+	pattr->pktlen = sizeof(struct ieee80211_hdr_3addr);
 
 	return pframe;
 }
@@ -335,7 +410,7 @@ int issue_null_reply(struct rm_obj *prm)
 		return _FALSE;
 	}
 	pattr = &pmgntframe->attrib;
-	pframe = build_wlan_hdr(padapter, pmgntframe, prm->psta, WIFI_ACTION);
+	pframe = build_wlan_hdr(padapter, pmgntframe, prm->psta, IEEE80211_STYPE_ACTION);
 	pframe = rtw_set_fixed_ie(pframe, 3, &prm->p.category, &pattr->pktlen);
 
 	my_len = 0;
@@ -380,7 +455,7 @@ int rm_sitesurvey(struct rm_obj *prm)
 
 	pch_set = &prm->q.ch_set[0];
 
-	_rtw_memset(pch_set, 0,
+	memset(pch_set, 0,
 		sizeof(struct rtw_ieee80211_channel) * MAX_OP_CHANNEL_SET_NUM);
 
 	if (prm->q.ch_num == 0) {
@@ -399,11 +474,11 @@ int rm_sitesurvey(struct rm_obj *prm)
 	meas_ch_num = rm_get_ch_set(pch_set, op_class, ch_num);
 	prm->q.ch_set_ch_amount = meas_ch_num;
 
-	_rtw_memset(&parm, 0, sizeof(struct sitesurvey_parm));
-	_rtw_memcpy(parm.ch, pch_set,
+	memset(&parm, 0, sizeof(struct sitesurvey_parm));
+	memcpy(parm.ch, pch_set,
 		sizeof(struct rtw_ieee80211_channel) * MAX_OP_CHANNEL_SET_NUM);
 
-	_rtw_memcpy(&parm.ssid[0], &prm->q.opt.bcn.ssid, IW_ESSID_MAX_SIZE);
+	memcpy(&parm.ssid[0], &prm->q.opt.bcn.ssid, IW_ESSID_MAX_SIZE);
 
 	parm.ssid_num = 1;
 	parm.scan_mode = prm->q.m_mode;
@@ -416,6 +491,24 @@ int rm_sitesurvey(struct rm_obj *prm)
 	rtw_sitesurvey_cmd(prm->psta->padapter, &parm);
 
 	return _SUCCESS;
+}
+
+static u8 translate_percentage_to_rcpi(u32 SignalStrengthIndex)
+{
+	s32 SignalPower; /* in dBm. */
+	u8 rcpi;
+
+	/* Translate to dBm (x=y-100) */
+	SignalPower = SignalStrengthIndex - 100;
+
+	/* RCPI = Int{(Power in dBm + 110)*2} for 0dBm > Power > -110dBm
+	 *    0	: power <= -110.0 dBm
+	 *    1	: power =  -109.5 dBm
+	 *    2	: power =  -109.0 dBm
+	 */
+
+	rcpi = (SignalPower + 110)*2;
+	return rcpi;
 }
 
 static int rm_parse_ch_load_s_elem(struct rm_obj *prm, u8 *pbody, int req_len)
@@ -436,7 +529,7 @@ static int rm_parse_ch_load_s_elem(struct rm_obj *prm, u8 *pbody, int req_len)
 			/* check RM_EN */
 			rm_en_cap_chk_and_set(prm, RM_CH_LOAD_CAP_EN);
 
-			_rtw_memcpy(&(prm->q.opt.clm.rep_cond),
+			memcpy(&(prm->q.opt.clm.rep_cond),
 				&pbody[p+2], sizeof(prm->q.opt.clm.rep_cond));
 
 			RTW_INFO("RM: ch_load_rep_info=%u:%u\n",
@@ -476,7 +569,7 @@ static int rm_parse_noise_histo_s_elem(struct rm_obj *prm,
 			/* check RM_EN */
 			rm_en_cap_chk_and_set(prm, RM_NOISE_HISTO_CAP_EN);
 
-			_rtw_memcpy(&(prm->q.opt.nhm.rep_cond),
+			memcpy(&(prm->q.opt.nhm.rep_cond),
 				&pbody[p+2], sizeof(prm->q.opt.nhm.rep_cond));
 
 			RTW_INFO("RM: noise_histo_rep_info=%u:%u\n",
@@ -525,12 +618,12 @@ static int rm_parse_bcn_req_s_elem(struct rm_obj *prm, u8 *pbody, int req_len)
 			RTW_INFO("DBG set ssid to %s\n",DBG_BCN_REQ_SSID_NAME);
 			i = strlen(DBG_BCN_REQ_SSID_NAME);
 			prm->q.opt.bcn.ssid.SsidLength = i;
-			_rtw_memcpy(&(prm->q.opt.bcn.ssid.Ssid),
+			memcpy(&(prm->q.opt.bcn.ssid.Ssid),
 				DBG_BCN_REQ_SSID_NAME, i);
 
 #else /* original */
 			prm->q.opt.bcn.ssid.SsidLength = pbody[p+1];
-			_rtw_memcpy(&(prm->q.opt.bcn.ssid.Ssid),
+			memcpy(&(prm->q.opt.bcn.ssid.Ssid),
 				&pbody[p+2], pbody[p+1]);
 #endif
 #endif
@@ -545,7 +638,7 @@ static int rm_parse_bcn_req_s_elem(struct rm_obj *prm, u8 *pbody, int req_len)
 			/* check RM_EN */
 			rm_en_cap_chk_and_set(prm, RM_BCN_MEAS_REP_COND_CAP_EN);
 
-			_rtw_memcpy(&(prm->q.opt.bcn.rep_cond),
+			memcpy(&(prm->q.opt.bcn.rep_cond),
 				&pbody[p+2], sizeof(prm->q.opt.bcn.rep_cond));
 
 			RTW_INFO("bcn_req_rep_info=%u:%u\n",
@@ -633,7 +726,7 @@ static int rm_parse_meas_req(struct rm_obj *prm, u8 *pbody)
 		prm->q.m_mode = pbody[p++];
 
 		/* BSSID */
-		_rtw_memcpy(&(prm->q.bssid), &pbody[p], 6);
+		memcpy(&(prm->q.bssid), &pbody[p], 6);
 		p+=6;
 
 		/*
@@ -670,7 +763,7 @@ int rm_recv_radio_mens_req(_adapter *padapter,
 	struct rm_obj *prm;
 	struct rm_priv *prmpriv = &padapter->rmpriv;
 	u8 *pdiag_body = (u8 *)(precv_frame->u.hdr.rx_data +
-		sizeof(struct rtw_ieee80211_hdr_3addr));
+		sizeof(struct ieee80211_hdr_3addr));
 	u8 *pmeas_body = &pdiag_body[5];
 	u8 rmid, update = 0;
 
@@ -719,7 +812,7 @@ int rm_recv_radio_mens_req(_adapter *padapter,
 	RTW_INFO("RM: meas_type = %d\n", prm->q.m_type);
 #endif
 
-	if (prm->q.e_id != _MEAS_REQ_IE_) /* 38 */
+	if (prm->q.e_id != WLAN_EID_MEASURE_REQUEST) /* 38 */
 		return _FALSE;
 
 	switch (prm->q.m_type) {
@@ -770,7 +863,7 @@ int rm_recv_radio_mens_rep(_adapter *padapter,
 	struct rm_obj *prm;
 	u32 rmid;
 	u8 *pdiag_body = (u8 *)(precv_frame->u.hdr.rx_data +
-		sizeof(struct rtw_ieee80211_hdr_3addr));
+		sizeof(struct ieee80211_hdr_3addr));
 	u8 *pmeas_body = &pdiag_body[3];
 
 
@@ -779,11 +872,8 @@ int rm_recv_radio_mens_rep(_adapter *padapter,
 		| RM_MASTER;
 
 	prm = rm_get_rmobj(padapter, rmid);
-	if (prm == NULL) {
-		/* not belong to us, report to upper */
-		rtw_cfg80211_rx_rrm_action(psta->padapter, precv_frame);
-		return _TRUE;
-	}
+	if (prm == NULL)
+		return _FALSE;
 
 	prm->p.action_code = pdiag_body[1];
 	prm->p.diag_token = pdiag_body[2];
@@ -804,7 +894,7 @@ int rm_recv_radio_mens_rep(_adapter *padapter,
 	RTW_INFO("RM: meas_mode = %d\n", prm->p.m_mode);
 	RTW_INFO("RM: meas_type = %d\n", prm->p.m_type);
 #endif
-	if (prm->p.e_id != _MEAS_RSP_IE_) /* 39 */
+	if (prm->p.e_id != WLAN_EID_MEASURE_REPORT) /* 39 */
 		return _FALSE;
 
 	RTW_INFO("RM: recv %s\n", rm_type_rep_name(prm->p.m_type));
@@ -813,108 +903,11 @@ int rm_recv_radio_mens_rep(_adapter *padapter,
 	return ret;
 }
 
-/* receive link measurement request */
-int rm_recv_link_mens_req(_adapter *padapter,
-	union recv_frame *precv_frame, struct sta_info *psta)
-{
-	struct rm_obj *prm;
-	struct rm_priv *prmpriv = &padapter->rmpriv;
-	u8 *pdiag_body = (u8 *)(precv_frame->u.hdr.rx_data +
-		sizeof(struct rtw_ieee80211_hdr_3addr));
-	u8 *pmeas_body = &pdiag_body[3];
-	u8 rmid, update = 0;
-	int i;
-
-
-	prm = rm_alloc_rmobj(padapter);
-
-	if (prm == NULL) {
-		RTW_ERR("RM: unable to alloc rm obj for requeset\n");
-		return _FALSE;
-	}
-
-	prm->psta = psta;
-	prm->q.action_code = pdiag_body[1];
-	prm->q.diag_token = pdiag_body[2];
-
-	prm->q.tx_pwr_used = pmeas_body[0];
-	prm->q.tx_pwr_max = pmeas_body[1];
-	prm->q.rx_pwr = precv_frame->u.hdr.attrib.phy_info.rx_power;
-	prm->q.rx_rate = hw_rate_to_m_rate(precv_frame->u.hdr.attrib.data_rate);
-	prm->q.rx_bw = precv_frame->u.hdr.attrib.bw;
-	prm->q.rx_rsni = rm_get_frame_rsni(prm, precv_frame);
-
-	prm->rmid = psta->cmn.aid << 16
-		| prm->q.diag_token << 8
-		| RM_SLAVE;
-
-	RTW_INFO("RM: rmid=%x, bssid" MAC_FMT " rx_pwr=%ddBm, rate=%s\n",
-		prm->rmid, MAC_ARG(prm->psta->cmn.mac_addr), prm->q.rx_pwr,
-		MGN_RATE_STR(prm->q.rx_rate));
-
-#if (RM_MORE_DBG_MSG)
-	RTW_INFO("RM: tx_pwr_used =%d dBm\n", prm->q.tx_pwr_used);
-	RTW_INFO("RM: tx_pwr_max  =%d dBm\n", prm->q.tx_pwr_max);
-#endif
-
-	if (!update)
-		rm_enqueue_rmobj(padapter, prm, _FALSE);
-
-	return _SUCCESS;
-}
-
-/* receive link measurement report */
-int rm_recv_link_mens_rep(_adapter *padapter,
-	union recv_frame *precv_frame, struct sta_info *psta)
-{
-	int ret = _FALSE;
-	struct rm_obj *prm;
-	u32 rmid;
-	u8 *pdiag_body = (u8 *)(precv_frame->u.hdr.rx_data +
-		sizeof(struct rtw_ieee80211_hdr_3addr));
-	u8 *pmeas_body = pdiag_body + 3;
-	s8 val;
-
-
-	rmid = psta->cmn.aid << 16
-		| pdiag_body[2] << 8
-		| RM_MASTER;
-
-	prm = rm_get_rmobj(padapter, rmid);
-	if (prm == NULL) {
-		/* not belong to us, report to upper */
-		rtw_cfg80211_rx_rrm_action(psta->padapter, precv_frame);
-		return _TRUE;
-	}
-
-	RTW_INFO("RM: rmid=%x, bssid " MAC_FMT "\n", prm->rmid,
-		MAC_ARG(prm->psta->cmn.mac_addr));
-
-	prm->p.action_code = pdiag_body[1];
-	prm->p.diag_token = pdiag_body[2];
-
-#if (RM_MORE_DBG_MSG)
-	RTW_INFO("RM: action_code = %d\n", prm->p.action_code);
-	RTW_INFO("RM: diag_token  = %d\n", prm->p.diag_token);
-	RTW_INFO("RM: xmit_power  = %d dBm\n", pmeas_body[2]);
-	RTW_INFO("RM: link_margin = %d dBm\n", pmeas_body[3]);
-	RTW_INFO("RM: xmit_ant    = %d\n", pmeas_body[4]);
-	RTW_INFO("RM: recv_ant    = %d\n", pmeas_body[5]);
-	RTW_INFO("RM: RCPI        = %d\n", pmeas_body[6]);
-	RTW_INFO("RM: RSNI        = %d\n", pmeas_body[7]);
-#endif
-	RTW_INFO("RM: recv link meas report ...\n");
-	ret = rm_post_event(padapter, prm->rmid, RM_EV_recv_rep);
-
-	return ret;
-}
-
-
 int rm_radio_mens_nb_rep(_adapter *padapter,
 	union recv_frame *precv_frame, struct sta_info *psta)
 {
 	u8 *pdiag_body = (u8 *)(precv_frame->u.hdr.rx_data +
-		sizeof(struct rtw_ieee80211_hdr_3addr));
+		sizeof(struct ieee80211_hdr_3addr));
 	u8 *pmeas_body = &pdiag_body[3];
 	u32 len = precv_frame->u.hdr.len;
 	u32 rmid;
@@ -926,12 +919,8 @@ int rm_radio_mens_nb_rep(_adapter *padapter,
 		| RM_MASTER;
 
 	prm = rm_get_rmobj(padapter, rmid);
-
-	if (prm == NULL) {
-		/* not belong to us, report to upper */
-		rtw_cfg80211_rx_rrm_action(psta->padapter, precv_frame);
-		return _TRUE;
-	}
+	if (prm == NULL)
+		return _FALSE;
 
 	prm->p.action_code = pdiag_body[1];
 	prm->p.diag_token = pdiag_body[2];
@@ -949,7 +938,7 @@ int rm_radio_mens_nb_rep(_adapter *padapter,
 #ifdef CONFIG_LAYER2_ROAMING
 	if (rtw_wnm_btm_candidates_survey(padapter
 			,(pdiag_body + 3)
-			,(len - sizeof(struct rtw_ieee80211_hdr_3addr))
+			,(len - sizeof(struct ieee80211_hdr_3addr))
 			,_FALSE) == _FAIL)
 		return _FALSE;
 #endif
@@ -965,7 +954,7 @@ unsigned int rm_on_action(_adapter *padapter, union recv_frame *precv_frame)
 	u8 *pframe_body = NULL;
 	u8 action_code = 0;
 	u8 diag_token = 0;
-	struct rtw_ieee80211_hdr_3addr *whdr;
+	struct ieee80211_hdr_3addr *whdr;
 	struct sta_info *psta;
 
 
@@ -976,7 +965,7 @@ unsigned int rm_on_action(_adapter *padapter, union recv_frame *precv_frame)
 		GetAddr1Ptr(pframe), ETH_ALEN))
 		goto exit;
 
-	whdr = (struct rtw_ieee80211_hdr_3addr *)pframe;
+	whdr = (struct ieee80211_hdr_3addr *)pframe;
 	RTW_INFO("RM: %s bssid = " MAC_FMT "\n",
 		__func__, MAC_ARG(whdr->addr2));
 
@@ -988,7 +977,7 @@ unsigned int rm_on_action(_adapter *padapter, union recv_frame *precv_frame)
         }
 
 	pframe_body = (unsigned char *)(pframe +
-		sizeof(struct rtw_ieee80211_hdr_3addr));
+		sizeof(struct ieee80211_hdr_3addr));
 
 	/* Figure 8-438 radio measurement request frame Action field format */
 	/* Category = pframe_body[0] = 5 (Radio Measurement) */
@@ -1014,12 +1003,10 @@ unsigned int rm_on_action(_adapter *padapter, union recv_frame *precv_frame)
 
 	case RM_ACT_LINK_MEAS_REQ:
 		RTW_INFO("RM: RM_ACT_LINK_MEAS_REQ\n");
-		ret = rm_recv_link_mens_req(padapter, precv_frame, psta);
 		break;
 
 	case RM_ACT_LINK_MEAS_REP:
 		RTW_INFO("RM: RM_ACT_LINK_MEAS_REP\n");
-		ret = rm_recv_link_mens_rep(padapter, precv_frame, psta);
 		break;
 
 	case RM_ACT_NB_REP_REQ:
@@ -1095,7 +1082,7 @@ static u8 *rm_gen_bcn_detail_elem(_adapter *padapter, u8 *pframe,
 #if (RM_MORE_DBG_MSG)
 			RTW_INFO("RM: bcn_req_ssid\n");
 #endif
-			pframe = rtw_set_ie(pframe, _SSID_IE_,
+			pframe = rtw_set_ie(pframe, WLAN_EID_SSID,
 				pbss->Ssid.SsidLength,
 				pbss->Ssid.Ssid, &my_len);
 			break;
@@ -1116,11 +1103,11 @@ static u8 *rm_gen_bcn_detail_elem(_adapter *padapter, u8 *pframe,
 					continue;
 #if (RM_MORE_DBG_MSG)
 				switch (eid) {
-				case EID_QBSSLoad:
-					RTW_INFO("RM: EID_QBSSLoad\n");
+				case WLAN_EID_QBSS_LOAD:
+					RTW_INFO("RM: WLAN_EID_QBSS_LOAD\n");
 					break;
-				case EID_HTCapability:
-					RTW_INFO("RM: EID_HTCapability\n");
+				case WLAN_EID_HT_CAPABILITY:
+					RTW_INFO("RM: WLAN_EID_HT_CAPABILITY\n");
 					break;
 				case _MDIE_:
 					RTW_INFO("RM: EID_MobilityDomain\n");
@@ -1154,6 +1141,34 @@ done:
 	return pframe;
 }
 
+static u8 rm_get_rcpi(struct rm_obj *prm, struct wlan_network *pnetwork)
+{
+	return translate_percentage_to_rcpi(
+		pnetwork->network.PhyInfo.SignalStrength);
+}
+
+static u8 rm_get_rsni(struct rm_obj *prm, struct wlan_network *pnetwork)
+{
+	int i;
+	u8 val8, snr;
+	HAL_DATA_TYPE *pHalData = GET_HAL_DATA(prm->psta->padapter);
+
+
+	if (pnetwork->network.PhyInfo.is_cck_rate) {
+		/* current HW doesn't have CCK RSNI */
+		/* 255 indicates RSNI is unavailable */
+		val8 = 255;
+	} else {
+		snr = 0;
+		for (i = 0; i < pHalData->NumTotalRFPath; i++) {
+			snr += pnetwork->network.PhyInfo.rx_snr[i];
+		}
+		snr = snr / pHalData->NumTotalRFPath;
+		val8 = (u8)(snr + 10)*2;
+	}
+	return val8;
+}
+
 u8 rm_bcn_req_cond_mach(struct rm_obj *prm, struct wlan_network *pnetwork)
 {
 	u8 val8;
@@ -1163,22 +1178,22 @@ u8 rm_bcn_req_cond_mach(struct rm_obj *prm, struct wlan_network *pnetwork)
 	case bcn_rep_cond_immediately:
 		return _SUCCESS;
 	case bcn_req_cond_rcpi_greater:
-		val8 = rm_get_bcn_rcpi(prm, pnetwork);
+		val8 = rm_get_rcpi(prm, pnetwork);
 		if (val8 > prm->q.opt.bcn.rep_cond.threshold)
 			return _SUCCESS;
 		break;
 	case bcn_req_cond_rcpi_less:
-		val8 = rm_get_bcn_rcpi(prm, pnetwork);
+		val8 = rm_get_rcpi(prm, pnetwork);
 		if (val8 < prm->q.opt.bcn.rep_cond.threshold)
 			return _SUCCESS;
 		break;
 	case bcn_req_cond_rsni_greater:
-		val8 = rm_get_bcn_rsni(prm, pnetwork);
+		val8 = rm_get_rsni(prm, pnetwork);
 		if (val8 != 255 && val8 > prm->q.opt.bcn.rep_cond.threshold)
 			return _SUCCESS;
 		break;
 	case bcn_req_cond_rsni_less:
-		val8 = rm_get_bcn_rsni(prm, pnetwork);
+		val8 = rm_get_rsni(prm, pnetwork);
 		if (val8 != 255 && val8 < prm->q.opt.bcn.rep_cond.threshold)
 			return _SUCCESS;
 		break;
@@ -1188,6 +1203,113 @@ u8 rm_bcn_req_cond_mach(struct rm_obj *prm, struct wlan_network *pnetwork)
 		break;
 	}
 	return _FALSE;
+}
+
+static u8 *rm_bcn_rep_fill_scan_resule (struct rm_obj *prm,
+	u8 *pframe, struct wlan_network *pnetwork, unsigned int *fr_len)
+{
+	int snr, i;
+	u8 val8, *plen;
+	u16 val16;
+	u32 val32;
+	u64 val64;
+	PWLAN_BSSID_EX pbss;
+	unsigned int my_len;
+	_adapter *padapter = prm->psta->padapter;
+
+
+	my_len = 0;
+	/* meas ID */
+	val8 = WLAN_EID_MEASURE_REPORT;
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	/* remember position form elelment length */
+	plen = pframe;
+
+	/* meas_rpt_len */
+	/* default 3 = mode + token + type but no beacon content */
+	val8 = 3;
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	/* meas_token */
+	val8 = prm->q.m_token;
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	/* meas_rpt_mode F8-141 */
+	val8 = prm->p.m_mode;
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	/* meas_type T8-81 */
+	val8 = bcn_rep;
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	if (pnetwork == NULL)
+		goto done;
+
+	pframe = rtw_set_fixed_ie(pframe, 1, &prm->q.op_class, &my_len);
+
+	/* channel */
+	pbss = &pnetwork->network;
+	val8 = pbss->Configuration.DSConfig;
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	/* Actual Measurement StartTime */
+	val64 = cpu_to_le64(prm->meas_start_time);
+	pframe = rtw_set_fixed_ie(pframe, 8, (u8 *)&val64, &my_len);
+
+	/* Measurement Duration */
+	val16 = prm->meas_end_time - prm->meas_start_time;
+	val16 = cpu_to_le16(val16);
+	pframe = rtw_set_fixed_ie(pframe, 2, (u8 *)&val16, &my_len);
+
+	/* TODO
+	 * ReportedFrameInformation:
+	 * 0 :beacon or probe rsp
+	 * 1 :pilot frame
+	 */
+	val8 = 0; /* report frame info */
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	/* RCPI */
+	val8 = rm_get_rcpi(prm, pnetwork);
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	/* RSNI */
+	val8 = rm_get_rsni(prm, pnetwork);
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	/* BSSID */
+	pframe = rtw_set_fixed_ie(pframe, 6, (u8 *)&pbss->MacAddress, &my_len);
+
+	/*
+	 * AntennaID
+	 * 0: unknown
+	 * 255: multiple antenna (Diversity)
+	 */
+	val8 = 0;
+	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
+
+	/* ParentTSF */
+	val32 = prm->meas_start_time + pnetwork->network.PhyInfo.free_cnt;
+	pframe = rtw_set_fixed_ie(pframe, 4, (u8 *)&val32, &my_len);
+
+	/*
+	 * Generate Beacon detail
+	 */
+	pframe = rm_gen_bcn_detail_elem(padapter, pframe,
+		prm, pnetwork, &my_len);
+done:
+	/*
+	 * update my length
+	 * content length does NOT include ID and LEN
+	 */
+	val8 = my_len - 2;
+	rtw_set_fixed_ie(plen, 1, &val8, &i);
+
+	/* update length to caller */
+	*fr_len += my_len;
+
+	return pframe;
 }
 
 static u8 *rm_gen_bcn_rep_ie (struct rm_obj *prm,
@@ -1224,11 +1346,11 @@ static u8 *rm_gen_bcn_rep_ie (struct rm_obj *prm,
 	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
 
 	/* RCPI */
-	val8 = rm_get_bcn_rcpi(prm, pnetwork);
+	val8 = rm_get_rcpi(prm, pnetwork);
 	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
 
 	/* RSNI */
-	val8 = rm_get_bcn_rsni(prm, pnetwork);
+	val8 = rm_get_rsni(prm, pnetwork);
 	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
 
 	/* BSSID */
@@ -1244,15 +1366,13 @@ static u8 *rm_gen_bcn_rep_ie (struct rm_obj *prm,
 	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
 
 	/* ParentTSF */
-	val32 = pnetwork->network.PhyInfo.free_cnt;
-	if (prm->free_run_counter_valid)
-		val32 += prm->meas_start_time;
-
+	val32 = prm->meas_start_time + pnetwork->network.PhyInfo.free_cnt;
 	pframe = rtw_set_fixed_ie(pframe, 4, (u8 *)&val32, &my_len);
 
 	/* Generate Beacon detail */
 	pframe = rm_gen_bcn_detail_elem(padapter, pframe,
 		prm, pnetwork, &my_len);
+done:
 	/*
 	* update my length
 	* content length does NOT include ID and LEN
@@ -1303,7 +1423,7 @@ static int retrieve_scan_result(struct rm_obj *prm)
 	/* search scan queue to find requested SSID */
 	while (1) {
 
-		if (rtw_end_of_queue_search(phead, plist) == _TRUE)
+		if (phead == plist)
 			break;
 
 		pnetwork = LIST_CONTAINOR(plist, struct wlan_network, list);
@@ -1368,7 +1488,7 @@ static int retrieve_scan_result(struct rm_obj *prm)
 				MAC_ARG(pbss->MacAddress));
 
 			len = 0;
-			_rtw_memset(tmp_buf, 0, MAX_XMIT_EXTBUF_SZ);
+			memset(tmp_buf, 0, MAX_XMIT_EXTBUF_SZ);
 			rm_gen_bcn_rep_ie(prm, tmp_buf, pnetwork, &len);
 new_packet:
 			if (my_len == 0) {
@@ -1436,7 +1556,7 @@ int issue_beacon_rep(struct rm_obj *prm)
 		}
 		pattr = &pmgntframe->attrib;
 		pframe = build_wlan_hdr(padapter,
-			pmgntframe, prm->psta, WIFI_ACTION);
+			pmgntframe, prm->psta, IEEE80211_STYPE_ACTION);
 		pframe = rtw_set_fixed_ie(pframe,
 			3, &prm->p.category, &pattr->pktlen);
 
@@ -1480,7 +1600,7 @@ int issue_nb_req(struct rm_obj *prm)
 		return _FALSE;
 	}
 	pattr = &pmgntframe->attrib;
-	pframe = build_wlan_hdr(padapter, pmgntframe, psta, WIFI_ACTION);
+	pframe = build_wlan_hdr(padapter, pmgntframe, psta, IEEE80211_STYPE_ACTION);
 	pframe = rtw_set_fixed_ie(pframe,
 		3, &prm->q.category, &pattr->pktlen);
 
@@ -1497,7 +1617,7 @@ int issue_nb_req(struct rm_obj *prm)
 		sub_ie[0] = 0; /*SSID*/
 		sub_ie[1] = val8;
 
-		_rtw_memcpy(pie, prm->q.pssid, val8);
+		memcpy(pie, prm->q.pssid, val8);
 
 		pframe = rtw_set_fixed_ie(pframe, val8 + 2,
 			sub_ie, &pattr->pktlen);
@@ -1517,7 +1637,7 @@ int issue_nb_req(struct rm_obj *prm)
 			sub_ie[0] = 0; /*SSID*/
 			sub_ie[1] = pmlmepriv->cur_network.network.Ssid.SsidLength;
 
-			_rtw_memcpy(pie, pmlmepriv->cur_network.network.Ssid.Ssid,
+			memcpy(pie, pmlmepriv->cur_network.network.Ssid.Ssid,
 				pmlmepriv->cur_network.network.Ssid.SsidLength);
 
 			pframe = rtw_set_fixed_ie(pframe,
@@ -1526,131 +1646,6 @@ int issue_nb_req(struct rm_obj *prm)
 		}
 	}
 
-	pattr->last_txcmdsz = pattr->pktlen;
-	dump_mgntframe(padapter, pmgntframe);
-
-	return _SUCCESS;
-}
-
-/* issue link measurement request */
-int issue_link_meas_req(struct rm_obj *prm)
-{
-	_adapter *padapter = prm->psta->padapter;
-	struct sta_info *psta = prm->psta;
-	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
-	struct xmit_frame *pmgntframe = NULL;
-	struct pkt_attrib *pattr = NULL;
-	u8 *pframe = NULL;
-	s8 pwr_used, path_a_pwr;
-
-
-	RTW_INFO("RM: %s\n", __func__);
-
-	pmgntframe = alloc_mgtxmitframe(pxmitpriv);
-	if (pmgntframe == NULL) {
-		RTW_ERR("RM: %s alloc xmit_frame fail\n",__func__);
-		return _FALSE;
-	}
-	pattr = &pmgntframe->attrib;
-	pframe = build_wlan_hdr(padapter, pmgntframe, psta, WIFI_ACTION);
-
-	/* Category, Action code, Dialog token */
-	pframe = rtw_set_fixed_ie(pframe,
-		3, &prm->q.category, &pattr->pktlen);
-
-	/* xmit power used */
-	/* we don't know actual TX power due to RA may change TX rate;
-	 * But if we fix TX rate then we can get specific tx power
-	 */
-	pattr->rate = MGN_6M;
-	rm_get_tx_power(padapter, RF_PATH_A, MGN_6M, &pwr_used);
-	pframe = rtw_set_fixed_ie(pframe,
-		1, &pwr_used, &pattr->pktlen);
-
-	/* Max xmit power */
-	rm_get_path_a_max_tx_power(padapter, &path_a_pwr);
-	pframe = rtw_set_fixed_ie(pframe,
-		1, &path_a_pwr, &pattr->pktlen);
-
-	pattr->last_txcmdsz = pattr->pktlen;
-	dump_mgntframe(padapter, pmgntframe);
-
-	return _SUCCESS;
-}
-
-/* issue link measurement report */
-int issue_link_meas_rep(struct rm_obj *prm)
-{
-	u8 val8;
-	u8 *pframe;
-	unsigned int my_len;
-	_adapter *padapter = prm->psta->padapter;
-	struct xmit_frame *pmgntframe;
-	struct pkt_attrib *pattr;
-	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
-	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
-	struct sta_info *psta = prm->psta;
-	int i;
-	u8 tpc[4];
-	s8 pwr_used;
-
-
-	RTW_INFO("RM: %s\n", __func__);
-
-	pmgntframe = alloc_mgtxmitframe(pxmitpriv);
-	if (pmgntframe == NULL) {
-		RTW_ERR("RM: ERR %s alloc xmit_frame fail\n",__func__);
-		return _FALSE;
-	}
-	pattr = &pmgntframe->attrib;
-	pframe = build_wlan_hdr(padapter, pmgntframe, psta, WIFI_ACTION);
-	/* Category, action code, Dialog token */
-	pframe = rtw_set_fixed_ie(pframe, 3,
-		&prm->p.category, &pattr->pktlen);
-
-	my_len = 0;
-
-	/* TPC report */
-	rm_get_tx_power(padapter, RF_PATH_A, MGN_6M, &pwr_used);
-	tpc[0] = EID_TPC;
-	tpc[1] = 2; /* length */
-
-	/* TX power */
-	tpc[2] = pwr_used;
-
-	/* link margin */
-	rm_get_rx_sensitivity(padapter, prm->q.rx_bw, prm->q.rx_rate, &pwr_used);
-	tpc[3] = prm->q.rx_pwr - pwr_used; /* RX sensitivity */
-	pattr->rate = MGN_6M; /* use fix rate to get fixed RX sensitivity */
-
-#if (RM_MORE_DBG_MSG)
-	RTW_INFO("RM: rx_pwr=%ddBm - rx_sensitivity=%ddBm = link_margin=%ddB\n",
-		prm->q.rx_pwr, pwr_used, tpc[3]);
-#endif
-	pframe = rtw_set_fixed_ie(pframe, 4, tpc, &my_len);
-
-	/* RECV antenna ID */
-	val8 = 0; /* unknown antenna */
-	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
-
-	/* XMIT antenna ID */
-	/* Fix rate 6M(1T) always use main antenna to TX */
-	val8 = 1; /* main antenna */
-	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
-
-	/* RCPI */
-	val8 = translate_dbm_to_rcpi(prm->q.rx_pwr);
-	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
-
-	/* RSNI */
-	val8 = prm->q.rx_rsni;
-	pframe = rtw_set_fixed_ie(pframe, 1, &val8, &my_len);
-
-	/* length */
-	//val8 = (u8)my_len-2;
-	//rtw_set_fixed_ie(plen, 1, &val8, &i); /* use variable i to ignore it */
-
-	pattr->pktlen += my_len;
 	pattr->last_txcmdsz = pattr->pktlen;
 	dump_mgntframe(padapter, pmgntframe);
 
@@ -1748,7 +1743,7 @@ int issue_radio_meas_req(struct rm_obj *prm)
 		return _FALSE;
 	}
 	pattr = &pmgntframe->attrib;
-	pframe = build_wlan_hdr(padapter, pmgntframe, prm->psta, WIFI_ACTION);
+	pframe = build_wlan_hdr(padapter, pmgntframe, prm->psta, IEEE80211_STYPE_ACTION);
 	pframe = rtw_set_fixed_ie(pframe, 3, &prm->q.category, &pattr->pktlen);
 
 	/* repeat */
@@ -1797,6 +1792,13 @@ int issue_radio_meas_req(struct rm_obj *prm)
 	dump_mgntframe(padapter, pmgntframe);
 
 	return _SUCCESS;
+}
+
+/* noise histogram */
+static u8 rm_get_anpi(struct rm_obj *prm, struct wlan_network *pnetwork)
+{
+	return translate_percentage_to_rcpi(
+		pnetwork->network.PhyInfo.SignalStrength);
 }
 
 int rm_radio_meas_report_cond(struct rm_obj *prm)
@@ -1915,7 +1917,7 @@ int issue_radio_meas_rep(struct rm_obj *prm)
 		return _FALSE;
 	}
 	pattr = &pmgntframe->attrib;
-	pframe = build_wlan_hdr(padapter, pmgntframe, psta, WIFI_ACTION);
+	pframe = build_wlan_hdr(padapter, pmgntframe, psta, IEEE80211_STYPE_ACTION);
 	pframe = rtw_set_fixed_ie(pframe, 3,
 		&prm->p.category, &pattr->pktlen);
 
@@ -1958,6 +1960,7 @@ int issue_radio_meas_rep(struct rm_obj *prm)
 	default:
 		break;
 	}
+done:
 	/* length */
 	val8 = (u8)my_len-2;
 	rtw_set_fixed_ie(plen, 1, &val8, &i); /* use variable i to ignore it */
@@ -1975,7 +1978,7 @@ void rtw_ap_parse_sta_rm_en_cap(_adapter *padapter,
 	if (elem->rm_en_cap) {
 		RTW_INFO("assoc.rm_en_cap="RM_CAP_FMT"\n",
 			RM_CAP_ARG(elem->rm_en_cap));
-		_rtw_memcpy(psta->rm_en_cap,
+		memcpy(psta->rm_en_cap,
 			(elem->rm_en_cap), elem->rm_en_cap_len);
 	}
 }
@@ -1984,7 +1987,7 @@ void RM_IE_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE)
 {
 	int i;
 
-	_rtw_memcpy(&padapter->rmpriv.rm_en_cap_assoc, pIE->data, pIE->Length);
+	memcpy(&padapter->rmpriv.rm_en_cap_assoc, pIE->data, pIE->Length);
 	RTW_INFO("assoc.rm_en_cap="RM_CAP_FMT"\n", RM_CAP_ARG(pIE->data));
 }
 
@@ -2047,7 +2050,7 @@ void rm_dbg_list_sta(_adapter *padapter, char *s)
 		phead = &(pstapriv->sta_hash[i]);
 		plist = get_next(phead);
 
-		while ((rtw_end_of_queue_search(phead, plist)) == _FALSE) {
+		while (phead != plist) {
 			psta = LIST_CONTAINOR(plist,
 				struct sta_info, hash_list);
 
@@ -2076,7 +2079,7 @@ void rm_dbg_help(_adapter *padapter, char *s)
 	sprintf(pstr(s), "rrm list_sta\n");
 	sprintf(pstr(s), "rrm list_meas\n");
 
-	sprintf(pstr(s), "rrm add_meas <aid=1|mac=>,m=<bcn|clm|nhm|nb|link>,rpt=\n");
+	sprintf(pstr(s), "rrm add_meas <aid=1|mac=>,m=<bcn|clm|nhm|nb>,rpt=\n");
 	sprintf(pstr(s), "rrm run_meas <aid=1|evid=>\n");
 	sprintf(pstr(s), "rrm del_meas\n");
 
@@ -2103,7 +2106,7 @@ struct sta_info *rm_get_sta(_adapter *padapter, u16 aid, u8* pbssid)
 		phead = &(pstapriv->sta_hash[i]);
 		plist = get_next(phead);
 
-		while ((rtw_end_of_queue_search(phead, plist)) == _FALSE) {
+		while (phead != plist) {
 			psta = LIST_CONTAINOR(plist,
 				struct sta_info, hash_list);
 
@@ -2130,13 +2133,13 @@ static int rm_dbg_modify_meas(_adapter *padapter, char *s)
 	struct mlme_ext_info *pmlmeinfo = &padapter->mlmeextpriv.mlmext_info;
 	struct rm_obj *prm;
 	struct sta_info *psta;
-	char *pmac, *ptr, *paid, *prpt, *pnbp, *pclm, *pnhm, *pbcn, *plnk;
+	char *pmac, *ptr, *paid, *prpt, *pnbp, *pclm, *pnhm, *pbcn;
 	unsigned val;
 	u8 bssid[ETH_ALEN];
 
 
 	/* example :
-	* rrm add_meas <aid=1|mac=>,m=<nb|clm|nhm|bcn|link>,<rept=>
+	* rrm add_meas <aid=1|mac=>,m=<nb|clm|nhm|bcn>,<rept=>
 	* rrm run_meas <aid=1|evid=>
 	*/
 	paid = strstr(s, "aid=");
@@ -2145,7 +2148,6 @@ static int rm_dbg_modify_meas(_adapter *padapter, char *s)
 	pclm = strstr(s, "m=clm");
 	pnhm = strstr(s, "m=nhm");
 	pnbp = strstr(s, "m=nb");
-	plnk = strstr(s, "m=link");
 	prpt = strstr(s, "rpt=");
 
 	/* set all ',' to NULL (end of line) */
@@ -2182,11 +2184,7 @@ static int rm_dbg_modify_meas(_adapter *padapter, char *s)
 		prm->q.diag_token = psta->rm_diag_token++;
 #else
 		/* TODO dialog should base on sta_info */
-		do {
-			pmlmeinfo->dialogToken++;
-		} while (pmlmeinfo->dialogToken == 0);
-
-		prm->q.diag_token = pmlmeinfo->dialogToken;
+		prm->q.diag_token = pmlmeinfo->dialogToken++;
 #endif
 		prm->rmid = psta->cmn.aid << 16
 			| prm->q.diag_token << 8
@@ -2203,8 +2201,6 @@ static int rm_dbg_modify_meas(_adapter *padapter, char *s)
 		prm->q.m_type = ch_load_req;
 	} else if (pnbp) {
 		prm->q.action_code = RM_ACT_NB_REP_REQ;
-	} else if (plnk) {
-		prm->q.action_code = RM_ACT_LINK_MEAS_REQ;
 	} else
 		return _FAIL;
 
@@ -2261,7 +2257,7 @@ static void rm_dbg_add_meas(_adapter *padapter, char *s)
 
 
 	/* example :
-	* rrm add_meas <aid=1|mac=>,m=<nb|clm|nhm|link>
+	* rrm add_meas <aid=1|mac=>,m=<nb_req|clm_req|nhm_req>
 	* rrm run_meas <aid=1|evid=>
 	*/
 	prm = (struct rm_obj *)prmpriv->prm_sel;
@@ -2283,11 +2279,15 @@ static void rm_dbg_add_meas(_adapter *padapter, char *s)
 		prmpriv->prm_sel = NULL;
 		return;
 	}
-	prm->q.category = RTW_WLAN_CATEGORY_RADIO_MEAS;
-	prm->q.e_id = _MEAS_REQ_IE_; /* 38 */
+	prm->q.category = WLAN_CATEGORY_RADIO_MEASUREMENT;
+	prm->q.e_id = WLAN_EID_MEASURE_REQUEST; /* 38 */
 
-	sprintf(pstr(s), "\nAdd rmid=%x, meas_type=%s ok\n",
-		prm->rmid, rm_type_req_name(prm->q.m_type));
+	if (prm->q.action_code == RM_ACT_RADIO_MEAS_REQ)
+		sprintf(pstr(s), "\nAdd rmid=%x, meas_type=%s ok\n",
+			prm->rmid, rm_type_req_name(prm->q.m_type));
+	else  if (prm->q.action_code == RM_ACT_NB_REP_REQ) 
+		sprintf(pstr(s), "\nAdd rmid=%x, meas_type=bcn_req ok\n",
+			prm->rmid);
 
 	if (prm->psta)
 		sprintf(pstr(s), "mac="MAC_FMT"\n",
@@ -2374,7 +2374,7 @@ static void rm_dbg_show_meas(struct rm_obj *prm, char *s)
 			psta->cmn.aid, MAC_ARG(psta->cmn.mac_addr));
 
 	sprintf(pstr(s), "clock=%d, state=%s, rpt=%u/%u\n",
-		(int)ATOMIC_READ(&prm->pclock->counter),
+		(int)atomic_read(&prm->pclock->counter),
 		rm_state_name(prm->state), prm->p.rpt, prm->q.rpt);
 }
 
@@ -2395,7 +2395,7 @@ static void rm_dbg_list_meas(_adapter *padapter, char *s)
 	plist = get_next(phead);
 	meas_amount = 0;
 
-	while ((rtw_end_of_queue_search(phead, plist)) == _FALSE) {
+	while (phead != plist) {
 		prm = LIST_CONTAINOR(plist, struct rm_obj, list);
 		meas_amount++;
 		plist = get_next(plist);
@@ -2449,7 +2449,6 @@ void rm_dbg_cmd(_adapter *padapter, char *s)
 
 	} else if (_rtw_memcmp(s, "run_meas", 8)) {
 		rm_dbg_run_meas(padapter, s);
-
 	} else if (_rtw_memcmp(s, "nb", 2)) {
 
 		paid = strstr(s, "aid=");

@@ -125,7 +125,7 @@ make install || { echo "Failed to make libfmt"; exit 1; }
 cd ../.. || { echo "Failed to make libfmt"; exit 1; }
 rm -rf ./fmt || { echo "Failed to make libfmt"; exit 1; }
 
-git clone -b v3 https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
+git clone -b v2 https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
 cd iptsd || { echo "Failed to make iptsd"; exit 1; }
 sed -i "s@'-Wconversion',@'-Wconversion', '-Wno-pedantic',@g" ./src/meson.build
 meson --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" build/ || { echo "Failed to make iptsd"; exit 1; }

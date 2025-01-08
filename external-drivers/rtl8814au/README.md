@@ -1,32 +1,51 @@
-### All-Points Bulletin
+Notice: This notice is to let you know that a new mac80211 compatible
+rtl8814au driver is available for testing. The plan is to upstream it to
+the Linux Mainline kernel when testing shows the driver is stabile and
+relatively bug free. We need your help to test and report.
 
-I need your help. We need to find a newer version of the source code for
-this driver, if Realtek still supports Linux on this chipset. It is
-unfortunate that Realtek does such a poor job of making the source code
-for their drivers available but that is the way it is. I recommend
-Mediatek based USB WiFi adapters because Mediatek does a MUCH better job
-of supporting Linux users. However, there are still many of us that have
-and use adapters based on the rtl8814au chipset so I will try to
-maintain this driver as long as it is practical to do so. What we really
-need is a new modernized version of this driver as it has become hard to
-maintain and it is missing many modern features. As much as I have
-searched, I have not been able to locate a newer version. This driver is
-v5.8.5.1 dated 20191029. If we can find a new driver for the 8814au that
-is up to date, we can make better use of our 8814au adapters. A newer
-driver should have version numbers of 5.12.x, 5.13.x or higher. Please
-search all locations that might have a new version available. Ask 
-retailers. Please help.
+The driver is available for testing at the following repo:
 
------
+https://github.com/lwfinger/rtw88
 
-### 8814au ( 8814au.ko ) :rocket:
+Remember to first remove the driver in this repo or from whatever repo
+you may have installed. You can run the following to remove it if using
+this repo:
 
-### Linux Driver for USB WiFi Adapters that are based on the RTL8814AU Chipset
+$ sudo sh remove-driver.sh
 
-- v5.8.5.1 (Realtek) (20191029)
-- Plus updates from the Linux community
+My plan is to take this repo offline once the new driver is stabilized
+in the Linux Mainline kernel as this driver has never been a very good
+driver. It has just been the only thing we have had.
 
-### Features
+Regards,
+
+@morrownr
+
+## 8814au ( 8814au.ko ) :rocket:
+
+## Linux Driver for USB WiFi Adapters that are based on the RTL8814AU Chipset
+
+- v5.8.5.1 (Realtek) (20191029) - Plus updates from the Linux community
+
+Note: Please read the file "supported-device-IDs" for information about
+how to confirm that this is the correct driver for your adapter.
+
+Note: Posting this driver is not a recommendation for Linux users to buy
+USB WiFi adapters based on the Realtek chipsets supported by this driver.
+Realtek out-of-kernel wifi drivers, such as this one, are not Linux Wireless
+Standards compliant and appear to be designed to be used by skilled
+programmers producing products such as embedded systems. Users of desktop
+and server distros such as Ubuntu, Debian, Manjaro, Fedora, Raspberry Pi OS
+and other mainline desktop and server distros will likely find adapters that
+use in-kernel drivers (Linux Wireless Standards compliant) to be more stable
+and much more trouble-free. The following links will provide more
+information:
+
+[USB WiFi adapters that are supported with Linux in-kernel drivers](https://github.com/morrownr/USB-WiFi/blob/main/home/USB_WiFi_Adapters_that_are_supported_with_Linux_in-kernel_drivers.md)
+
+[USB WiFi adapter information for Linux](https://github.com/morrownr/USB-WiFi/blob/main/home/USB_WiFi_Adapter_Information_for_Linux.md)
+
+### Supported Features
 
 - IEEE 802.11 b/g/n/ac WiFi compliant
 - 802.1x, WEP, WPA TKIP and WPA2 AES/Mixed mode for PSK and TLS (Radius)
@@ -44,10 +63,6 @@ retailers. Please help.
 - VHT control (allows 80 MHz channel width in AP mode)
 - USB mode control
 
-### Not supported
-
-- hcxdumptool
-
 ### A FAQ is available in this repo with the name `FAQ.md`
 
 - Please read the FAQ and this document before posting issues.
@@ -56,44 +71,48 @@ retailers. Please help.
 
 ### Compatible CPU Architectures
 
-- x86, i686
+- x86, i386, i686
 - x86-64, amd64
 - armv6l, armv7l (arm)
 - aarch64 (arm64)
 
+Note: Additional CPU architectures may work but I currently only have
+the hardware to test the above.
+
 ### Compatible Kernels
 
 - Kernels: 4.19 - 5.2 (Realtek)
-- Kernels: 5.3  - 6.7 (community support)
+- Kernels: 5.3  - 6.9 (community support)
+
+Note: Kernels earlier than 4.19 may work but are not tested or
+supported.
 
 ### Tested Compilers
 
-- gcc 9, 10, 11 and 12
+- gcc 11, 12 and 13
 
 ### Tested Linux Distributions
 
-Note: The information in this section depends largely on user reports which can
-be provided via PR or message in Issues.
+Note: The information in this section depends largely on user reports
+which can be provided via PR or message in Issues.
 
-- [Arch Linux](https://www.archlinux.org) (kernels 5.4 and 5.11)
+- [Arch Linux](https://www.archlinux.org) (kernels 5.4, 5.11 and 6.6)
 
 - [Armbian](https://www.armbian.com/) (kernel 5.15) (Rock 4 SE (Rock 4b image with xfce))
 
-- [Debian](https://www.debian.org/) (kernels 5.10, 5.15 and 6.1)
+- [Debian](https://www.debian.org/) (kernels 5.10, 5.15, 6.1 and 6.6)
 
 - [Fedora](https://getfedora.org) Fedora 38 (6.2.13-300)
 
-- [Kali Linux](https://www.kali.org/) (kernel 5.10)
-
-- [Manjaro](https://manjaro.org) (kernel 5.13)
+- [Manjaro](https://manjaro.org) (kernel 5.15)
 
 - [openSUSE](https://www.opensuse.org/) Tumbleweed (rolling) (kernel 5.15)
 
-- [Raspberry Pi OS](https://www.raspberrypi.org) (2023-02-21) (ARM 32 bit and 64 bit) (kernel 5.15)
+- [Raspberry Pi OS](https://www.raspberrypi.org) (2023-12-05)(ARM 32 bit and 64 bit)
 
 - [Raspberry Pi Desktop](https://www.raspberrypi.org) (2022-07-01) (x86 32 bit) (kernel 5.10)
 
-- [SkiffOS](https://github.com/skiffos/skiffos/) for Odroid XU4 (ARM 32 bit) (kernel 6.0.7)
+- [Ubuntu](https://www.ubuntu.com) 22.04 (kernel 5.15) and 22.10 (kernel 5.19) (kernel 6.5)
 
 - [Ubuntu](https://www.ubuntu.com) 22.04 (kernel 5.15) and 22.10 (kernel 5.19) (kernel 6.2)
 
@@ -257,10 +276,16 @@ sudo apt install -y build-essential
 sudo apt install -y raspberrypi-kernel-headers build-essential bc dkms git
 ```
 
-- Option for Debian, Kali, and Raspberry Pi Desktop (x86)
+- Option for Debian, Kali, and Raspberry Pi Desktop (x86) (if using kali-pi for RasPi4B/5B, see note)
 
 ```
 sudo apt install -y linux-headers-$(uname -r) build-essential bc dkms git libelf-dev rfkill iw
+```
+
+Note: The following is needed if using kali-pi for RasPi4B/5B.
+
+```
+sudo apt install -y kalipi-kernel-headers build-essential bc dkms git
 ```
 
 - Option for Ubuntu (all official flavors) and the numerous Ubuntu based distros
@@ -293,7 +318,7 @@ sudo apk add linux-lts-dev make gcc
 sudo xbps-install linux-headers dkms git make
 ```
 
-- Options for Arch and Manjaro (if using Manjaro for RasPi4B, see note)
+- Options for Arch and Manjaro (if using Manjaro for RasPi4B/5B, see note)
 
 If using pacman
 
@@ -301,7 +326,7 @@ If using pacman
 sudo pacman -S --noconfirm linux-headers dkms git bc iw
 ```
 
-Note: The following is needed if using Manjaro for RasPi4B.
+Note: The following is needed if using Manjaro for RasPi4B/5B.
 
 ```
 sudo pacman -S --noconfirm linux-rpi4-headers dkms git bc
@@ -507,7 +532,6 @@ sudo ./install-driver.sh
 
 Note: Removing the driver is advised in the following situations:
 
-- if driver installation fails
 - if the driver is no longer needed
 
 Note: The following removes everything that has been installed, with the
@@ -524,7 +548,8 @@ cd ~/src/8814au
 
 #### Step 3: Run the removal script
 
-Note: For automated builds (non-interactive), use `NoPrompt` as an option.
+Note: For automated builds (non-interactive), use `NoPrompt` as an
+option.
 
 ```
 sudo ./remove-driver.sh
@@ -534,23 +559,47 @@ sudo ./remove-driver.sh
 
 ### Recommended WiFi Router/ Access Point Settings
 
-Note: These are general recommendations, some of which may not apply to your specific situation.
+Note: These recommendations apply when using your adapter in managed
+(client) mode, not AP mode.
 
-- Security: Set WPA2-AES or WPA2/WPA3 mixed or WPA3. Do not set WPA2 mixed mode or WPA or TKIP.
+Note: These are general recommendations, some of which may not apply to
+your specific situation.
 
-- Channel width for 2.4 GHz: Set 20 MHz fixed width. Do not use 40 MHz or 20/40 automatic.
+- Security: Set WPA2-AES or WPA2/WPA3 mixed or WPA3. Do not set WPA2
+mixed mode or WPA or TKIP.
 
-- Channels for 2.4 GHz: Set channel 1 or 6 or 11 depending on the congestion at your location. Do not set automatic channel selection. As time passes, if you notice poor performance, recheck congestion and set channel appropriately. The environment around you can and does change over time.
+- Channel width for 2.4 GHz: Set 20 MHz fixed width. Do not use 40 MHz
+or 20/40 automatic.
 
-- Mode for 2.4 GHz: For best performance, set "N only" if you no longer use B or G capable devices.
+- Channels for 2.4 GHz: Set channel 1 or 6 or 11 depending on the
+congestion at your location. Do not set automatic channel selection. As
+time passes, if you notice poor performance, recheck congestion and set
+channel appropriately. The environment around you can and does change
+over time.
 
-- Network names: Do not set the 2.4 GHz Network and the 5 GHz Network to the same name. Note: Unfortunately many routers come with both networks set to the same name. You need to be able to control which network that is in use so changing the name of one of the networks is recommended. Since many IoT devices use the 2.4 GHz network, it may be better to change the name of the 5 GHz network.
+- Mode for 2.4 GHz: For best performance, set "N only" if you no longer
+use B or G capable devices.
 
-- Channels for 5 GHz: Not all devices are capable of using DFS channels (I'm looking at you Roku.) It may be necessary to set a fixed channel in the range of 36 to 48 or 149 to 165 in order for all of your devices to work on 5 GHz. (For US, other countries may vary.)
+- Network names: Do not set the 2.4 GHz Network and the 5 GHz Network
+to the same name. Note: Unfortunately many routers come with both
+networks set to the same name. You need to be able to control which
+network that is in use so changing the name of one of the networks is
+recommended. Since many IoT devices use the 2.4 GHz network, it may be
+better to change the name of the 5 GHz network.
 
-- Best location for the WiFi router/access point: Near center of apartment or house, at least a couple of feet away from walls, in an elevated location. You may have to test to see what the best location is in your environment.
+- Channels for 5 GHz: Not all devices are capable of using DFS channels
+(I'm looking at you Roku.) It may be necessary to set a fixed channel in
+the range of 36 to 48 or 149 to 165 in order for all of your devices to
+work on 5 GHz. (For US, other countries may vary.)
 
-- Check congestion: There are apps available for smart phones that allow you to get an idea of the congestion levels on WiFi channels. The apps generally go by the name of `WiFi Analyzer` or something similar.
+- Best location for the WiFi router/access point: Near center of
+apartment or house, at least a couple of feet away from walls, in an
+elevated location. You may have to test to find the best location is
+in your environment.
+
+- Check congestion: There are apps available for smart phones that allow
+you to get an idea of the congestion levels on WiFi channels. The apps
+generally go by the name of `WiFi Analyzer` or something similar.
 
 After making and saving changes, reboot the router.
 
@@ -558,19 +607,45 @@ After making and saving changes, reboot the router.
 
 ### Recommendations regarding USB
 
-- Moving your USB WiFi adapter to a different USB port has been known to fix a variety of problems.
+- Moving your USB WiFi adapter to a different USB port has been known to
+fix a variety of problems.
 
-- If connecting your USB WiFi adapter to a desktop computer, use the USB ports on the rear of the computer. Why? The ports on the rear are directly connected to the motherboard which will reduce problems with interference and disconnection.
+- If connecting your USB WiFi adapter to a desktop computer, use the USB
+ports on the rear of the computer if you encounter any problems. Why?
+The ports on the rear are directly connected to the motherboard which
+will reduce problems with interference and disconnection. An extension
+cable can be helpful to position the adapter for best reception.
 
-- If your USB WiFi adapter is USB 3 capable and you want it to operate in USB3 mode, plug it into a USB 3 port.
+- If your USB WiFi adapter is USB 3 capable and you want it to operate
+in USB3 mode, plug it into a USB 3 port.
 
-- Avoid USB 3.1 Gen 2 ports if possible as almost all currently available adapters have been tested with USB 3.1 Gen 1 (aka USB 3) and not with USB 3.1 Gen 2.
+- Avoid USB 3.1 Gen 2 ports if possible as most currently available
+adapters have been tested with USB 3.1 Gen 1 (aka USB 3) and not with
+USB 3.1 Gen 2.
 
-- If you use an extension cable and your adapter is USB 3 capable, the cable needs to be USB 3 capable (if not, you will be limited to USB 2 speeds).
+- If you use an extension cable and your adapter is USB 3 capable, the
+cable needs to be USB 3 capable (if not, you will be limited to USB 2
+speeds).
 
-- Extention cables can be problematic. A way to check if the extension cable is the problem is to plug the adapter temporarily into a USB port on the computer.
+- Extention cables can be problematic. A way to check if the extension
+cable is the problem is to plug the adapter temporarily into a USB port
+on the computer.
 
-- Some USB WiFi adapters require considerable electrical current and push the capabilities of the power available via USB port. One example is adapters that use the Realtek 8814au chipset. Using a powered multiport USB extension can be a good idea in cases like this.
+- Some USB WiFi adapters require considerable electrical current and
+push the capabilities of the power available via USB port. One example
+is adapters that use the Realtek 8814au chipset. Using a powered
+multiport USB extension can be a good idea in cases like this.
+
+-----
+
+To Contribute:
+
+- Fork this repository.
+- Make your edits.
+- TEST THEM!
+- Create a pull request.
+
+-----
 
 #### [Go to Main Menu](https://github.com/morrownr/USB-WiFi)
 

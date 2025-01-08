@@ -14,6 +14,8 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/poll.h>
+#include <linux/timer.h>
+#include <linux/vmalloc.h>
 
 #define DEVNAME "ithc"
 #define DEVFULLNAME "Intel Touch Host Controller"
@@ -25,6 +27,31 @@
 #define CHECK_RET(...) do { int r = CHECK(__VA_ARGS__); if (r < 0) return r; } while (0)
 
 #define NUM_RX_BUF 16
+
+// PCI device IDs:
+// Lakefield
+#define PCI_DEVICE_ID_INTEL_THC_LKF_PORT1    0x98d0
+#define PCI_DEVICE_ID_INTEL_THC_LKF_PORT2    0x98d1
+// Tiger Lake
+#define PCI_DEVICE_ID_INTEL_THC_TGL_LP_PORT1 0xa0d0
+#define PCI_DEVICE_ID_INTEL_THC_TGL_LP_PORT2 0xa0d1
+#define PCI_DEVICE_ID_INTEL_THC_TGL_H_PORT1  0x43d0
+#define PCI_DEVICE_ID_INTEL_THC_TGL_H_PORT2  0x43d1
+// Alder Lake
+#define PCI_DEVICE_ID_INTEL_THC_ADL_S_PORT1  0x7ad8
+#define PCI_DEVICE_ID_INTEL_THC_ADL_S_PORT2  0x7ad9
+#define PCI_DEVICE_ID_INTEL_THC_ADL_P_PORT1  0x51d0
+#define PCI_DEVICE_ID_INTEL_THC_ADL_P_PORT2  0x51d1
+#define PCI_DEVICE_ID_INTEL_THC_ADL_M_PORT1  0x54d0
+#define PCI_DEVICE_ID_INTEL_THC_ADL_M_PORT2  0x54d1
+// Raptor Lake
+#define PCI_DEVICE_ID_INTEL_THC_RPL_S_PORT1  0x7a58
+#define PCI_DEVICE_ID_INTEL_THC_RPL_S_PORT2  0x7a59
+// Meteor Lake
+#define PCI_DEVICE_ID_INTEL_THC_MTL_S_PORT1  0x7f59
+#define PCI_DEVICE_ID_INTEL_THC_MTL_S_PORT2  0x7f5b
+#define PCI_DEVICE_ID_INTEL_THC_MTL_MP_PORT1 0x7e49
+#define PCI_DEVICE_ID_INTEL_THC_MTL_MP_PORT2 0x7e4b
 
 struct ithc;
 
@@ -40,6 +67,7 @@ struct ithc {
 	struct pci_dev *pci;
 	int irq;
 	struct task_struct *poll_thread;
+	struct timer_list idle_timer;
 
 	struct ithc_registers __iomem *regs;
 	struct ithc_registers *prev_regs; // for debugging

@@ -15,7 +15,7 @@
 #ifndef __RTL8723D_RF_H__
 #define __RTL8723D_RF_H__
 
-int PHY_RF6052_Config8723D(PADAPTER pdapter);
+int PHY_RF6052_Config8723D(IN PADAPTER pdapter);
 
-void PHY_RF6052SetBandwidth8723D(PADAPTER Adapter, enum channel_width Bandwidth);
+void PHY_RF6052SetBandwidth8723D(IN PADAPTER Adapter, IN enum channel_width Bandwidth);
 #endif

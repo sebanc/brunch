@@ -1,26 +1,38 @@
 rtw89
 ===========
-### A repo for the newest Realtek rtlwifi codes.
+### A repo for the newest Realtek rtw89 codes.
 
-This branch was created from the version merged into the wireless-drivers-next
+This repo now contains the code for the Realtek RTW8922AE,  which
+is a Wifi 7 device. It has been tested using a Wifi 6 AP as I do not have access
+to a Wifi 7 model. The driver works very well.
+
+This repo is current with rtw-next up to April 3, 2024.
+
+This branch was created from the version merged into the wireless-next
 repo, which is in the 5.16 kernel. IF YOU USE DRIVERS FROM THIS REPO FOR KERNELS
 5.16+, YOU MUST BLACKLIST THE KERNEL VERSIONS!!!! FAILING TO DO THIS WILL RESULT
 IN ALL MANNER OF STRANGE ERRORS.
 
-This code will build on any kernel 5.7 and newer as long as the distro has not modified
+This code will build on any kernel 6.10 and newer as long as the distro has not modified
 any of the kernel APIs. IF YOU RUN UBUNTU, YOU CAN BE ASSURED THAT THE APIs HAVE CHANGED.
 NO, I WILL NOT MODIFY THE SOURCE FOR YOU. YOU ARE ON YOUR OWN!!!!!
 
-I am working on fixing builds on older kernels.
+Note that if you use this driver on kernels older than 5.15, the enhanced features
+of  wifi 5 and wifi 6 are greatly crippled as the kernel does hot have the capability
+to support the new packet widths and speeds. If you use such a kernel, you might
+as well have an 802.11n (wifi 4) device.
 
 This repository includes drivers for the following cards:
 
-Realtek 8852AE, 8851BE, 8852BE, and 8853CE
+Realtek 8851BE, 8852AE, 8852BE, 8852CE, and 8922AE.
 
 If you are looking for a driver for chips such as
-RTL8188EE, RTL8192CE, RTL8192CU, RTL8192DE, RTL8192EE, RTL8192SE, RTL8723AE, RTL8723BE, or RTL8821AE,
+RTL8188EE, RTL8192CE, RTL8192CU, RTL8192DE, RTL8192EE, RTL8192SE, RTL8723AE, or RTL8723BE,
 these should be provided by your kernel. If not, then you should go to the Backports Project
 (https://backports.wiki.kernel.org/index.php/Main_Page) to obtain the necessary code.
+
+If you have an RTW8822B{E,U,S}, RTW8822C{E,U,S}, RTW8723D{E,U,S}, or RTW8821C{E,U,S}, then
+you should use the drivers at https://github.com/lwfinger/rtw88.git.
 
 ### Installation instruction
 ##### Requirements
@@ -67,25 +79,25 @@ cd rtw89
 make
 sudo make sign-install
 ```
-You will be promted a password, please keep it in mind and use it in next steps.
+You will be prompted with a password, please keep it in mind and use it in the next steps.
 Reboot to activate the new installed module.
-In the MOK managerment screen:
+In the MOK management screen:
 1. Select "Enroll key" and enroll the key created by above sign-install step
-2. When promted, enter the password you entered when create sign key. 
-3. If you enter wrong password, your computer won't not bebootable. In this case,
+2. When prompted, enter the password you entered when create sign key. 
+3. If you enter wrong password, your computer won't be bootable. In this case,
    use the BOOT menu from your BIOS, to boot into your OS then do below steps:
 ```bash
 sudo mokutil --reset
 ```
 Restart your computer
 Use BOOT menu from BIOS to boot into your OS
-In the MOK managerment screen, select reset MOK list
-Reboot then retry from the step make sign-install
+In the MOK management screen, select reset MOK list
+Reboot then retry from the step to make sign-install
 
 ##### How to unload/reload a Kernel module
  ```bash
 sudo modprobe -rv rtw_8852ae
-sudo modprobe -rv rtw_core	     #These two statements unload the module
+sudo modprobe -rv rtw89core	     #These two statements unload the module
 
 Due to the behavior of the modprobe utility, it takes both to unload.
 
@@ -101,14 +113,20 @@ sudo make uninstall
 ```
 
 ##### Problem with recovery after sleep or hibernation
-Some BIOSs have trouble changing power state from D3hot to D0. If you have this problem, then
+Some BIOSs have trouble changing the power state from D3hot to D0. If you have this problem, then
 
 sudo cp suspend_rtw89 /usr/lib/systemd/system-sleep/.
 
 That script will unload the driver before sleep or hibernation, and reload it following resumption.
 
 ##### Option configuration
-If it turns out that your system needs one of the configuration options, then do the following:
+IMPORTANT: If you have an HP or Lenovo laptop, Their BIOS does not handle the PCIe interface correctly.
+To compensate, run the following command:
+sudo cp 70-rtw89.conf /etc/modprobe.d/.
+Then unload the drivers and reload. You should see the options appended to the end of the rtw89_pci
+or rtw89pci load line.
+
+If it turns out that your system needs one of the other configuration options, then do the following:
 ```bash
 sudo nano /etc/modprobe.d/<dev_name>.conf
 ```
@@ -117,10 +135,22 @@ There, enter the line below:
 options <driver_name> <<driver_option_name>>=<value>
 ```
 The available options for rtw89pci are disable_clkreq, disable_aspm_l1, and disable_aspm_l1ss.
-The available options for rtw89core are debug_mask, and disable_ps_mode
+The available options for rtw89core are debug_mask, and disable_ps_mode.
+
+If after rebooting the wifi still doesn't work, it might mean that it was not loaded.
+To fix that, you will have to manually rebuild `initramfs`. To do that, execute one of the two commands, 
+depending on how old/new your system is.
+
+```bash
+mkinitrd # If you're running an older system
+
+dracut -f --regenerate-all # If you're running a newer system
+```
+
+After rebuilding `initramfs`, reboot your computer and check if the wifi works properly now.
 
 Normally, none of these will be needed; however, if you are getting firmware errors, one or both
-of the disable_aspm_* options may help. Thay are needed when a buggy BIOS fails to implement the
+of the disable_aspm_* options may help. They are needed when a buggy BIOS fails to implement the
 PCI specs correctly.
 
 ***********************************************************************************************
@@ -138,9 +168,9 @@ sudo make sign-install
 
 Remember, this MUST be done whenever you get a new kernel - no exceptions.
 
-These drivers will not build for kernels older than 5.4. If you must use an older kernel,
-submit a GitHub issue with a listing of the build errors. Without the errors, the issue
-will be ignored. I am not a mind reader.
+These drivers will not build for kernels older than 5.8. If you must use an older kernel,
+submit a GitHub issue with a listing of the build errors, but be aware that doing so will
+cripple your device. Without the errors, the issue will be ignored. I am not a mind reader.
 
 When you have problems where the driver builds and loads correctly, but fails to work, a GitHub
 issue is NOT the best place to report it. I have no idea of the internal workings of any of the
@@ -159,7 +189,7 @@ as long as the dkms signing key (usually located at /var/lib/dkms/mok.key) is en
 Prerequisites:
 
 ``` bash
-sudo apt install dh-sequence-dkms debhelper build-essential devscripts
+sudo apt install dh-sequence-dkms debhelper build-essential devscripts git-build-recipe
 ```
 
 This workflow uses devscripts, which has quite a few perl dependencies.  

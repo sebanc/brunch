@@ -942,7 +942,7 @@ void halbtc8192e2ant_dac_swing(IN struct btc_coexist *btcoexist,
 		     coex_dm->cur_dac_swing_lvl))
 			return;
 	}
-	delay_ms(30);
+	mdelay(30);
 	halbtc8192e2ant_set_sw_full_time_dac_swing(btcoexist, dac_swing_on,
 			dac_swing_lvl);
 
@@ -1562,7 +1562,7 @@ void halbtc8192e2ant_ps_tdma(IN struct btc_coexist *btcoexist,
 			break;
 		case 1:  /* ANT2BT, 0x778=3 */
 			halbtc8192e2ant_set_fw_pstdma(btcoexist, 0x0, 0x0, 0x0, 0x8, 0x0);
-			delay_ms(5);
+			mdelay(5);
 			halbtc8192e2ant_set_ant_path(btcoexist, BTC_ANT_PATH_BT, false, false);
 			break;
 		}

@@ -53,81 +53,90 @@
 /*
  * BB and RF register read/write
  *   */
-u32	PHY_QueryBBReg8812(PADAPTER	Adapter,
-				u32			RegAddr,
-				u32			BitMask);
-void	PHY_SetBBReg8812(PADAPTER		Adapter,
-				u32			RegAddr,
-				u32			BitMask,
-				u32			Data);
-u32	PHY_QueryRFReg8812(PADAPTER	Adapter,
-				enum rf_path	eRFPath,
-				u32			RegAddr,
-				u32			BitMask);
-void	PHY_SetRFReg8812(PADAPTER		Adapter,
-				enum rf_path	eRFPath,
-				u32			RegAddr,
-				u32			BitMask,
-				u32			Data);
+u32	PHY_QueryBBReg8812(IN	PADAPTER	Adapter,
+			   IN	u32			RegAddr,
+			   IN	u32			BitMask);
+void	PHY_SetBBReg8812(IN	PADAPTER		Adapter,
+			 IN	u32			RegAddr,
+			 IN	u32			BitMask,
+			 IN	u32			Data);
+u32	PHY_QueryRFReg8812(IN	PADAPTER	Adapter,
+			   IN	enum rf_path	eRFPath,
+			   IN	u32			RegAddr,
+			   IN	u32			BitMask);
+void	PHY_SetRFReg8812(IN	PADAPTER		Adapter,
+			 IN	enum rf_path	eRFPath,
+			 IN	u32			RegAddr,
+			 IN	u32			BitMask,
+			 IN	u32			Data);
 
 /*
  * Initialization related function
  *
  * MAC/BB/RF HAL config */
-int	PHY_MACConfig8812(PADAPTER	Adapter);
-int	PHY_BBConfig8812(PADAPTER	Adapter);
-void	PHY_BB8812_Config_1T(PADAPTER	Adapter);
-int	PHY_RFConfig8812(PADAPTER	Adapter);
+int	PHY_MACConfig8812(IN PADAPTER	Adapter);
+int	PHY_BBConfig8812(IN PADAPTER	Adapter);
+void	PHY_BB8812_Config_1T(IN PADAPTER	Adapter);
+int	PHY_RFConfig8812(IN PADAPTER	Adapter);
 
 /* RF config */
 
 s32
 PHY_SwitchWirelessBand8812(
-		PADAPTER		Adapter,
-		u8			Band
+	IN PADAPTER		Adapter,
+	IN u8			Band
 );
 
 /*
  * BB TX Power R/W
  *   */
-void	PHY_SetTxPowerLevel8812(PADAPTER	Adapter, u8	Channel);
+void	PHY_GetTxPowerLevel8812(IN PADAPTER	Adapter, OUT s32	*powerlevel);
+void	PHY_SetTxPowerLevel8812(IN PADAPTER	Adapter, IN u8	Channel);
 
-bool phy_get_txpwr_target_skip_by_rate_8812a(_adapter *adapter, enum MGN_RATE rate);
-
-u32 phy_get_tx_bb_swing_8812a(
-		PADAPTER	Adapter,
-		BAND_TYPE	Band,
-		enum rf_path	RFPath
+BOOLEAN	PHY_UpdateTxPowerDbm8812(IN PADAPTER	Adapter, IN int	powerInDbm);
+u8 PHY_GetTxPowerIndex_8812A(
+	IN	PADAPTER			pAdapter,
+	IN	enum rf_path			RFPath,
+	IN	u8					Rate,
+	IN	u8					BandWidth,
+	IN	u8					Channel,
+	struct txpwr_idx_comp *tic
 );
 
-void
+u32 phy_get_tx_bb_swing_8812a(
+	IN	PADAPTER	Adapter,
+	IN	BAND_TYPE	Band,
+	IN	enum rf_path	RFPath
+);
+
+VOID
 PHY_SetTxPowerIndex_8812A(
-		PADAPTER		Adapter,
-		u32				PowerIndex,
-		enum rf_path		RFPath,
-		u8				Rate
+	IN	PADAPTER		Adapter,
+	IN	u32				PowerIndex,
+	IN	enum rf_path		RFPath,
+	IN	u8				Rate
 );
 
 /*
  * channel switch related funciton
  *   */
-void
+VOID
 PHY_SetSwChnlBWMode8812(
-		PADAPTER			Adapter,
-		u8					channel,
-		enum channel_width	Bandwidth,
-		u8					Offset40,
-		u8					Offset80
+	IN	PADAPTER			Adapter,
+	IN	u8					channel,
+	IN	enum channel_width	Bandwidth,
+	IN	u8					Offset40,
+	IN	u8					Offset80
 );
 
 /*
  * BB/MAC/RF other monitor API
  *   */
 
-void
+VOID
 phy_set_rf_path_switch_8812a(
-		struct dm_struct		*phydm,
-		bool		bMain
+	IN	struct dm_struct		*phydm,
+	IN	bool		bMain
 );
 
 /*--------------------------Exported Function prototype---------------------*/

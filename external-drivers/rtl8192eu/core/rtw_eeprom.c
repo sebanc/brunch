@@ -22,7 +22,7 @@ void up_clk(_adapter	*padapter,	 u16 *x)
 {
 	*x = *x | _EESK;
 	rtw_write8(padapter, EE_9346CR, (u8)*x);
-	rtw_udelay_os(CLOCK_RATE);
+	udelay(CLOCK_RATE);
 
 
 }
@@ -31,7 +31,7 @@ void down_clk(_adapter	*padapter, u16 *x)
 {
 	*x = *x & ~_EESK;
 	rtw_write8(padapter, EE_9346CR, (u8)*x);
-	rtw_udelay_os(CLOCK_RATE);
+	udelay(CLOCK_RATE);
 }
 
 void shift_out_bits(_adapter *padapter, u16 data, u16 count)
@@ -54,7 +54,7 @@ void shift_out_bits(_adapter *padapter, u16 data, u16 count)
 			goto out;
 		}
 		rtw_write8(padapter, EE_9346CR, (u8)x);
-		rtw_udelay_os(CLOCK_RATE);
+		udelay(CLOCK_RATE);
 		up_clk(padapter, &x);
 		down_clk(padapter, &x);
 		mask = mask >> 1;
@@ -106,10 +106,10 @@ void standby(_adapter	*padapter)
 	x &= ~(_EECS | _EESK);
 	rtw_write8(padapter, EE_9346CR, x);
 
-	rtw_udelay_os(CLOCK_RATE);
+	udelay(CLOCK_RATE);
 	x |= _EECS;
 	rtw_write8(padapter, EE_9346CR, x);
-	rtw_udelay_os(CLOCK_RATE);
+	udelay(CLOCK_RATE);
 }
 
 u16 wait_eeprom_cmd_done(_adapter *padapter)
@@ -123,7 +123,7 @@ u16 wait_eeprom_cmd_done(_adapter *padapter)
 			res = _TRUE;
 			goto exit;
 		}
-		rtw_udelay_os(CLOCK_RATE);
+		udelay(CLOCK_RATE);
 	}
 exit:
 	return res;
@@ -156,6 +156,20 @@ out:
 void eeprom_write16(_adapter *padapter, u16 reg, u16 data)
 {
 	u8 x;
+#ifdef CONFIG_RTL8712
+	u8	tmp8_ori, tmp8_new, tmp8_clk_ori, tmp8_clk_new;
+	tmp8_ori = rtw_read8(padapter, 0x102502f1);
+	tmp8_new = tmp8_ori & 0xf7;
+	if (tmp8_ori != tmp8_new) {
+		rtw_write8(padapter, 0x102502f1, tmp8_new);
+	}
+	tmp8_clk_ori = rtw_read8(padapter, 0x10250003);
+	tmp8_clk_new = tmp8_clk_ori | 0x20;
+	if (tmp8_clk_new != tmp8_clk_ori) {
+		rtw_write8(padapter, 0x10250003, tmp8_clk_new);
+	}
+#endif
+
 	x = rtw_read8(padapter, EE_9346CR);
 
 	x &= ~(_EEDI | _EEDO | _EESK | _EEM0);
@@ -207,6 +221,13 @@ void eeprom_write16(_adapter *padapter, u16 reg, u16 data)
 
 	eeprom_clean(padapter);
 exit:
+#ifdef CONFIG_RTL8712
+	if (tmp8_clk_new != tmp8_clk_ori)
+		rtw_write8(padapter, 0x10250003, tmp8_clk_ori);
+	if (tmp8_new != tmp8_ori)
+		rtw_write8(padapter, 0x102502f1, tmp8_ori);
+
+#endif
 	return;
 }
 
@@ -215,6 +236,19 @@ u16 eeprom_read16(_adapter *padapter, u16 reg)  /* ReadEEprom */
 
 	u16 x;
 	u16 data = 0;
+#ifdef CONFIG_RTL8712
+	u8	tmp8_ori, tmp8_new, tmp8_clk_ori, tmp8_clk_new;
+	tmp8_ori = rtw_read8(padapter, 0x102502f1);
+	tmp8_new = tmp8_ori & 0xf7;
+	if (tmp8_ori != tmp8_new) {
+		rtw_write8(padapter, 0x102502f1, tmp8_new);
+	}
+	tmp8_clk_ori = rtw_read8(padapter, 0x10250003);
+	tmp8_clk_new = tmp8_clk_ori | 0x20;
+	if (tmp8_clk_new != tmp8_clk_ori) {
+		rtw_write8(padapter, 0x10250003, tmp8_clk_new);
+	}
+#endif
 
 	if (rtw_is_surprise_removed(padapter)) {
 		goto out;
@@ -240,7 +274,13 @@ u16 eeprom_read16(_adapter *padapter, u16 reg)  /* ReadEEprom */
 
 	eeprom_clean(padapter);
 out:
+#ifdef CONFIG_RTL8712
+	if (tmp8_clk_new != tmp8_clk_ori)
+		rtw_write8(padapter, 0x10250003, tmp8_clk_ori);
+	if (tmp8_new != tmp8_ori)
+		rtw_write8(padapter, 0x102502f1, tmp8_ori);
 
+#endif
 	return data;
 
 
@@ -321,7 +361,7 @@ u8 eeprom_read(_adapter *padapter, u32 addr_off, u8 sz, u8 *rbuf)
 
 
 
-void read_eeprom_content(_adapter	*padapter)
+VOID read_eeprom_content(_adapter	*padapter)
 {
 
 

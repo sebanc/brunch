@@ -132,7 +132,7 @@ u8 HalPwrSeqCmdParsing(
 					if (value == (GET_PWR_CFG_VALUE(PwrCfgCmd) & GET_PWR_CFG_MASK(PwrCfgCmd)))
 						bPollingBit = _TRUE;
 					else
-						rtw_udelay_os(10);
+						udelay(10);
 
 					if (pollingCount++ > maxPollingCnt) {
 						RTW_ERR("HalPwrSeqCmdParsing: Fail to polling Offset[%#x]=%02x\n", offset, value);
@@ -142,13 +142,13 @@ u8 HalPwrSeqCmdParsing(
 
 							RTW_ERR("[WARNING] PCIE polling(0x%X) timeout(%d), Toggle 0x04[3] and try again.\n", offset, maxPollingCnt);
 							if (IS_HARDWARE_TYPE_8723DE(padapter))
-								PlatformEFIOWrite1Byte(padapter, 0x40, (PlatformEFIORead1Byte(padapter, 0x40)) & (~BIT3));
+								rtw_write8(padapter, 0x40, (rtw_read8(padapter, 0x40)) & (~BIT3));
 
-							PlatformEFIOWrite1Byte(padapter, 0x04, PlatformEFIORead1Byte(padapter, 0x04) | BIT3);
-							PlatformEFIOWrite1Byte(padapter, 0x04, PlatformEFIORead1Byte(padapter, 0x04) & ~BIT3);
+							rtw_write8(padapter, 0x04, rtw_read8(padapter, 0x04) | BIT3);
+							rtw_write8(padapter, 0x04, rtw_read8(padapter, 0x04) & ~BIT3);
 
 							if (IS_HARDWARE_TYPE_8723DE(padapter))
-								PlatformEFIOWrite1Byte(padapter, 0x40, PlatformEFIORead1Byte(padapter, 0x40)|BIT3);
+								rtw_write8(padapter, 0x40, rtw_read8(padapter, 0x40)|BIT3);
 
 							/* Retry Polling Process one more time */
 							pollingCount = 0;
@@ -163,9 +163,9 @@ u8 HalPwrSeqCmdParsing(
 
 			case PWR_CMD_DELAY:
 				if (GET_PWR_CFG_VALUE(PwrCfgCmd) == PWRSEQ_DELAY_US)
-					rtw_udelay_os(GET_PWR_CFG_OFFSET(PwrCfgCmd));
+					udelay(GET_PWR_CFG_OFFSET(PwrCfgCmd));
 				else
-					rtw_udelay_os(GET_PWR_CFG_OFFSET(PwrCfgCmd) * 1000);
+					udelay(GET_PWR_CFG_OFFSET(PwrCfgCmd) * 1000);
 				break;
 
 			case PWR_CMD_END:

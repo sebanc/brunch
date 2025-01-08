@@ -2729,14 +2729,21 @@ union recv_frame *recvframe_defrag(_adapter *adapter, _queue *defrag_q)
 			return NULL;
 		}
 
-		curfragnum++;
-
 		/* copy the 2nd~n fragment frame's payload to the first fragment */
 		/* get the 2nd~last fragment frame's payload */
 
 		wlanhdr_offset = pnfhdr->attrib.hdrlen + pnfhdr->attrib.iv_len;
 
 		recvframe_pull(pnextrframe, wlanhdr_offset);
+
+		if ((pfhdr->rx_end - pfhdr->rx_tail) < pnfhdr->len) {
+			RTW_INFO("Not enough buffer space, drop fragmented frame!\n");
+			rtw_free_recvframe(prframe, pfree_recv_queue);
+			rtw_free_recvframe_queue(defrag_q, pfree_recv_queue);
+			return NULL;
+		}
+
+		curfragnum++;
 
 		/* append  to first fragment frame's tail (if privacy frame, pull the ICV) */
 		recvframe_pull_tail(prframe, pfhdr->attrib.icv_len);

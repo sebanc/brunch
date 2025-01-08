@@ -11,6 +11,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 
+#include "eds1.h"
 #include "context.h"
 #include "control.h"
 #include "spec-hid.h"

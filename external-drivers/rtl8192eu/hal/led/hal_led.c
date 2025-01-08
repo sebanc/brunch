@@ -184,7 +184,7 @@ void rtw_led_control(_adapter *adapter, LED_CTL_MODE ctl)
 void rtw_led_tx_control(_adapter *adapter, const u8 *da)
 {
 #if CONFIG_RTW_SW_LED_TRX_DA_CLASSIFY
-	if (IS_MCAST(da))
+	if (is_multicast_ether_addr(da))
 		rtw_led_control(adapter, LED_CTL_BMC_TX);
 	else
 		rtw_led_control(adapter, LED_CTL_UC_TX);
@@ -196,7 +196,7 @@ void rtw_led_tx_control(_adapter *adapter, const u8 *da)
 void rtw_led_rx_control(_adapter *adapter, const u8 *da)
 {
 #if CONFIG_RTW_SW_LED_TRX_DA_CLASSIFY
-	if (IS_MCAST(da))
+	if (is_multicast_ether_addr(da))
 		rtw_led_control(adapter, LED_CTL_BMC_RX);
 	else
 		rtw_led_control(adapter, LED_CTL_UC_RX);

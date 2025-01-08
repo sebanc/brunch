@@ -3671,23 +3671,7 @@ static void hw_var_set_monitor(PADAPTER adapter, u8 variable, u8 *val)
 	rtw_hal_get_hwreg(adapter, HW_VAR_RCR, (u8 *)& mon->rcr);
 
 	/* Receive all type */
-#if 0
 	tmp_32bit = RCR_AAP | RCR_APP_PHYST_RXFF;
-#else
-	tmp_32bit = 
-		RCR_AAP | 
-		RCR_APM | 
-		RCR_AM | 
-		RCR_AB | 
-		RCR_APWRMGT | 
-		RCR_ADF | 
-		RCR_ACF |
-		RCR_AMF | 
-		RCR_APP_PHYST_RXFF;
-
-	/* CRC and ICV packet will drop in recvbuf2recvframe() so we don't turn them on. */
-	tmp_32bit &= ~(RCR_ACRC32 | RCR_AICV);
-#endif
 
 	if (ndev->type == ARPHRD_IEEE80211_RADIOTAP) {
 		/* Append FCS */

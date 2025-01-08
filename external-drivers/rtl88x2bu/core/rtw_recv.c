@@ -2729,14 +2729,21 @@ union recv_frame *recvframe_defrag(_adapter *adapter, _queue *defrag_q)
 			return NULL;
 		}
 
-		curfragnum++;
-
 		/* copy the 2nd~n fragment frame's payload to the first fragment */
 		/* get the 2nd~last fragment frame's payload */
 
 		wlanhdr_offset = pnfhdr->attrib.hdrlen + pnfhdr->attrib.iv_len;
 
 		recvframe_pull(pnextrframe, wlanhdr_offset);
+
+		if ((pfhdr->rx_end - pfhdr->rx_tail) < pnfhdr->len) {
+			RTW_INFO("Not enough buffer space, drop fragmented frame!\n");
+			rtw_free_recvframe(prframe, pfree_recv_queue);
+			rtw_free_recvframe_queue(defrag_q, pfree_recv_queue);
+			return NULL;
+		}
+
+		curfragnum++;
 
 		/* append  to first fragment frame's tail (if privacy frame, pull the ICV) */
 		recvframe_pull_tail(prframe, pfhdr->attrib.icv_len);
@@ -3835,11 +3842,11 @@ int validate_mp_recv_frame(_adapter *adapter, union recv_frame *precv_frame)
 			for (i = 0; i < precv_frame->u.hdr.len; i = i + 8)
 				RTW_INFO("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:\n", *(ptr + i),
 					*(ptr + i + 1), *(ptr + i + 2) , *(ptr + i + 3) , *(ptr + i + 4), *(ptr + i + 5), *(ptr + i + 6), *(ptr + i + 7));
-			RTW_INFO("#############################\n");
-			_rtw_memset(pmppriv->mplink_buf, '\0' , sizeof(pmppriv->mplink_buf));
-			_rtw_memcpy(pmppriv->mplink_buf, ptr, precv_frame->u.hdr.len);
-			pmppriv->mplink_rx_len = precv_frame->u.hdr.len;
-			pmppriv->mplink_brx =_TRUE;
+				RTW_INFO("#############################\n");
+				_rtw_memset(pmppriv->mplink_buf, '\0' , sizeof(pmppriv->mplink_buf));
+				_rtw_memcpy(pmppriv->mplink_buf, ptr, precv_frame->u.hdr.len);
+				pmppriv->mplink_rx_len = precv_frame->u.hdr.len;
+				pmppriv->mplink_brx =_TRUE;
 		}
 	}
 	if (pmppriv->bloopback) {

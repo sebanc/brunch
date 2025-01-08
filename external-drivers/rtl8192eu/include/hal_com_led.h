@@ -199,15 +199,15 @@ typedef struct _LED_PCIE {
 typedef struct _LED_PCIE	LED_DATA, *PLED_DATA;
 typedef enum _LED_STRATEGY_PCIE	LED_STRATEGY, *PLED_STRATEGY;
 
-void
+VOID
 LedControlPCIE(
-		PADAPTER		Adapter,
-		LED_CTL_MODE		LedAction
+	IN	PADAPTER		Adapter,
+	IN	LED_CTL_MODE		LedAction
 );
 
-void
+VOID
 gen_RefreshLedState(
-		PADAPTER		Adapter);
+	IN	PADAPTER		Adapter);
 
 /* ********************************************************************************
  * USB  LED Definition.
@@ -274,10 +274,10 @@ typedef struct _LED_USB {
 typedef struct _LED_USB	LED_DATA, *PLED_DATA;
 typedef enum _LED_STRATEGY_USB	LED_STRATEGY, *PLED_STRATEGY;
 #ifdef CONFIG_RTW_SW_LED
-void
+VOID
 LedControlUSB(
-		PADAPTER		Adapter,
-		LED_CTL_MODE		LedAction
+	IN	PADAPTER		Adapter,
+	IN	LED_CTL_MODE		LedAction
 );
 #endif
 
@@ -336,10 +336,10 @@ typedef struct _LED_SDIO {
 typedef struct _LED_SDIO	LED_DATA, *PLED_DATA;
 typedef enum _LED_STRATEGY_SDIO	LED_STRATEGY, *PLED_STRATEGY;
 
-void
+VOID
 LedControlSDIO(
-		PADAPTER		Adapter,
-		LED_CTL_MODE		LedAction
+	IN	PADAPTER		Adapter,
+	IN	LED_CTL_MODE		LedAction
 );
 
 #endif

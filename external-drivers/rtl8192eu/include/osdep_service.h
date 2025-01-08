@@ -27,9 +27,6 @@
 #define RTW_ALREADY				8
 #define RTW_RA_RESOLVING		9
 #define RTW_BMC_NO_NEED			10
-#define RTW_XBUF_UNAVAIL		11
-#define RTW_TX_BALANCE			12
-#define RTW_TX_WAIT_MORE_FRAME	13
 
 /* #define RTW_STATUS_TIMEDOUT -110 */
 
@@ -39,11 +36,6 @@
 #undef _FALSE
 #define _FALSE		0
 
-
-#ifdef PLATFORM_FREEBSD
-	#include <osdep_service_bsd.h>
-#endif
-
 #ifdef PLATFORM_LINUX
 	#include <linux/version.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
@@ -51,26 +43,12 @@
 	#include <linux/sched/types.h>
 #endif
 	#include <osdep_service_linux.h>
-	#include <drv_types_linux.h>
-#endif
-
-#ifdef PLATFORM_OS_XP
-	#include <osdep_service_xp.h>
-	#include <drv_types_xp.h>
-#endif
-
-#ifdef PLATFORM_OS_CE
-	#include <osdep_service_ce.h>
-	#include <drv_types_ce.h>
 #endif
 
 /* #include <rtw_byteorder.h> */
 
 #ifndef BIT
 	#define BIT(x)	(1 << (x))
-#endif
-#ifndef BIT_ULL
-#define BIT_ULL(x)	(1ULL << (x))
 #endif
 
 #define CHECK_BIT(a, b) (!!((a) & (b)))
@@ -113,16 +91,7 @@
 #define BIT35	0x0800000000
 #define BIT36	0x1000000000
 
-#ifndef GENMASK
-#define GENMASK(h, l) \
-	(((~0UL) - (1UL << (l)) + 1) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
-#endif
-
 extern int RTW_STATUS_CODE(int error_code);
-
-#ifndef RTK_DMP_PLATFORM
-	#define CONFIG_USE_VMALLOC
-#endif
 
 /* flags used for rtw_mstat_update() */
 enum mstat_f {
@@ -157,9 +126,6 @@ typedef enum mstat_status {
 void rtw_mstat_update(const enum mstat_f flags, const MSTAT_STATUS status, u32 sz);
 void rtw_mstat_dump(void *sel);
 bool match_mstat_sniff_rules(const enum mstat_f flags, const size_t size);
-void *dbg_rtw_vmalloc(u32 sz, const enum mstat_f flags, const char *func, const int line);
-void *dbg_rtw_zvmalloc(u32 sz, const enum mstat_f flags, const char *func, const int line);
-void dbg_rtw_vmfree(void *pbuf, const enum mstat_f flags, u32 sz, const char *func, const int line);
 void *dbg_rtw_malloc(u32 sz, const enum mstat_f flags, const char *func, const int line);
 void *dbg_rtw_zmalloc(u32 sz, const enum mstat_f flags, const char *func, const int line);
 void dbg_rtw_mfree(void *pbuf, const enum mstat_f flags, u32 sz, const char *func, const int line);
@@ -181,21 +147,6 @@ void *dbg_rtw_usb_buffer_alloc(struct usb_device *dev, size_t size, dma_addr_t *
 void dbg_rtw_usb_buffer_free(struct usb_device *dev, size_t size, void *addr, dma_addr_t dma, const enum mstat_f flags, const char *func, const int line);
 #endif /* CONFIG_USB_HCI */
 
-#ifdef CONFIG_USE_VMALLOC
-#define rtw_vmalloc(sz)			dbg_rtw_vmalloc((sz), MSTAT_TYPE_VIR, __FUNCTION__, __LINE__)
-#define rtw_zvmalloc(sz)			dbg_rtw_zvmalloc((sz), MSTAT_TYPE_VIR, __FUNCTION__, __LINE__)
-#define rtw_vmfree(pbuf, sz)		dbg_rtw_vmfree((pbuf), (sz), MSTAT_TYPE_VIR, __FUNCTION__, __LINE__)
-#define rtw_vmalloc_f(sz, mstat_f)			dbg_rtw_vmalloc((sz), ((mstat_f) & 0xff00) | MSTAT_TYPE_VIR, __FUNCTION__, __LINE__)
-#define rtw_zvmalloc_f(sz, mstat_f)		dbg_rtw_zvmalloc((sz), ((mstat_f) & 0xff00) | MSTAT_TYPE_VIR, __FUNCTION__, __LINE__)
-#define rtw_vmfree_f(pbuf, sz, mstat_f)	dbg_rtw_vmfree((pbuf), (sz), ((mstat_f) & 0xff00) | MSTAT_TYPE_VIR, __FUNCTION__, __LINE__)
-#else /* CONFIG_USE_VMALLOC */
-#define rtw_vmalloc(sz)			dbg_rtw_malloc((sz), MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
-#define rtw_zvmalloc(sz)			dbg_rtw_zmalloc((sz), MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
-#define rtw_vmfree(pbuf, sz)		dbg_rtw_mfree((pbuf), (sz), MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
-#define rtw_vmalloc_f(sz, mstat_f)			dbg_rtw_malloc((sz), ((mstat_f) & 0xff00) | MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
-#define rtw_zvmalloc_f(sz, mstat_f)		dbg_rtw_zmalloc((sz), ((mstat_f) & 0xff00) | MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
-#define rtw_vmfree_f(pbuf, sz, mstat_f)	dbg_rtw_mfree((pbuf), (sz), ((mstat_f) & 0xff00) | MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
-#endif /* CONFIG_USE_VMALLOC */
 #define rtw_malloc(sz)			dbg_rtw_malloc((sz), MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
 #define rtw_zmalloc(sz)			dbg_rtw_zmalloc((sz), MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
 #define rtw_mfree(pbuf, sz)		dbg_rtw_mfree((pbuf), (sz), MSTAT_TYPE_PHY, __FUNCTION__, __LINE__)
@@ -230,9 +181,6 @@ void dbg_rtw_usb_buffer_free(struct usb_device *dev, size_t size, void *addr, dm
 #define rtw_mstat_update(flag, status, sz) do {} while (0)
 #define rtw_mstat_dump(sel) do {} while (0)
 #define match_mstat_sniff_rules(flags, size) _FALSE
-void *_rtw_vmalloc(u32 sz);
-void *_rtw_zvmalloc(u32 sz);
-void _rtw_vmfree(void *pbuf, u32 sz);
 void *_rtw_zmalloc(u32 sz);
 void *_rtw_malloc(u32 sz);
 void _rtw_mfree(void *pbuf, u32 sz);
@@ -255,21 +203,6 @@ void *_rtw_usb_buffer_alloc(struct usb_device *dev, size_t size, dma_addr_t *dma
 void _rtw_usb_buffer_free(struct usb_device *dev, size_t size, void *addr, dma_addr_t dma);
 #endif /* CONFIG_USB_HCI */
 
-#ifdef CONFIG_USE_VMALLOC
-#define rtw_vmalloc(sz)			_rtw_vmalloc((sz))
-#define rtw_zvmalloc(sz)			_rtw_zvmalloc((sz))
-#define rtw_vmfree(pbuf, sz)		_rtw_vmfree((pbuf), (sz))
-#define rtw_vmalloc_f(sz, mstat_f)			_rtw_vmalloc((sz))
-#define rtw_zvmalloc_f(sz, mstat_f)		_rtw_zvmalloc((sz))
-#define rtw_vmfree_f(pbuf, sz, mstat_f)	_rtw_vmfree((pbuf), (sz))
-#else /* CONFIG_USE_VMALLOC */
-#define rtw_vmalloc(sz)			_rtw_malloc((sz))
-#define rtw_zvmalloc(sz)			_rtw_zmalloc((sz))
-#define rtw_vmfree(pbuf, sz)		_rtw_mfree((pbuf), (sz))
-#define rtw_vmalloc_f(sz, mstat_f)			_rtw_malloc((sz))
-#define rtw_zvmalloc_f(sz, mstat_f)		_rtw_zmalloc((sz))
-#define rtw_vmfree_f(pbuf, sz, mstat_f)	_rtw_mfree((pbuf), (sz))
-#endif /* CONFIG_USE_VMALLOC */
 #define rtw_malloc(sz)			_rtw_malloc((sz))
 #define rtw_zmalloc(sz)			_rtw_zmalloc((sz))
 #define rtw_mfree(pbuf, sz)		_rtw_mfree((pbuf), (sz))
@@ -302,18 +235,13 @@ void _rtw_usb_buffer_free(struct usb_device *dev, size_t size, void *addr, dma_a
 #endif /* DBG_MEM_ALLOC */
 
 extern void	*rtw_malloc2d(int h, int w, size_t size);
-extern void	rtw_mfree2d(void *pbuf, int h, int w, int size);
 
 void rtw_os_pkt_free(_pkt *pkt);
 _pkt *rtw_os_pkt_copy(_pkt *pkt);
 void *rtw_os_pkt_data(_pkt *pkt);
 u32 rtw_os_pkt_len(_pkt *pkt);
 
-extern void	_rtw_memcpy(void *dec, const void *sour, u32 sz);
-extern void _rtw_memmove(void *dst, const void *src, u32 sz);
 extern int	_rtw_memcmp(const void *dst, const void *src, u32 sz);
-extern int _rtw_memcmp2(const void *dst, const void *src, u32 sz);
-extern void	_rtw_memset(void *pbuf, int c, u32 sz);
 
 extern void	_rtw_init_listhead(_list *list);
 extern u32	rtw_is_list_empty(_list *phead);
@@ -323,9 +251,7 @@ void rtw_list_splice(_list *list, _list *head);
 void rtw_list_splice_init(_list *list, _list *head);
 void rtw_list_splice_tail(_list *list, _list *head);
 
-#ifndef PLATFORM_FREEBSD
 extern void	rtw_list_delete(_list *plist);
-#endif /* PLATFORM_FREEBSD */
 
 void rtw_hlist_head_init(rtw_hlist_head *h);
 void rtw_hlist_add_head(rtw_hlist_node *n, rtw_hlist_head *h);
@@ -334,15 +260,11 @@ void rtw_hlist_add_head_rcu(rtw_hlist_node *n, rtw_hlist_head *h);
 void rtw_hlist_del_rcu(rtw_hlist_node *n);
 
 extern void	_rtw_init_sema(_sema *sema, int init_val);
-extern void	_rtw_free_sema(_sema	*sema);
 extern void	_rtw_up_sema(_sema	*sema);
 extern u32	_rtw_down_sema(_sema *sema);
 extern void	_rtw_mutex_init(_mutex *pmutex);
 extern void	_rtw_mutex_free(_mutex *pmutex);
-#ifndef PLATFORM_FREEBSD
 extern void	_rtw_spinlock_init(_lock *plock);
-#endif /* PLATFORM_FREEBSD */
-extern void	_rtw_spinlock_free(_lock *plock);
 extern void	_rtw_spinlock(_lock	*plock);
 extern void	_rtw_spinunlock(_lock	*plock);
 extern void	_rtw_spinlock_ex(_lock	*plock);
@@ -351,32 +273,19 @@ extern void	_rtw_spinunlock_ex(_lock	*plock);
 extern void	_rtw_init_queue(_queue *pqueue);
 extern void _rtw_deinit_queue(_queue *pqueue);
 extern u32	_rtw_queue_empty(_queue	*pqueue);
-extern u32	rtw_end_of_queue_search(_list *queue, _list *pelement);
 
-extern systime _rtw_get_current_time(void);
-extern u32	_rtw_systime_to_ms(systime stime);
-extern systime _rtw_ms_to_systime(u32 ms);
-extern systime _rtw_us_to_systime(u32 us);
 extern s32	_rtw_get_passing_time_ms(systime start);
 extern s32 _rtw_get_remaining_time_ms(systime end);
 extern s32	_rtw_get_time_interval_ms(systime start, systime end);
 extern bool _rtw_time_after(systime a, systime b);
 
 #ifdef DBG_SYSTIME
-#define rtw_get_current_time() ({systime __stime = _rtw_get_current_time(); __stime;})
-#define rtw_systime_to_ms(stime) ({u32 __ms = _rtw_systime_to_ms(stime); typecheck(systime, stime); __ms;})
-#define rtw_ms_to_systime(ms) ({systime __stime = _rtw_ms_to_systime(ms); __stime;})
-#define rtw_us_to_systime(us) ({systime __stime = _rtw_us_to_systime(us); __stime;})
 #define rtw_get_passing_time_ms(start) ({u32 __ms = _rtw_get_passing_time_ms(start); typecheck(systime, start); __ms;})
 #define rtw_get_remaining_time_ms(end) ({u32 __ms = _rtw_get_remaining_time_ms(end); typecheck(systime, end); __ms;})
 #define rtw_get_time_interval_ms(start, end) ({u32 __ms = _rtw_get_time_interval_ms(start, end); typecheck(systime, start); typecheck(systime, end); __ms;})
 #define rtw_time_after(a,b) ({bool __r = _rtw_time_after(a,b); typecheck(systime, a); typecheck(systime, b); __r;})
 #define rtw_time_before(a,b) ({bool __r = _rtw_time_after(b, a); typecheck(systime, a); typecheck(systime, b); __r;})
 #else
-#define rtw_get_current_time() _rtw_get_current_time()
-#define rtw_systime_to_ms(stime) _rtw_systime_to_ms(stime)
-#define rtw_ms_to_systime(ms) _rtw_ms_to_systime(ms)
-#define rtw_us_to_systime(us) _rtw_us_to_systime(us)
 #define rtw_get_passing_time_ms(start) _rtw_get_passing_time_ms(start)
 #define rtw_get_remaining_time_ms(end) _rtw_get_remaining_time_ms(end)
 #define rtw_get_time_interval_ms(start, end) _rtw_get_time_interval_ms(start, end)
@@ -384,25 +293,9 @@ extern bool _rtw_time_after(systime a, systime b);
 #define rtw_time_before(a,b) _rtw_time_after(b,a)
 #endif
 
-extern void	rtw_sleep_schedulable(int ms);
-
-extern void	rtw_msleep_os(int ms);
 extern void	rtw_usleep_os(int us);
 
 extern u32	rtw_atoi(u8 *s);
-
-#ifdef DBG_DELAY_OS
-#define rtw_mdelay_os(ms) _rtw_mdelay_os((ms), __FUNCTION__, __LINE__)
-#define rtw_udelay_os(ms) _rtw_udelay_os((ms), __FUNCTION__, __LINE__)
-extern void _rtw_mdelay_os(int ms, const char *func, const int line);
-extern void _rtw_udelay_os(int us, const char *func, const int line);
-#else
-extern void	rtw_mdelay_os(int ms);
-extern void	rtw_udelay_os(int us);
-#endif
-
-extern void rtw_yield_os(void);
-
 
 extern void rtw_init_timer(_timer *ptimer, void *padapter, void *pfunc, void *ctx);
 
@@ -421,9 +314,6 @@ static __inline void thread_enter(char *name)
 #ifdef PLATFORM_LINUX
 	allow_signal(SIGTERM);
 #endif
-#ifdef PLATFORM_FREEBSD
-	printf("%s", "RTKTHREAD_enter");
-#endif
 }
 void thread_exit(_completion *comp);
 void _rtw_init_completion(_completion *comp);
@@ -441,7 +331,7 @@ static inline void rtw_thread_wait_stop(void)
 #ifdef PLATFORM_LINUX
 	#if 0
 	while (!kthread_should_stop())
-		rtw_msleep_os(10);
+		msleep(10);
 	#else
 	set_current_state(TASK_INTERRUPTIBLE);
 	while (!kthread_should_stop()) {
@@ -463,19 +353,7 @@ __inline static void flush_signals_thread(void)
 
 __inline static _OS_STATUS res_to_status(sint res)
 {
-
-#if defined(PLATFORM_LINUX) || defined (PLATFORM_MPIXEL) || defined (PLATFORM_FREEBSD)
 	return res;
-#endif
-
-#ifdef PLATFORM_WINDOWS
-
-	if (res == _SUCCESS)
-		return NDIS_STATUS_SUCCESS;
-	else
-		return NDIS_STATUS_FAILURE;
-
-#endif
 
 }
 
@@ -495,16 +373,6 @@ __inline static void rtw_dump_stack(void)
 __inline static int rtw_bug_check(void *parg1, void *parg2, void *parg3, void *parg4)
 {
 	int ret = _TRUE;
-
-#ifdef PLATFORM_WINDOWS
-	if (((uint)parg1) <= 0x7fffffff ||
-	    ((uint)parg2) <= 0x7fffffff ||
-	    ((uint)parg3) <= 0x7fffffff ||
-	    ((uint)parg4) <= 0x7fffffff) {
-		ret = _FALSE;
-		KeBugCheckEx(0x87110000, (ULONG_PTR)parg1, (ULONG_PTR)parg2, (ULONG_PTR)parg3, (ULONG_PTR)parg4);
-	}
-#endif
 
 	return ret;
 
@@ -595,20 +463,8 @@ static inline int largest_bit(u32 bitmask)
 	return i;
 }
 
-static inline int largest_bit_64(u64 bitmask)
-{
-	int i;
-
-	for (i = 63; i >= 0; i--)
-		if (bitmask & BIT_ULL(i))
-			break;
-
-	return i;
-}
-
 #define rtw_abs(a) (a < 0 ? -a : a)
 #define rtw_min(a, b) ((a > b) ? b : a)
-#define rtw_max(a, b) ((a > b) ? a : b)
 #define rtw_is_range_a_in_b(hi_a, lo_a, hi_b, lo_b) (((hi_a) <= (hi_b)) && ((lo_a) >= (lo_b)))
 #define rtw_is_range_overlap(hi_a, lo_a, hi_b, lo_b) (((hi_a) > (lo_b)) && ((lo_a) < (hi_b)))
 
@@ -638,33 +494,13 @@ extern void rtw_set_bit(int nr, unsigned long *addr);
 extern void rtw_clear_bit(int nr, unsigned long *addr);
 extern int rtw_test_and_clear_bit(int nr, unsigned long *addr);
 
-extern void ATOMIC_SET(ATOMIC_T *v, int i);
-extern int ATOMIC_READ(ATOMIC_T *v);
-extern void ATOMIC_ADD(ATOMIC_T *v, int i);
-extern void ATOMIC_SUB(ATOMIC_T *v, int i);
-extern void ATOMIC_INC(ATOMIC_T *v);
-extern void ATOMIC_DEC(ATOMIC_T *v);
-extern int ATOMIC_ADD_RETURN(ATOMIC_T *v, int i);
-extern int ATOMIC_SUB_RETURN(ATOMIC_T *v, int i);
-extern int ATOMIC_INC_RETURN(ATOMIC_T *v);
-extern int ATOMIC_DEC_RETURN(ATOMIC_T *v);
-extern bool ATOMIC_INC_UNLESS(ATOMIC_T *v, int u);
-
 /* File operation APIs, just for linux now */
-extern int rtw_is_dir_readable(const char *path);
 extern int rtw_is_file_readable(const char *path);
 extern int rtw_is_file_readable_with_size(const char *path, u32 *sz);
-extern int rtw_readable_file_sz_chk(const char *path, u32 sz);
 extern int rtw_retrieve_from_file(const char *path, u8 *buf, u32 sz);
 extern int rtw_store_to_file(const char *path, u8 *buf, u32 sz);
 
-
-#ifndef PLATFORM_FREEBSD
 extern void rtw_free_netdev(struct net_device *netdev);
-#endif /* PLATFORM_FREEBSD */
-
-
-extern u64 rtw_modular64(u64 x, u64 y);
 extern u64 rtw_division64(u64 x, u64 y);
 extern u32 rtw_random32(void);
 
@@ -678,11 +514,6 @@ extern u32 rtw_random32(void);
 	} while (0)
 
 #define RTW_GET_LE16(a) ((u16) (((a)[1] << 8) | (a)[0]))
-#define RTW_PUT_LE16(a, val)			\
-	do {					\
-		(a)[1] = ((u16) (val)) >> 8;	\
-		(a)[0] = ((u16) (val)) & 0xff;	\
-	} while (0)
 
 #define RTW_GET_BE24(a) ((((u32) (a)[0]) << 16) | (((u32) (a)[1]) << 8) | \
 			 ((u32) (a)[2]))
@@ -793,13 +624,11 @@ struct blacklist_ent {
 	systime exp_time;
 };
 
-#ifdef CONFIG_RTW_MESH
 int rtw_blacklist_add(_queue *blist, const u8 *addr, u32 timeout_ms);
 int rtw_blacklist_del(_queue *blist, const u8 *addr);
 int rtw_blacklist_search(_queue *blist, const u8 *addr);
 void rtw_blacklist_flush(_queue *blist);
 void dump_blacklist(void *sel, _queue *blist, const char *title);
-#endif
 
 /* String handler */
 

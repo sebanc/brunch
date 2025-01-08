@@ -2797,6 +2797,10 @@ normal:
 				goto authclnt_fail;
 			}
 
+			if (len > sizeof(pmlmeinfo->chg_txt)) {
+				goto authclnt_fail;
+			}
+
 			_rtw_memcpy((void *)(pmlmeinfo->chg_txt), (void *)(p + 2), len);
 			pmlmeinfo->auth_seq = 3;
 			issue_auth(padapter, NULL, 0);
@@ -4698,6 +4702,7 @@ void issue_p2p_GO_response(_adapter *padapter, u8 *raddr, u8 *frame_body, uint l
 	/*	Try to get the device password ID from the WPS IE of group negotiation request frame */
 	/*	WiFi Direct test plan 5.1.15 */
 	rtw_get_wps_ie(frame_body + _PUBLIC_ACTION_IE_OFFSET_, len - _PUBLIC_ACTION_IE_OFFSET_, wpsie, &wpsielen);
+	wps_devicepassword_id_len = sizeof(wps_devicepassword_id);
 	rtw_get_wps_attr_content(wpsie, wpsielen, WPS_ATTR_DEVICE_PWID, (u8 *) &wps_devicepassword_id, &wps_devicepassword_id_len);
 	wps_devicepassword_id = be16_to_cpu(wps_devicepassword_id);
 
@@ -6799,9 +6804,11 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 
 				merged_p2p_ielen = rtw_p2p_merge_ies(frame_body + _PUBLIC_ACTION_IE_OFFSET_, len - _PUBLIC_ACTION_IE_OFFSET_, merged_p2pie);
 
+				attr_contentlen = sizeof(invitation_flag);
 				rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_INVITATION_FLAGS, &invitation_flag, &attr_contentlen);
 				if (attr_contentlen) {
 
+					attr_contentlen = sizeof(pwdinfo->p2p_peer_interface_addr);
 					rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_GROUP_BSSID, pwdinfo->p2p_peer_interface_addr, &attr_contentlen);
 					/*	Commented by Albert 20120510 */
 					/*	Copy to the pwdinfo->p2p_peer_interface_addr. */
@@ -6820,6 +6827,7 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 						/*	Re-invoke the persistent group. */
 
 						_rtw_memset(&group_id, 0x00, sizeof(struct group_id_info));
+						attr_contentlen = sizeof(struct group_id_info);
 						rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_GROUP_ID, (u8 *) &group_id, &attr_contentlen);
 						if (attr_contentlen) {
 							if (_rtw_memcmp(group_id.go_device_addr, adapter_mac_addr(padapter), ETH_ALEN)) {
@@ -6831,6 +6839,7 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 								/*	The p2p device sending this p2p invitation request wants to be the persistent GO. */
 								if (is_matched_in_profilelist(pwdinfo->p2p_peer_interface_addr, &pwdinfo->profileinfo[0])) {
 									u8 operatingch_info[5] = { 0x00 };
+									attr_contentlen = sizeof(operatingch_info);
 									if (rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_OPERATING_CH, operatingch_info,
 										&attr_contentlen)) {
 										if (rtw_chset_search_ch(adapter_to_chset(padapter), (u32)operatingch_info[4]) >= 0) {
@@ -6874,6 +6883,7 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 						/*	Received the invitation to join a P2P group. */
 
 						_rtw_memset(&group_id, 0x00, sizeof(struct group_id_info));
+						attr_contentlen = sizeof(struct group_id_info);
 						rtw_get_p2p_attr_content(merged_p2pie, merged_p2p_ielen, P2P_ATTR_GROUP_ID, (u8 *) &group_id, &attr_contentlen);
 						if (attr_contentlen) {
 							if (_rtw_memcmp(group_id.go_device_addr, adapter_mac_addr(padapter), ETH_ALEN)) {
@@ -6918,6 +6928,7 @@ unsigned int on_action_public_p2p(union recv_frame *precv_frame)
 			_cancel_timer_ex(&pwdinfo->restore_p2p_state_timer);
 			p2p_ie = rtw_get_p2p_ie(frame_body + _PUBLIC_ACTION_IE_OFFSET_, len - _PUBLIC_ACTION_IE_OFFSET_, NULL, &p2p_ielen);
 			if (p2p_ie) {
+				attr_contentlen = sizeof(attr_content);
 				rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_STATUS, &attr_content, &attr_contentlen);
 
 				if (attr_contentlen == 1) {
@@ -8900,6 +8911,7 @@ void issue_asocrsp(_adapter *padapter, unsigned short status, struct sta_info *p
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	WLAN_BSSID_EX *pnetwork = &(pmlmeinfo->network);
 	u8 *ie = pnetwork->IEs, cap[5], i;
+	struct security_priv *psecuritypriv = &(padapter->securitypriv);
 #ifdef CONFIG_P2P
 	struct wifidirect_info	*pwdinfo = &(padapter->wdinfo);
 #ifdef CONFIG_WFD
@@ -9081,6 +9093,14 @@ void issue_asocrsp(_adapter *padapter, unsigned short status, struct sta_info *p
 
 		pframe += pmlmepriv->wps_assoc_resp_ie_len;
 		pattrib->pktlen += pmlmepriv->wps_assoc_resp_ie_len;
+	}
+
+
+	if ((psecuritypriv->auth_type == MLME_AUTHTYPE_SAE) &&
+		pmlmepriv->assoc_rsp && pmlmepriv->assoc_rsp_len > 0) {
+		_rtw_memcpy(pframe, pmlmepriv->assoc_rsp, pmlmepriv->assoc_rsp_len);
+		pframe += pmlmepriv->assoc_rsp_len;
+		pattrib->pktlen += pmlmepriv->assoc_rsp_len;
 	}
 
 #ifdef CONFIG_P2P
@@ -9410,6 +9430,10 @@ void _issue_assocreq(_adapter *padapter, u8 is_reassoc)
 				/* tmp: update rsn's spp related opt. */
 				/*rtw_set_spp_amsdu_mode(padapter->registrypriv.amsdu_mode, pframe - (pIE->Length + 2), pIE->Length +2);*/
 			}
+			break;
+			case WLAN_EID_RSNX:
+				pframe = rtw_set_ie(pframe, WLAN_EID_RSNX, pIE->Length,
+					pIE->data, &(pattrib->pktlen));
 			break;
 #ifdef CONFIG_80211N_HT
 		case EID_HTCapability:
@@ -11273,6 +11297,7 @@ u8 collect_bss_info(_adapter *padapter, union recv_frame *precv_frame, WLAN_BSSI
 			u32	attr_contentlen = 0;
 			u8 listen_ch[5] = { 0x00 };
 
+			attr_contentlen = sizeof(listen_ch);
 			rtw_get_p2p_attr_content(p2p_ie, p2p_ielen, P2P_ATTR_LISTEN_CH, listen_ch, &attr_contentlen);
 			bssid->Configuration.DSConfig = listen_ch[4];
 		} else {
@@ -11404,7 +11429,8 @@ u8 collect_bss_info(_adapter *padapter, union recv_frame *precv_frame, WLAN_BSSI
 #ifdef CONFIG_RTW_80211K
 	p = rtw_get_ie(bssid->IEs + ie_offset, _EID_RRM_EN_CAP_IE_, &len, bssid->IELength - ie_offset);
 	if (p)
-		_rtw_memcpy(bssid->PhyInfo.rm_en_cap, (p + 2), *(p + 1));
+		_rtw_memcpy(bssid->PhyInfo.rm_en_cap, (p + 2), MIN(*(p + 1),
+			    sizeof(bssid->PhyInfo.rm_en_cap)));
 
 	/* save freerun counter */
 	bssid->PhyInfo.free_cnt = precv_frame->u.hdr.attrib.free_cnt;

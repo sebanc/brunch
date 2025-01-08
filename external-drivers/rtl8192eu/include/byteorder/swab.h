@@ -104,33 +104,23 @@ __inline static __u64 __arch__swab64(__u64 x)
 	#define __swab64(x) __fswab64(x)
 #endif /* __swab16 */
 
-#ifdef PLATFORM_FREEBSD
-	__inline static __u16 __fswab16(__u16 x)
-#else
 	__inline static const __u16 __fswab16(__u16 x)
-#endif /* PLATFORM_FREEBSD */
 {
 	return __arch__swab16(x);
 }
-#ifdef PLATFORM_FREEBSD
-	__inline static __u32 __fswab32(__u32 x)
-#else
 	__inline static const __u32 __fswab32(__u32 x)
-#endif /* PLATFORM_FREEBSD */
 {
 	return __arch__swab32(x);
 }
 
-#if defined(PLATFORM_LINUX) || defined(PLATFORM_WINDOWS)
-	#define swab16 __swab16
-	#define swab32 __swab32
-	#define swab64 __swab64
-	#define swab16p __swab16p
-	#define swab32p __swab32p
-	#define swab64p __swab64p
-	#define swab16s __swab16s
-	#define swab32s __swab32s
-	#define swab64s __swab64s
-#endif
+#define swab16 __swab16
+#define swab32 __swab32
+#define swab64 __swab64
+#define swab16p __swab16p
+#define swab32p __swab32p
+#define swab64p __swab64p
+#define swab16s __swab16s
+#define swab32s __swab32s
+#define swab64s __swab64s
 
 #endif /* _LINUX_BYTEORDER_SWAB_H */

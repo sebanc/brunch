@@ -2227,11 +2227,7 @@ int rtw_check_beacon_data(_adapter *padapter, u8 *pbuf,  int len)
 	}
 	psecuritypriv->mfp_opt = mfp_opt;
 
-#ifdef CONFIG_RTW_80211K
-	/* RRM */
-	update_rm_cap(pbuf, padapter, len, _BEACON_IE_OFFSET_);
-
-#endif /* CONFIG_RTW_80211K */
+	rm_update_cap(pbuf, padapter, len, _BEACON_IE_OFFSET_);
 
 	/* wmm */
 	ie_len = 0;
@@ -4025,7 +4021,7 @@ int rtw_sta_flush(_adapter *padapter, bool enqueue)
 		#endif
 	}
 
-	if (!MLME_IS_MESH(padapter))
+	if (MLME_IS_ASOC(padapter) && !MLME_IS_MESH(padapter))
 		issue_deauth(padapter, bc_addr, WLAN_REASON_DEAUTH_LEAVING);
 
 	associated_clients_update(padapter, _TRUE, STA_INFO_UPDATE_ALL);
@@ -4246,10 +4242,6 @@ void stop_ap_mode(_adapter *padapter)
 	padapter->securitypriv.ndisauthtype = Ndis802_11AuthModeOpen;
 	padapter->securitypriv.ndisencryptstatus = Ndis802_11WEPDisabled;
 
-#ifdef CONFIG_DFS_MASTER
-	rtw_dfs_rd_en_decision(padapter, self_action, 0);
-#endif
-
 	rtw_rfctl_update_op_mode(adapter_to_rfctl(padapter), BIT(padapter->iface_id), 0);
 
 	/* free scan queue */
@@ -4328,6 +4320,10 @@ void stop_ap_mode(_adapter *padapter)
 #ifdef CONFIG_RTW_WDS
 	if (MLME_IS_AP(padapter))
 		rtw_wds_pathtbl_unregister(padapter);
+#endif
+
+#ifdef CONFIG_DFS_MASTER
+	rtw_dfs_rd_en_decision(padapter, self_action, 0);
 #endif
 }
 

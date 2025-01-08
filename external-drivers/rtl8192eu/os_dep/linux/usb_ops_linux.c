@@ -23,7 +23,7 @@ struct rtw_async_write_data {
 	struct usb_ctrlrequest dr;
 };
 
-int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u8 request, u16 value, u16 index, void *pdata, u16 len, u8 requesttype)
+int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u16 value, void *pdata, u16 len, u8 requesttype)
 {
 	_adapter	*padapter = pintfhdl->padapter;
 	struct dvobj_priv  *pdvobjpriv = adapter_to_dvobj(padapter);
@@ -34,11 +34,10 @@ int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u8 request, u16 value, u16 inde
 #ifdef CONFIG_USB_VENDOR_REQ_BUFFER_DYNAMIC_ALLOCATE
 	u32 tmp_buflen = 0;
 #endif
-	u8 reqtype;
 	u8 *pIo_buf;
 	int vendorreq_times = 0;
 
-#if (defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C)) || defined(CONFIG_RTL8822C)
+#if (defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C))
 #define REG_ON_SEC 0x00
 #define REG_OFF_SEC 0x01
 #define REG_LOCAL_SEC 0x02
@@ -94,46 +93,30 @@ int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u8 request, u16 value, u16 inde
 		goto release_mutex;
 	}
 
-	while (++vendorreq_times <= MAX_USBCTRL_VENDORREQ_TIMES) {
-		_rtw_memset(pIo_buf, 0, len);
+	if (requesttype == REALTEK_USB_VENQT_READ)
+		pipe = usb_rcvctrlpipe(udev, 0);/* read_in */
+	else
+		pipe = usb_sndctrlpipe(udev, 0);/* write_out */
 
-		if (requesttype == 0x01) {
-			pipe = usb_rcvctrlpipe(udev, 0);/* read_in */
-			reqtype =  REALTEK_USB_VENQT_READ;
+	while (++vendorreq_times <= MAX_USBCTRL_VENDORREQ_TIMES) {
+
+		if (requesttype == REALTEK_USB_VENQT_READ) {
+			memset(pIo_buf, 0, len);
 		} else {
-			pipe = usb_sndctrlpipe(udev, 0);/* write_out */
-			reqtype =  REALTEK_USB_VENQT_WRITE;
-			_rtw_memcpy(pIo_buf, pdata, len);
+			memcpy(pIo_buf, pdata, len);
 		}
 
-		status = rtw_usb_control_msg(udev, pipe, request, reqtype, value, index, pIo_buf, len, RTW_USB_CONTROL_MSG_TIMEOUT);
+		status = usb_control_msg(udev, pipe, REALTEK_USB_VENQT_CMD_REQ, requesttype, value, REALTEK_USB_VENQT_CMD_IDX, pIo_buf, len, RTW_USB_CONTROL_MSG_TIMEOUT);
 
 		if (status == len) {  /* Success this control transfer. */
 			rtw_reset_continual_io_error(pdvobjpriv);
-			if (requesttype == 0x01) {
+			if (requesttype == REALTEK_USB_VENQT_READ) {
 				/* For Control read transfer, we have to copy the read data from pIo_buf to pdata. */
-				_rtw_memcpy(pdata, pIo_buf,  len);
+				memcpy(pdata, pIo_buf,  len);
 			}
 		} else { /* error cases */
-			switch (len) {
-				case 1:
-					RTW_INFO("reg 0x%x, usb %s %u fail, status:%d value=0x%x, vendorreq_times:%d\n"
-						, value, (requesttype == 0x01) ? "read" : "write" , len, status, *(u8 *)pdata, vendorreq_times);
-				break;
-				case 2:
-					RTW_INFO("reg 0x%x, usb %s %u fail, status:%d value=0x%x, vendorreq_times:%d\n"
-						, value, (requesttype == 0x01) ? "read" : "write" , len, status, *(u16 *)pdata, vendorreq_times);
-				break;
-				case 4:
-					RTW_INFO("reg 0x%x, usb %s %u fail, status:%d value=0x%x, vendorreq_times:%d\n"
-						, value, (requesttype == 0x01) ? "read" : "write" , len, status, *(u32 *)pdata, vendorreq_times);
-				break;
-				default:
-					RTW_INFO("reg 0x%x, usb %s %u fail, status:%d, vendorreq_times:%d\n"
-						, value, (requesttype == 0x01) ? "read" : "write" , len, status, vendorreq_times);
-				break;
-				
-			}
+			RTW_INFO("reg 0x%x, usb %s %u fail, status:%d value=0x%x, vendorreq_times:%d\n"
+				, value, (requesttype == REALTEK_USB_VENQT_READ) ? "read" : "write" , len, status, *(u32 *)pdata, vendorreq_times);
 
 			if (status < 0) {
 				if (status == (-ESHUTDOWN)	|| status == -ENODEV)
@@ -150,7 +133,7 @@ int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u8 request, u16 value, u16 inde
 				if (status > 0) {
 					if (requesttype == 0x01) {
 						/* For Control read transfer, we have to copy the read data from pIo_buf to pdata. */
-						_rtw_memcpy(pdata, pIo_buf,  len);
+						memcpy(pdata, pIo_buf,  len);
 					}
 				}
 			}
@@ -168,9 +151,9 @@ int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u8 request, u16 value, u16 inde
 
 	}
 
-#if (defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C)) || defined(CONFIG_RTL8822C)
+#if (defined(CONFIG_RTL8822B) || defined(CONFIG_RTL8821C))
 	if (value < 0xFE00) {
-		if (value <= 0xff)
+		if (0x00 <= value && value <= 0xff)
 			current_reg_sec = REG_ON_SEC;
 		else if (0x1000 <= value && value <= 0x10ff)
 			current_reg_sec = REG_ON_SEC;
@@ -182,15 +165,11 @@ int usbctrl_vendorreq(struct intf_hdl *pintfhdl, u8 request, u16 value, u16 inde
 
 	if (current_reg_sec == REG_ON_SEC) {
 		unsigned int t_pipe = usb_sndctrlpipe(udev, 0);/* write_out */
-		u8 t_reqtype =  REALTEK_USB_VENQT_WRITE;
 		u8 t_len = 1;
-		u8 t_req = 0x05;
 		u16 t_reg = 0;
-		u16 t_index = 0;
-
 		t_reg = 0x4e0;
 
-		status = rtw_usb_control_msg(udev, t_pipe, t_req, t_reqtype, t_reg, t_index, pIo_buf, t_len, RTW_USB_CONTROL_MSG_TIMEOUT);
+		status = usb_control_msg(udev, t_pipe, REALTEK_USB_VENQT_CMD_REQ, REALTEK_USB_VENQT_WRITE, t_reg, REALTEK_USB_VENQT_CMD_IDX, pIo_buf, t_len, RTW_USB_CONTROL_MSG_TIMEOUT);
 
 		if (status == t_len)
 			rtw_reset_continual_io_error(pdvobjpriv);
@@ -225,22 +204,19 @@ static void _usbctrl_vendorreq_async_callback(struct urb *urb, struct pt_regs *r
 }
 
 int _usbctrl_vendorreq_async_write(struct usb_device *udev, u8 request,
-	u16 value, u16 index, void *pdata, u16 len, u8 requesttype)
+	u16 value, void *pdata, u16 len, u8 requesttype)
 {
 	int rc;
 	unsigned int pipe;
-	u8 reqtype;
 	struct usb_ctrlrequest *dr;
 	struct urb *urb;
 	struct rtw_async_write_data *buf;
 
 
-	if (requesttype == VENDOR_READ) {
+	if (requesttype == REALTEK_USB_VENQT_READ) {
 		pipe = usb_rcvctrlpipe(udev, 0);/* read_in */
-		reqtype =  REALTEK_USB_VENQT_READ;
 	} else {
 		pipe = usb_sndctrlpipe(udev, 0);/* write_out */
-		reqtype =  REALTEK_USB_VENQT_WRITE;
 	}
 
 	buf = (struct rtl819x_async_write_data *)rtw_zmalloc(sizeof(*buf));
@@ -258,13 +234,13 @@ int _usbctrl_vendorreq_async_write(struct usb_device *udev, u8 request,
 
 	dr = &buf->dr;
 
-	dr->bRequestType = reqtype;
+	dr->bRequestType = requesttype;
 	dr->bRequest = request;
 	dr->wValue = cpu_to_le16(value);
-	dr->wIndex = cpu_to_le16(index);
+	dr->wIndex = cpu_to_le16(REALTEK_USB_VENQT_CMD_IDX);
 	dr->wLength = cpu_to_le16(len);
 
-	_rtw_memcpy(buf, pdata, len);
+	memcpy(buf, pdata, len);
 
 	usb_fill_control_urb(urb, udev, pipe, (unsigned char *)dr, buf, len,
 		_usbctrl_vendorreq_async_callback, buf);
@@ -295,8 +271,7 @@ unsigned int ffaddr2pipehdl(struct dvobj_priv *pdvobj, u32 addr)
 
 #ifdef RTW_HALMAC
          /* halmac already translate queue id to bulk out id (addr 0~3) */
-		 /* 8814BU bulk out id range is 0~6 */
-        else if (addr < MAX_BULKOUT_NUM) {
+        else if (addr < 4) {
                 ep_num = pdvobj->RtOutPipe[addr];
                 pipe = usb_sndbulkpipe(pusbd, ep_num);
         }
@@ -317,83 +292,7 @@ struct zero_bulkout_context {
 	void *pirp;
 	void *padapter;
 };
-#if 0
-static void usb_bulkout_zero_complete(struct urb *purb, struct pt_regs *regs)
-{
-	struct zero_bulkout_context *pcontext = (struct zero_bulkout_context *)purb->context;
 
-	/* RTW_INFO("+usb_bulkout_zero_complete\n"); */
-
-	if (pcontext) {
-		if (pcontext->pbuf)
-			rtw_mfree(pcontext->pbuf, sizeof(int));
-
-		if (pcontext->purb && (pcontext->purb == purb))
-			usb_free_urb(pcontext->purb);
-
-
-		rtw_mfree((u8 *)pcontext, sizeof(struct zero_bulkout_context));
-	}
-
-
-}
-
-static u32 usb_bulkout_zero(struct intf_hdl *pintfhdl, u32 addr)
-{
-	int pipe, status, len;
-	u32 ret;
-	unsigned char *pbuf;
-	struct zero_bulkout_context *pcontext;
-	PURB	purb = NULL;
-	_adapter *padapter = (_adapter *)pintfhdl->padapter;
-	struct dvobj_priv *pdvobj = adapter_to_dvobj(padapter);
-	struct usb_device *pusbd = pdvobj->pusbdev;
-
-	/* RTW_INFO("%s\n", __func__); */
-
-
-	if (RTW_CANNOT_TX(padapter))
-		return _FAIL;
-
-
-	pcontext = (struct zero_bulkout_context *)rtw_zmalloc(sizeof(struct zero_bulkout_context));
-	if (pcontext == NULL)
-		return _FAIL;
-
-	pbuf = (unsigned char *)rtw_zmalloc(sizeof(int));
-	purb = usb_alloc_urb(0, GFP_ATOMIC);
-
-	/* translate DMA FIFO addr to pipehandle */
-	pipe = ffaddr2pipehdl(pdvobj, addr);
-
-	len = 0;
-	pcontext->pbuf = pbuf;
-	pcontext->purb = purb;
-	pcontext->pirp = NULL;
-	pcontext->padapter = padapter;
-
-
-	/* translate DMA FIFO addr to pipehandle */
-	/* pipe = ffaddr2pipehdl(pdvobj, addr);	 */
-
-	usb_fill_bulk_urb(purb, pusbd, pipe,
-			  pbuf,
-			  len,
-			  usb_bulkout_zero_complete,
-			  pcontext);/* context is pcontext */
-
-	status = usb_submit_urb(purb, GFP_ATOMIC);
-
-	if (!status)
-		ret = _SUCCESS;
-	else
-		ret = _FAIL;
-
-
-	return _SUCCESS;
-
-}
-#endif
 void usb_read_mem(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *rmem)
 {
 
@@ -543,7 +442,7 @@ static void usb_write_port_complete(struct urb *purb, struct pt_regs *regs)
 	#ifdef DBG_CONFIG_ERROR_DETECT
 	{
 		HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
-		pHalData->srestpriv.last_tx_complete_time = rtw_get_current_time();
+		pHalData->srestpriv.last_tx_complete_time = jiffies;
 	}
 	#endif
 
@@ -664,7 +563,7 @@ u32 usb_write_port(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *wmem)
 		#ifdef DBG_CONFIG_ERROR_DETECT
 		{
 			HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
-			pHalData->srestpriv.last_tx_time = rtw_get_current_time();
+			pHalData->srestpriv.last_tx_time = jiffies;
 		}
 		#endif
 	} else {
@@ -771,7 +670,7 @@ void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 	_adapter			*padapter = (_adapter *)precvbuf->adapter;
 	struct recv_priv	*precvpriv = &padapter->recvpriv;
 
-	ATOMIC_DEC(&(precvpriv->rx_pending_cnt));
+	atomic_dec(&(precvpriv->rx_pending_cnt));
 
 	if (RTW_CANNOT_RX(padapter)) {
 		RTW_INFO("%s() RX Warning! bDriverStopped(%s) OR bSurpriseRemoved(%s)\n"
@@ -855,7 +754,7 @@ u32 usb_read_port(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *rmem)
 	usb_init_recvbuf(adapter, precvbuf);
 
 	if (precvbuf->pbuf) {
-		ATOMIC_INC(&(precvpriv->rx_pending_cnt));
+		atomic_inc(&(precvpriv->rx_pending_cnt));
 		purb = precvbuf->purb;
 
 		/* translate DMA FIFO addr to pipehandle */
@@ -924,7 +823,7 @@ void usb_read_port_complete(struct urb *purb, struct pt_regs *regs)
 	_adapter			*padapter = (_adapter *)precvbuf->adapter;
 	struct recv_priv	*precvpriv = &padapter->recvpriv;
 
-	ATOMIC_DEC(&(precvpriv->rx_pending_cnt));
+	atomic_dec(&(precvpriv->rx_pending_cnt));
 
 	if (RTW_CANNOT_RX(padapter)) {
 		RTW_INFO("%s() RX Warning! bDriverStopped(%s) OR bSurpriseRemoved(%s)\n"
@@ -1064,7 +963,7 @@ recv_buf_hook:
 		goto exit;
 	}
 
-	ATOMIC_INC(&(precvpriv->rx_pending_cnt));
+	atomic_inc(&(precvpriv->rx_pending_cnt));
 	ret = _SUCCESS;
 
 exit:

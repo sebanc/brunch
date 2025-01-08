@@ -211,9 +211,7 @@
 	#define		is_tx_agc_byte1_jaguar	0xff00
 	#define		is_tx_agc_byte2_jaguar	0xff0000
 	#define		is_tx_agc_byte3_jaguar	0xff000000
-#if defined(CONFIG_WLAN_HAL_8198F) || defined(CONFIG_WLAN_HAL_8822CE) ||\
-defined(CONFIG_WLAN_HAL_8814BE) || defined(CONFIG_WLAN_HAL_8812FE) ||\
-defined(CONFIG_WLAN_HAL_8197G)
+	#if defined(CONFIG_WLAN_HAL_8198F) || defined(CONFIG_WLAN_HAL_8822CE)
 		#define REG_TX_AGC_CCK_11_CCK_1_JAGUAR3		0x3a00
 		#define REG_TX_AGC_OFDM_18_CCK_6_JAGUAR3	0x3a04
 		#define	REG_TX_AGC_OFDM_54_CCK_24_JAGUAR3	0x3a08
@@ -235,7 +233,7 @@ defined(CONFIG_WLAN_HAL_8197G)
 		#define	REG_TX_AGC_VHT_Nss4_MCS1_Nss3_MCS8_JAGUAR3	0x3a48
 		#define	REG_TX_AGC_VHT_Nss4_MCS5_2_JAGUAR3	0x3a4c
 		#define	REG_TX_AGC_VHT_Nss4_MCS9_6_JAGUAR3	0x3a50
-#endif
+	#endif
 #endif
 
 #define	BIT_FA_RESET					BIT(0)

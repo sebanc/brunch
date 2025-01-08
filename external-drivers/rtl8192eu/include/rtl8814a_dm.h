@@ -15,9 +15,9 @@
 #ifndef __RTL8814A_DM_H__
 #define __RTL8814A_DM_H__
 
-void rtl8814_init_dm_priv(PADAPTER Adapter);
-void rtl8814_deinit_dm_priv(PADAPTER Adapter);
-void rtl8814_InitHalDm(PADAPTER Adapter);
-void rtl8814_HalDmWatchDog(PADAPTER Adapter);
+void rtl8814_init_dm_priv(IN PADAPTER Adapter);
+void rtl8814_deinit_dm_priv(IN PADAPTER Adapter);
+void rtl8814_InitHalDm(IN PADAPTER Adapter);
+void rtl8814_HalDmWatchDog(IN PADAPTER Adapter);
 
 #endif

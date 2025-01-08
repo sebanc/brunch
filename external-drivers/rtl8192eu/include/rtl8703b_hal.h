@@ -214,8 +214,8 @@ void Hal_EfuseParseCustomerID_8703B(PADAPTER padapter, u8 *hwinfo, BOOLEAN AutoL
 void Hal_EfuseParseAntennaDiversity_8703B(PADAPTER padapter, u8 *hwinfo, BOOLEAN AutoLoadFail);
 void Hal_EfuseParseXtal_8703B(PADAPTER pAdapter, u8 *hwinfo, u8 AutoLoadFail);
 void Hal_EfuseParseThermalMeter_8703B(PADAPTER padapter, u8 *hwinfo, u8 AutoLoadFail);
-void Hal_EfuseParseVoltage_8703B(PADAPTER pAdapter, u8 *hwinfo, BOOLEAN	AutoLoadFail);
-void Hal_EfuseParseBoardType_8703B(PADAPTER Adapter,	u8	*PROMContent, BOOLEAN AutoloadFail);
+VOID Hal_EfuseParseVoltage_8703B(PADAPTER pAdapter, u8 *hwinfo, BOOLEAN	AutoLoadFail);
+VOID Hal_EfuseParseBoardType_8703B(PADAPTER Adapter,	u8	*PROMContent, BOOLEAN AutoloadFail);
 
 void rtl8703b_set_hal_ops(struct hal_ops *pHalFunc);
 void init_hal_spec_8703b(_adapter *adapter);
@@ -249,7 +249,7 @@ void rtl8703b_stop_thread(_adapter *padapter);
 	void HalSetOutPutGPIO(PADAPTER padapter, u8 index, u8 OutPutValue);
 #endif
 #ifdef CONFIG_MP_INCLUDED
-int FirmwareDownloadBT(PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
+int FirmwareDownloadBT(IN PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
 #endif
 void CCX_FwC2HTxRpt_8703b(PADAPTER padapter, u8 *pdata, u8 len);
 
@@ -260,7 +260,7 @@ void Hal_ReadRFGainOffset(PADAPTER pAdapter, u8 *hwinfo, BOOLEAN AutoLoadFail);
 
 #ifdef CONFIG_PCI_HCI
 	BOOLEAN	InterruptRecognized8703BE(PADAPTER Adapter);
-	void	UpdateInterruptMask8703BE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
+	VOID	UpdateInterruptMask8703BE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
 #endif
 
 #endif

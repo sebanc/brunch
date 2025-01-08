@@ -5004,6 +5004,15 @@ sint rtw_restruct_sec_ie(_adapter *adapter, u8 *out_ie)
 		ielength = rtw_rsn_sync_pmkid(adapter, out_ie, ielength, iEntry);
 	}
 
+	if ((psecuritypriv->auth_type == MLME_AUTHTYPE_SAE) &&
+		(psecuritypriv->rsnx_ie_len >= 3)) {
+		u8 *_pos = out_ie + (psecuritypriv->supplicant_ie[1] + 2);
+		_rtw_memcpy(_pos, psecuritypriv->rsnx_ie,
+			psecuritypriv->rsnx_ie_len);
+		ielength += psecuritypriv->rsnx_ie_len;
+		RTW_INFO_DUMP("update IE for RSNX :", out_ie, ielength);
+	}
+
 	return ielength;
 }
 

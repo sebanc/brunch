@@ -106,7 +106,6 @@ extern const char *_rtw_mesh_ps_str[];
 #define RTW_PREQ_Q_F_REFRESH	0x2
 #define RTW_PREQ_Q_F_CHK	0x4
 #define RTW_PREQ_Q_F_PEER_AKA	0x8
-#define RTW_PREQ_Q_F_BCAST_PREQ	0x10 /* force path_dicover using broadcast */
 struct rtw_mesh_preq_queue {
 	_list list;
 	u8 dst[ETH_ALEN];
@@ -156,11 +155,11 @@ enum rtw_mesh_deferred_task_flags {
 #define RTW_MESH_PEER_CONF_DISABLED 0 /* special time value means no confirmation ongoing */
 #if CONFIG_RTW_MESH_PEER_BLACKLIST
 #define IS_PEER_CONF_DISABLED(plink) ((plink)->peer_conf_end_time == RTW_MESH_PEER_CONF_DISABLED)
-#define IS_PEER_CONF_TIMEOUT(plink)(!IS_PEER_CONF_DISABLED(plink) && rtw_time_after(rtw_get_current_time(), (plink)->peer_conf_end_time))
+#define IS_PEER_CONF_TIMEOUT(plink)(!IS_PEER_CONF_DISABLED(plink) && rtw_time_after(jiffies, (plink)->peer_conf_end_time))
 #define SET_PEER_CONF_DISABLED(plink) (plink)->peer_conf_end_time = RTW_MESH_PEER_CONF_DISABLED
 #define SET_PEER_CONF_END_TIME(plink, timeout_ms) \
 	do { \
-		(plink)->peer_conf_end_time = rtw_get_current_time() + rtw_ms_to_systime(timeout_ms); \
+		(plink)->peer_conf_end_time = jiffies + msecs_to_jiffies(timeout_ms); \
 		if ((plink)->peer_conf_end_time == RTW_MESH_PEER_CONF_DISABLED) \
 			(plink)->peer_conf_end_time++; \
 	} while (0)
@@ -174,11 +173,11 @@ enum rtw_mesh_deferred_task_flags {
 #define RTW_MESH_CTO_MGATE_CONF_DISABLED 0 /* special time value means no confirmation ongoing */
 #if CONFIG_RTW_MESH_CTO_MGATE_BLACKLIST
 #define IS_CTO_MGATE_CONF_DISABLED(plink) ((plink)->cto_mgate_conf_end_time == RTW_MESH_CTO_MGATE_CONF_DISABLED)
-#define IS_CTO_MGATE_CONF_TIMEOUT(plink)(!IS_CTO_MGATE_CONF_DISABLED(plink) && rtw_time_after(rtw_get_current_time(), (plink)->cto_mgate_conf_end_time))
+#define IS_CTO_MGATE_CONF_TIMEOUT(plink)(!IS_CTO_MGATE_CONF_DISABLED(plink) && rtw_time_after(jiffies, (plink)->cto_mgate_conf_end_time))
 #define SET_CTO_MGATE_CONF_DISABLED(plink) (plink)->cto_mgate_conf_end_time = RTW_MESH_CTO_MGATE_CONF_DISABLED
 #define SET_CTO_MGATE_CONF_END_TIME(plink, timeout_ms) \
 	do { \
-		(plink)->cto_mgate_conf_end_time = rtw_get_current_time() + rtw_ms_to_systime(timeout_ms); \
+		(plink)->cto_mgate_conf_end_time = jiffies + msecs_to_jiffies(timeout_ms); \
 		if ((plink)->cto_mgate_conf_end_time == RTW_MESH_CTO_MGATE_CONF_DISABLED) \
 			(plink)->cto_mgate_conf_end_time++; \
 	} while (0)
@@ -378,7 +377,7 @@ struct rtw_mesh_info {
 	/* Last used Path Discovery ID */
 	u32 preq_id;
 	
-	ATOMIC_T mpaths;
+	atomic_t mpaths;
 	struct rtw_mesh_table *mesh_paths;
 	struct rtw_mesh_table *mpp_paths;
 	int mesh_paths_generation;
@@ -392,7 +391,7 @@ struct rtw_mesh_info {
 
 	_queue mpath_tx_queue;
 	u32 mpath_tx_queue_len;
-	_tasklet mpath_tx_tasklet;
+	struct tasklet_struct mpath_tx_tasklet;
 
 	struct rtw_mrc *mrc;
 
@@ -402,7 +401,6 @@ struct rtw_mesh_info {
 };
 
 extern const char *_action_self_protected_str[];
-#define action_self_protected_str(action) ((action < RTW_ACT_SELF_PROTECTED_NUM) ? _action_self_protected_str[action] : _action_self_protected_str[0])
 
 u8 *rtw_set_ie_mesh_id(u8 *buf, u32 *buf_len, const char *mesh_id, u8 id_len);
 u8 *rtw_set_ie_mesh_config(u8 *buf, u32 *buf_len
@@ -412,7 +410,7 @@ u8 *rtw_set_ie_mesh_config(u8 *buf, u32 *buf_len
 	, bool mbca_en, bool tbtt_adj, bool ps_level);
 
 int rtw_bss_is_same_mbss(WLAN_BSSID_EX *a, WLAN_BSSID_EX *b);
-int rtw_bss_is_candidate_mesh_peer(_adapter *adapter, WLAN_BSSID_EX *target, u8 ch, u8 add_peer);
+int rtw_bss_is_candidate_mesh_peer(WLAN_BSSID_EX *self, WLAN_BSSID_EX *target, u8 ch, u8 add_peer);
 
 void rtw_chk_candidate_peer_notify(_adapter *adapter, struct wlan_network *scanned);
 
@@ -484,8 +482,7 @@ void rtw_mesh_plink_ctl_init(_adapter *adapter);
 void rtw_mesh_plink_ctl_deinit(_adapter *adapter);
 void dump_mesh_plink_ctl(void *sel, _adapter *adapter);
 
-u8 rtw_mesh_set_plink_state_cmd(_adapter *adapter, const u8 *mac, u8 plink_state);
-
+int rtw_mesh_peer_establish(_adapter *adapter, struct mesh_plink_ent *plink, struct sta_info *sta);
 void _rtw_mesh_expire_peer_ent(_adapter *adapter, struct mesh_plink_ent *plink);
 void rtw_mesh_expire_peer(_adapter *adapter, const u8 *peer_addr);
 u8 rtw_mesh_ps_annc(_adapter *adapter, u8 ps);
@@ -502,24 +499,23 @@ void rtw_mesh_deinit_mesh_info(_adapter *adapter);
 void dump_mesh_b2u_flags(void *sel, _adapter *adapter);
 #endif
 
-int rtw_mesh_addr_resolve(_adapter *adapter, u16 os_qid, struct xmit_frame *xframe, _pkt *pkt, _list *b2u_list);
+int rtw_mesh_addr_resolve(_adapter *adapter, struct xmit_frame *xframe, _pkt *pkt, _list *b2u_list);
 
 s8 rtw_mesh_tx_set_whdr_mctrl_len(u8 mesh_frame_mode, struct pkt_attrib *attrib);
 void rtw_mesh_tx_build_mctrl(_adapter *adapter, struct pkt_attrib *attrib, u8 *buf);
 u8 rtw_mesh_tx_build_whdr(_adapter *adapter, struct pkt_attrib *attrib
-	, u16 *fctrl, struct rtw_ieee80211_hdr *whdr);
+	, u16 *fctrl, struct ieee80211_hdr *whdr);
 
 int rtw_mesh_rx_data_validate_hdr(_adapter *adapter, union recv_frame *rframe, struct sta_info **sta);
 int rtw_mesh_rx_data_validate_mctrl(_adapter *adapter, union recv_frame *rframe
-	, const struct rtw_ieee80211s_hdr *mctrl, const u8 *mda, const u8 *msa
+	, const struct ieee80211s_hdr *mctrl, const u8 *mda, const u8 *msa
 	, u8 *mctrl_len, const u8 **da, const u8 **sa);
 int rtw_mesh_rx_validate_mctrl_non_amsdu(_adapter *adapter, union recv_frame *rframe);
 
 int rtw_mesh_rx_msdu_act_check(union recv_frame *rframe
 	, const u8 *mda, const u8 *msa
 	, const u8 *da, const u8 *sa
-	, struct rtw_ieee80211s_hdr *mctrl
-	, u8 *msdu, enum rtw_rx_llc_hdl llc_hdl
+	, struct ieee80211s_hdr *mctrl
 	, struct xmit_frame **fwd_frame, _list *b2u_list);
 
 void dump_mesh_stats(void *sel, _adapter *adapter);

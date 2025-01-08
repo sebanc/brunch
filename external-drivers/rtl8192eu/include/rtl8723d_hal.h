@@ -242,9 +242,9 @@ void Hal_EfuseParseXtal_8723D(PADAPTER pAdapter,
 			      u8 *hwinfo, u8 AutoLoadFail);
 void Hal_EfuseParseThermalMeter_8723D(PADAPTER padapter,
 				      u8 *hwinfo, u8 AutoLoadFail);
-void Hal_EfuseParseVoltage_8723D(PADAPTER pAdapter,
+VOID Hal_EfuseParseVoltage_8723D(PADAPTER pAdapter,
 				 u8 *hwinfo, BOOLEAN	AutoLoadFail);
-void Hal_EfuseParseBoardType_8723D(PADAPTER Adapter,
+VOID Hal_EfuseParseBoardType_8723D(PADAPTER Adapter,
 				   u8	*PROMContent, BOOLEAN AutoloadFail);
 
 void rtl8723d_set_hal_ops(struct hal_ops *pHalFunc);
@@ -277,7 +277,7 @@ void rtl8723d_stop_thread(_adapter *padapter);
 	void HalSetOutPutGPIO(PADAPTER padapter, u8 index, u8 OutPutValue);
 #endif
 #ifdef CONFIG_MP_INCLUDED
-int FirmwareDownloadBT(PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
+int FirmwareDownloadBT(IN PADAPTER Adapter, PRT_MP_FIRMWARE pFirmware);
 #endif
 void CCX_FwC2HTxRpt_8723d(PADAPTER padapter, u8 *pdata, u8 len);
 
@@ -296,7 +296,7 @@ void Hal_ReadRFGainOffset(PADAPTER pAdapter, u8 *hwinfo, BOOLEAN AutoLoadFail);
 
 #ifdef CONFIG_PCI_HCI
 	BOOLEAN	InterruptRecognized8723DE(PADAPTER Adapter);
-	void	UpdateInterruptMask8723DE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
+	VOID	UpdateInterruptMask8723DE(PADAPTER Adapter, u32 AddMSR, u32 AddMSR1, u32 RemoveMSR, u32 RemoveMSR1);
 	u16 get_txbd_rw_reg(u16 ff_hwaddr);
 #endif
 

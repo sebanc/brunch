@@ -310,7 +310,7 @@ void SecCalculateMicSMS4(
 
 	memcpy((TempBuf + 16), (pHeader + 16), 6); /* Addr3 */
 
-	fc = le16_to_cpu(header->frame_ctl);
+	fc = le16_to_cpu(header->frame_control);
 
 
 
@@ -473,7 +473,7 @@ u8 WapiCheckPnInSwDecrypt(
 	header = (struct ieee80211_hdr_3addr_qos *)pskb->data;
 	pTaddr = header->addr2;
 	pRaddr = header->addr1;
-	fc = le16_to_cpu(header->frame_ctl);
+	fc = le16_to_cpu(header->frame_control);
 
 	if (GetToDs(&fc))
 		pDaddr = header->addr3;
@@ -482,7 +482,7 @@ u8 WapiCheckPnInSwDecrypt(
 
 	if ((_rtw_memcmp(pRaddr, padapter->pnetdev->dev_addr, ETH_ALEN) == 0)
 	    &&	!(pDaddr)
-	    && (GetFrameType(&fc) == WIFI_QOS_DATA_TYPE))
+	    && (GetFrameType(&fc) == (IEEE80211_STYPE_QOS_DATA |  IEEE80211_FTYPE_DATA)))
 		/* && ieee->pHTInfo->bCurrentHTSupport && */
 		/* ieee->pHTInfo->bCurRxReorderEnable) */
 		ret = false;
@@ -509,7 +509,7 @@ int SecSMS4HeaderFillIV(_adapter *padapter, u8 *pxmitframe)
 	return ret;
 #if 0
 	hdr_len = sMacHdrLng;
-	if (GetFrameType(pskb->data) == WIFI_QOS_DATA_TYPE)
+	if (GetFrameType(pskb->data) == (IEEE80211_STYPE_QOS_DATA |  IEEE80211_FTYPE_DATA))
 		hdr_len += 2;
 	/* hdr_len += SNAP_SIZE + sizeof(u16); */
 
@@ -523,7 +523,7 @@ int SecSMS4HeaderFillIV(_adapter *padapter, u8 *pxmitframe)
 	WAPI_DATA(WAPI_TX, "FillIV - Before Fill IV", pskb->data, pskb->len);
 
 	/* Address 1 is always receiver's address */
-	if (IS_MCAST(pRA)) {
+	if (is_multicast_ether_addr(pRA)) {
 		if (!pWapiInfo->wapiTxMsk.bTxEnable) {
 			WAPI_TRACE(WAPI_ERR, "%s: bTxEnable = 0!!\n", __FUNCTION__);
 			return -2;
@@ -610,7 +610,7 @@ void SecSWSMS4Encryption(
 	pRA = pframe + 4;
 
 
-	if (IS_MCAST(pRA)) {
+	if (is_multicast_ether_addr(pRA)) {
 		KeyIdx = pWapiInfo->wapiTxMsk.keyId;
 		pIV = pWapiInfo->lastTxMulticastPN;
 		pMicKey = pWapiInfo->wapiTxMsk.micKey;
@@ -694,7 +694,7 @@ u8 SecSWSMS4Decryption(
 	WAPI_DATA(WAPI_RX, "Decryption - Before decryption", pskb->data, pskb->len);
 
 	IVOffset = sMacHdrLng;
-	bQosData = GetFrameType(pskb->data) == WIFI_QOS_DATA_TYPE;
+	bQosData = GetFrameType(pskb->data) == (IEEE80211_STYPE_QOS_DATA |  IEEE80211_FTYPE_DATA);
 	if (bQosData)
 		IVOffset += 2;
 
@@ -728,7 +728,7 @@ u8 SecSWSMS4Decryption(
 		return false;
 	}
 
-	if (IS_MCAST(pRA)) {
+	if (is_multicast_ether_addr(pRA)) {
 		WAPI_TRACE(WAPI_RX, "%s: Multicast decryption !!!\n", __FUNCTION__);
 		if (pWapiSta->wapiMsk.keyId == KeyIdx && pWapiSta->wapiMsk.bSet) {
 			pLastRxPN = pWapiSta->lastRxMulticastPN;
@@ -757,7 +757,7 @@ u8 SecSWSMS4Decryption(
 		if (pWapiSta->wapiUsk.keyId == KeyIdx && pWapiSta->wapiUsk.bSet) {
 			WAPI_TRACE(WAPI_RX, "%s: Use USK for Decryption!!!\n", __FUNCTION__);
 			if (precv_hdr->bWapiCheckPNInDecrypt) {
-				if (GetFrameType(pskb->data) == WIFI_QOS_DATA_TYPE) {
+				if (GetFrameType(pskb->data) == (IEEE80211_STYPE_QOS_DATA |  IEEE80211_FTYPE_DATA)) {
 					WapiGetLastRxUnicastPNForQoSData(TID, pWapiSta, lastRxPNforQoS);
 					pLastRxPN = lastRxPNforQoS;
 				} else
@@ -821,7 +821,7 @@ u8 SecSWSMS4Decryption(
 		WAPI_TRACE(WAPI_RX, "%s: Check MIC OK!!\n", __FUNCTION__);
 		if (bUseUpdatedKey) {
 			/* delete the old key */
-			if (IS_MCAST(pRA)) {
+			if (is_multicast_ether_addr(pRA)) {
 				WAPI_TRACE(WAPI_API, "%s(): AE use new update MSK!!\n", __FUNCTION__);
 				pWapiSta->wapiMsk.keyId = pWapiSta->wapiMskUpdate.keyId;
 				memcpy(pWapiSta->wapiMsk.dataKey, pWapiSta->wapiMskUpdate.dataKey, 16);

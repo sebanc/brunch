@@ -182,6 +182,9 @@ struct security_priv {
 	u8 owe_ie[MAX_OWE_IE_LEN];/* added in assoc req */
 	int owe_ie_len;
 
+	u8 rsnx_ie[MAX_RSNX_IE_LEN];
+	int rsnx_ie_len;
+
 	u8	binstallGrpkey;
 #ifdef CONFIG_GTK_OL
 	u8	binstallKCK_KEK;

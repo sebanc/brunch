@@ -96,15 +96,15 @@ struct EMInfo {
 void
 InsertEMContent_8192E(
 	struct EMInfo *pEMInfo,
-	u8 *VirtualAddress)
+	IN pu1Byte	VirtualAddress)
 {
 
 #if RTL8188E_EARLY_MODE_PKT_NUM_10 == 1
-	u8 index = 0;
-	u32	dwtmp = 0;
+	u1Byte index = 0;
+	u4Byte	dwtmp = 0;
 #endif
 
-	_rtw_memset(VirtualAddress, 0, EARLY_MODE_INFO_SIZE);
+	memset(VirtualAddress, 0, EARLY_MODE_INFO_SIZE);
 	if (pEMInfo->EMPktNum == 0)
 		return;
 
@@ -210,7 +210,7 @@ void UpdateEarlyModeInfo8192E(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmi
 		offset = pxmitpriv->agg_pkt[index].offset;
 		pktlen = pxmitpriv->agg_pkt[index].pkt_len;
 
-		_rtw_memset(&eminfo, 0, sizeof(struct EMInfo));
+		memset(&eminfo, 0, sizeof(struct EMInfo));
 		if (pframe->agg_num > EARLY_MODE_MAX_PKT_NUM) {
 			if (node_num_0 > EARLY_MODE_MAX_PKT_NUM) {
 				eminfo.EMPktNum = EARLY_MODE_MAX_PKT_NUM;
@@ -243,7 +243,7 @@ void UpdateEarlyModeInfo8192E(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmi
 
 
 	}
-	_rtw_memset(pxmitpriv->agg_pkt, 0, sizeof(struct agg_pkt_info) * MAX_AGG_PKT_NUM);
+	memset(pxmitpriv->agg_pkt, 0, sizeof(struct agg_pkt_info) * MAX_AGG_PKT_NUM);
 
 }
 #endif
@@ -266,6 +266,7 @@ void rtl8192e_cal_txdesc_chksum(u8 *ptxdesc)
 }
 #endif
 
+#if defined(CONFIG_CONCURRENT_MODE)
 void fill_txdesc_force_bmc_camid(struct pkt_attrib *pattrib, u8 *ptxdesc)
 {
 	if ((pattrib->encrypt > 0) && (!pattrib->bswenc)
@@ -275,7 +276,7 @@ void fill_txdesc_force_bmc_camid(struct pkt_attrib *pattrib, u8 *ptxdesc)
 		SET_TX_DESC_MACID_92E(ptxdesc, pattrib->bmc_camid);
 	}
 }
-
+#endif
 void fill_txdesc_bmc_tx_rate(struct pkt_attrib *pattrib, u8 *ptxdesc)
 {
 	SET_TX_DESC_USE_RATE_92E(ptxdesc, 1);
@@ -339,7 +340,7 @@ void fill_txdesc_vcs(struct pkt_attrib *pattrib, u8 *ptxdesc)
 
 		SET_TX_DESC_CTROL_STBC_92E(pDesc, ((pTcb->bRTSSTBC) ? 1 : 0));
 		SET_TX_DESC_RTS_SHORT_92E(pDesc, pTcb->bRTSShort);
-		SET_TX_DESC_RTS_RATE_92E(pDesc, MRateToHwRate((u8)pTcb->RTSRate));
+		SET_TX_DESC_RTS_RATE_92E(pDesc, MRateToHwRate((u1Byte)pTcb->RTSRate));
 
 		if (pMgntInfo->ForcedProtectionMode == PROTECTION_MODE_FORCE_ENABLE)
 			SET_TX_DESC_RTS_RATE_FB_LIMIT_92E(pDesc, 1);
@@ -351,8 +352,8 @@ void fill_txdesc_vcs(struct pkt_attrib *pattrib, u8 *ptxdesc)
 
 u8
 BWMapping_92E(
-		PADAPTER		Adapter,
-		struct pkt_attrib	*pattrib
+	IN	PADAPTER		Adapter,
+	IN	struct pkt_attrib	*pattrib
 )
 {
 	u8	BWSettingOfDesc = 0;
@@ -376,8 +377,8 @@ BWMapping_92E(
 
 u8
 SCMapping_92E(
-		PADAPTER		Adapter,
-		struct pkt_attrib	*pattrib
+	IN	PADAPTER		Adapter,
+	IN	struct pkt_attrib	*pattrib
 )
 {
 	u8	SCSettingOfDesc = 0;
@@ -475,7 +476,7 @@ void rtl8192e_fill_fake_txdesc(
 	struct xmit_priv		*pxmitpriv = &padapter->xmitpriv;
 
 	/* Clear all status */
-	_rtw_memset(pDesc, 0, TXDESC_SIZE);
+	memset(pDesc, 0, TXDESC_SIZE);
 
 	SET_TX_DESC_OFFSET_92E(pDesc, (TXDESC_SIZE + OFFSET_SZ));
 

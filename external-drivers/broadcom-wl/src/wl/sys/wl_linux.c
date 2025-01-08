@@ -56,7 +56,12 @@
 #include <asm/irq.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+#include <linux/unaligned.h>
+#else
 #include <asm/unaligned.h>
+#endif
+
 
 #include <proto/802.1d.h>
 

@@ -12,45 +12,45 @@ ID VendorID:DeviceID = 0bda:8812
 
 We can search the list of driver supported IDs shown below.
 
-Realtek default IDs
+Realtek default IDs (4)
 
-ID 0BDA:8812 - Default ID
-ID 0BDA:881A - Default ID
-ID 0BDA:881B - Default ID
-ID 0BDA:881C - Default ID
+ID 0bda:8812 - Default ID
+ID 0bda:881a - Default ID
+ID 0bda:881b - Default ID
+ID 0bda:881c - Default ID
 
-Seller specific IDs
+Seller specific IDs (31)
 
-ID 050D:1106
-ID 7392:A822
-ID 0DF6:0074
-ID 04BB:0952
-ID 0789:016E
-ID 0409:0408
-ID 0B05:17D2
-ID 0E66:0022
-ID 0586:3426
-ID 1058:0632
-ID 1740:0100
-ID 2019:AB30
-ID 07B8:8812
-ID 0846:9051
-ID 2001:330E
-ID 2001:3313
-ID 2001:3315
-ID 2001:3316
-ID 13B1:003F
-ID 2357:0101
-ID 2357:0103
-ID 2357:010D
-ID 2357:010E
-ID 2357:010F /* TP-Link - T4UP_UN  */
-ID 2357:0122 /* TP-Link - T4UHP_US */
-ID 20F4:805B
-ID 0411:025D
-ID 050D:1109
-ID 148F:9097
-ID 2604:0012
+ID 0409:0408 /* NEC */
+ID 0411:025d /* Buffalo */
+ID 04bb:0952 /* I-O DATA */
+ID 050d:1106 /* Belkin */
+ID 050d:1109 /* Belkin */
+ID 0586:3426 /* ZyXEL */
+ID 0789:016e /* Logitec */
+ID 07b8:8812 /* Abocom */
+ID 0846:9051 /* Netgear */
+ID 0b05:17d2 /* ASUS */
+ID 0df6:0074 /* Sitecom */
+ID 0e66:0022 /* Hawking */
+ID 1058:0632 /* WD */
+ID 13b1:003f /* Linksys */
+ID 148f:9097 /* Amped Wireless */
+ID 1740:0100 /* EnGenius */
+ID 2001:330e /* D-Link */
+ID 2001:3313 /* D-Link */
+ID 2001:3315 /* D-Link */
+ID 2001:3316 /* D-Link */
+ID 2019:ab30 /* Planex */
+ID 20f4:805b /* TRENDnet */
+ID 2357:0101 /* TP-Link */
+ID 2357:0103 /* TP-Link */
+ID 2357:010d /* TP-Link */
+ID 2357:010e /* TP-Link */
+ID 2357:010f /* TP-Link */
+ID 2357:0122 /* TP-Link */
+ID 2604:0012 /* Tenda */
+ID 7392:a822 /* Edimax */
 
 If your adapter matches one of the default or seller specific
 IDs then this is the driver to use.

@@ -5,48 +5,15 @@
 MODULE_DESCRIPTION("Intel Touch Host Controller driver");
 MODULE_LICENSE("Dual BSD/GPL");
 
-// Lakefield
-#define PCI_DEVICE_ID_INTEL_THC_LKF_PORT1    0x98d0
-#define PCI_DEVICE_ID_INTEL_THC_LKF_PORT2    0x98d1
-// Tiger Lake
-#define PCI_DEVICE_ID_INTEL_THC_TGL_LP_PORT1 0xa0d0
-#define PCI_DEVICE_ID_INTEL_THC_TGL_LP_PORT2 0xa0d1
-#define PCI_DEVICE_ID_INTEL_THC_TGL_H_PORT1  0x43d0
-#define PCI_DEVICE_ID_INTEL_THC_TGL_H_PORT2  0x43d1
-// Alder Lake
-#define PCI_DEVICE_ID_INTEL_THC_ADL_S_PORT1  0x7ad8
-#define PCI_DEVICE_ID_INTEL_THC_ADL_S_PORT2  0x7ad9
-#define PCI_DEVICE_ID_INTEL_THC_ADL_P_PORT1  0x51d0
-#define PCI_DEVICE_ID_INTEL_THC_ADL_P_PORT2  0x51d1
-#define PCI_DEVICE_ID_INTEL_THC_ADL_M_PORT1  0x54d0
-#define PCI_DEVICE_ID_INTEL_THC_ADL_M_PORT2  0x54d1
-// Raptor Lake
-#define PCI_DEVICE_ID_INTEL_THC_RPL_S_PORT1  0x7a58
-#define PCI_DEVICE_ID_INTEL_THC_RPL_S_PORT2  0x7a59
-// Meteor Lake
-#define PCI_DEVICE_ID_INTEL_THC_MTL_PORT1    0x7e48
-#define PCI_DEVICE_ID_INTEL_THC_MTL_PORT2    0x7e4a
-
 static const struct pci_device_id ithc_pci_tbl[] = {
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_LKF_PORT1) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_LKF_PORT2) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_TGL_LP_PORT1) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_TGL_LP_PORT2) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_TGL_H_PORT1) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_TGL_H_PORT2) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_ADL_S_PORT1) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_ADL_S_PORT2) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_ADL_P_PORT1) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_ADL_P_PORT2) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_ADL_M_PORT1) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_ADL_M_PORT2) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_RPL_S_PORT1) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_RPL_S_PORT2) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_MTL_PORT1) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_THC_MTL_PORT2) },
-	// XXX So far the THC seems to be the only Intel PCI device with PCI_CLASS_INPUT_PEN,
-	// so instead of the device list we could just do:
-	// { .vendor = PCI_VENDOR_ID_INTEL, .device = PCI_ANY_ID, .subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID, .class = PCI_CLASS_INPUT_PEN, .class_mask = ~0, },
+	{
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_ANY_ID,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+		.class = PCI_CLASS_INPUT_PEN << 8,
+		.class_mask = ~0,
+	},
 	{}
 };
 MODULE_DEVICE_TABLE(pci, ithc_pci_tbl);
@@ -74,49 +41,13 @@ static int ithc_idle_ltr_us = -1;
 module_param_named(idleltr, ithc_idle_ltr_us, int, 0);
 MODULE_PARM_DESC(idleltr, "Idle LTR value override (in microseconds)");
 
+static unsigned int ithc_idle_delay_ms = 1000;
+module_param_named(idledelay, ithc_idle_delay_ms, uint, 0);
+MODULE_PARM_DESC(idleltr, "Minimum idle time before applying idle LTR value (in milliseconds)");
+
 static bool ithc_log_regs_enabled = false;
 module_param_named(logregs, ithc_log_regs_enabled, bool, 0);
 MODULE_PARM_DESC(logregs, "Log changes in register values (for debugging)");
-
-// Sysfs attributes
-
-static ssize_t vendor_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct ithc *ithc = dev_get_drvdata(dev);
-	if (!ithc || !ithc->have_config)
-		return -ENODEV;
-	return sprintf(buf, "0x%04x", ithc->vendor_id);
-}
-static DEVICE_ATTR_RO(vendor);
-static ssize_t product_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct ithc *ithc = dev_get_drvdata(dev);
-	if (!ithc || !ithc->have_config)
-		return -ENODEV;
-	return sprintf(buf, "0x%04x", ithc->product_id);
-}
-static DEVICE_ATTR_RO(product);
-static ssize_t revision_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct ithc *ithc = dev_get_drvdata(dev);
-	if (!ithc || !ithc->have_config)
-		return -ENODEV;
-	return sprintf(buf, "%u", ithc->product_rev);
-}
-static DEVICE_ATTR_RO(revision);
-
-static const struct attribute_group *ithc_attribute_groups[] = {
-	&(const struct attribute_group){
-		.name = DEVNAME,
-		.attrs = (struct attribute *[]){
-			&dev_attr_vendor.attr,
-			&dev_attr_product.attr,
-			&dev_attr_revision.attr,
-			NULL
-		},
-	},
-	NULL
-};
 
 // Interrupts/polling
 
@@ -146,14 +77,19 @@ static void ithc_clear_interrupts(struct ithc *ithc)
 		&ithc->regs->dma_tx.status);
 }
 
+static void ithc_idle_timer_callback(struct timer_list *t)
+{
+	struct ithc *ithc = container_of(t, struct ithc, idle_timer);
+	ithc_set_ltr_idle(ithc);
+}
+
 static void ithc_process(struct ithc *ithc)
 {
 	ithc_log_regs(ithc);
 
 	// The THC automatically transitions from LTR idle to active at the start of a DMA transfer.
-	// It does not appear to automatically go back to idle, so we switch it back here, since
-	// the DMA transfer should be complete.
-	ithc_set_ltr_idle(ithc);
+	// It does not appear to automatically go back to idle, so we switch it back after a delay.
+	mod_timer(&ithc->idle_timer, jiffies + msecs_to_jiffies(ithc_idle_delay_ms));
 
 	bool rx0 = ithc_use_rx0 && (readl(&ithc->regs->dma_rx[0].status) & (DMA_RX_STATUS_ERROR | DMA_RX_STATUS_HAVE_DATA)) != 0;
 	bool rx1 = ithc_use_rx1 && (readl(&ithc->regs->dma_rx[1].status) & (DMA_RX_STATUS_ERROR | DMA_RX_STATUS_HAVE_DATA)) != 0;
@@ -253,10 +189,10 @@ static int ithc_init_device(struct ithc *ithc)
 	// Set Latency Tolerance Reporting config. The device will automatically
 	// apply these values depending on whether it is active or idle.
 	// If active value is too high, DMA buffer data can become truncated.
-	// By default, we set the active LTR value to 100us, and idle to 100ms.
+	// By default, we set the active LTR value to 50us, and idle to 100ms.
 	u64 active_ltr_ns = ithc_active_ltr_us >= 0 ? (u64)ithc_active_ltr_us * 1000
 		: cfg.has_config && cfg.has_active_ltr ? (u64)cfg.active_ltr << 10
-		: 100 * 1000;
+		: 50 * 1000;
 	u64 idle_ltr_ns = ithc_idle_ltr_us >= 0 ? (u64)ithc_idle_ltr_us * 1000
 		: cfg.has_config && cfg.has_idle_ltr ? (u64)cfg.idle_ltr << 10
 		: 100 * 1000 * 1000;
@@ -301,6 +237,7 @@ static void ithc_stop(void *res)
 	else
 		ithc_legacy_exit(ithc);
 	ithc_disable(ithc);
+	del_timer_sync(&ithc->idle_timer);
 
 	// Clear DMA config.
 	for (unsigned int i = 0; i < 2; i++) {
@@ -365,12 +302,13 @@ static int ithc_start(struct pci_dev *pci)
 
 	// Initialize HID and DMA.
 	CHECK_RET(ithc_hid_init, ithc);
-	CHECK(devm_device_add_groups, &pci->dev, ithc_attribute_groups);
 	if (ithc_use_rx0)
 		CHECK_RET(ithc_dma_rx_init, ithc, 0);
 	if (ithc_use_rx1)
 		CHECK_RET(ithc_dma_rx_init, ithc, 1);
 	CHECK_RET(ithc_dma_tx_init, ithc);
+
+	timer_setup(&ithc->idle_timer, ithc_idle_timer_callback, 0);
 
 	// Add ithc_stop() callback AFTER setting up DMA buffers, so that polling/irqs/DMA are
 	// disabled BEFORE the buffers are freed.
@@ -474,7 +412,6 @@ static struct pci_driver ithc_driver = {
 		.restore = ithc_restore,
 	},
 	.driver.probe_type = PROBE_PREFER_ASYNCHRONOUS,
-	//.dev_groups = ithc_attribute_groups, // could use this (since 5.14), however the attributes won't have valid values until config has been read anyway
 };
 
 static int __init ithc_init(void)

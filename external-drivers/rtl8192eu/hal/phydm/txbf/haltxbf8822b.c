@@ -185,7 +185,6 @@ hal_txbf_8822b_download_ndpa(
 	platform_efio_write_1byte(adapter, REG_FWHW_TXQ_CTRL_8814A + 2,  tmp_reg422 & (~BIT(6)));
 
 	if (tmp_reg422 & BIT(6)) {
-		RT_TRACE(COMP_INIT, DBG_LOUD, ("SetBeamformDownloadNDPA_8814A(): There is an adapter is sending beacon.\n"));
 		is_send_beacon = true;
 	}
 
@@ -306,8 +305,7 @@ hal_txbf_8822b_init(
 
 	if (dm->rf_type == RF_2T2R) { /*@2T2R*/
 		PHYDM_DBG(dm, DBG_TXBF, "%s: rf_type is 2T2R\n", __func__);
-		config_phydm_trx_mode_8822b(dm, (enum bb_path)3,
-					    (enum bb_path)3, BB_PATH_AB;
+		config_phydm_trx_mode_8822b(dm, (enum bb_path)3, (enum bb_path)3, true);/*Tx2path*/
 	}
 
 #if (OMNIPEEK_SNIFFER_ENABLED == 1)
@@ -601,7 +599,7 @@ void hal_txbf_8822b_enter(
 		hal_txbf_8822b_rf_mode(dm, beamforming_info, bfee_idx);
 #if (SUPPORT_MU_BF == 1)
 		/*Special for plugfest*/
-		delay_ms(50); /* wait for 4-way handshake ending*/
+		mdelay(50); /* wait for 4-way handshake ending*/
 		send_sw_vht_gid_mgnt_frame(dm, p_beamformee_entry->mac_addr, bfee_idx);
 #endif
 

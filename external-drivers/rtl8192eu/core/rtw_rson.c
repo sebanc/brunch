@@ -77,7 +77,7 @@ void init_rtw_rson_data(struct dvobj_priv *dvobj)
 	dvobj->rson_data.connectible = RTW_RSON_DENYCONNECT;
 #endif
 	dvobj->rson_data.loading = 0;
-	_rtw_memset(dvobj->rson_data.res, 0xAA, sizeof(dvobj->rson_data.res));
+	memset(dvobj->rson_data.res, 0xAA, sizeof(dvobj->rson_data.res));
 }
 
 void	rtw_rson_get_property_str(_adapter *padapter, char *rson_data_str)
@@ -218,7 +218,7 @@ int rtw_get_rson_struct(WLAN_BSSID_EX *bssid, struct  rtw_rson_struct *rson_data
 	limit = bssid->IELength - _BEACON_IE_OFFSET_;
 
 	for (p = bssid->IEs + _BEACON_IE_OFFSET_; ; p += (len + 2)) {
-		p = rtw_get_ie(p, _VENDOR_SPECIFIC_IE_, &len, limit);
+		p = rtw_get_ie(p, WLAN_EID_VENDOR_SPECIFIC, &len, limit);
 		limit -= len;
 		if ((p == NULL) || (len == 0))
 			break;
@@ -252,9 +252,9 @@ u32 rtw_rson_append_ie(_adapter *padapter, unsigned char *pframe, u32 *len)
 	if ((!pdvobj) || (!pframe))
 		return 0;
 	ptr = ori = pframe;
-	*ptr++ = _VENDOR_SPECIFIC_IE_;
+	*ptr++ = WLAN_EID_VENDOR_SPECIFIC;
 	*ptr++ = ie_len = sizeof(RTW_RSON_OUI)+sizeof(pdvobj->rson_data);
-	_rtw_memcpy(ptr, RTW_RSON_OUI, sizeof(RTW_RSON_OUI));
+	memcpy(ptr, RTW_RSON_OUI, sizeof(RTW_RSON_OUI));
 	ptr = ptr + sizeof(RTW_RSON_OUI);
 	*ptr++ = pdvobj->rson_data.ver;
 	*(s32 *)ptr = cpu_to_le32(pdvobj->rson_data.id);
@@ -262,7 +262,7 @@ u32 rtw_rson_append_ie(_adapter *padapter, unsigned char *pframe, u32 *len)
 	*ptr++ = pdvobj->rson_data.hopcnt;
 	*ptr++ = pdvobj->rson_data.connectible;
 	*ptr++ = pdvobj->rson_data.loading;
-	_rtw_memcpy(ptr, pdvobj->rson_data.res, sizeof(pdvobj->rson_data.res));
+	memcpy(ptr, pdvobj->rson_data.res, sizeof(pdvobj->rson_data.res));
 	pframe = ptr;
 /*
 	iii = iii % 20;
@@ -285,9 +285,7 @@ void rtw_rson_do_disconnect(_adapter *padapter)
 	pdvobj->rson_data.hopcnt = RTW_RSON_HC_NOTREADY;
 	pdvobj->rson_data.connectible = RTW_RSON_DENYCONNECT;
 	pdvobj->rson_data.loading = 0;
-	#ifdef CONFIG_AP_MODE
 	rtw_mi_tx_beacon_hdl(padapter);
-	#endif
 #endif
 }
 
@@ -313,9 +311,7 @@ void rtw_rson_join_done(_adapter *padapter)
 	pdvobj->rson_data.hopcnt = rson_data.hopcnt + 1;
 	pdvobj->rson_data.connectible = RTW_RSON_ALLOWCONNECT;
 	pdvobj->rson_data.loading = 0;
-	#ifdef CONFIG_AP_MODE
 	rtw_mi_tx_beacon_hdl(padapter);
-	#endif
 #endif
 }
 
@@ -393,14 +389,14 @@ void rtw_rson_show_survey_info(struct seq_file *m, _list *plist, _list *phead)
 
 	RTW_PRINT_SEL(m, "%5s  %-17s  %3s  %5s %14s  %10s  %-3s  %5s %32s\n", "index", "bssid", "ch", "id", "hop_cnt", "loading", "RSSI", "score", "ssid");
 	while (1) {
-		if (rtw_end_of_queue_search(phead, plist) == _TRUE)
+		if (phead == plist)
 			break;
 
 		pnetwork = LIST_CONTAINOR(plist, struct wlan_network, list);
 		if (!pnetwork)
 			break;
 
-		_rtw_memset(&rson_data, 0, sizeof(rson_data));
+		memset(&rson_data, 0, sizeof(rson_data));
 		rson_score = 0;
 		if (rtw_get_rson_struct(&(pnetwork->network), &rson_data) == _TRUE)
 			rson_score = rtw_cal_rson_score(&rson_data, pnetwork->network.Rssi);
@@ -436,9 +432,9 @@ u8 rtw_rson_ap_check_sta(_adapter *padapter, u8 *pframe, uint pkt_len, unsigned 
 	u8 *p;
 
 #ifndef CONFIG_RTW_REPEATER_SON_ROOT
-	_rtw_memset(&rson_target, 0, sizeof(rson_target));
+	memset(&rson_target, 0, sizeof(rson_target));
 	for (p = pframe + WLAN_HDR_A3_LEN + ie_offset; ; p += (len + 2)) {
-		p = rtw_get_ie(p, _VENDOR_SPECIFIC_IE_, &len, pkt_len - WLAN_HDR_A3_LEN - ie_offset);
+		p = rtw_get_ie(p, WLAN_EID_VENDOR_SPECIFIC, &len, pkt_len - WLAN_HDR_A3_LEN - ie_offset);
 
 		if ((p == NULL) || (len == 0))
 			break;
@@ -501,7 +497,7 @@ u8 rtw_rson_scan_wk_cmd(_adapter *padapter, int op)
 	pdrvextra_cmd_parm->size = 0;
 	pdrvextra_cmd_parm->pbuf = NULL;
 
-	init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, CMD_SET_DRV_EXTRA);
+	init_h2fwcmd_w_parm_no_rsp(ph2c, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
 
 	res = rtw_enqueue_cmd(pcmdpriv, ph2c);
 
@@ -539,32 +535,39 @@ void rtw_rson_scan_cmd_hdl(_adapter *padapter, int op)
 			if (check_fwstate(pmlmepriv, WIFI_ADHOC_STATE) != _TRUE) {
 				int s_ret;
 
-				set_fwstate(pmlmepriv, WIFI_UNDER_LINKING);
+				set_fwstate(pmlmepriv, _FW_UNDER_LINKING);
 				pmlmepriv->to_join = _FALSE;
 				s_ret = rtw_select_and_join_from_scanned_queue(pmlmepriv);
 				if (s_ret == _SUCCESS)
 					_set_timer(&pmlmepriv->assoc_timer, MAX_JOIN_TIMEOUT);
 				else if (s_ret == 2) {
-					_clr_fwstate_(pmlmepriv, WIFI_UNDER_LINKING);
+					_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING);
 					rtw_indicate_connect(padapter);
 				} else {
 					RTW_INFO("try_to_join, but select scanning queue fail, to_roam:%d\n", rtw_to_roam(padapter));
 					if (rtw_to_roam(padapter) != 0) {
 						if (rtw_dec_to_roam(padapter) == 0) {
 							rtw_set_to_roam(padapter, 0);
+#ifdef CONFIG_INTEL_WIDI
+							if (padapter->mlmepriv.widi_state == INTEL_WIDI_STATE_ROAMING) {
+								memset(pmlmepriv->sa_ext, 0x00, L2SDTA_SERVICE_VE_LEN);
+								intel_widi_wk_cmd(padapter, INTEL_WIDI_LISTEN_WK, NULL, 0);
+								RTW_INFO("change to widi listen\n");
+							}
+#endif /* CONFIG_INTEL_WIDI */
 							rtw_free_assoc_resources(padapter, _TRUE);
 							rtw_indicate_disconnect(padapter, 0, _FALSE);
 						} else
 							pmlmepriv->to_join = _TRUE;
 					} else
 						rtw_indicate_disconnect(padapter, 0, _FALSE);
-					_clr_fwstate_(pmlmepriv, WIFI_UNDER_LINKING);
+					_clr_fwstate_(pmlmepriv, _FW_UNDER_LINKING);
 				}
 			}
 		} else {
 			if (rtw_chk_roam_flags(padapter, RTW_ROAM_ACTIVE)) {
 				if (check_fwstate(pmlmepriv, WIFI_STATION_STATE)
-				    && check_fwstate(pmlmepriv, WIFI_ASOC_STATE)) {
+				    && check_fwstate(pmlmepriv, _FW_LINKED)) {
 					if (rtw_select_roaming_candidate(pmlmepriv) == _SUCCESS) {
 #ifdef CONFIG_RTW_80211R
 						if (rtw_chk_ft_flags(padapter, RTW_FT_OVER_DS_SUPPORTED)) {

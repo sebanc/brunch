@@ -79,25 +79,16 @@ enum channel_width {
 enum rf_type {
 	RF_1T1R			= 0,
 	RF_1T2R			= 1,
-	RF_2T1R			= 2,
-	RF_2T2R			= 3,
-	RF_1T3R			= 4,
-	RF_2T3R			= 5,
-	RF_3T1R			= 6,
-	RF_3T2R			= 7,
-	RF_3T3R			= 8,
-	RF_1T4R			= 9,
-	RF_2T4R			= 10,
-	RF_3T4R			= 11,
-	RF_4T1R			= 12,
-	RF_4T2R			= 13,
-	RF_4T3R			= 14,
-	RF_4T4R			= 15,
+	RF_2T2R			= 2,
+	RF_2T3R			= 3,
+	RF_2T4R			= 4,
+	RF_3T3R			= 5,
+	RF_3T4R			= 6,
+	RF_4T4R			= 7,
 	RF_TYPE_MAX,
 };
 
 enum bb_path {
-	BB_PATH_NON = 0,
 	BB_PATH_A = 0x00000001,
 	BB_PATH_B = 0x00000002,
 	BB_PATH_C = 0x00000004,
@@ -116,7 +107,6 @@ enum bb_path {
 	BB_PATH_BCD = (BB_PATH_B | BB_PATH_C | BB_PATH_D),
 
 	BB_PATH_ABCD = (BB_PATH_A | BB_PATH_B | BB_PATH_C | BB_PATH_D),
-	BB_PATH_AUTO = 0xff /*for path diversity*/
 };
 
 enum rf_path {
@@ -140,11 +130,6 @@ enum rf_path {
 enum rf_syn {
 	RF_SYN0 = 0,
 	RF_SYN1 = 1,
-};
-
-enum rfc_mode {
-	rfc_4x4 = 0,
-	rfc_2x2 = 1,
 };
 
 enum wireless_set {
@@ -204,7 +189,7 @@ struct dtp_info {
 };
 
 struct cmn_sta_info {
-	u16	dm_ctrl;			/*[Driver]*/
+	u16	dm_ctrl;			/*[Driver]*/			
 	enum channel_width	bw_mode;	/*[Driver] max support BW*/
 	u8	mac_id;				/*[Driver]*/
 	u8	mac_addr[6];			/*[Driver]*/
@@ -226,12 +211,7 @@ struct cmn_sta_info {
 	/*u8		total_pw2cca_cnt;*/
 };
 
-struct phydm_phyinfo_fw_struct {
-	u8		rx_rssi[4];	/* RSSI in 0~100 index */
-};
-
 struct phydm_phyinfo_struct {
-	boolean		physts_rpt_valid; /* @if physts_rpt_valid is false, please ignore the parsing result in this structure*/
 	u8		rx_pwdb_all;
 	u8		signal_quality;				/* OFDM: signal_quality=rx_mimo_signal_quality[0], CCK: signal qualityin 0-100 index. */
 	u8		rx_mimo_signal_strength[4];	/* RSSI in 0~100 index */
@@ -248,7 +228,7 @@ struct phydm_phyinfo_struct {
 	u8		ant_idx[4];	/*per-path's antenna index*/
 /*ODM_PHY_STATUS_NEW_TYPE_SUPPORT*/
 	u8		rx_count:2;					/* RX path counter---*/
-	u8		band_width:3;
+	u8		band_width:2;
 	u8		rxsc:4;						/* sub-channel---*/
 	u8		channel;						/* channel number---*/
 	u8		is_mu_packet:1;				/* is MU packet or not---boolean*/

@@ -1,4 +1,4 @@
-2022-12-27
+2024-03-07
 
 What is Concurrent Mode?
 
@@ -50,6 +50,7 @@ the driver is already installed, run the following first:
 ```
 sudo ./remove-driver.sh
 ```
+
 and then reinstall the driver with:
 
 ```
@@ -80,7 +81,7 @@ For example:
 
 Assume the throughput limitation of current environment is 85Mb/s,
 then the throughput of wlan0 + the throughput of wlan1 is basically
-equal or smaller than 85Mb/s.
+equal to or smaller than 85Mb/s.
 
 Q: Everything is fine when I only start hostapd, but when I start running
 station mode in the other interface at the same time, hostapd will disconnect

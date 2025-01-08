@@ -65,7 +65,7 @@ typedef struct _NDIS_802_11_FIXED_IEs {
 typedef struct _NDIS_802_11_VARIABLE_IEs {
 	u8  ElementID;
 	u8  Length;
-	u8  data[1];
+	u8  data[];
 } NDIS_802_11_VARIABLE_IEs, *PNDIS_802_11_VARIABLE_IEs;
 
 typedef enum _NDIS_802_11_AUTHENTICATION_MODE {
@@ -150,7 +150,7 @@ typedef struct _NDIS_802_11_FIXED_IEs {
 typedef struct _NDIS_802_11_VARIABLE_IEs {
 	u8  ElementID;
 	u8  Length;
-	u8  data[1];
+	u8  data[];
 } NDIS_802_11_VARIABLE_IEs, *PNDIS_802_11_VARIABLE_IEs;
 
 typedef enum _NDIS_802_11_AUTHENTICATION_MODE {

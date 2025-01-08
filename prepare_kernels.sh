@@ -52,12 +52,29 @@ kernel_remote_path="$(git ls-remote https://chromium.googlesource.com/chromiumos
 echo "kernel_remote_path=$kernel_remote_path"
 
 # Download kernels source
-kernels="4.19 5.4 5.10 5.15 6.1 6.6"
+kernels="4.19 5.4 5.10 5.15 6.1 6.6 6.12"
 for kernel in $kernels; do
 	kernel_version=$(curl -Ls "https://chromium.googlesource.com/chromiumos/third_party/kernel/+/$kernel_remote_path$kernel/Makefile?format=TEXT" | base64 --decode | sed -n -e 1,4p | sed -e '/^#/d' | cut -d'=' -f 2 | sed -z 's#\n##g' | sed 's#^ *##g' | sed 's# #.#g')
 	echo "kernel_version=$kernel_version"
 	[ ! "x$kernel_version" == "x" ] || { echo "Kernel version not found"; exit 1; }
 	case "$kernel" in
+		6.12)
+			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"
+			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
+			mkdir "./kernels/chromebook-6.12" "./kernels/6.12"
+			tar -C "./kernels/chromebook-6.12" -zxf "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel $kernel source extraction failed"; exit 1; }
+			tar -C "./kernels/6.12" -zxf "./kernels/chromiumos-$kernel.tar.gz" chromeos || { echo "Kernel $kernel source extraction failed"; exit 1; }
+			rm -f "./kernels/chromiumos-$kernel.tar.gz"
+			apply_patches "chromebook-6.12"
+			make_config "chromebook-6.12"
+			echo "Downloading Mainline kernel source for kernel $kernel version $kernel_version"
+			if [ "$kernel_version" == "6.12.0" ]; then kernel_version_url="6.12"; else kernel_version_url="$kernel_version"; fi
+			curl -L "https://mirrors.edge.kernel.org/pub/linux/kernel/v6.x/linux-$kernel_version_url.tar.gz" -o "./kernels/mainline-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
+			tar -C "./kernels/6.12" -zxf "./kernels/mainline-$kernel.tar.gz" --strip 1 || { echo "Kernel $kernel source extraction failed"; exit 1; }
+			rm -f "./kernels/mainline-$kernel.tar.gz"
+			apply_patches "6.12"
+			make_config "6.12"
+		;;
 		6.6)
 			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version"
 			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
@@ -106,6 +123,6 @@ done
 rm -rf ./kernels
 mkdir ./kernels
 
-chromeos_version="R132"
+chromeos_version="R133"
 download_and_patch_kernels
 

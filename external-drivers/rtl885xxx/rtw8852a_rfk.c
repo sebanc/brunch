@@ -776,7 +776,7 @@ static void _iqk_rxk_setting(struct rtw89_dev *rtwdev, u8 path)
 	rtw89_write_rf(rtwdev, path, RR_RXKPLL, RR_RXKPLL_OFF, 0x13);
 	rtw89_write_rf(rtwdev, path, RR_RXKPLL, RR_RXKPLL_POW, 0x0);
 	rtw89_write_rf(rtwdev, path, RR_RXKPLL, RR_RXKPLL_POW, 0x1);
-	fsleep_alt(128);
+	fsleep(128);
 }
 
 static bool _iqk_check_cal(struct rtw89_dev *rtwdev, u8 path, u8 ktype)
@@ -1212,7 +1212,7 @@ static bool _iqk_lok(struct rtw89_dev *rtwdev,
 	rtw89_phy_write32_mask(rtwdev, R_KIP_IQP + (path << 8), MASKDWORD, itqt);
 	tmp = _iqk_one_shot(rtwdev, phy_idx, path, ID_FLOK_COARSE);
 	iqk_info->lok_cor_fail[0][path] = tmp;
-	fsleep_alt(10);
+	fsleep(10);
 	rtw89_phy_write32_mask(rtwdev, R_KIP_IQP + (path << 8), MASKDWORD, itqt);
 	tmp = _iqk_one_shot(rtwdev, phy_idx, path, ID_FLOK_FINE);
 	iqk_info->lok_fin_fail[0][path] = tmp;
@@ -1284,11 +1284,8 @@ static void _iqk_info_iqk(struct rtw89_dev *rtwdev, enum rtw89_phy_idx phy_idx,
 	u32 tmp = 0x0;
 	bool flag = 0x0;
 
-	iqk_info->thermal[path] =
-		ewma_thermal_read(&rtwdev->phystat.avg_thermal[path]);
-	iqk_info->thermal_rek_en = false;
-	rtw89_debug(rtwdev, RTW89_DBG_RFK, "[IQK]S%d_thermal = %d\n", path,
-		    iqk_info->thermal[path]);
+	rtw89_debug(rtwdev, RTW89_DBG_RFK, "[IQK]S%d_thermal = %lu\n", path,
+		    ewma_thermal_read(&rtwdev->phystat.avg_thermal[path]));
 	rtw89_debug(rtwdev, RTW89_DBG_RFK, "[IQK]S%d_LOK_COR_fail= %d\n", path,
 		    iqk_info->lok_cor_fail[0][path]);
 	rtw89_debug(rtwdev, RTW89_DBG_RFK, "[IQK]S%d_LOK_FIN_fail= %d\n", path,
@@ -1536,28 +1533,6 @@ static void _iqk_dbcc(struct rtw89_dev *rtwdev, u8 path)
 	_iqk_afebb_restore(rtwdev, phy_idx, path);
 }
 
-static void _iqk_track(struct rtw89_dev *rtwdev)
-{
-	struct rtw89_iqk_info *iqk = &rtwdev->iqk;
-	u8 path = 0x0;
-	u8 cur_ther;
-
-	if (iqk->iqk_band[0] == RTW89_BAND_2G)
-		return;
-	if (iqk->iqk_bw[0] < RTW89_CHANNEL_WIDTH_80)
-		return;
-
-	/* only check path 0 */
-	for (path = 0; path < 1; path++) {
-		cur_ther = ewma_thermal_read(&rtwdev->phystat.avg_thermal[path]);
-
-		if (abs(cur_ther - iqk->thermal[path]) > RTW8852A_IQK_THR_REK)
-			iqk->thermal_rek_en = true;
-		else
-			iqk->thermal_rek_en = false;
-	}
-}
-
 static void _rck(struct rtw89_dev *rtwdev, enum rtw89_rf_path path)
 {
 	u32 rf_reg5, rck_val = 0;
@@ -1616,7 +1591,6 @@ static void _iqk_init(struct rtw89_dev *rtwdev)
 	iqk_info->iqk_sram_en = false;
 	iqk_info->iqk_cfir_en = false;
 	iqk_info->iqk_xym_en = false;
-	iqk_info->thermal_rek_en = false;
 	iqk_info->iqk_times = 0x0;
 
 	for (ch = 0; ch < RTW89_IQK_CHS_NR; ch++) {
@@ -1645,7 +1619,6 @@ static void _doiqk(struct rtw89_dev *rtwdev, bool force,
 	rtw89_debug(rtwdev, RTW89_DBG_RFK,
 		    "[IQK]==========IQK start!!!!!==========\n");
 	iqk_info->iqk_times++;
-	iqk_info->kcount = 0;
 	iqk_info->version = RTW8852A_IQK_VER;
 
 	rtw89_debug(rtwdev, RTW89_DBG_RFK, "[IQK]Test Ver 0x%x\n", iqk_info->version);
@@ -1717,7 +1690,7 @@ static void _set_rx_dck(struct rtw89_dev *rtwdev, enum rtw89_phy_idx phy,
 	rtw89_write_rf(rtwdev, path, RR_DCK, RR_DCK_LV, 0x0);
 	rtw89_write_rf(rtwdev, path, RR_DCK, RR_DCK_LV, 0x1);
 
-	fsleep_alt(600);
+	fsleep(600);
 
 	rtw89_btc_ntfy_wl_rfk(rtwdev, phy_map, BTC_WRFKT_RXDCK, BTC_WRFK_ONESHOT_STOP);
 
@@ -2011,7 +1984,7 @@ static void _dpk_lbk_rxiqk(struct rtw89_dev *rtwdev,
 	rtw89_write_rf(rtwdev, path, RR_RXKPLL, RR_RXKPLL_POW, 0x0);
 	rtw89_write_rf(rtwdev, path, RR_RXKPLL, RR_RXKPLL_POW, 0x1);
 
-	fsleep_alt(70);
+	fsleep(70);
 
 	rtw89_write_rf(rtwdev, path, RR_RXIQGEN, RR_RXIQGEN_ATTL, 0x1f);
 
@@ -3653,11 +3626,6 @@ void rtw8852a_iqk(struct rtw89_dev *rtwdev, enum rtw89_phy_idx phy_idx)
 
 	rtw89_chip_resume_sch_tx(rtwdev, phy_idx, tx_en);
 	rtw89_btc_ntfy_wl_rfk(rtwdev, phy_map, BTC_WRFKT_IQK, BTC_WRFK_STOP);
-}
-
-void rtw8852a_iqk_track(struct rtw89_dev *rtwdev)
-{
-	_iqk_track(rtwdev);
 }
 
 void rtw8852a_rx_dck(struct rtw89_dev *rtwdev, enum rtw89_phy_idx phy_idx,

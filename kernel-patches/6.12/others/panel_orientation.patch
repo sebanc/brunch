@@ -83,14 +83,14 @@ index 5b2506c65e95..d88ebdca1766 100644
  	const char *bios_date;
  	int i;
  
-+	pr_info("drm_get_panel_orientation_quirk called with width=%d height=%d", width, height);
++	pr_info("%s called with width=%d height=%d", __func__, width, height);
 +
  	for (match = dmi_first_match(orientation_data);
  	     match;
  	     match = dmi_first_match(match + 1)) {
  		data = match->driver_data;
  
-+		pr_info("drm_get_panel_orientation_quirk dmi match found");
++		pr_info("%s dmi match found", __func__);
 +
  		if (data->width != width ||
  		    data->height != height)
@@ -101,7 +101,7 @@ index 5b2506c65e95..d88ebdca1766 100644
  		i = match_string(data->bios_dates, -1, bios_date);
 -		if (i >= 0)
 +		if (i >= 0) {
-+			pr_info("drm_get_panel_orientation_quirk dmi match applied");
++			pr_info("%s dmi match applied, __func__");
  			return data->orientation;
 +		}
  	}

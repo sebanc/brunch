@@ -1,0 +1,58 @@
+From 6162d328fe7b2cf5a3ee8c29bdb229e9528c7a6c Mon Sep 17 00:00:00 2001
+From: Kerem Karabay <kekrby@gmail.com>
+Date: Wed, 19 Jul 2023 19:44:10 +0300
+Subject: [PATCH 05/12] HID: multitouch: support getting the tip state from
+ HID_DG_TOUCH fields
+
+This is necessary on Apple Touch Bars, where the tip state is contained
+in fields with the HID_DG_TOUCH usage. This feature is gated by a quirk
+in order to prevent breaking other devices, see commit c2ef8f21ea8f
+("HID: multitouch: add support for trackpads").
+
+Signed-off-by: Kerem Karabay <kekrby@gmail.com>
+---
+ drivers/hid/hid-multitouch.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/hid/hid-multitouch.c b/drivers/hid/hid-multitouch.c
+index 902a59928..dd5509eeb 100644
+--- a/drivers/hid/hid-multitouch.c
++++ b/drivers/hid/hid-multitouch.c
+@@ -72,6 +72,7 @@ MODULE_LICENSE("GPL");
+ #define MT_QUIRK_FORCE_MULTI_INPUT	BIT(20)
+ #define MT_QUIRK_DISABLE_WAKEUP		BIT(21)
+ #define MT_QUIRK_ORIENTATION_INVERT	BIT(22)
++#define MT_QUIRK_TOUCH_IS_TIPSTATE	BIT(23)
+ 
+ #define MT_INPUTMODE_TOUCHSCREEN	0x02
+ #define MT_INPUTMODE_TOUCHPAD		0x03
+@@ -810,6 +811,15 @@ static int mt_touch_input_mapping(struct hid_device *hdev, struct hid_input *hi,
+ 
+ 			MT_STORE_FIELD(confidence_state);
+ 			return 1;
++		case HID_DG_TOUCH:
++			/*
++			 * Legacy devices use TIPSWITCH and not TOUCH.
++			 * Let's just ignore this field unless the quirk is set.
++			 */
++			if (!(cls->quirks & MT_QUIRK_TOUCH_IS_TIPSTATE))
++				return -1;
++
++			fallthrough;
+ 		case HID_DG_TIPSWITCH:
+ 			if (field->application != HID_GD_SYSTEM_MULTIAXIS)
+ 				input_set_capability(hi->input,
+@@ -873,10 +883,6 @@ static int mt_touch_input_mapping(struct hid_device *hdev, struct hid_input *hi,
+ 		case HID_DG_CONTACTMAX:
+ 			/* contact max are global to the report */
+ 			return -1;
+-		case HID_DG_TOUCH:
+-			/* Legacy devices use TIPSWITCH and not TOUCH.
+-			 * Let's just ignore this field. */
+-			return -1;
+ 		}
+ 		/* let hid-input decide for the others */
+ 		return 0;
+-- 
+2.42.0
+

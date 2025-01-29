@@ -8,7 +8,7 @@ echo "exit 0" > /roota/usr/sbin/flashrom
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 echo "exit 0" > /roota/usr/sbin/gsctool
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
-rm -r /roota/opt/google/touch/scripts/*
-if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
+
+rm -rf /roota/opt/google/touch /roota/opt/google/modemfwd*
 
 exit $ret

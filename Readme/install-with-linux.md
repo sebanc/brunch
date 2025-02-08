@@ -132,7 +132,7 @@ This guide is for installing Brunch to a disk using a Brunch USB. This guide req
 
 ### Selecting a Target Disk
   
-1. Log into ChromeOS, and switch to the TTY2 terminal with **Ctrl + Alt + F2**, then login as `chronos`.
+1. Log into ChromeOS, and switch to the TTY2 terminal with **Ctrl + Alt + F2**, then login as `root`.
   
 2. Before continuing, you will need to know what disk you want to install to. Be absolutely sure **before** you continue, this installation will erase **everything** on that disk, including other partitions. The disk must be at least 16 GB, or the installation will fail. There are several ways to determine which disk is your target, in my example I'll be using `lsblk`.
   
@@ -158,7 +158,7 @@ This command will show your disks, and the partitions on them. It will also show
 3. Once you've determined your target disk, you're ready to install Brunch.
   * You will replace `disk` with your target disk. (Such as `sdb`, `mmcblk0` or `nvme0n1` for example)
   
-```sudo chromeos-install -dst /dev/disk```
+`chromeos-install -dst /dev/disk`
   
 The script will ask for confirmation. If you're ready to install, type `yes` into the prompt.
   

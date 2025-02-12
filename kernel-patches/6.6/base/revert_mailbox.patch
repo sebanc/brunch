@@ -1,0 +1,167 @@
+reverted:
+--- b/drivers/mailbox/mailbox.c
++++ a/drivers/mailbox/mailbox.c
+@@ -58,12 +58,6 @@
+ 	void *data;
+ 	int err = -EBUSY;
+ 
+-	if (chan->mbox->ops->power_get) {
+-		err = chan->mbox->ops->power_get(chan);
+-		if (err < 0)
+-			return;
+-	}
+-
+ 	spin_lock_irqsave(&chan->lock, flags);
+ 
+ 	if (!chan->msg_count || chan->active_req)
+@@ -95,16 +89,12 @@
+ 		hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
+ 		spin_unlock_irqrestore(&chan->mbox->poll_hrt_lock, flags);
+ 	}
+-
+-	if (chan->mbox->ops->power_put)
+-		chan->mbox->ops->power_put(chan);
+ }
+ 
+ static void tx_tick(struct mbox_chan *chan, int r)
+ {
+ 	unsigned long flags;
+ 	void *mssg;
+-	int ret;
+ 
+ 	spin_lock_irqsave(&chan->lock, flags);
+ 	mssg = chan->active_req;
+@@ -117,19 +107,10 @@
+ 	if (!mssg)
+ 		return;
+ 
+-	if (chan->mbox->ops->power_get) {
+-		ret = chan->mbox->ops->power_get(chan);
+-		if (ret < 0)
+-			return;
+-	}
+-
+ 	/* Notify the client */
+ 	if (chan->cl->tx_done)
+ 		chan->cl->tx_done(chan->cl, mssg, r);
+ 
+-	if (chan->mbox->ops->power_put)
+-		chan->mbox->ops->power_put(chan);
+-
+ 	if (r != -ETIME && chan->cl->tx_block)
+ 		complete(&chan->tx_complete);
+ }
+@@ -242,16 +223,9 @@
+  */
+ bool mbox_client_peek_data(struct mbox_chan *chan)
+ {
+-	if (chan->mbox->ops->power_get)
+-		if (chan->mbox->ops->power_get(chan) < 0)
+-			return false;
+-
+ 	if (chan->mbox->ops->peek_data)
+ 		return chan->mbox->ops->peek_data(chan);
+ 
+-	if (chan->mbox->ops->power_put)
+-		chan->mbox->ops->power_put(chan);
+-
+ 	return false;
+ }
+ EXPORT_SYMBOL_GPL(mbox_client_peek_data);
+@@ -336,19 +310,10 @@
+ 	if (!chan->mbox->ops->flush)
+ 		return -ENOTSUPP;
+ 
+-	if (chan->mbox->ops->power_get) {
+-		ret = chan->mbox->ops->power_get(chan);
+-		if (ret < 0)
+-			return ret;
+-	}
+-
+ 	ret = chan->mbox->ops->flush(chan, timeout);
+ 	if (ret < 0)
+ 		tx_tick(chan, ret);
+ 
+-	if (chan->mbox->ops->power_put)
+-		chan->mbox->ops->power_put(chan);
+-
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(mbox_flush);
+@@ -376,12 +341,6 @@
+ 
+ 	spin_unlock_irqrestore(&chan->lock, flags);
+ 
+-	if (chan->mbox->ops->power_get) {
+-		ret = chan->mbox->ops->power_get(chan);
+-		if (ret < 0)
+-			return ERR_PTR(ret);
+-	}
+-
+ 	if (chan->mbox->ops->startup) {
+ 		ret = chan->mbox->ops->startup(chan);
+ 
+@@ -482,11 +441,7 @@
+ 	if (ret)
+ 		chan = ERR_PTR(ret);
+ 
+-	if (chan->mbox->ops->power_put)
+-		chan->mbox->ops->power_put(chan);
+-
+ 	mutex_unlock(&con_mutex);
+-
+ 	return chan;
+ }
+ EXPORT_SYMBOL_GPL(mbox_request_channel);
+@@ -530,23 +485,13 @@
+ void mbox_free_channel(struct mbox_chan *chan)
+ {
+ 	unsigned long flags;
+-	int ret;
+ 
+ 	if (!chan || !chan->cl)
+ 		return;
+ 
+-	if (chan->mbox->ops->power_get) {
+-		ret = chan->mbox->ops->power_get(chan);
+-		if (ret < 0)
+-			return;
+-	}
+-
+ 	if (chan->mbox->ops->shutdown)
+ 		chan->mbox->ops->shutdown(chan);
+ 
+-	if (chan->mbox->ops->power_put)
+-		chan->mbox->ops->power_put(chan);
+-
+ 	/* The queued TX requests are simply aborted, no callbacks are made */
+ 	spin_lock_irqsave(&chan->lock, flags);
+ 	chan->cl = NULL;
+reverted:
+--- b/include/linux/mailbox_controller.h
++++ a/include/linux/mailbox_controller.h
+@@ -42,15 +42,6 @@
+  *		  Used only if txdone_poll:=true && txdone_irq:=false
+  * @peek_data: Atomic check for any received data. Return true if controller
+  *		  has some data to push to the client. False otherwise.
+- * @power_get:	Called when the controller need to get the reference to keep
+- *		the power on for the device of mailbox controller. It is
+- *		optional to implement this function with pm_runtime APIs or
+- *		more complicated operation.
+- *		Return 0 is success, otherwise are fail.
+- * @power_put:	Called when the controller need to put the reference to release
+- *		the power for the device of mailbox controller. It is optional
+- *		to implement this function with pm_runtime APIs or more
+- *		complicated operation.
+  */
+ struct mbox_chan_ops {
+ 	int (*send_data)(struct mbox_chan *chan, void *data);
+@@ -59,8 +50,6 @@
+ 	void (*shutdown)(struct mbox_chan *chan);
+ 	bool (*last_tx_done)(struct mbox_chan *chan);
+ 	bool (*peek_data)(struct mbox_chan *chan);
+-	int (*power_get)(struct mbox_chan *chan);
+-	void (*power_put)(struct mbox_chan *chan);
+ };
+ 
+ /**

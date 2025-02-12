@@ -114,14 +114,14 @@ index 5ec1f174127a3..a7a12b56f79cb 100644
  	HID_LATENCY_NORMAL = 0,
  	HID_LATENCY_HIGH = 1,
 @@ -169,6 +176,8 @@ struct mt_device {
- 
- 	struct list_head applications;
- 	struct list_head reports;
+ 	struct work_struct lid_work;
+ 	struct mutex mode_mutex;
+ 	bool lid_switch;
 +
 +	struct notifier_block pm_notifier;
  };
  
- static void mt_post_parse_default_settings(struct mt_device *td,
+ static struct workqueue_struct *mt_mode_wq;
 @@ -213,6 +222,7 @@ static void mt_post_parse(struct mt_device *td, struct mt_application *app);
  #define MT_CLS_GOOGLE				0x0111
  #define MT_CLS_RAZER_BLADE_STEALTH		0x0112
@@ -511,42 +511,30 @@ index a7a12b56f79cb..d4ac41f2f9a8a 100644
  		hid_err(hdev, "couldn't find backlight field\n");
  		goto out;
  	}
-@@ -1909,13 +1975,24 @@ static int mt_suspend(struct hid_device *hdev, pm_message_t state)
- 
- static int mt_reset_resume(struct hid_device *hdev)
- {
-+	struct mt_device *td = hid_get_drvdata(hdev);
-+
- 	mt_release_contacts(hdev);
+@@ -1909,6 +1975,12 @@ static int mt_suspend(struct hid_device *hdev, pm_message_t state)
+ 	mutex_lock(&td->mode_mutex);
  	mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
+ 	mutex_unlock(&td->mode_mutex);
 +
 +	/* Request an update on the typecover folding state on resume
 +	 * after reset.
 +	 */
 +	if (td->mtclass.quirks & MT_QUIRK_HAS_TYPE_COVER_TABLET_MODE_SWITCH)
 +		request_type_cover_tablet_mode_switch(hdev);
-+
- 	return 0;
- }
  
- static int mt_resume(struct hid_device *hdev)
- {
-+	struct mt_device *td = hid_get_drvdata(hdev);
-+
- 	/* Some Elan legacy devices require SET_IDLE to be set on resume.
- 	 * It should be safe to send it to other devices too.
- 	 * Tested on 3M, Stantum, Cypress, Zytronic, eGalax, and Elan panels. */
+ 	if (td->is_haptic_touchpad)
+ 		hid_haptic_resume(hdev, haptic);
 @@ -1924,6 +2001,10 @@ static int mt_resume(struct hid_device *hdev)
- 
  	mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
+ 	mutex_unlock(&td->mode_mutex);
  
 +	/* Request an update on the typecover folding state on resume. */
 +	if (td->mtclass.quirks & MT_QUIRK_HAS_TYPE_COVER_TABLET_MODE_SWITCH)
 +		request_type_cover_tablet_mode_switch(hdev);
 +
- 	return 0;
- }
- #endif
+ 	if (td->is_haptic_touchpad)
+ 		hid_haptic_suspend(hdev, haptic);
+ 
 @@ -1931,6 +2012,21 @@ static int mt_resume(struct hid_device *hdev)
  static void mt_remove(struct hid_device *hdev)
  {

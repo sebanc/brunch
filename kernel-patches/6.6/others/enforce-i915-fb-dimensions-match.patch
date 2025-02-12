@@ -3,16 +3,16 @@ index 31d0d69..d515048 100644
 --- a/drivers/gpu/drm/i915/display/intel_fbdev.c
 +++ b/drivers/gpu/drm/i915/display/intel_fbdev.c
 @@ -234,10 +234,10 @@ static int intelfb_create(struct drm_fb_helper *helper,
- 		return ret;
+ 	ifbdev->fb = NULL;
  
- 	if (intel_fb &&
--	    (sizes->fb_width > intel_fb->base.width ||
--	     sizes->fb_height > intel_fb->base.height)) {
-+	    (sizes->fb_width != intel_fb->base.width ||
-+	     sizes->fb_height != intel_fb->base.height)) {
+ 	if (fb &&
+-	    (sizes->fb_width > fb->base.width ||
+-	     sizes->fb_height > fb->base.height)) {
++	    (sizes->fb_width != fb->base.width ||
++	     sizes->fb_height != fb->base.height)) {
  		drm_dbg_kms(&dev_priv->drm,
 -			    "BIOS fb too small (%dx%d), we require (%dx%d),"
 +			    "BIOS fb not valid (%dx%d), we require (%dx%d),"
  			    " releasing it\n",
- 			    intel_fb->base.width, intel_fb->base.height,
+ 			    fb->base.width, fb->base.height,
  			    sizes->fb_width, sizes->fb_height);

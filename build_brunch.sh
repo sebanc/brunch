@@ -127,17 +127,6 @@ rm -r ./chroot/tmp/rtl8723bu || { echo "Failed to build external rtl8723bu modul
 
 fi
 
-if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ]; then
-
-cp -r ./external-drivers/rtl8723du ./chroot/tmp/ || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }
-cd ./chroot/tmp/rtl8723du || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }
-make -j"$NTHREADS" || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }
-cp ./8723du.ko ../../../chroot/home/chronos/kernel/lib/modules/"$kernel_version"/rtl8723du.ko || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }
-cd ../../.. || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }
-rm -r ./chroot/tmp/rtl8723du || { echo "Failed to build external rtl8723du module for kernel $kernel"; exit 1; }
-
-fi
-
 if [ "$kernel" == "6.1" ] || [ "$kernel" == "6.6" ] || [ "$kernel" == "6.12" ]; then
 
 cp -r ./external-drivers/rtl8812au ./chroot/tmp/ || { echo "Failed to build external rtl8812au module for kernel $kernel"; exit 1; }

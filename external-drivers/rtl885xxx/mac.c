@@ -4644,14 +4644,14 @@ void rtw89_mac_set_he_obss_narrow_bw_ru(struct rtw89_dev *rtwdev,
 	if (!vif->bss_conf.he_support || vif->type != NL80211_IFTYPE_STATION)
 		return;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 	if (!(vif->bss_conf.chanreq.oper.chan->flags & IEEE80211_CHAN_RADAR))
 #else
 	if (!(vif->bss_conf.chandef.chan->flags & IEEE80211_CHAN_RADAR))
 #endif
 		return;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 	cfg80211_bss_iter(hw->wiphy, &vif->bss_conf.chanreq.oper,
 #else
 	cfg80211_bss_iter(hw->wiphy, &vif->bss_conf.chandef,

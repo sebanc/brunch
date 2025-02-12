@@ -34,7 +34,7 @@ do
 			if [ -d /mnt/stateful_partition/unencrypted/brunch_pwa ]; then rm -r /mnt/stateful_partition/unencrypted/brunch_pwa; fi
 			mkdir /mnt/stateful_partition/unencrypted/brunch_pwa
 			echo -e "Downloading latest brunch stable."
-			curl -L -s -o /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_update.tar.gz $(curl -L -s "https://api.github.com/repos/sebanc/brunch/releases/latest" | grep browser_download_url | tr -d '"' | sed 's#browser_download_url: ##g')
+			curl -L -s -o /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_update.tar.gz $(curl -L -s "https://api.github.com/repos/sebanc/brunch/releases/latest" | grep browser_download_url | tr -d '"' | sed 's#browser_download_url: ##g') || { echo "Failed to download brunch stable release, please try again..."; continue; }
 			chromeos-update -f /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_update.tar.gz
 			rm -r /mnt/stateful_partition/unencrypted/brunch_pwa
 			echo -e '<a href=javascript:reboot(); style=color:#ffffff;>Click here</a> to reboot your computer and finish the update.'
@@ -48,7 +48,7 @@ do
 			if [ -d /mnt/stateful_partition/unencrypted/brunch_pwa ]; then rm -r /mnt/stateful_partition/unencrypted/brunch_pwa; fi
 			mkdir /mnt/stateful_partition/unencrypted/brunch_pwa
 			echo -e "Downloading latest brunch unstable."
-			curl -L -s -o /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_update.tar.gz $(curl -L -s "https://api.github.com/repos/sebanc/brunch-unstable/releases/latest" | grep browser_download_url | tr -d '"' | sed 's#browser_download_url: ##g')
+			curl -L -s -o /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_update.tar.gz $(curl -L -s "https://api.github.com/repos/sebanc/brunch-unstable/releases/latest" | grep browser_download_url | tr -d '"' | sed 's#browser_download_url: ##g') || { echo "Failed to download brunch unstable release, please try again..."; continue; }
 			chromeos-update -f /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_update.tar.gz
 			rm -r /mnt/stateful_partition/unencrypted/brunch_pwa
 			echo -e '<a href=javascript:reboot(); style=color:#ffffff;>Click here</a> to reboot your computer and finish the update.'
@@ -78,7 +78,7 @@ do
 			else
 				recovery_file_url="https://dl.google.com/dl/edgedl/chromeos/recovery/recovery.conf"
 			fi
-			curl -L -s -o /mnt/stateful_partition/unencrypted/brunch_pwa/recovery_image.zip $(curl -L -s $recovery_file_url | grep .bin.zip | cut -d'=' -f2 | grep $(cat /etc/lsb-release | grep CHROMEOS_RELEASE_BOARD | cut -d'=' -f2 | cut -d'-' -f1) | sort -n | tail -1)
+			curl -L -s -o /mnt/stateful_partition/unencrypted/brunch_pwa/recovery_image.zip $(curl -L -s $recovery_file_url | grep .bin.zip | cut -d'=' -f2 | grep $(cat /etc/lsb-release | grep CHROMEOS_RELEASE_BOARD | cut -d'=' -f2 | cut -d'-' -f1) | sort -n | tail -1) || { echo "Failed to download ChromeOS recovery image, please try again..."; continue; }
 			bsdtar -xf /mnt/stateful_partition/unencrypted/brunch_pwa/recovery_image.zip -C /mnt/stateful_partition/unencrypted/brunch_pwa
 			rm /mnt/stateful_partition/unencrypted/brunch_pwa/recovery_image.zip
 			recovery=$(find /mnt/stateful_partition/unencrypted/brunch_pwa -type f -name "*.bin" | tail -1)
@@ -90,7 +90,7 @@ do
 			if [ -d /mnt/stateful_partition/unencrypted/brunch_pwa ]; then rm -r /mnt/stateful_partition/unencrypted/brunch_pwa; fi
 			echo -e "Downloading the latest brunch-toolchain."
 			mkdir /mnt/stateful_partition/unencrypted/brunch_pwa
-			curl -L -s -o /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_toolchain.tar.gz $(curl -L -s "https://api.github.com/repos/sebanc/brunch-toolchain/releases/latest" | grep browser_download_url | tr -d '"' | sed 's#browser_download_url: ##g')
+			curl -L -s -o /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_toolchain.tar.gz $(curl -L -s "https://api.github.com/repos/sebanc/brunch-toolchain/releases/latest" | grep browser_download_url | tr -d '"' | sed 's#browser_download_url: ##g') || { echo "Failed to download the brunch toolchain, please try again..."; continue; }
 			rm -r /usr/local/*
 			chown -R 1000:1000 /usr/local
 			tar zxf /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_toolchain.tar.gz -C /usr/local

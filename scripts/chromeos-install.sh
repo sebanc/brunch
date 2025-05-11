@@ -467,7 +467,7 @@ if [ $# -eq 0 ]; then
 	source=$(su $(getent passwd "$SUDO_UID" | cut -d: -f1) -c "zenity --height=480 --width=640 --file-selection --title=\"Select the ChromeOS recovery image\" --file-filter=*.bin --filename=\"$(echo $PWD)/\"")
 	if [ -z "$source" ]; then exit 0; fi
 	if [ ! -f "$source" ]; then echo "ChromeOS recovery image $1 not found"; exit 1; fi
-	if [ ! $(dd if="$source" bs=1 count=4 2> /dev/null | od -A n -t x1 | sed 's/ //g') == '33c0fa8e' ] || [ $(cgpt show -i 12 -b "$source") -eq 0 ] || [ $(cgpt show -i 13 -b "$source") -gt 0 ] || [ ! $(cgpt show -i 3 -l "$source") == 'ROOT-A' ]; then echo "$source is not a valid ChromeOS recovey image (have you unzipped it ?)"; exit 1; fi
+	if [ ! $(dd if="$source" bs=1 count=4 2> /dev/null | od -A n -t x1 | sed 's/ //g') == '33c0fa8e' ] || [ $(cgpt show -i 12 -b "$source") -eq 0 ] || [ ! $(cgpt show -i 3 -l "$source") == 'ROOT-A' ]; then echo "$source is not a valid ChromeOS recovey image (have you unzipped it ?)"; exit 1; fi
 	type=$(zenity --height=480 --width=640 --title "Brunch installer" --list --column "Do you want to install brunch as Singleboot or Dualboot ?" "Singleboot (install on a disk)" "Dualboot (create an image)" --ok-label="Next")
 else
 	while [ $# -gt 0 ]; do
@@ -475,7 +475,7 @@ else
 			-src | --source)
 			shift
 			if [ ! -f "$1" ]; then echo "ChromeOS recovery image $1 not found"; exit 1; fi
-			if [ ! $(dd if="$1" bs=1 count=4 2> /dev/null | od -A n -t x1 | sed 's/ //g') == '33c0fa8e' ] || [ $(cgpt show -i 12 -b "$1") -eq 0 ] || [ $(cgpt show -i 13 -b "$1") -gt 0 ] || [ ! $(cgpt show -i 3 -l "$1") == 'ROOT-A' ]; then echo "$1 is not a valid ChromeOS recovey image (have you unzipped it ?)"; exit 1; fi
+			if [ ! $(dd if="$1" bs=1 count=4 2> /dev/null | od -A n -t x1 | sed 's/ //g') == '33c0fa8e' ] || [ $(cgpt show -i 12 -b "$1") -eq 0 ] || [ ! $(cgpt show -i 3 -l "$1") == 'ROOT-A' ]; then echo "$1 is not a valid ChromeOS recovey image (have you unzipped it ?)"; exit 1; fi
 			source="$1"
 			;;
 			-dst | --destination)

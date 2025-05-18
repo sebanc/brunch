@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [ ! -d /home/runner/work ]; then NTHREADS=$(nproc); else NTHREADS=$(($(nproc)*4)); fi
 
@@ -32,7 +32,7 @@ if [ ! -z $1 ] && [ "$1" != "skip" ] ; then
 else
 	git clone -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
 	cd rootfs
-	curl -L https://dl.google.com/chromeos/rammus/16209.50.0/stable-channel/chromeos_16209.50.0_rammus_stable-channel_full_RammusMPKeys-v7.bin-gy3wmzrvg5rdomjn6oz5tb6gssdr6p46.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
+	curl -L https://dl.google.com/chromeos/rammus/16238.47.0/stable-channel/chromeos_16238.47.0_rammus_stable-channel_full_RammusMPKeys-v7.bin-gy4demjzg44wncc6yqpsix3ycevqnlj5.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
 	PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
 	cd ..
 	[ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 apply_patches()
 {
@@ -15,6 +15,7 @@ done
 make_config()
 {
 sed -i -z 's@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool@# Detect buggy gcc and clang, fixed in gcc-11 clang-14.\n\tdef_bool $(success,echo 0)\n\t#def_bool@g' ./kernels/$1/init/Kconfig
+sed -i 's@#!/usr/bin/awk@#!/usr/bin/env -S awk@g' ./kernels/$1/scripts/ld-version.sh
 echo "Creating $2 config for kernel $1"
 sed '/CONFIG_ATH\|CONFIG_BUILD\|CONFIG_EXTRA_FIRMWARE\|CONFIG_DEBUG_INFO\|CONFIG_IWL\|CONFIG_LSM\|CONFIG_MODULE_COMPRESS/d' ./kernel-patches/flex_configs > ./kernels/$1/arch/x86/configs/chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
 if [ "$2" == "generic" ]; then
@@ -71,7 +72,7 @@ done
 rm -rf ./kernels
 mkdir ./kernels
 
-chromeos_version="R136"
+chromeos_version="R137"
 kernels="5.4 5.10 5.15 6.1 6.6 6.12"
 download_and_patch_kernels
 

@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 'continuous-integration'
+      - 'r136'
     paths-ignore:
       - 'README.md'
 concurrency:

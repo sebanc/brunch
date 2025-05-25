@@ -154,6 +154,8 @@ elif [ -f /roota/usr/share/chromeos-config/configfs.img ]; then
 	echo "${board}" > /tmp/configfs/v1/chromeos/configs/0/arc/build-properties/product
 	mkdir -p /tmp/configfs/v1/chromeos/configs/0/camera
 	echo "2" > /tmp/configfs/v1/chromeos/configs/0/camera/count
+	mkdir -p /tmp/configfs/v1/chromeos/configs/0/firmware
+	echo "false" > /tmp/configfs/v1/chromeos/configs/0/firmware/has-splash-screen
 	mkdir -p /tmp/configfs/v1/chromeos/configs/0/hardware-properties
 	echo "true" > /tmp/configfs/v1/chromeos/configs/0/hardware-properties/has-base-accelerometer
 	echo "true" > /tmp/configfs/v1/chromeos/configs/0/hardware-properties/has-base-gyroscope

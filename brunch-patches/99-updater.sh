@@ -23,7 +23,7 @@ while [ $# -gt 0 ]; do
 		-r | --recovery)
 		shift
 		if [ ! -f "$1" ]; then echo "ChromeOS recovery image $1 not found"; exit 1; fi
-		if [ ! $(dd if="$1" bs=1 count=4 status=none | od -A n -t x1 | sed 's/ //g') == '33c0fa8e' ] || [ $(cgpt show -i 12 -b "$1") -eq 0 ] || [ $(cgpt show -i 13 -b "$1") -gt 0 ] || [ ! $(cgpt show -i 3 -l "$1") == 'ROOT-A' ]; then
+		if [ ! $(dd if="$1" bs=1 count=4 status=none | od -A n -t x1 | sed 's/ //g') == '33c0fa8e' ] || [ $(cgpt show -i 12 -b "$1") -eq 0 ] || [ ! $(cgpt show -i 3 -l "$1") == 'ROOT-A' ]; then
 			echo "$1 is not a valid ChromeOS recovey image (have you unzipped it ?)"
 			exit 1
 		fi

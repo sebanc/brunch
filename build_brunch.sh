@@ -32,7 +32,7 @@ if [ ! -z $1 ] && [ "$1" != "skip" ] ; then
 else
 	git clone -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
 	cd rootfs
-	curl -L https://dl.google.com/chromeos/rammus/16295.54.0/stable-channel/chromeos_16295.54.0_rammus_stable-channel_full_RammusMPKeys-v7.bin-gy4doodbmmytderzlmtu4sst3vg46rxd.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
+	curl -L https://dl.google.com/chromeos/reven/16295.70.0/stable-channel/chromeos_16295.70.0_reven_stable-channel_full_mp-v8.bin-gy4dqzdcmq2gmeqd6m6vfzpvlzjgvclf.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
 	PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
 	cd ..
 	[ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }
@@ -257,7 +257,11 @@ rm -r ./chroot/tmp/kernel || { echo "Failed to cleanup for kernel $kernel"; exit
 done
 
 cd ./chroot/home/chronos || { echo "Failed to switch to chronos directory"; exit 1; }
-cp -r ../../../alsa-ucm-conf ./ || { echo "Failed to copy ucm configuration"; exit 1; }
+git clone --depth=1 -b v$(curl -L https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/refs/heads/release-$(cat ../../etc/lsb-release | grep 'CHROMEOS_RELEASE_BUILDER_PATH=' | cut -d'/' -f2 | cut -d '.' -f1).B/media-libs/alsa-lib/ | sed 's@>@\n@g' | grep '^alsa-lib-' | head -1 | cut -d '-' -f3) https://github.com/alsa-project/alsa-ucm-conf.git || { echo "Failed to clone the alsa-ucm-conf git"; exit 1; }
+rm -r ./alsa-ucm-conf/.github ./alsa-ucm-conf/.gitignore ./alsa-ucm-conf/LICENSE ./alsa-ucm-conf/README.md ./alsa-ucm-conf/VERSION || { echo "Failed to clone the alsa-ucm-conf git"; exit 1; }
+sed -i 's@Define.V1 ""@Define.V1 yes@g' ./alsa-ucm-conf/ucm2/ucm.conf || { echo "Failed to modify ucm configuration"; exit 1; }
+cp -rT ../../usr/share/alsa/ucm ./alsa-ucm-conf/ucm || { echo "Failed to copy ChromeOS ucm configurations"; exit 1; }
+cp -rT ../../../alsa-ucm-conf ./alsa-ucm-conf || { echo "Failed to copy custom ucm configurations"; exit 1; }
 cd ./alsa-ucm-conf || { echo "Failed to switch to ucm configuration directory"; exit 1; }
 tar zcf ../rootc/packages/alsa-ucm-conf.tar.gz * --owner=0 --group=0 || { echo "Failed to create ucm configuration archive"; exit 1; }
 cd .. || { echo "Failed to cleanup ucm configuration directory"; exit 1; }
@@ -279,6 +283,7 @@ rm -rf ./out/ti-connectivity
 curl -L https://git.kernel.org/pub/scm/linux/kernel/git/sforshee/wireless-regdb.git/plain/regulatory.db -o ./out/regulatory.db || { echo "Failed to download the regulatory db"; exit 1; }
 curl -L https://git.kernel.org/pub/scm/linux/kernel/git/sforshee/wireless-regdb.git/plain/regulatory.db.p7s -o ./out/regulatory.db.p7s || { echo "Failed to download the regulatory db"; exit 1; }
 cp -r ../../../../extra-firmwares/* ./out/ || { echo "Failed to copy brunch extra firmware files"; exit 1; }
+cp -a ../../../lib/firmware/intel/sof* ./out/intel/ || { echo "Failed to copy sof firmwares"; exit 1; }
 mkdir -p ../rootc/lib/firmware || { echo "Failed to make firmware directory"; exit 1; }
 curl -L https://archlinux.org/packages/core/any/amd-ucode/download/ -o /tmp/amd-ucode.tar.zst || { echo "Failed to download amd ucode"; exit 1; }
 tar -C ../rootc/lib/firmware/ -xf /tmp/amd-ucode.tar.zst boot/amd-ucode.img --strip 1 || { echo "Failed to extract amd ucode"; exit 1; }

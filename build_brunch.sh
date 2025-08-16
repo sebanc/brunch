@@ -30,7 +30,7 @@ if [ ! -z $1 ] && [ "$1" != "skip" ] ; then
 	umount ./out || { echo "Failed to unmount ChromeOS rootfs"; exit 1; }
 	losetup -d "$recovery_image" || { echo "Failed to detach loop device"; exit 1; }
 else
-	git clone -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
+	git clone --depth=1 -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
 	cd rootfs
 	curl -L https://dl.google.com/chromeos/reven/16295.70.0/stable-channel/chromeos_16295.70.0_reven_stable-channel_full_mp-v8.bin-gy4dqzdcmq2gmeqd6m6vfzpvlzjgvclf.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
 	PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }

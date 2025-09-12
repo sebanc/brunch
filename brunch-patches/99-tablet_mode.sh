@@ -71,8 +71,6 @@ ACTION=="add", SUBSYSTEMS=="hid", KERNEL=="*:044E:1218.*" , RUN+="/bin/bash -c '
 ACTION=="remove", SUBSYSTEMS=="hid", KERNEL=="*:044E:1218.*" , RUN+="/bin/bash -c 'echo 1 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
 ACTION=="add", SUBSYSTEMS=="hid", KERNEL=="*:045E:09AE.*" , RUN+="/bin/bash -c 'echo 0 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
 ACTION=="remove", SUBSYSTEMS=="hid", KERNEL=="*:045E:09AE.*" , RUN+="/bin/bash -c 'echo 1 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
-ACTION=="add", SUBSYSTEMS=="hid", KERNEL=="*:045E:09AE.*" , RUN+="/bin/bash -c 'echo 0 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
-ACTION=="remove", SUBSYSTEMS=="hid", KERNEL=="*:045E:09AE.*" , RUN+="/bin/bash -c 'echo 1 > /sys/bus/platform/devices/tablet_mode_switch.0/tablet_mode'"
 UDEVRULE
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
 fi

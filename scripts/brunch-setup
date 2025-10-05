@@ -222,7 +222,7 @@ reset
 
 fi
 
-available_cmdline_params="enforce_hyperthreading=1;snd-intel-dspcfg.dsp_driver=1;snd-intel-dspcfg.dsp_driver=4;i915.enable_fbc=0 i915.enable_psr=0;psmouse.elantech_smbus=0;psmouse.synaptics_intertouch=0"
+available_cmdline_params="enforce_hyperthreading=1;snd-intel-dspcfg.dsp_driver=1;snd-intel-dspcfg.dsp_driver=4;i915.enable_fbc=0 i915.enable_psr=0;psmouse.elantech_smbus=0;psmouse.synaptics_intertouch=0;intremap=nosid"
 echo "Select your kernel commandline parameters (press SPACE to select an item and ENTER to validate your choice)"
 multiselect "$available_cmdline_params" " "
 selected_cmdline_params="$returned_values"

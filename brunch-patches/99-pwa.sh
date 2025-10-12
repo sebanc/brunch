@@ -94,20 +94,8 @@ do
 			rm -r /usr/local/*
 			chown -R 1000:1000 /usr/local
 			tar zxf /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_toolchain.tar.gz -C /usr/local
-			echo -e "Downloading the latest brioche."
-			curl -l https://raw.githubusercontent.com/sebanc/brioche/main/brioche -o /mnt/stateful_partition/unencrypted/brunch_pwa/brioche
-			install -Dt /usr/local/bin -m 755 -g 1000 -o 1000 /mnt/stateful_partition/unencrypted/brunch_pwa/brioche
 			rm -r /mnt/stateful_partition/unencrypted/brunch_pwa
-			echo -e "Brunch-toolchain and brioche installed."
-		;;
-		"install-toolkit")
-			if [ -d /mnt/stateful_partition/unencrypted/brunch_pwa ]; then rm -r /mnt/stateful_partition/unencrypted/brunch_pwa; fi
-			echo -e "Downloading the latest brunch-toolkit."
-			mkdir /mnt/stateful_partition/unencrypted/brunch_pwa
-			curl -l https://raw.githubusercontent.com/WesBosch/brunch-toolkit/main/brunch-toolkit -o /mnt/stateful_partition/unencrypted/brunch_pwa/brunch-toolkit
-			install -Dt /usr/local/bin -m 755 -g 1000 -o 1000 /mnt/stateful_partition/unencrypted/brunch_pwa/brunch-toolkit
-			rm -r /mnt/stateful_partition/unencrypted/brunch_pwa
-			echo -e "Brunch-toolkit installed."
+			echo -e "Brunch-toolchain installed."
 		;;
 		"reboot")
 			reboot

@@ -3,16 +3,8 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export HOME=/home/chronos
 export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/usr/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib:/lib64:/lib
 export C_INCLUDE_PATH=/home/chronos/ncurses-pkg/usr/include:/usr/local/include:/usr/include
-export GCONV_PATH=/usr/local/lib64/gconv
-export PERL5LIB=/usr/local/lib/perl5/5.32.0
 export PKG_CONFIG_PATH=/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig
-export PYTHON=/usr/local/bin/python3
-export PYTHONHOME=/usr/local
-export SGML_CATALOG_FILES="/usr/local/etc/sgml/catalog"
-export XML_CATALOG_FILES="/usr/local/etc/xml/catalog"
-export LANGUAGE=en_US.UTF-8
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
+export LC_ALL=C
 
 cd /home/chronos/
 
@@ -24,14 +16,12 @@ echo "Entered chroot with recovery version $version"
 sudo chown 1000:1000 /usr/local || { echo "Failed to change ownership of /usr/local"; exit 1; }
 
 if [ ! -f brunch_toolchain.tar.gz ]; then
-curl -L https://github.com/sebanc/brunch-toolchain/releases/download/20210529/brunch_toolchain_20210529.tar.gz -o brunch_toolchain.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
+	curl -L -s $(curl -L -s "https://api.github.com/repos/sebanc/brunch-toolchain/releases/latest" | grep browser_download_url | tr -d '"' | sed 's#browser_download_url: ##g') -o brunch_toolchain.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
 fi
 tar zxf brunch_toolchain.tar.gz -C /usr/local || { echo "Failed to extract the brunch toolchain"; exit 1; }
-sudo rm -f /usr/lib64/libc.so /usr/lib64/libm.so /usr/lib64/libpthread.so
 
-# Temporary fixes
+# Temporary fix
 if [ ! -f /lib64/libnsl.so.2 ]; then sudo ln -sf libnsl.so.1 /lib64/libnsl.so.2; fi
-perl -MCPAN -e 'CPAN::HandleConfig->load; CPAN::HandleConfig->commit; CPAN::Shell->install("Autom4te::ChannelDefs")' < /dev/null || { echo "Failed to install Autom4te::ChannelDefs using CPAN"; exit 1; }
 
 mkdir -p ./version-pkg/etc || { echo "Failed to make the brunch version package"; exit 1; }
 echo "Brunch $version $(date +"%Y%m%d")" > ./version-pkg/etc/brunch_version || { echo "Failed to make the brunch version package"; exit 1; }
@@ -162,12 +152,10 @@ rm -rf ./popt || { echo "Failed to make popt"; exit 1; }
 
 git clone --depth=1 -b 37 https://github.com/rhboot/efivar.git || { echo "Failed to make efivar"; exit 1; }
 cd ./efivar || { echo "Failed to make efivar"; exit 1; }
-#sed -i -z 's@# define __HAVE_FLOAT128 0\n#else@# define __HAVE_FLOAT128 1\n#else@g' /usr/local/include/bits/floatn.h
 sed -i "s# --add-needed##g" ./gcc.specs || { echo "Failed to make efivar"; exit 1; }
 make -j"$NTHREADS" CFLAGS="-Wno-address-of-packed-member" || { echo "Failed to make efivar"; exit 1; }
 make DESTDIR=/home/chronos/efibootmgr-pkg install || { echo "Failed to make efivar"; exit 1; }
 sed -i "s#/usr#/home/chronos/efibootmgr-pkg/usr#g" /home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig/* || { echo "Failed to make efivar"; exit 1; }
-#sed -i -z 's@# define __HAVE_FLOAT128 1\n#else@# define __HAVE_FLOAT128 0\n#else@g' /usr/local/include/bits/floatn.h
 cd .. || { echo "Failed to make efivar"; exit 1; }
 rm -rf ./efivar || { echo "Failed to make efivar"; exit 1; }
 
@@ -180,7 +168,6 @@ cd .. || { echo "Failed to make efibootmgr"; exit 1; }
 rm -rf ./efibootmgr || { echo "Failed to make efibootmgr"; exit 1; }
 
 cd ./efibootmgr-pkg || { echo "Failed to make efibootmgr package"; exit 1; }
-#sed -i "s#/home/chronos/efibootmgr-pkg/usr#/usr#g" ./usr/lib64/pkgconfig/* || { echo "Failed to make efibootmgr package"; exit 1; }
 rm -rf ./usr/include ./usr/lib64/pkgconfig ./usr/share/pkgconfig || { echo "Failed to make efibootmgr package"; exit 1; }
 tar zcvf ../rootc/packages/efibootmgr.tar.gz * --owner=0 --group=0 || { echo "Failed to make efibootmgr package"; exit 1; }
 cd .. || { echo "Failed to make efibootmgr package"; exit 1; }
@@ -189,8 +176,6 @@ rm -rf ./efibootmgr-pkg || { echo "Failed to make efibootmgr package"; exit 1; }
 git clone https://github.com/stefanberger/libtpms.git libtpms || { echo "Failed to make libtpms"; exit 1; }
 cd ./libtpms || { echo "Failed to make libtpms"; exit 1; }
 git checkout df1c3e98d697f3c1f09262d2ba161a7db784d6cc || { echo "Failed to make libtpms"; exit 1; }
-#sed -i -z 's@if(!IS_ATTRIBUTE(attributes, TPMA_NV, PPREAD))\n\t\treturn TPM_RC_NV_AUTHORIZATION;@return TPM_RC_SUCCESS;@g' ./src/tpm2/NV_spt.c || { echo "Failed to make libtpms"; exit 1; }
-#sed -i -z 's@if(!IS_ATTRIBUTE(attributes, TPMA_NV, PPWRITE))\n\t\treturn TPM_RC_NV_AUTHORIZATION;@return TPM_RC_SUCCESS;@g' ./src/tpm2/NV_spt.c || { echo "Failed to make libtpms"; exit 1; }
 ./autogen.sh --prefix=/usr/local --libdir=/usr/local/lib64 --with-openssl --with-tpm2 --enable-debug || { echo "Failed to make libtpms"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make libtpms"; exit 1; }
 make install || { echo "Failed to make libtpms"; exit 1; }

@@ -16,7 +16,7 @@ end script
 expect fork
 
 script
-  swtpm chardev --daemon --vtpm-proxy --tpm2 --tpmstate dir=/mnt/stateful_partition/brunch/swtpm --ctrl type=tcp,port=10001 --flags startup-clear
+  LD_LIBRARY_PATH=/usr/libswtpm swtpm chardev --daemon --vtpm-proxy --tpm2 --tpmstate dir=/mnt/stateful_partition/brunch/swtpm --ctrl type=tcp,port=10001 --flags startup-clear
   until [ -c /dev/tpm0 ]; do sleep 1; done
 end script
 

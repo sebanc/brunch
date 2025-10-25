@@ -10,6 +10,7 @@ if ( ! test -z {,} ); then echo "Must be ran with \"sudo bash\""; exit 1; fi
 if [ $(whoami) != "root" ]; then echo "Please run with sudo"; exit 1; fi
 
 if mountpoint -q ./chroot/dev/shm; then umount ./chroot/dev/shm; fi
+if mountpoint -q ./chroot/dev/pts; then umount ./chroot/dev/pts; fi
 if mountpoint -q ./chroot/dev; then umount ./chroot/dev; fi
 if mountpoint -q ./chroot/sys; then umount ./chroot/sys; fi
 if mountpoint -q ./chroot/proc; then umount ./chroot/proc; fi
@@ -17,8 +18,17 @@ if mountpoint -q ./chroot/out; then umount ./chroot/out; fi
 if [ -d ./chroot ]; then rm -r ./chroot; fi
 if [ -d ./out ]; then rm -r ./out; fi
 
-mkdir -p ./chroot/out ./out || { echo "Failed to create output directory"; exit 1; }
+mkdir -p ./chroot/chromeos ./chroot/out ./out || { echo "Failed to create output directory"; exit 1; }
 chmod 0777 ./out || { echo "Failed to fix output directory permissions"; exit 1; }
+
+if [ -f ../chromiumos-stage3/chromiumos_stage3.tar.gz ]; then
+	echo "Using local ChromiumOS Stage3"
+	cp ../chromiumos-stage3/chromiumos_stage3.tar.gz ./out/chromiumos_stage3.tar.gz || { echo "Failed to copy the brunch toolchain"; exit 1; }
+else
+	curl -L https://github.com/sebanc/chromiumos-stage3/releases/download/20251025/chromiumos_stage3_20251025.tar.gz -o ./out/chromiumos_stage3.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
+fi
+tar zxf ./out/chromiumos_stage3.tar.gz -C ./chroot || { echo "Failed to extract the brunch toolchain"; exit 1; }
+rm -f ./out/chromiumos_stage3.tar.gz
 
 if [ ! -z $1 ] && [ "$1" != "skip" ] ; then
 	if [ ! -f "$1" ]; then echo "ChromeOS recovery image $1 not found"; exit 1; fi
@@ -32,12 +42,12 @@ if [ ! -z $1 ] && [ "$1" != "skip" ] ; then
 else
 	git clone --depth=1 -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
 	cd rootfs
-	curl -L https://dl.google.com/chromeos/reven/16371.61.0/stable-channel/chromeos_16371.61.0_reven_stable-channel_full_mp-v8.bin-gy4giyjtguygjhbhbj456kwz7m53w34u.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
+	curl -L https://dl.google.com/chromeos/reven/16404.45.0/stable-channel/chromeos_16404.45.0_reven_stable-channel_full_mp-v8.bin-gy4gkzjqgq4gla43x4s7iwfg26u5q5p7.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
 	PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
 	cd ..
 	[ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }
 	mount -o ro ./rootfs/root.img ./out || { echo "Failed to mount ChromeOS rootfs image"; exit 1; }
-	cp -a ./out/* ./chroot/ || { echo "Failed to copy ChromeOS rootfs content"; exit 1; }
+	cp -a ./out/* ./chroot/chromeos/ || { echo "Failed to copy ChromeOS rootfs content"; exit 1; }
 	umount ./out || { echo "Failed to unmount ChromeOS rootfs image"; exit 1; }
 	rm -r ./rootfs
 fi
@@ -257,10 +267,10 @@ rm -r ./chroot/tmp/kernel || { echo "Failed to cleanup for kernel $kernel"; exit
 done
 
 cd ./chroot/home/chronos || { echo "Failed to switch to chronos directory"; exit 1; }
-git clone --depth=1 -b v$(curl -L https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/refs/heads/release-$(cat ../../etc/lsb-release | grep 'CHROMEOS_RELEASE_BUILDER_PATH=' | cut -d'/' -f2 | cut -d '.' -f1).B/media-libs/alsa-lib/ | sed 's@>@\n@g' | grep '^alsa-lib-' | head -1 | cut -d '-' -f3) https://github.com/alsa-project/alsa-ucm-conf.git || { echo "Failed to clone the alsa-ucm-conf git"; exit 1; }
+git clone --depth=1 -b v$(curl -L https://chromium.googlesource.com/chromiumos/overlays/chromiumos-overlay/+/refs/heads/release-$(cat ../../chromeos/etc/lsb-release | grep 'CHROMEOS_RELEASE_BUILDER_PATH=' | cut -d'/' -f2 | cut -d '.' -f1).B/media-libs/alsa-lib/ | sed 's@>@\n@g' | grep '^alsa-lib-' | head -1 | cut -d '-' -f3) https://github.com/alsa-project/alsa-ucm-conf.git || { echo "Failed to clone the alsa-ucm-conf git"; exit 1; }
 rm -r ./alsa-ucm-conf/.github ./alsa-ucm-conf/.gitignore ./alsa-ucm-conf/LICENSE ./alsa-ucm-conf/README.md ./alsa-ucm-conf/VERSION || { echo "Failed to clone the alsa-ucm-conf git"; exit 1; }
 sed -i 's@Define.V1 ""@Define.V1 yes@g' ./alsa-ucm-conf/ucm2/ucm.conf || { echo "Failed to modify ucm configuration"; exit 1; }
-cp -rT ../../usr/share/alsa/ucm ./alsa-ucm-conf/ucm || { echo "Failed to copy ChromeOS ucm configurations"; exit 1; }
+cp -rT ../../chromeos/usr/share/alsa/ucm ./alsa-ucm-conf/ucm || { echo "Failed to copy ChromeOS ucm configurations"; exit 1; }
 cp -rT ../../../alsa-ucm-conf ./alsa-ucm-conf || { echo "Failed to copy custom ucm configurations"; exit 1; }
 cd ./alsa-ucm-conf || { echo "Failed to switch to ucm configuration directory"; exit 1; }
 tar zcf ../rootc/packages/alsa-ucm-conf.tar.gz * --owner=0 --group=0 || { echo "Failed to create ucm configuration archive"; exit 1; }
@@ -283,7 +293,7 @@ rm -rf ./out/ti-connectivity
 curl -L https://git.kernel.org/pub/scm/linux/kernel/git/sforshee/wireless-regdb.git/plain/regulatory.db -o ./out/regulatory.db || { echo "Failed to download the regulatory db"; exit 1; }
 curl -L https://git.kernel.org/pub/scm/linux/kernel/git/sforshee/wireless-regdb.git/plain/regulatory.db.p7s -o ./out/regulatory.db.p7s || { echo "Failed to download the regulatory db"; exit 1; }
 cp -r ../../../../extra-firmwares/* ./out/ || { echo "Failed to copy brunch extra firmware files"; exit 1; }
-cp -a ../../../lib/firmware/intel/sof* ./out/intel/ || { echo "Failed to copy sof firmwares"; exit 1; }
+cp -a ../../../chromeos/lib/firmware/intel/sof* ./out/intel/ || { echo "Failed to copy sof firmwares"; exit 1; }
 mkdir -p ../rootc/lib/firmware || { echo "Failed to make firmware directory"; exit 1; }
 curl -L https://archlinux.org/packages/core/any/amd-ucode/download/ -o /tmp/amd-ucode.tar.zst || { echo "Failed to download amd ucode"; exit 1; }
 tar -C ../rootc/lib/firmware/ -xf /tmp/amd-ucode.tar.zst boot/amd-ucode.img --strip 1 || { echo "Failed to extract amd ucode"; exit 1; }
@@ -299,14 +309,19 @@ cd ../../.. || { echo "Failed to cleanup firmwares directory"; exit 1; }
 
 mount --bind ./out ./chroot/out || { echo "Failed to bind mount output directory in chroot"; exit 1; }
 mount -t proc none ./chroot/proc || { echo "Failed to mount proc directory in chroot"; exit 1; }
-mount -t sysfs none ./chroot/sys || { echo "Failed to mount sys directory in chroot"; exit 1; }
-mount -t devtmpfs none ./chroot/dev || { echo "Failed to mount dev directory in chroot"; exit 1; }
-mount -t tmpfs -o mode=1777,nosuid,nodev,strictatime tmpfs ./chroot/dev/shm || { echo "Failed to mount shm directory in chroot"; exit 1; }
+mount --bind -o ro /sys ./chroot/sys || { echo "Failed to mount sys directory in chroot"; exit 1; }
+mount --make-slave ./chroot/sys || { echo "Failed to mount sys directory in chroot"; exit 1; }
+mount --bind /dev ./chroot/dev || { echo "Failed to mount dev directory in chroot"; exit 1; }
+mount --make-slave ./chroot/dev || { echo "Failed to mount dev directory in chroot"; exit 1; }
+mount --bind /dev/pts ./chroot/dev/pts || { echo "Failed to mount dev/pts directory in chroot"; exit 1; }
+mount --make-slave ./chroot/dev/pts || { echo "Failed to mount dev/pts directory in chroot"; exit 1; }
+mount -t tmpfs -o mode=1777 none ./chroot/dev/shm || { echo "Failed to mount dev/shm directory in chroot"; exit 1; }
 
 cp ./scripts/build-init ./chroot/init || { echo "Failed to copy the chroot init script"; exit 1; }
-NTHREADS="$NTHREADS" chroot --userspec=1000:1000 ./chroot /init || { echo "The chroot script failed"; exit 1; }
+NTHREADS="$NTHREADS" PATH=/usr/sbin:/usr/bin:sbin:/bin chroot --userspec=1000:1000 ./chroot /init || { echo "The chroot script failed"; exit 1; }
 
-umount ./chroot/dev/shm || { echo "Failed to umount shm directory from chroot"; exit 1; }
+umount ./chroot/dev/shm || { echo "Failed to umount dev/shm directory from chroot"; exit 1; }
+umount ./chroot/dev/pts || { echo "Failed to umount dev/pts directory from chroot"; exit 1; }
 umount ./chroot/dev || { echo "Failed to umount dev directory from chroot"; exit 1; }
 umount ./chroot/sys || { echo "Failed to umount sys directory from chroot"; exit 1; }
 umount ./chroot/proc || { echo "Failed to umount proc directory from chroot"; exit 1; }

@@ -232,6 +232,8 @@ mount --move /dev /roota/dev
 mount --move /sys /roota/sys
 mount --move /proc /roota/proc
 
+pkill -9 fbv
+
 sync
 
 exec switch_root /roota /sbin/init "$@"

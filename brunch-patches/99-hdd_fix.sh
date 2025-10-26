@@ -15,9 +15,9 @@ done
 
 ret=0
 cat >/roota/lib/udev/rules.d/99-hdd_fix.rules <<HDDFIX
-ACTION=="add", SUBSYSTEMS=="block", ATTRS{removable}=="0", ENV{UDISKS_PRESENTATION_HIDE}="$disable_internal_drives"
-ACTION=="add", SUBSYSTEMS=="mmc", ATTRS{type}!="MMC", ENV{UDISKS_PRESENTATION_HIDE}="$disable_sdcard_storage"
-ACTION=="add", SUBSYSTEMS=="usb", ENV{UDISKS_PRESENTATION_HIDE}="$disable_usb_storage"
+ACTION=="add", SUBSYSTEMS=="block", ATTRS{removable}=="0", ENV{UDISKS_IGNORE}="$disable_internal_drives", ENV{UDISKS_PRESENTATION_HIDE}="$disable_internal_drives"
+ACTION=="add", SUBSYSTEMS=="mmc", ATTRS{type}!="MMC", ENV{UDISKS_IGNORE}="$disable_sdcard_storage", ENV{UDISKS_PRESENTATION_HIDE}="$disable_sdcard_storage"
+ACTION=="add", SUBSYSTEMS=="usb", ENV{UDISKS_IGNORE}="$disable_usb_storage", ENV{UDISKS_PRESENTATION_HIDE}="$disable_usb_storage"
 HDDFIX
 if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
 exit $ret

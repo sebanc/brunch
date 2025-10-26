@@ -86,16 +86,16 @@ do
 			rm -r /mnt/stateful_partition/unencrypted/brunch_pwa
 			echo -e '<a href=javascript:reboot(); style=color:#ffffff;>Click here</a> to reboot your computer and finish the update.'
 		;;
-		"install-toolchain")
+		"install-gentoo-prefix")
 			if [ -d /mnt/stateful_partition/unencrypted/brunch_pwa ]; then rm -r /mnt/stateful_partition/unencrypted/brunch_pwa; fi
-			echo -e "Downloading the latest brunch-toolchain."
-			mkdir /mnt/stateful_partition/unencrypted/brunch_pwa
-			curl -L -s -o /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_toolchain.tar.gz $(curl -L -s "https://api.github.com/repos/sebanc/brunch-toolchain/releases/latest" | grep browser_download_url | tr -d '"' | sed 's#browser_download_url: ##g') || { echo "Failed to download the brunch toolchain, please try again..."; continue; }
-			rm -r /usr/local/*
+			echo -e "Downloading the latest Gentoo prefix."
+			mkdir /mnt/stateful_partition/unencrypted/gentoo_prefix
+			curl -L -s -o /mnt/stateful_partition/unencrypted/gentoo_prefix/gentoo_prefix.tar.gz $(curl -L -s "https://api.github.com/repos/sebanc/chromeos-gentoo-prefix/releases/latest" | grep browser_download_url | tr -d '"' | sed 's#browser_download_url: ##g') || { echo "Failed to download the Gentoo prefix, please try again..."; continue; }
+			rm -r /usr/local/gentoo
 			chown -R 1000:1000 /usr/local
-			tar zxf /mnt/stateful_partition/unencrypted/brunch_pwa/brunch_toolchain.tar.gz -C /usr/local
-			rm -r /mnt/stateful_partition/unencrypted/brunch_pwa
-			echo -e "Brunch-toolchain installed."
+			tar zxf /mnt/stateful_partition/unencrypted/gentoo_prefix/gentoo_prefix.tar.gz -C /usr/local
+			rm -r /mnt/stateful_partition/unencrypted/gentoo_prefix
+			echo -e "Gentoo prefix installed."
 		;;
 		"reboot")
 			reboot

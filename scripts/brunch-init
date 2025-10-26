@@ -49,8 +49,15 @@ if [ -e "$img_part" ] && [ ! -z "$img_path" ]; then
 		#else
 			ntfs-3g "$img_part" /mainroot
 		#fi
+	elif [ "$fstype" == "btrfs" ]; then
+		mount -n -t "$fstype" "$img_part" /mainroot
+		if [ ! -f /mainroot/"$img_path" ]; then
+			# If the image file is not found on the boot partition, assume that the default btrfs subvolid is not 5
+			umount /mainroot
+			mount -n -t "$fstype" -o subvolid=5 "$img_part" /mainroot
+		fi
 	else
-		mount -n "$img_part" /mainroot
+		mount -n -t "$fstype" "$img_part" /mainroot
 	fi
 	if [ -f /mainroot/"$img_path" ]; then
 		#mknod -m660 /dev/sdz b 7 4096

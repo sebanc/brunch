@@ -1,0 +1,19 @@
+name: Close inactive issues and PRs
+on:
+  schedule:
+    - cron: "0 22 * * *"
+
+jobs:
+  close-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v10
+        with:
+          close-issue-message: "Unfortunately, this issue could not be resolved and is closed due to inactivity."
+          close-pr-message: 'Unfortunately, this PR was not merged and is closed due to inactivity.'
+          days-before-stale: 30
+          days-before-close: 5
+

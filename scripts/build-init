@@ -150,7 +150,7 @@ make DESTDIR=/home/chronos/swtpm-pkg install || { echo "Failed to make swtpm"; e
 rm $(find ../swtpm-pkg/usr/lib64/swtpm -type f | grep -v '.so') || { echo "Failed to make swtpm package"; exit 1; }
 mv ../swtpm-pkg/usr/lib64/*.so* ../swtpm-pkg/usr/lib64/swtpm/ || { echo "Failed to make swtpm package"; exit 1; }
 mv ../swtpm-pkg/usr/lib64/swtpm ../swtpm-pkg/usr/libswtpm || { echo "Failed to make swtpm package"; exit 1; }
-for i in $(ldd ../swtpm-pkg/usr/bin/swtpm | grep -v 'ld-linux' | grep -v '/swtpm-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/libswtpm ***"; cp "$i" ../swtpm-pkg/usr/libswtpm/ || { echo "Failed to make swtpm package"; exit 1; }; done
+for i in $(ldd ../swtpm-pkg/usr/bin/swtpm | grep -v '/swtpm-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/libswtpm ***"; cp "$i" ../swtpm-pkg/usr/libswtpm/ || { echo "Failed to make swtpm package"; exit 1; }; done
 cd .. || { echo "Failed to make swtpm"; exit 1; }
 rm -rf ./swtpm || { echo "Failed to make swtpm"; exit 1; }
 cd ./swtpm-pkg || { echo "Failed to make swtpm package"; exit 1; }

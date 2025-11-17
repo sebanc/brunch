@@ -25,7 +25,7 @@ if [ -f ../chromiumos-stage3/chromiumos_stage3.tar.gz ]; then
 	echo "Using local ChromiumOS Stage3"
 	cp ../chromiumos-stage3/chromiumos_stage3.tar.gz ./out/chromiumos_stage3.tar.gz || { echo "Failed to copy the brunch toolchain"; exit 1; }
 else
-	curl -L https://github.com/sebanc/chromiumos-stage3/releases/download/20251025/chromiumos_stage3_20251025.tar.gz -o ./out/chromiumos_stage3.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
+	curl -L https://github.com/sebanc/chromiumos-stage3/releases/download/20251117/chromiumos_stage3_20251117.tar.gz -o ./out/chromiumos_stage3.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
 fi
 tar zxf ./out/chromiumos_stage3.tar.gz -C ./chroot || { echo "Failed to extract the brunch toolchain"; exit 1; }
 rm -f ./out/chromiumos_stage3.tar.gz

@@ -24,7 +24,7 @@ script
         insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/ithc.ko 2>/dev/null || true
         sleep 2
     fi
-    exec iptsd \$(iptsd-find-hidraw)
+    exec env LD_LIBRARY_PATH=/usr/libipts /usr/libipts/ld-linux-x86-64.so.2 /usr/bin/iptsd \$(LD_LIBRARY_PATH=/usr/libipts /usr/libipts/ld-linux-x86-64.so.2 /usr/bin/iptsd-find-hidraw)
 end script
 ITHC
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
@@ -42,7 +42,7 @@ script
         insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/ipts.ko 2>/dev/null || true
         sleep 2
     fi
-    exec iptsd \$(iptsd-find-hidraw)
+    exec env LD_LIBRARY_PATH=/usr/libipts /usr/libipts/ld-linux-x86-64.so.2 /usr/bin/iptsd \$(LD_LIBRARY_PATH=/usr/libipts /usr/libipts/ld-linux-x86-64.so.2 /usr/bin/iptsd-find-hidraw)
 end script
 IPTS
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi

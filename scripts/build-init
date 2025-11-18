@@ -1,7 +1,7 @@
 #!/bin/bash
 export HOME=/home/chronos
 export LC_ALL=C
-export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/home/chronos/swtpm-pkg/usr/libswtpm:/home/chronos/efibootmgr-pkg/usr/lib64:/usr/lib64:/lib64
+export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/home/chronos/swtpm-pkg/usr/libswtpm:/home/chronos/ipts-pkg/usr/libipts:/home/chronos/efibootmgr-pkg/usr/lib64:/usr/lib64:/lib64
 export C_INCLUDE_PATH=/home/chronos/ncurses-pkg/usr/include:/home/chronos/swtpm-pkg/usr/include:/home/chronos/efibootmgr-pkg/usr/include:/usr/include
 export PKG_CONFIG_PATH=/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/swtpm-pkg/usr/lib64/pkgconfig:/home/chronos/efibootmgr-pkg/usr/lib64/pkgconfig:/usr/lib/pkgconfig:/usr/lib64/pkgconfig:/usr/share/pkgconfig
 
@@ -29,7 +29,7 @@ mkdir -p ./binaries-pkg/usr/bin ./binaries-pkg/usr/sbin || { echo "Failed to mak
 
 git clone --depth=1 -b master https://git.code.sf.net/p/linuxconsole/code linuxconsole || { echo "Failed to make inputattach"; exit 1; }
 cd linuxconsole/utils || { echo "Failed to make inputattach"; exit 1; }
-make -j"$NTHREADS" inputattach || bash || { echo "Failed to make inputattach"; exit 1; }
+make -j"$NTHREADS" inputattach || { echo "Failed to make inputattach"; exit 1; }
 cp inputattach ../../binaries-pkg/usr/sbin/ || { echo "Failed to make inputattach"; exit 1; }
 cd ../.. || { echo "Failed to make inputattach"; exit 1; }
 rm -rf ./linuxconsole || { echo "Failed to make inputattach"; exit 1; }
@@ -113,12 +113,14 @@ cd iptsd || { echo "Failed to make iptsd"; exit 1; }
 sed -i "s@'-Wconversion',@'-Wconversion', '-Wno-pedantic',@g" ./src/meson.build
 meson setup --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" build/ || { echo "Failed to make iptsd"; exit 1; }
 DESTDIR=/home/chronos/ipts-pkg ninja -j"$NTHREADS" -C build/ install || { echo "Failed to make iptsd"; exit 1; }
-cp -r /usr/local/* ../ipts-pkg/usr/
-mkdir -p ../ipts-pkg/usr/lib64 || { echo "Failed to make iptsd"; exit 1; }
+cp -r /usr/local/* ../ipts-pkg/usr/ || { echo "Failed to make iptsd"; exit 1; }
+mv ../ipts-pkg/usr/lib64 ../ipts-pkg/usr/libipts || { echo "Failed to make iptsd"; exit 1; }
+cp /lib64/ld-linux-x86-64.so.2 ../ipts-pkg/usr/libipts/ || { echo "Failed to make iptsd"; exit 1; }
+for i in $(ldd ../ipts-pkg/usr/bin/iptsd | grep -v '/ipts-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/libipts ***"; cp "$i" ../ipts-pkg/usr/libipts/ || { echo "Failed to make iptsd"; exit 1; }; done
 cd .. || { echo "Failed to make iptsd"; exit 1; }
 rm -rf ./iptsd || { echo "Failed to make iptsd"; exit 1; }
 cd ./ipts-pkg || { echo "Failed to make iptsd"; exit 1; }
-rm -rf ./usr/include ./usr/lib64/pkgconfig ./usr/share/pkgconfig || { echo "Failed to make iptsd"; exit 1; }
+rm -rf ./usr/include ./usr/libipts/cmake ./usr/libipts/pkgconfig ./usr/share/pkgconfig || { echo "Failed to make iptsd"; exit 1; }
 tar zcvf ../rootc/packages/ipts.tar.gz * --owner=0 --group=0 || { echo "Failed to make iptsd"; exit 1; }
 cd .. || { echo "Failed to make iptsd"; exit 1; }
 
@@ -150,6 +152,7 @@ make DESTDIR=/home/chronos/swtpm-pkg install || { echo "Failed to make swtpm"; e
 rm $(find ../swtpm-pkg/usr/lib64/swtpm -type f | grep -v '.so') || { echo "Failed to make swtpm package"; exit 1; }
 mv ../swtpm-pkg/usr/lib64/*.so* ../swtpm-pkg/usr/lib64/swtpm/ || { echo "Failed to make swtpm package"; exit 1; }
 mv ../swtpm-pkg/usr/lib64/swtpm ../swtpm-pkg/usr/libswtpm || { echo "Failed to make swtpm package"; exit 1; }
+cp /lib64/ld-linux-x86-64.so.2 ../swtpm-pkg/usr/libswtpm/ || { echo "Failed to make swtpm package"; exit 1; }
 for i in $(ldd ../swtpm-pkg/usr/bin/swtpm | grep -v '/swtpm-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/libswtpm ***"; cp "$i" ../swtpm-pkg/usr/libswtpm/ || { echo "Failed to make swtpm package"; exit 1; }; done
 cd .. || { echo "Failed to make swtpm"; exit 1; }
 rm -rf ./swtpm || { echo "Failed to make swtpm"; exit 1; }

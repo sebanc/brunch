@@ -24,12 +24,10 @@ script
         insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/ithc.ko 2>/dev/null || true
         sleep 2
     fi
-    exec env LD_LIBRARY_PATH=/usr/libipts /usr/libipts/ld-linux-x86-64.so.2 /usr/bin/iptsd \$(LD_LIBRARY_PATH=/usr/libipts /usr/libipts/ld-linux-x86-64.so.2 /usr/bin/iptsd-find-hidraw)
+    exec iptsd \$(iptsd-find-hidraw)
 end script
 ITHC
 	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 0))); fi
-	tar zxf /rootc/packages/ipts.tar.gz -C /roota
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 elif [ "$ipts_touchscreen" -eq 1 ]; then
 	echo "brunch: $0 ipts enabled" > /dev/kmsg
 	cat >/roota/etc/init/ipts.conf <<IPTS
@@ -42,12 +40,10 @@ script
         insmod /lib/modules/$(cat /proc/version |  cut -d' ' -f3)/ipts.ko 2>/dev/null || true
         sleep 2
     fi
-    exec env LD_LIBRARY_PATH=/usr/libipts /usr/libipts/ld-linux-x86-64.so.2 /usr/bin/iptsd \$(LD_LIBRARY_PATH=/usr/libipts /usr/libipts/ld-linux-x86-64.so.2 /usr/bin/iptsd-find-hidraw)
+    exec iptsd \$(iptsd-find-hidraw)
 end script
 IPTS
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
-	tar zxf /rootc/packages/ipts.tar.gz -C /roota
-	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 3))); fi
+	if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 1))); fi
 fi
 
 exit $ret

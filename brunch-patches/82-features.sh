@@ -47,7 +47,7 @@ else
 fi
 
 if [ "$enable_crosh_sudo" -eq 1 ]; then
-	sed -i '1s/^/env LD_PRELOAD=\/usr\/bin\/minioverride.so\n/' /roota/etc/init/ui.conf
+	sed -i '1s/^/env LD_PRELOAD=\/usr\/lib\/brunch-base\/minioverride.so\n/' /roota/etc/init/ui.conf
 fi
 
 if [ "$cros_debug" -eq 0 ]; then

@@ -95,7 +95,7 @@ cd .. || { echo "Failed to make swtpm"; exit 1; }
 rm -rf ./swtpm || { echo "Failed to make swtpm"; exit 1; }
 
 mkdir ncurses || { echo "Failed to make ncurses"; exit 1; }
-curl -L https://ftp.gnu.org/gnu/ncurses/ncurses-6.5.tar.gz | tar zxf - -C ncurses --strip 1 || { echo "Failed to make ncurses"; exit 1; }
+curl -L https://mirrors.ocf.berkeley.edu/gnu/ncurses/ncurses-6.5.tar.gz | tar zxf - -C ncurses --strip 1 || { echo "Failed to make ncurses"; exit 1; }
 cd ./ncurses || { echo "Failed to make ncurses"; exit 1; }
 ./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal --enable-pc-files --with-pkg-config-libdir=/usr/lib64/pkgconfig --enable-widec || { echo "Failed to make ncurses"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make ncurses"; exit 1; }
@@ -106,7 +106,7 @@ cd .. || { echo "Failed to make ncurses"; exit 1; }
 rm -rf ./ncurses || { echo "Failed to make ncurses"; exit 1; }
 
 mkdir nano || { echo "Failed to make nano"; exit 1; }
-curl -L https://www.nano-editor.org/dist/latest/nano-8.7.tar.gz | tar zxf - -C nano --strip 1 || { echo "Failed to make nano"; exit 1; }
+curl -L https://mirrors.ocf.berkeley.edu/gnu/nano/nano-8.7.tar.gz | tar zxf - -C nano --strip 1 || { echo "Failed to make nano"; exit 1; }
 cd ./nano || { echo "Failed to make nano"; exit 1; }
 ./configure --prefix=/usr --libdir=/usr/lib64 --disable-libmagic || { echo "Failed to make nano"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make nano"; exit 1; }

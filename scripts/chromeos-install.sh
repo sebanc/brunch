@@ -355,7 +355,7 @@ if [ -z "$zenity" ] && [ ! -z "$wsl" ]; then
 fi
 if [ "$type" == "Dualboot (create an image)" ]; then
 	if [ ! -z "$wsl" ]; then
-		img_uuid=$(su $(getent passwd $SUDO_UID | cut -d: -f1) -c "PATH=$PATH:/mnt/c/Windows/System32 mountvol.exe $(echo ${fullpath:5:1} | tr a-z A-Z): /L | cut -d'{' -f2 | cut -d'}' -f1")
+		img_uuid=$(su $(getent passwd $SUDO_UID | cut -d: -f1) -c "PATH=$PATH:/mnt/${wsl_windows_drive}/Windows/System32 mountvol.exe $(echo ${fullpath:5:1} | tr a-z A-Z): /L | cut -d'{' -f2 | cut -d'}' -f1")
 	else
 		img_uuid=$(blkid -s PARTUUID -o value "$(df "$fullpath" --output=source | sed 1d)")
 	fi
@@ -425,7 +425,7 @@ if [ ! -z "$zenity" ]; then
 	if  [ -z "$wsl" ]; then
 		path=$(su $(getent passwd "$SUDO_UID" | cut -d: -f1) -c "zenity --height=480 --width=640 --file-selection --save --title=\"Select the path to store the ChromeOS disk image\" --file-filter=*.img --filename=\"$(getent passwd $SUDO_UID | cut -d: -f6)/chromeos.img\"")
 	else
-		path=$(su $(getent passwd "$SUDO_UID" | cut -d: -f1) -c "zenity --height=480 --width=640 --file-selection --save --title=\"Select the path to store the ChromeOS disk image\" --file-filter=*.img --filename=\"/mnt/c/Users/$(echo $(/mnt/c/Windows/System32/cmd.exe /c echo %username% 2> /dev/null) | sed 's/[^a-zA-Z0-9]//g')/chromeos.img\"")
+		path=$(su $(getent passwd "$SUDO_UID" | cut -d: -f1) -c "zenity --height=480 --width=640 --file-selection --save --title=\"Select the path to store the ChromeOS disk image\" --file-filter=*.img --filename=\"/mnt/${wsl_windows_drive}/Users/$(echo $(/mnt/${wsl_windows_drive}/Windows/System32/cmd.exe /c echo %username% 2> /dev/null) | sed 's/[^a-zA-Z0-9]//g')/chromeos.img\"")
 	fi
 	if [ -z "$path" ]; then exit 1; else destination="$path"; fi
 	check_args
@@ -459,7 +459,19 @@ fi
 }
 
 if [ ! -f /proc/version ]; then macos=1; else if grep -qi 'Microsoft' /proc/version; then wsl=1; fi; fi
-if [ ! -z "$wsl" ] && [ ! -e /dev/loop-control ]; then echo "WSL1 is not supported, please install WSL2 to use this installer."; exit 1; fi
+if [ ! -z "${wsl}" ]; then
+	if [ ! -e /dev/loop-control ]; then echo "WSL1 is not supported, please enable WSL2 to use this installer."; exit 1; fi
+	for wsl_drive in {a..z}; do
+		if [ -d "/mnt/${wsl_drive}/Windows" ] && [ -d "/mnt/${wsl_drive}/Users" ]; then
+			wsl_windows_drive="${wsl_drive}"
+			break
+		fi
+	done
+	if [ -z ${wsl_windows_drive} ]; then
+		echo "Windows drive not found at standard path. Exiting."
+		exit 1
+	fi
+fi
 if [ $# -eq 0 ]; then
 	if ! which zenity > /dev/null 2>&1 ; then echo "To use the GUI installer you need a Linux environment with GUI apps support (actual Linux distro or Windows 11 WSL) and to install the \"zenity\" package."; usage; exit 1; fi
 	zenity=1

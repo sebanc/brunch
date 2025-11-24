@@ -23,6 +23,7 @@ echo "Brunch startup:"
 
 systemd-tmpfiles --create --remove --boot --prefix /dev --prefix /proc --prefix /run
 
+mount_with_log -t efivarfs -o nosuid,nodev,noexec efivarfs /sys/firmware/efi/efivars
 mount_with_log -t debugfs -o nosuid,nodev,noexec,mode=0750,uid=0,gid=\$(cat /etc/group | grep '^debugfs-access:' | cut -d':' -f3) debugfs /sys/kernel/debug
 mount_with_log -t tracefs -o nosuid,nodev,noexec,mode=0755 tracefs /sys/kernel/tracing
 mount_with_log -t configfs -o nosuid,nodev,noexec configfs /sys/kernel/config

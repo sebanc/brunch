@@ -25,7 +25,7 @@ if [ -f ../chromiumos-stage3/chromiumos_stage3.tar.gz ]; then
 	echo "Using local ChromiumOS Stage3"
 	cp ../chromiumos-stage3/chromiumos_stage3.tar.gz ./out/chromiumos_stage3.tar.gz || { echo "Failed to copy the brunch toolchain"; exit 1; }
 else
-	curl -L https://github.com/sebanc/chromiumos-stage3/releases/download/20251117/chromiumos_stage3_20251117.tar.gz -o ./out/chromiumos_stage3.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
+	curl -L https://github.com/sebanc/chromiumos-stage3/releases/download/r143-20251218/chromiumos_stage3_r143_20251218.tar.gz -o ./out/chromiumos_stage3.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
 fi
 tar zxf ./out/chromiumos_stage3.tar.gz -C ./chroot || { echo "Failed to extract the brunch toolchain"; exit 1; }
 rm -f ./out/chromiumos_stage3.tar.gz
@@ -42,7 +42,7 @@ if [ ! -z $1 ] && [ "$1" != "skip" ] ; then
 else
 	git clone --depth=1 -b master https://github.com/sebanc/chromeos-ota-extract.git rootfs || { echo "Failed to clone chromeos-ota-extract"; exit 1; }
 	cd rootfs
-	curl -L https://dl.google.com/chromeos/reven/16433.41.0/stable-channel/chromeos_16433.41.0_reven_stable-channel_full_mp-v8.bin-gy4tcmjzmzrghsnrmzksdffc5if5la7c.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
+	curl -L https://dl.google.com/chromeos/reven/16463.51.0/stable-channel/chromeos_16463.51.0_reven_stable-channel_full_mp-v8.bin-gy4timjqmztdc26viexdtux3m4xeepye.signed -o ./update.signed || { echo "Failed to Download the OTA update"; exit 1; }
 	PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python python3 extract_android_ota_payload.py ./update.signed || { echo "Failed to extract the OTA update"; exit 1; }
 	cd ..
 	[ -f ./rootfs/root.img ] || { echo "ChromeOS rootfs has not been extracted"; exit 1; }
@@ -307,6 +307,7 @@ cd ../.. || { echo "Failed to cleanup firmwares directory"; exit 1; }
 rm -r ./linux-firmware || { echo "Failed to cleanup firmwares directory"; exit 1; }
 cd ../../.. || { echo "Failed to cleanup firmwares directory"; exit 1; }
 
+mkdir -p ./chroot/dev ./chroot/proc ./chroot/sys
 mount --bind ./out ./chroot/out || { echo "Failed to bind mount output directory in chroot"; exit 1; }
 mount -t proc none ./chroot/proc || { echo "Failed to mount proc directory in chroot"; exit 1; }
 mount --bind -o ro /sys ./chroot/sys || { echo "Failed to mount sys directory in chroot"; exit 1; }

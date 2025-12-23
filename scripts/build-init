@@ -1,9 +1,9 @@
 #!/bin/bash
 export HOME=/home/chronos
 export LC_ALL=C
-export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/home/chronos/base-pkg/usr/lib64:/usr/local/lib64:/usr/lib64:/lib64
-export C_INCLUDE_PATH=/home/chronos/ncurses-pkg/usr/include:/home/chronos/base-pkg/usr/include:/usr/local/include:/usr/include
-export PKG_CONFIG_PATH=/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/base-pkg/usr/lib64/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig:/usr/lib/pkgconfig:/usr/lib64/pkgconfig:/usr/share/pkgconfig
+export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/home/chronos/fmt-pkg/usr/lib64:/home/chronos/base-pkg/usr/lib64:$(dirname $(find '/usr/lib/gcc/x86_64-cros-linux-gnu/' -depth -maxdepth 2 | grep '/libstdc++.so$' | head -1)):/usr/local/lib64:/usr/lib64:/lib64
+export C_INCLUDE_PATH=/home/chronos/ncurses-pkg/usr/include:/home/chronos/fmt-pkg/usr/include:/home/chronos/base-pkg/usr/include:/usr/local/include:/usr/include
+export PKG_CONFIG_PATH=/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/fmt-pkg/usr/lib64/pkgconfig:/home/chronos/base-pkg/usr/lib64/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig:/usr/lib/pkgconfig:/usr/lib64/pkgconfig:/usr/share/pkgconfig
 
 cd /home/chronos/
 
@@ -16,14 +16,20 @@ sudo mkdir -p /usr/local
 sudo chown 1000:1000 /usr/local || { echo "Failed to change ownership of /usr/local"; exit 1; }
 
 mkdir -p ./initramfs/{bin,lib64,sbin} || { echo "Failed to make initramfs directories"; exit 1; }
-mkdir -p ./base-pkg/etc ./base-pkg/usr/bin ./base-pkg/usr/lib/brunch-base ./base-pkg/usr/lib/brunch-efibootmgr ./base-pkg/usr/sbin || { echo "Failed to make the brunch base directories"; exit 1; }
+mkdir -p ./base-pkg/etc ./base-pkg/usr/bin ./base-pkg/usr/lib/brunch-base ./base-pkg/usr/lib/brunch-efibootmgr ./base-pkg/usr/sbin ./base-pkg/usr/share || { echo "Failed to make the brunch base directories"; exit 1; }
 ln -s ./lib/brunch-base ./base-pkg/usr/lib64 || { echo "Failed to make the brunch base directories"; exit 1; }
 
-cp /chromeos/usr/sbin/efibootmgr ./base-pkg/usr/lib/brunch-efibootmgr/ || { echo "Failed to make efibootmgr"; exit 1; }
-cp /chromeos/lib64/ld-linux-x86-64.so.2 ./base-pkg/usr/lib/brunch-efibootmgr/ || { echo "Failed to make efibootmgr"; exit 1; }
-for i in $(LD_LIBRARY_PATH=/chromeos/usr/lib64:/chromeos/lib64 ldd /chromeos/usr/sbin/efibootmgr | cut -d' ' -f3); do cp "$i" ./base-pkg/usr/lib/brunch-efibootmgr/ || { echo "Failed to make efibootmgr"; exit 1; }; done
-echo -e "#!/bin/bash\n\nexport LD_LIBRARY_PATH=/usr/lib/brunch-efibootmgr\nexec /usr/lib/brunch-efibootmgr/ld-linux-x86-64.so.2 /usr/lib/brunch-efibootmgr/efibootmgr \"\$@\"" > "./base-pkg/usr/sbin/efibootmgr" || { echo "Failed to make efibootmgr"; exit 1; }
-chmod 0755 "./base-pkg/usr/sbin/efibootmgr" || { echo "Failed to make efibootmgr"; exit 1; }
+cp /usr/bin/strings ./base-pkg/usr/bin/ || { echo "Failed to import strings"; exit 1; }
+for i in $(ldd ./base-pkg/usr/bin/strings | grep -v '/base-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/lib/brunch-base ***"; cp "$i" ./base-pkg/usr/lib/brunch-base/ || { echo "Failed to import strings"; exit 1; }; done
+
+cp /bin/nano ./base-pkg/usr/bin/ || { echo "Failed to import nano"; exit 1; }
+for i in $(ldd ./base-pkg/usr/bin/nano | grep -v '/base-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/lib/brunch-base ***"; cp "$i" ./base-pkg/usr/lib/brunch-base/ || { echo "Failed to import nano"; exit 1; }; done
+cp -r /etc/nanorc ./base-pkg/etc/
+cp -r /etc/terminfo ./base-pkg/etc/
+cp -r /usr/share/nano ./base-pkg/usr/share/
+
+cp /usr/sbin/efibootmgr ./base-pkg/usr/sbin/ || { echo "Failed to import efibootmgr"; exit 1; }
+for i in $(ldd ./base-pkg/usr/sbin/efibootmgr | grep -v '/base-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/lib/brunch-base ***"; cp "$i" ./base-pkg/usr/lib/brunch-base/ || { echo "Failed to import efibootmgr"; exit 1; }; done
 
 git clone --depth=1 -b master https://github.com/joewalnes/websocketd.git || { echo "Failed to make websocketd"; exit 1; }
 cd ./websocketd || { echo "Failed to make websocketd"; exit 1; }
@@ -59,7 +65,7 @@ rm -rf ./minioverride || { echo "Failed to make minioverride"; exit 1; }
 git clone --depth=1 -b 10.2.1 https://github.com/fmtlib/fmt.git || { echo "Failed to make libfmt"; exit 1; }
 mkdir ./fmt/build || { echo "Failed to make libfmt"; exit 1; }
 cd ./fmt/build || { echo "Failed to make libfmt"; exit 1; }
-cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr/local -DBUILD_SHARED_LIBS=TRUE .. || { echo "Failed to make libfmt"; exit 1; }
+cmake -DCMAKE_INSTALL_PREFIX:PATH=/home/chronos/fmt-pkg -DBUILD_SHARED_LIBS=TRUE .. || { echo "Failed to make libfmt"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make libfmt"; exit 1; }
 make install || { echo "Failed to make libfmt"; exit 1; }
 cd ../.. || { echo "Failed to make libfmt"; exit 1; }
@@ -94,27 +100,6 @@ for i in $(ldd ../base-pkg/usr/bin/swtpm | grep -v '/base-pkg/' | cut -d' ' -f3)
 cd .. || { echo "Failed to make swtpm"; exit 1; }
 rm -rf ./swtpm || { echo "Failed to make swtpm"; exit 1; }
 
-mkdir ncurses || { echo "Failed to make ncurses"; exit 1; }
-curl -L https://mirrors.ocf.berkeley.edu/gnu/ncurses/ncurses-6.5.tar.gz | tar zxf - -C ncurses --strip 1 || { echo "Failed to make ncurses"; exit 1; }
-cd ./ncurses || { echo "Failed to make ncurses"; exit 1; }
-./configure  --prefix=/usr --libdir=/usr/lib64 --with-shared --without-debug --without-normal --enable-pc-files --with-pkg-config-libdir=/usr/lib64/pkgconfig --enable-widec || { echo "Failed to make ncurses"; exit 1; }
-make -j"$NTHREADS" || { echo "Failed to make ncurses"; exit 1; }
-make DESTDIR=/home/chronos/ncurses-pkg install || { echo "Failed to make ncurses"; exit 1; }
-sed -i 's@/usr@/home/chronos/ncurses-pkg/usr@g' ../ncurses-pkg/usr/lib64/pkgconfig/* || { echo "Failed to make ncurses"; exit 1; }
-cp -r ../ncurses-pkg/usr/share/terminfo ../base-pkg/usr/share/ || { echo "Failed to make nano"; exit 1; }
-cd .. || { echo "Failed to make ncurses"; exit 1; }
-rm -rf ./ncurses || { echo "Failed to make ncurses"; exit 1; }
-
-mkdir nano || { echo "Failed to make nano"; exit 1; }
-curl -L https://mirrors.ocf.berkeley.edu/gnu/nano/nano-8.7.tar.gz | tar zxf - -C nano --strip 1 || { echo "Failed to make nano"; exit 1; }
-cd ./nano || { echo "Failed to make nano"; exit 1; }
-./configure --prefix=/usr --libdir=/usr/lib64 --disable-libmagic || { echo "Failed to make nano"; exit 1; }
-make -j"$NTHREADS" || { echo "Failed to make nano"; exit 1; }
-make DESTDIR=/home/chronos/base-pkg install || { echo "Failed to make nano"; exit 1; }
-for i in $(ldd ../base-pkg/usr/bin/nano | grep -v '/base-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/lib/brunch-base ***"; cp "$i" ../base-pkg/usr/lib/brunch-base/ || { echo "Failed to make nano"; exit 1; }; done
-cd .. || { echo "Failed to make nano"; exit 1; }
-rm -rf ./nano || { echo "Failed to make nano"; exit 1; }
-
 git clone --depth=1 -b master https://github.com/icetee/pv || { echo "Failed to make pv"; exit 1; }
 cd ./pv || { echo "Failed to make pv"; exit 1; }
 ./configure --prefix=/usr || { echo "Failed to make pv"; exit 1; }
@@ -128,11 +113,10 @@ rm -rf ./nano || { echo "Failed to make pv"; exit 1; }
 cd ./base-pkg || { echo "Failed to make base"; exit 1; }
 echo "Brunch $version $(date +"%Y%m%d")" > ./etc/brunch_version || { echo "Failed to make base"; exit 1; }
 cp /usr/bin/ldd ./usr/bin/ || { echo "Failed to make base"; exit 1; }
-cp /usr/bin/strings ./usr/bin/ || { echo "Failed to make base"; exit 1; }
 cp /lib64/ld-linux-x86-64.so.2 ./usr/lib/brunch-base/ || { echo "Failed to make base"; exit 1; }
 for i in bin sbin; do
 	for j in $(ls "./usr/$i"); do
-		if [ "$j" != "efibootmgr" ] && [ "$(file -bL --mime-encoding ./usr/$i/$j)" == "binary" ]; then
+		if [ "$(file -bL --mime-encoding ./usr/$i/$j)" == "binary" ]; then
 			echo "Replacing /usr/$i/$j with launcher script" || { echo "Failed to make base"; exit 1; }
 			mv "./usr/$i/$j" "./usr/lib/brunch-base/$j" || { echo "Failed to make base"; exit 1; }
 			echo -e "#!/bin/bash\n\nexport LD_LIBRARY_PATH=/usr/lib/brunch-base\nexec /usr/lib/brunch-base/ld-linux-x86-64.so.2 /usr/lib/brunch-base/$j \"\$@\"" > "./usr/$i/$j" || { echo "Failed to make base"; exit 1; }

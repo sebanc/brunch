@@ -29,7 +29,7 @@ if [ ! -z "$img_uuid" ] || [ ! -z "$img_part" ]; then
 		sleep 1
 	done
 else
-	# Wait 10s for block devices to be available by default, this can be overrided by setting "brunch_timeout" value on kernel command line
+	# Wait 5s for block devices to be available by default, this can be overrided by setting "brunch_timeout" value on kernel command line
 	if [ ! -z "$brunch_timeout" ]; then
 		sleep "$brunch_timeout"
 	else

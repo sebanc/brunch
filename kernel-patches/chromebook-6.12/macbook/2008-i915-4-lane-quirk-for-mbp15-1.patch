@@ -72,9 +72,9 @@ index 151c8f4ae..46e7feba8 100644
 --- a/drivers/gpu/drm/i915/display/intel_quirks.h
 +++ b/drivers/gpu/drm/i915/display/intel_quirks.h
 @@ -17,6 +17,7 @@ enum intel_quirk_id {
- 	QUIRK_NO_PPS_BACKLIGHT_POWER_HOOK,
  	QUIRK_FW_SYNC_LEN,
  	QUIRK_SKIP_LINK_CHECK,
+ 	QUIRK_NO_CHICKEN_ON_S0IX_ENTRY,
 +	QUIRK_DDI_A_FORCE_4_LANES,
  };
  

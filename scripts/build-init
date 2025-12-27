@@ -62,15 +62,6 @@ gcc minioverride.c -o ../base-pkg/usr/lib/brunch-base/minioverride.so -shared ||
 cd .. || { echo "Failed to make minioverride"; exit 1; }
 rm -rf ./minioverride || { echo "Failed to make minioverride"; exit 1; }
 
-git clone --depth=1 -b 10.2.1 https://github.com/fmtlib/fmt.git || { echo "Failed to make libfmt"; exit 1; }
-mkdir ./fmt/build || { echo "Failed to make libfmt"; exit 1; }
-cd ./fmt/build || { echo "Failed to make libfmt"; exit 1; }
-cmake -DCMAKE_INSTALL_PREFIX:PATH=/home/chronos/fmt-pkg -DBUILD_SHARED_LIBS=TRUE .. || { echo "Failed to make libfmt"; exit 1; }
-make -j"$NTHREADS" || { echo "Failed to make libfmt"; exit 1; }
-make install || { echo "Failed to make libfmt"; exit 1; }
-cd ../.. || { echo "Failed to make libfmt"; exit 1; }
-rm -rf ./fmt || { echo "Failed to make libfmt"; exit 1; }
-
 git clone -b v3.0.1 https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
 cd iptsd || { echo "Failed to make iptsd"; exit 1; }
 sed -i "s@'-Wconversion',@'-Wconversion', '-Wno-pedantic',@g" ./src/meson.build

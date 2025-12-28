@@ -290,8 +290,8 @@ rm -rf ./out/netronome
 rm -rf ./out/qcom
 rm -rf ./out/qed
 rm -rf ./out/ti-connectivity
-curl -L https://git.kernel.org/pub/scm/linux/kernel/git/sforshee/wireless-regdb.git/plain/regulatory.db -o ./out/regulatory.db || { echo "Failed to download the regulatory db"; exit 1; }
-curl -L https://git.kernel.org/pub/scm/linux/kernel/git/sforshee/wireless-regdb.git/plain/regulatory.db.p7s -o ./out/regulatory.db.p7s || { echo "Failed to download the regulatory db"; exit 1; }
+curl -L https://git.kernel.org/pub/scm/linux/kernel/git/wens/wireless-regdb.git/plain/regulatory.db -o ./out/regulatory.db || { echo "Failed to download the regulatory db"; exit 1; }
+curl -L https://git.kernel.org/pub/scm/linux/kernel/git/wens/wireless-regdb.git/plain/regulatory.db.p7s -o ./out/regulatory.db.p7s || { echo "Failed to download the regulatory db"; exit 1; }
 cp -r ../../../../extra-firmwares/* ./out/ || { echo "Failed to copy brunch extra firmware files"; exit 1; }
 cp -a ../../../chromeos/lib/firmware/intel/sof* ./out/intel/ || { echo "Failed to copy sof firmwares"; exit 1; }
 mkdir -p ../rootc/lib/firmware || { echo "Failed to make firmware directory"; exit 1; }

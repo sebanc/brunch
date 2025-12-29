@@ -290,16 +290,16 @@ rm -rf ./out/netronome
 rm -rf ./out/qcom
 rm -rf ./out/qed
 rm -rf ./out/ti-connectivity
-curl -L https://git.kernel.org/pub/scm/linux/kernel/git/wens/wireless-regdb.git/plain/regulatory.db -o ./out/regulatory.db || { echo "Failed to download the regulatory db"; exit 1; }
-curl -L https://git.kernel.org/pub/scm/linux/kernel/git/wens/wireless-regdb.git/plain/regulatory.db.p7s -o ./out/regulatory.db.p7s || { echo "Failed to download the regulatory db"; exit 1; }
 cp -r ../../../../extra-firmwares/* ./out/ || { echo "Failed to copy brunch extra firmware files"; exit 1; }
 cp -a ../../../chromeos/lib/firmware/intel/sof* ./out/intel/ || { echo "Failed to copy sof firmwares"; exit 1; }
 mkdir -p ../rootc/lib/firmware || { echo "Failed to make firmware directory"; exit 1; }
+curl -L https://archlinux.org/packages/core/any/wireless-regdb/download/ -o /tmp/wireless-regdb.tar.zst || { echo "Failed to download regulatory db"; exit 1; }
+tar --wildcards --strip 3 --zstd -C ../rootc/lib/firmware/ -xf /tmp/wireless-regdb.tar.zst usr/lib/firmware/* || { echo "Failed to extract regulatory db"; exit 1; }
 curl -L https://archlinux.org/packages/core/any/amd-ucode/download/ -o /tmp/amd-ucode.tar.zst || { echo "Failed to download amd ucode"; exit 1; }
-tar -C ../rootc/lib/firmware/ -xf /tmp/amd-ucode.tar.zst boot/amd-ucode.img --strip 1 || { echo "Failed to extract amd ucode"; exit 1; }
+tar --strip 1 -C ../rootc/lib/firmware/ -xf /tmp/amd-ucode.tar.zst boot/amd-ucode.img || { echo "Failed to extract amd ucode"; exit 1; }
 rm /tmp/amd-ucode.tar.zst || { echo "Failed to cleanup amd ucode"; exit 1; }
 curl -L https://archlinux.org/packages/extra/any/intel-ucode/download/ -o /tmp/intel-ucode.tar.zst || { echo "Failed to download intel ucode"; exit 1; }
-tar -C ../rootc/lib/firmware/ -xf /tmp/intel-ucode.tar.zst boot/intel-ucode.img --strip 1 || { echo "Failed to extract intel ucode"; exit 1; }
+tar --strip 1 -C ../rootc/lib/firmware/ -xf /tmp/intel-ucode.tar.zst boot/intel-ucode.img || { echo "Failed to extract intel ucode"; exit 1; }
 rm /tmp/intel-ucode.tar.zst || { echo "Failed to cleanup intel ucode"; exit 1; }
 cd ./out || { echo "Failed to enter the final firmware directory"; exit 1; }
 tar zcf ../../rootc/packages/firmwares.tar.gz * --owner=0 --group=0 || { echo "Failed to create the firmwares archive"; exit 1; }

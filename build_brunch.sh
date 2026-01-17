@@ -80,6 +80,11 @@ ln -s kernel ./chroot/home/chronos/rootc/kernel-5.4 || { echo "Failed to make th
 ln -s kernel ./chroot/home/chronos/rootc/kernel-5.10 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
 ln -s kernel ./chroot/home/chronos/rootc/kernel-5.15 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
 ln -s kernel ./chroot/home/chronos/rootc/kernel-6.1 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
+ln -s kernel ./chroot/home/chronos/rootc/kernel-chromebook-4.19 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
+ln -s kernel ./chroot/home/chronos/rootc/kernel-chromebook-5.4 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
+ln -s kernel ./chroot/home/chronos/rootc/kernel-chromebook-5.10 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
+ln -s kernel ./chroot/home/chronos/rootc/kernel-chromebook-5.15 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
+ln -s kernel ./chroot/home/chronos/rootc/kernel-chromebook-6.1 || { echo "Failed to make the legacy kernel symlink"; exit 1; }
 ln -s kernel-chromebook-6.12 ./chroot/home/chronos/rootc/kernel-macbook || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 ln -s kernel-chromebook-6.12 ./chroot/home/chronos/rootc/kernel-macbook-t2 || { echo "Failed to make the macbook kernel symlink"; exit 1; }
 cp -r ./packages ./chroot/home/chronos/rootc/ || { echo "Failed to copy brunch packages"; exit 1; }

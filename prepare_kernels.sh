@@ -73,6 +73,6 @@ rm -rf ./kernels
 mkdir ./kernels
 
 chromeos_version="R145"
-kernels="5.4 5.10 5.15 6.1 6.6 6.12"
+kernels="6.6 6.12"
 download_and_patch_kernels
 

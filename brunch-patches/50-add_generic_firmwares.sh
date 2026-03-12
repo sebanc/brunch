@@ -38,7 +38,7 @@ if [ -f /etc/camera/camera_characteristics.conf ]; then rm /etc/camera/camera_ch
 if [ -f /lib/udev/rules.d/50-camera.rules ]; then rm /lib/udev/rules.d/50-camera.rules; fi
 
 nr=0
-for i in \$(dmesg | grep "uvcvideo: Found UVC" | sed 's/^.*(//;s/)\$//' | uniq); do
+for i in \$(dmesg | grep "Found UVC" | sed 's/^.*(//;s/)\$//' | uniq); do
 vendor=\$(echo \$i | cut -d: -f1)
 product=\$(echo \$i | cut -d: -f2)
 echo "SUBSYSTEM==\"video4linux\", ATTRS{idVendor}==\"\$vendor\", ATTRS{idProduct}==\"\$product\", SYMLINK+=\"camera-internal\$nr\"" >> /lib/udev/rules.d/50-camera.rules
@@ -56,7 +56,7 @@ if [ -f /etc/camera/camera_characteristics.conf ]; then rm /etc/camera/camera_ch
 if [ -f /lib/udev/rules.d/50-camera.rules ]; then rm /lib/udev/rules.d/50-camera.rules; fi
 
 nr=0
-for i in \$(dmesg | grep "uvcvideo: Found UVC" | sed 's/^.*(//;s/)\$//' | uniq | tac); do
+for i in \$(dmesg | grep "Found UVC" | sed 's/^.*(//;s/)\$//' | uniq | tac); do
 vendor=\$(echo \$i | cut -d: -f1)
 product=\$(echo \$i | cut -d: -f2)
 echo "SUBSYSTEM==\"video4linux\", ATTRS{idVendor}==\"\$vendor\", ATTRS{idProduct}==\"\$product\", SYMLINK+=\"camera-internal\$nr\"" >> /lib/udev/rules.d/50-camera.rules
@@ -91,7 +91,7 @@ if [ -f /etc/camera/camera_characteristics.conf ]; then rm /etc/camera/camera_ch
 if [ -f /lib/udev/rules.d/50-camera.rules ]; then rm /lib/udev/rules.d/50-camera.rules; fi
 
 nr=0
-for i in \$(dmesg | grep "uvcvideo: Found UVC" | sed 's/^.*(//;s/)\$//' | uniq); do
+for i in \$(dmesg | grep "Found UVC" | sed 's/^.*(//;s/)\$//' | uniq); do
 vendor=\$(echo \$i | cut -d: -f1)
 product=\$(echo \$i | cut -d: -f2)
 echo "SUBSYSTEM==\"video4linux\", ATTRS{idVendor}==\"\$vendor\", ATTRS{idProduct}==\"\$product\", SYMLINK+=\"camera-internal\$nr\"" >> /lib/udev/rules.d/50-camera.rules

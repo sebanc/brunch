@@ -31,11 +31,13 @@ if [ ! "$?" -eq 0 ]; then ret=$((ret + (2 ** 2))); fi
 
 if [ "$no_camera_config" -eq 1 ]; then
 cat >/roota/etc/init/camera.conf <<CAMERASCRIPT
-start on starting boot-services
+start on stopped udev-trigger
 
 script
 if [ -f /etc/camera/camera_characteristics.conf ]; then rm /etc/camera/camera_characteristics.conf; fi
 if [ -f /lib/udev/rules.d/50-camera.rules ]; then rm /lib/udev/rules.d/50-camera.rules; fi
+
+logger -t "camera.conf" "Starting camera discovery"
 
 nr=0
 for i in \$(dmesg | grep "Found UVC" | sed 's/^.*(//;s/)\$//' | uniq); do
@@ -49,11 +51,13 @@ end script
 CAMERASCRIPT
 elif [ "$invert_camera_order" -eq 1 ]; then
 cat >/roota/etc/init/camera.conf <<CAMERASCRIPT
-start on starting boot-services
+start on stopped udev-trigger
 
 script
 if [ -f /etc/camera/camera_characteristics.conf ]; then rm /etc/camera/camera_characteristics.conf; fi
 if [ -f /lib/udev/rules.d/50-camera.rules ]; then rm /lib/udev/rules.d/50-camera.rules; fi
+
+logger -t "camera.conf" "Starting camera discovery"
 
 nr=0
 for i in \$(dmesg | grep "Found UVC" | sed 's/^.*(//;s/)\$//' | uniq | tac); do
@@ -84,11 +88,13 @@ end script
 CAMERASCRIPT
 else
 cat >/roota/etc/init/camera.conf <<CAMERASCRIPT
-start on starting boot-services
+start on stopped udev-trigger
 
 script
 if [ -f /etc/camera/camera_characteristics.conf ]; then rm /etc/camera/camera_characteristics.conf; fi
 if [ -f /lib/udev/rules.d/50-camera.rules ]; then rm /lib/udev/rules.d/50-camera.rules; fi
+
+logger -t "camera.conf" "Starting camera discovery"
 
 nr=0
 for i in \$(dmesg | grep "Found UVC" | sed 's/^.*(//;s/)\$//' | uniq); do

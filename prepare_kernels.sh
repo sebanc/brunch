@@ -72,7 +72,7 @@ done
 rm -rf ./kernels
 mkdir ./kernels
 
-chromeos_version="R147"
+chromeos_version="R148"
 kernels="6.6 6.12"
 download_and_patch_kernels
 

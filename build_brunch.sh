@@ -284,7 +284,7 @@ rm -r ./alsa-ucm-conf || { echo "Failed to cleanup ucm configuration directory";
 
 git clone --depth=1 -b main https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git || { echo "Failed to clone the linux firmware git"; exit 1; }
 cd ./linux-firmware || { echo "Failed to enter the linux firmware directory"; exit 1; }
-make DESTDIR=./tmp FIRMWAREDIR=/lib/firmware install || { echo "Failed to install firmwares in temporary directory"; exit 1; }
+make DESTDIR=./tmp FIRMWAREDIR=/lib/firmware install-xz || { echo "Failed to install firmwares in temporary directory"; exit 1; }
 mv ./tmp/lib/firmware ./out || { echo "Failed to move the firmwares temporary directory"; exit 1; }
 rm -rf ./out/bnx2x
 rm -rf ./out/dpaa2

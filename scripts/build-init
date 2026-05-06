@@ -31,7 +31,7 @@ cp -r /usr/share/nano ./base-pkg/usr/share/
 cp /usr/sbin/efibootmgr ./base-pkg/usr/sbin/ || { echo "Failed to import efibootmgr"; exit 1; }
 for i in $(ldd ./base-pkg/usr/sbin/efibootmgr | grep -v '/base-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/lib/brunch-base ***"; cp "$i" ./base-pkg/usr/lib/brunch-base/ || { echo "Failed to import efibootmgr"; exit 1; }; done
 
-git clone --depth=1 -b master https://github.com/joewalnes/websocketd.git || { echo "Failed to make websocketd"; exit 1; }
+git clone --depth=1 -b v0.4.1 https://github.com/joewalnes/websocketd.git || { echo "Failed to make websocketd"; exit 1; }
 cd ./websocketd || { echo "Failed to make websocketd"; exit 1; }
 make -j"$NTHREADS" websocketd || { echo "Failed to make websocketd"; exit 1; }
 cp ./websocketd ../base-pkg/usr/sbin/ || { echo "Failed to make websocketd"; exit 1; }

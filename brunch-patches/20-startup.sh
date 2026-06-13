@@ -21,18 +21,14 @@ exec 1>>/root/brunch_startup_log
 exec 2>>/root/brunch_startup_log
 echo "Brunch startup:"
 
-systemd-tmpfiles --create --remove --boot --prefix /dev --prefix /proc --prefix /sys --prefix /run
+systemd-tmpfiles --create --remove --boot --prefix /dev --prefix /proc --prefix /run
 
-if [ ! mountpoint -q /dev ]; then mount_with_log -t devtmpfs -o nosuid,mode=0755 devtmpfs /dev; fi
-if [ ! mountpoint -q /proc ]; then mount_with_log -t proc -o nosuid,nodev,noexec procfs /proc; fi
-if [ ! mountpoint -q /sys ]; then mount_with_log -t sysfs -o nosuid,nodev,noexec sysfs /sys; fi
-if [ ! mountpoint -q /run ]; then mount_with_log -t tmpfs -o nosuid,nodev,mode=0755 runtmpfs /run; fi
-if [ ! mountpoint -q /sys/firmware/efi/efivars ]; then mount_with_log -t efivarfs -o nosuid,nodev,noexec efivarfs /sys/firmware/efi/efivars; fi
-if [ ! mountpoint -q /sys/fs/bpf ]; then mount_with_log -t bpf -o nosuid,nodev,noexec,mode=0770,gid=\$(cat /etc/group | grep '^bpf-access:' | cut -d':' -f3) bpf /sys/fs/bpf; fi
-if [ ! mountpoint -q /sys/kernel/config ]; then mount_with_log -t configfs -o nosuid,nodev,noexec configfs /sys/kernel/config; fi
-if [ ! mountpoint -q /sys/kernel/debug ]; then mount_with_log -t debugfs -o nosuid,nodev,noexec,mode=0750,uid=0,gid=\$(cat /etc/group | grep '^debugfs-access:' | cut -d':' -f3) debugfs /sys/kernel/debug; fi
-if [ ! mountpoint -q /sys/kernel/security ]; then mount_with_log -t securityfs -o nosuid,nodev,noexec securityfs /sys/kernel/security; fi
-if [ ! mountpoint -q /sys/kernel/tracing ]; then mount_with_log -t tracefs -o nosuid,nodev,noexec,mode=0755 tracefs /sys/kernel/tracing; fi
+mount_with_log -t efivarfs -o nosuid,nodev,noexec efivarfs /sys/firmware/efi/efivars
+mount_with_log -t debugfs -o nosuid,nodev,noexec,mode=0750,uid=0,gid=\$(cat /etc/group | grep '^debugfs-access:' | cut -d':' -f3) debugfs /sys/kernel/debug
+mount_with_log -t tracefs -o nosuid,nodev,noexec,mode=0755 tracefs /sys/kernel/tracing
+mount_with_log -t configfs -o nosuid,nodev,noexec configfs /sys/kernel/config
+mount_with_log -t bpf -o nosuid,nodev,noexec,mode=0770,gid=\$(cat /etc/group | grep '^bpf-access:' | cut -d':' -f3) bpf /sys/fs/bpf
+mount_with_log -t securityfs -o nosuid,nodev,noexec securityfs /sys/kernel/security
 sysctl -q --system
 mount_with_log -o bind /run/namespaces /run/namespaces
 mount_with_log --make-private /run/namespaces

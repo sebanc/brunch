@@ -1,8 +1,8 @@
 #!/bin/bash
 export HOME=/home/chronos
 export LC_ALL=C
-export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/home/chronos/fmt-pkg/usr/lib64:/home/chronos/base-pkg/usr/lib64:$(dirname $(find '/usr/lib/gcc/x86_64-cros-linux-gnu/' -depth -maxdepth 2 | grep '/libstdc++.so$' | head -1)):/usr/local/lib64:/usr/lib64:/lib64
-export C_INCLUDE_PATH=/home/chronos/ncurses-pkg/usr/include:/home/chronos/fmt-pkg/usr/include:/home/chronos/base-pkg/usr/include:/usr/local/include:/usr/include
+export LD_LIBRARY_PATH=/home/chronos/ncurses-pkg/usr/lib64:/home/chronos/fmt-pkg/usr/lib64:/home/chronos/base-pkg/usr/lib64:/usr/local/lib64:/usr/lib64:/lib64
+export CPATH=/home/chronos/ncurses-pkg/usr/include:/home/chronos/fmt-pkg/usr/include:/home/chronos/base-pkg/usr/include:/usr/local/include:/usr/include
 export PKG_CONFIG_PATH=/home/chronos/ncurses-pkg/usr/lib64/pkgconfig:/home/chronos/fmt-pkg/usr/lib64/pkgconfig:/home/chronos/base-pkg/usr/lib64/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/share/pkgconfig:/usr/lib/pkgconfig:/usr/lib64/pkgconfig:/usr/share/pkgconfig
 
 cd /home/chronos/
@@ -16,7 +16,7 @@ sudo mkdir -p /usr/local
 sudo chown 1000:1000 /usr/local || { echo "Failed to change ownership of /usr/local"; exit 1; }
 
 mkdir -p ./initramfs/{bin,lib64,sbin} || { echo "Failed to make initramfs directories"; exit 1; }
-mkdir -p ./base-pkg/etc ./base-pkg/usr/bin ./base-pkg/usr/lib/brunch-base ./base-pkg/usr/lib/brunch-efibootmgr ./base-pkg/usr/sbin ./base-pkg/usr/share || { echo "Failed to make the brunch base directories"; exit 1; }
+mkdir -p ./base-pkg/etc ./base-pkg/usr/bin ./base-pkg/usr/lib/brunch-base ./base-pkg/usr/sbin ./base-pkg/usr/share || { echo "Failed to make the brunch base directories"; exit 1; }
 ln -s ./lib/brunch-base ./base-pkg/usr/lib64 || { echo "Failed to make the brunch base directories"; exit 1; }
 
 cp /usr/bin/strings ./base-pkg/usr/bin/ || { echo "Failed to import strings"; exit 1; }
@@ -62,7 +62,18 @@ gcc minioverride.c -o ../base-pkg/usr/lib/brunch-base/minioverride.so -shared ||
 cd .. || { echo "Failed to make minioverride"; exit 1; }
 rm -rf ./minioverride || { echo "Failed to make minioverride"; exit 1; }
 
-git clone -b v3.0.1 https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
+git clone -b 12.0.0 https://github.com/fmtlib/fmt.git fmt || { echo "Failed to make libfmt"; exit 1; }
+cd fmt || { echo "Failed to make libfmt"; exit 1; }
+mkdir build || { echo "Failed to make libfmt"; exit 1; }
+cd build || { echo "Failed to make libfmt"; exit 1; }
+cmake -D CMAKE_INSTALL_PREFIX=/usr -D CMAKE_INSTALL_LIBDIR=/usr/lib64 -D BUILD_SHARED_LIBS=ON -D FMT_TEST=OFF -G Ninja .. || { echo "Failed to make libfmt"; exit 1; }
+ninja || { echo "Failed to make libfmt"; exit 1; }
+DESTDIR=/home/chronos/fmt-pkg ninja install || { echo "Failed to make libfmt"; exit 1; }
+sed -i 's@/usr@/home/chronos/fmt-pkg/usr@g' /home/chronos/fmt-pkg/usr/lib64/pkgconfig/fmt.pc
+cd ../.. || { echo "Failed to make libfmt"; exit 1; }
+rm -rf ./fmt || { echo "Failed to make libfmt"; exit 1; }
+
+git clone -b v3.1.0 https://github.com/linux-surface/iptsd.git iptsd || { echo "Failed to make iptsd"; exit 1; }
 cd iptsd || { echo "Failed to make iptsd"; exit 1; }
 sed -i "s@'-Wconversion',@'-Wconversion', '-Wno-pedantic',@g" ./src/meson.build
 meson setup --prefix="/usr" -Dservice_manager="" -Ddebug_tools="" build/ || { echo "Failed to make iptsd"; exit 1; }
@@ -71,7 +82,7 @@ for i in $(ldd ../base-pkg/usr/bin/iptsd | grep -v '/base-pkg/' | cut -d' ' -f3)
 cd .. || { echo "Failed to make iptsd"; exit 1; }
 rm -rf ./iptsd || { echo "Failed to make iptsd"; exit 1; }
 
-git clone -b v0.9.7 https://github.com/stefanberger/libtpms.git libtpms || { echo "Failed to make libtpms"; exit 1; }
+git clone -b v0.10.2 https://github.com/stefanberger/libtpms.git libtpms || { echo "Failed to make libtpms"; exit 1; }
 cd ./libtpms || { echo "Failed to make libtpms"; exit 1; }
 ./autogen.sh --prefix=/usr --libdir=/usr/lib64 --with-openssl --with-tpm2 --disable-tests || { echo "Failed to make libtpms"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make libtpms"; exit 1; }
@@ -80,7 +91,7 @@ sed -i "s#/usr#/home/chronos/base-pkg/usr#g" /home/chronos/base-pkg/usr/lib64/pk
 cd .. || { echo "Failed to make libtpms"; exit 1; }
 rm -rf ./libtpms || { echo "Failed to make libtpms"; exit 1; }
 
-git clone -b v0.9.0 https://github.com/stefanberger/swtpm.git swtpm || { echo "Failed to make swtpm"; exit 1; }
+git clone -b v0.10.1 https://github.com/stefanberger/swtpm.git swtpm || { echo "Failed to make swtpm"; exit 1; }
 cd ./swtpm || { echo "Failed to make swtpm"; exit 1; }
 ./autogen.sh --prefix=/usr --libdir=/usr/lib64 --disable-python-installation --disable-tests with_seccomp=no with_gnutls=no with_cuse=no || { echo "Failed to make swtpm"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make swtpm"; exit 1; }
@@ -99,7 +110,7 @@ make DESTDIR=/home/chronos/base-pkg install || { echo "Failed to make pv"; exit 
 cp /home/chronos/base-pkg/usr/bin/pv ../initramfs/sbin/ || { echo "Failed to make pv"; exit 1; }
 for i in $(ldd ../base-pkg/usr/bin/pv | grep -v '/base-pkg/' | cut -d' ' -f3); do echo "*** importing $i to /usr/lib/brunch-base/ ***"; cp "$i" ../base-pkg/usr/lib/brunch-base/ || { echo "Failed to make pv"; exit 1; }; done
 cd .. || { echo "Failed to make pv"; exit 1; }
-rm -rf ./nano || { echo "Failed to make pv"; exit 1; }
+rm -rf ./pv || { echo "Failed to make pv"; exit 1; }
 
 cd ./base-pkg || { echo "Failed to make base"; exit 1; }
 echo "Brunch $version $(date +"%Y%m%d")" > ./etc/brunch_version || { echo "Failed to make base"; exit 1; }
@@ -115,7 +126,7 @@ for i in bin sbin; do
 		fi
 	done
 done
-rm -rf ./usr/include ./usr/lib64 ./usr/lib/brunch-base/*.a ./usr/lib/brunch-base/*.la ./usr/lib/brunch-base/pkgconfig ./usr/share/doc ./usr/share/info ./usr/share/locale ./usr/share/man ./var || { echo "Failed to make base"; exit 1; }
+rm -rf ./usr/include ./usr/lib64 ./usr/lib/brunch-base/*.a ./usr/lib/brunch-base/*.la ./usr/lib/brunch-base/pkgconfig ./usr/libexec ./usr/share/doc ./usr/share/info ./usr/share/locale ./usr/share/man ./var || { echo "Failed to make base"; exit 1; }
 tar zcvf ../rootc/packages/base.tar.gz * --owner=0 --group=0 || { echo "Failed to make base"; exit 1; }
 cd .. || { echo "Failed to make base"; exit 1; }
 
@@ -139,7 +150,7 @@ cp ../haveged-pkg/usr/lib64/libhavege.so* ../initramfs/lib64/ || { echo "Failed 
 cd .. || { echo "Failed to make haveged"; exit 1; }
 rm -rf ./haveged || { echo "Failed to make haveged"; exit 1; }
 
-git clone --depth=1 -b 4.6.1 https://github.com/plougher/squashfs-tools.git || { echo "Failed to make squashfs-tools"; exit 1; }
+git clone --depth=1 -b 4.7.5 https://github.com/plougher/squashfs-tools.git || { echo "Failed to make squashfs-tools"; exit 1; }
 cd squashfs-tools/squashfs-tools || { echo "Failed to make squashfs-tools"; exit 1; }
 sed "s/#XZ_SUPPORT/XZ_SUPPORT/" -i Makefile || { echo "Failed to make squashfs-tools"; exit 1; }
 make -j"$NTHREADS" || { echo "Failed to make squashfs-tools"; exit 1; }
@@ -150,7 +161,7 @@ cp unsquashfs ../../initramfs/bin/ || { echo "Failed to make squashfs-tools"; ex
 cd ../.. || { echo "Failed to make squashfs-tools"; exit 1; }
 rm -rf ./squashfs-tools || { echo "Failed to make squashfs-tools"; exit 1; }
 
-git clone --depth=1 -b 1_33_stable https://github.com/mirror/busybox.git || { echo "Failed to make busybox"; exit 1; }
+git clone --depth=1 -b 1_36_stable https://github.com/mirror/busybox.git || { echo "Failed to make busybox"; exit 1; }
 cd busybox || { echo "Failed to make busybox"; exit 1; }
 make defconfig || { echo "Failed to make busybox"; exit 1; }
 sed -i 's/CONFIG_MODPROBE_SMALL=y/# CONFIG_MODPROBE_SMALL is not set/g' .config || { echo "Failed to make busybox"; exit 1; }
@@ -219,4 +230,4 @@ cd ./brunch
 tar zcf /out/brunch_"$version"_"$(date +"%Y%m%d")".tar.gz * --owner=0 --group=0 || { echo "Failed to create brunch archive"; exit 1; }
 cd ..
 
-echo "End of chroot"
+echo "Brunch build completed successfully"

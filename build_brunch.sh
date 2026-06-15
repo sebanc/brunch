@@ -9,6 +9,7 @@ done
 if ( ! test -z {,} ); then echo "Must be ran with \"sudo bash\""; exit 1; fi
 if [ $(whoami) != "root" ]; then echo "Please run with sudo"; exit 1; fi
 
+if mountpoint -q ./chroot/tmp; then umount ./chroot/tmp; fi
 if mountpoint -q ./chroot/dev/shm; then umount ./chroot/dev/shm; fi
 if mountpoint -q ./chroot/dev/pts; then umount ./chroot/dev/pts; fi
 if mountpoint -q ./chroot/dev; then umount ./chroot/dev; fi
@@ -25,7 +26,7 @@ if [ -f ../chromiumos-stage3/chromiumos_stage3.tar.gz ]; then
 	echo "Using local ChromiumOS Stage3"
 	cp ../chromiumos-stage3/chromiumos_stage3.tar.gz ./out/chromiumos_stage3.tar.gz || { echo "Failed to copy the brunch toolchain"; exit 1; }
 else
-	curl -L https://github.com/sebanc/chromiumos-stage3/releases/download/r147-20260505/chromiumos_stage3_r147_20260505.tar.gz -o ./out/chromiumos_stage3.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
+	curl -L https://github.com/sebanc/chromiumos-stage3/releases/download/r148-20260615/chromiumos_stage3_r148_20260615.tar.gz -o ./out/chromiumos_stage3.tar.gz || { echo "Failed to download the brunch toolchain"; exit 1; }
 fi
 tar zxf ./out/chromiumos_stage3.tar.gz -C ./chroot || { echo "Failed to extract the brunch toolchain"; exit 1; }
 rm -f ./out/chromiumos_stage3.tar.gz
@@ -323,10 +324,14 @@ mount --make-slave ./chroot/dev || { echo "Failed to mount dev directory in chro
 mount --bind /dev/pts ./chroot/dev/pts || { echo "Failed to mount dev/pts directory in chroot"; exit 1; }
 mount --make-slave ./chroot/dev/pts || { echo "Failed to mount dev/pts directory in chroot"; exit 1; }
 mount -t tmpfs -o mode=1777 none ./chroot/dev/shm || { echo "Failed to mount dev/shm directory in chroot"; exit 1; }
+mount --make-slave ./chroot/dev/shm || { echo "Failed to mount dev/shm directory in chroot"; exit 1; }
+mount -t tmpfs -o mode=1777 none ./chroot/tmp || { echo "Failed to mount tmp directory in chroot"; exit 1; }
+mount --make-slave ./chroot/tmp || { echo "Failed to mount tmp directory in chroot"; exit 1; }
 
 cp ./scripts/build-init ./chroot/init || { echo "Failed to copy the chroot init script"; exit 1; }
 NTHREADS="$NTHREADS" PATH=/usr/sbin:/usr/bin:sbin:/bin chroot --userspec=1000:1000 ./chroot /init || { echo "The chroot script failed"; exit 1; }
 
+umount ./chroot/tmp || { echo "Failed to umount tmp directory from chroot"; exit 1; }
 umount ./chroot/dev/shm || { echo "Failed to umount dev/shm directory from chroot"; exit 1; }
 umount ./chroot/dev/pts || { echo "Failed to umount dev/pts directory from chroot"; exit 1; }
 umount ./chroot/dev || { echo "Failed to umount dev directory from chroot"; exit 1; }

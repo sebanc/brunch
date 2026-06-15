@@ -47,7 +47,6 @@ if [ ! -b \$data_partition ]; then echo "data partition \$data_partition was not
 tune2fs -g 20119 -O encrypt,project,quota,verity -Q usrquota,grpquota,prjquota \$data_partition
 mount_or_fail -o nosuid,nodev,noexec,noatime,commit=600,discard \$data_partition /mnt/stateful_partition
 if [ -f /mnt/stateful_partition/factory_install_reset ]; then echo "the factory_install_reset file triggered a powerwash."; rm -rf /mnt/stateful_partition/{*,.*}; fi
-mount_with_log -o ro,nosuid,nodev,noexec /dev/loop0p8 /usr/share/oem
 systemd-tmpfiles --create --remove --boot --prefix /mnt/stateful_partition
 mount_or_fail -o bind /mnt/stateful_partition/home /home
 mount_with_log -o remount,nosuid,nodev,noexec,nosymfollow /home

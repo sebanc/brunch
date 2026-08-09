@@ -187,6 +187,7 @@ static struct usb_device_id rtw_usb_id_tbl[] = {
 	{USB_DEVICE(0x2357, 0x010d), .driver_info = RTL8812}, /* TP-Link */
 	{USB_DEVICE(0x2357, 0x010e), .driver_info = RTL8812}, /* TP-Link */
 	{USB_DEVICE(0x2357, 0x010f), .driver_info = RTL8812}, /* TP-Link */
+	{USB_DEVICE(0x2357, 0x011e), .driver_info = RTL8812}, /* TP-Link */
 	{USB_DEVICE(0x2357, 0x0122), .driver_info = RTL8812}, /* TP-Link */
 	{USB_DEVICE(0x2604, 0x0012), .driver_info = RTL8812}, /* Tenda */
 	{USB_DEVICE(0x7392, 0xa822), .driver_info = RTL8812}, /* Edimax */

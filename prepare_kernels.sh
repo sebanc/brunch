@@ -38,10 +38,10 @@ for kernel in $kernels; do
 	case "$kernel" in
 		6.18)
 			echo "Downloading latest mainline kernel source for kernel $kernel"
-			curl -L $(curl -s https://www.kernel.org/releases.json | sed 's@ @@g' | grep '^"source"' | grep linux-$kernel | cut -d '"' -f4) -o "./kernels/mainline-$kernel.tar.xz" || { echo "Kernel source download failed"; exit 1; }
-			mkdir "./kernels/$kernel"
-			tar -C "./kernels/$kernel" -xf "./kernels/mainline-$kernel.tar.xz" --strip 1 || { echo "Kernel $kernel source extraction failed"; exit 1; }
-			rm -f "./kernels/mainline-$kernel.tar.xz"
+			curl -L $(curl -s https://www.kernel.org/releases.json | sed 's@ @@g' | grep '^"source"' | grep linux-$kernel | cut -d '"' -f4) -o "./kernels/experimental-$kernel.tar.xz" || { echo "Kernel source download failed"; exit 1; }
+			mkdir "./kernels/experimental-$kernel"
+			tar -C "./kernels/experimental-$kernel" -xf "./kernels/experimental-$kernel.tar.xz" --strip 1 || { echo "Kernel $kernel source extraction failed"; exit 1; }
+			rm -f "./kernels/experimental-$kernel.tar.xz"
 			apply_patches "experimental-$kernel"
 			make_config "experimental-$kernel" "generic"
 		;;

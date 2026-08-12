@@ -181,7 +181,7 @@ reset
 
 returned_values=""
 
-available_kernels="6.12;chromebook-6.12;6.6;chromebook-6.6"
+available_kernels="6.12;chromebook-6.12;6.6;chromebook-6.6;experimental-6.18"
 echo "Select your kernel (press ENTER to validate your choice)"
 singleselect "$available_kernels"
 selected_kernel="$returned_values"

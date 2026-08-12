@@ -1,0 +1,44 @@
+From 29bd9c39a2fa4a8e7ab8ec9ee4e2630b5dde6bc5 Mon Sep 17 00:00:00 2001
+From: Dmitry Torokhov <dtor@chromium.org>
+Date: Thu, 6 Oct 2016 16:14:16 -0700
+Subject: [PATCH 106/616] CHROMIUM: cgroups: relax permissions on moving tasks
+ between cgroups
+
+Android expects system_server to be able to move tasks between different
+cgroups/cpusets, but does not want to be running as root. Let's relax
+permission check so that processes can move other tasks if they have
+CAP_SYS_NICE in the affected task's user namespace.
+
+BUG=b:31790445,chromium:647994
+Bug: 147109865
+TEST=Boot android container, examine logcat
+
+Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/394927
+Reviewed-by: Ricky Zhou <rickyz@chromium.org>
+[AmitP: Refactored original changes to align with upstream commit
+        201af4c0fab0 ("cgroup: move cgroup files under kernel/cgroup/")]
+Change-Id: Ia919c66ab6ed6a6daf7c4cf67feb38b13b1ad09b
+Signed-off-by: Amit Pundir <amit.pundir@linaro.org>
+(cherry picked from commit ec54762b84a1d06de188bc846655305d3f7acf75)
+---
+ kernel/cgroup/cgroup-v1.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/cgroup/cgroup-v1.c b/kernel/cgroup/cgroup-v1.c
+index e28d5f0d20ed..e254879c2ebe 100644
+--- a/kernel/cgroup/cgroup-v1.c
++++ b/kernel/cgroup/cgroup-v1.c
+@@ -519,7 +519,8 @@ static ssize_t __cgroup1_procs_write(struct kernfs_open_file *of,
+ 	tcred = get_task_cred(task);
+ 	if (!uid_eq(cred->euid, GLOBAL_ROOT_UID) &&
+ 	    !uid_eq(cred->euid, tcred->uid) &&
+-	    !uid_eq(cred->euid, tcred->suid))
++	    !uid_eq(cred->euid, tcred->suid) &&
++	    !ns_capable(tcred->user_ns, CAP_SYS_NICE))
+ 		ret = -EACCES;
+ 	put_cred(tcred);
+ 	if (ret)
+-- 
+2.54.0
+

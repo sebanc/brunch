@@ -1,0 +1,54 @@
+From e71c55d72ea0103ea9b187e926bb119de57316d6 Mon Sep 17 00:00:00 2001
+From: Jason Macnak <natsu@google.com>
+Date: Fri, 25 Oct 2019 13:40:37 -0700
+Subject: [PATCH 588/616] CHROMIUM: Allow DRM_IOCTL_MODE_*_DUMB for render
+ clients.
+
+Minigbm uses dumb ioctls when the virtio gpu is in 2D mode. This
+changes allows those calls to pass the permission checks in
+drm_ioctl_permit().
+
+[CPNOTE: 19/07/21] Lee: This was due for removal
+- pinged the bug for an update
+
+Bug: b/123764798
+Test: booted cuttlefish on drm stack w/o 3d
+Signed-off-by: Jason Macnak <natsu@google.com>
+Signed-off-by: Alistair Delva <adelva@google.com>
+Signed-off-by: Lee Jones <joneslee@google.com>
+(cherry picked from 268745b9bcb48692bf1fbc2223068440a8f5f5ea)
+
+BUG=b:456505389
+TEST=deploy to radeon device, use camera
+UPSTREAM-TASK=b:194098499
+Signed-off-by: Allen Ballway <ballway@google.com>
+
+Change-Id: I0c2089a9ee0c10414af5110c9d8421009de20d37
+Reviewed-on: https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/7507770
+Reviewed-by: Prahlad Kilambi <prahladk@google.com>
+Commit-Queue: Allen Ballway <ballway@google.com>
+Tested-by: Allen Ballway <ballway@google.com>
+---
+ drivers/gpu/drm/drm_ioctl.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/drm_ioctl.c b/drivers/gpu/drm/drm_ioctl.c
+index 88948c1e0152..fe673c97a179 100644
+--- a/drivers/gpu/drm/drm_ioctl.c
++++ b/drivers/gpu/drm/drm_ioctl.c
+@@ -633,9 +633,9 @@ static const struct drm_ioctl_desc drm_ioctls[] = {
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_CLOSEFB, drm_mode_closefb_ioctl, 0),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_PAGE_FLIP, drm_mode_page_flip_ioctl, DRM_MASTER),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_DIRTYFB, drm_mode_dirtyfb_ioctl, DRM_MASTER),
+-	DRM_IOCTL_DEF(DRM_IOCTL_MODE_CREATE_DUMB, drm_mode_create_dumb_ioctl, 0),
+-	DRM_IOCTL_DEF(DRM_IOCTL_MODE_MAP_DUMB, drm_mode_mmap_dumb_ioctl, 0),
+-	DRM_IOCTL_DEF(DRM_IOCTL_MODE_DESTROY_DUMB, drm_mode_destroy_dumb_ioctl, 0),
++	DRM_IOCTL_DEF(DRM_IOCTL_MODE_CREATE_DUMB, drm_mode_create_dumb_ioctl, DRM_RENDER_ALLOW),
++	DRM_IOCTL_DEF(DRM_IOCTL_MODE_MAP_DUMB, drm_mode_mmap_dumb_ioctl, DRM_RENDER_ALLOW),
++	DRM_IOCTL_DEF(DRM_IOCTL_MODE_DESTROY_DUMB, drm_mode_destroy_dumb_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_OBJ_GETPROPERTIES, drm_mode_obj_get_properties_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_OBJ_SETPROPERTY, drm_mode_obj_set_property_ioctl, DRM_MASTER),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_CURSOR2, drm_mode_cursor2_ioctl, DRM_MASTER),
+-- 
+2.54.0
+

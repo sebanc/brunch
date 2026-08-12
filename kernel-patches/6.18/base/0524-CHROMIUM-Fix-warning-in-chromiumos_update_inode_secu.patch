@@ -1,0 +1,50 @@
+From 69287afbc3c9f103d358002621a66cb4d39a382a Mon Sep 17 00:00:00 2001
+From: Suleiman Souhlal <suleiman@google.com>
+Date: Tue, 18 Mar 2025 13:16:01 +0900
+Subject: [PATCH 524/616] CHROMIUM: Fix warning in
+ chromiumos_update_inode_security_policy().
+
+Upstream commit cad3f4a22cfa warns when we don't have GFP_NOFS while
+holding mark_mutex.
+So, call the intended interface for locking it, which also ensures we
+have GFP_NOFS, fsnotify_group_lock().
+
+Fixes: 55214e311929 ("CHROMIUM: LSM: chromiumos security module")
+
+BUG=b:404403912
+TEST=Booted with warning gone.
+
+Signed-off-by: Suleiman Souhlal <suleiman@google.com>
+Change-Id: I8197543efdf4e097977f0b8c07454beed7c18da1
+Reviewed-on: https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/6365835
+Reviewed-by: Sergey Senozhatsky <senozhatsky@chromium.org>
+Reviewed-by: Tzung-Bi Shih <tzungbi@chromium.org>
+---
+ security/chromiumos/inode_mark.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/security/chromiumos/inode_mark.c b/security/chromiumos/inode_mark.c
+index 88ceef488333..f03ccabad583 100644
+--- a/security/chromiumos/inode_mark.c
++++ b/security/chromiumos/inode_mark.c
+@@ -245,7 +245,7 @@ int chromiumos_update_inode_security_policy(
+ 	if (IS_ERR(sbm))
+ 		return PTR_ERR(sbm);
+ 
+-	mutex_lock(&sbm->fsn_group->mark_mutex);
++	fsnotify_group_lock(sbm->fsn_group);
+ 
+ 	mark = fsnotify_find_mark(inode, FSNOTIFY_OBJ_TYPE_INODE, sbm->fsn_group);
+ 	if (mark) {
+@@ -270,7 +270,7 @@ int chromiumos_update_inode_security_policy(
+ 		ret = chromiumos_inode_mark_create(sbm, inode, type, policy);
+ 	}
+ 
+-	mutex_unlock(&sbm->fsn_group->mark_mutex);
++	fsnotify_group_unlock(sbm->fsn_group);
+ 	chromiumos_super_block_put(sbm);
+ 
+ 	/* This must happen after dropping the mark mutex. */
+-- 
+2.54.0
+

@@ -1,0 +1,59 @@
+From 2fe3109fe4de350adb30865d5aedc1a0bc203e19 Mon Sep 17 00:00:00 2001
+From: Sarthak Kukreti <sarthakkukreti@chromium.org>
+Date: Mon, 29 Jan 2024 12:50:04 -0800
+Subject: [PATCH 132/616] CHROMIUM: security: Add a cmdline opt for overlayfs
+
+Add a kernel command line option fo allowing overlayfs
+mounts. By default, this will never be set but it allows
+users with verified boot disabled to mount overlayfs.
+
+BUG=b:322176103, b:328652444
+TEST=CQ
+
+Change-Id: I68ec0c6b11e8bed132d2c3a33d65f9140897db4d
+Signed-off-by: Sarthak Kukreti <sarthakkukreti@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/5351147
+Reviewed-by: Allen Webb <allenwebb@google.com>
+Tested-by: Sarthak Kukreti <sarthakkukreti@google.com>
+Commit-Queue: Sarthak Kukreti <sarthakkukreti@google.com>
+---
+ security/chromiumos/lsm.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/security/chromiumos/lsm.c b/security/chromiumos/lsm.c
+index da0b432b0e73..342c98c59d15 100644
+--- a/security/chromiumos/lsm.c
++++ b/security/chromiumos/lsm.c
+@@ -42,6 +42,15 @@
+ #include "inode_mark.h"
+ #include "utils.h"
+ 
++static int allow_overlayfs;
++
++static int __init allow_overlayfs_set(char *__unused)
++{
++	allow_overlayfs = 1;
++	return 1;
++}
++__setup("chromiumos.allow_overlayfs", allow_overlayfs_set);
++
+ #if defined(CONFIG_SECURITY_CHROMIUMOS_NO_UNPRIVILEGED_UNSAFE_MOUNTS) || \
+ 	defined(CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT)
+ static void report(const char *origin, const struct path *path, char *operation)
+@@ -83,6 +92,13 @@ static int chromiumos_security_sb_mount(const char *dev_name,
+ 					const char *type, unsigned long flags,
+ 					void *data)
+ {
++	if (!allow_overlayfs && type && !strcmp(type, "overlay")) {
++		report("sb_mount", path, "Overlayfs mounts prohibited");
++		pr_notice("sb_mount dev=%s type=%s flags=%#lx\n",
++			  dev_name, type, flags);
++		return -EPERM;
++	}
++
+ #ifdef CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
+ 	if (!(path->link_count & PATH_LINK_COUNT_VALID)) {
+ 		WARN(1, "No link count available");
+-- 
+2.54.0
+

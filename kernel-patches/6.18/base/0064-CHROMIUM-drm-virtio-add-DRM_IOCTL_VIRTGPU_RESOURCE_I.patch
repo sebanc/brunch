@@ -1,0 +1,303 @@
+From e7d76d5c68e87b9857d8c0dbe520b0092c909e72 Mon Sep 17 00:00:00 2001
+From: Chia-I Wu <olv@google.com>
+Date: Wed, 5 Sep 2018 16:52:09 -0700
+Subject: [PATCH 064/616] CHROMIUM: drm/virtio: add
+ DRM_IOCTL_VIRTGPU_RESOURCE_INFO_CROS
+
+Forward port of the following changes
+
+  https://crrev.com/c/1351813
+  https://crrev.com/c/2051223
+  https://crrev.com/c/2622949
+  https://crrev.com/c/2625398
+
+They are squashed because the first two CLs had ABI conflict with
+commit d9d9750e0a9a ("FROMGIT: drm/virtgpu api: blob resources") that
+was fixed by the last two CLs.
+
+BUG=b:176158397
+TEST=glxgears and vkcube
+
+Signed-off-by: Chia-I Wu <olv@google.com>
+Change-Id: I480495a218c9faec1c493b5d7012ad1c1982fa3d
+Reviewed-on: https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/2634406
+Reviewed-by: David Riley <davidriley@chromium.org>
+---
+ drivers/gpu/drm/virtio/virtgpu_drv.h   | 10 ++++-
+ drivers/gpu/drm/virtio/virtgpu_ioctl.c | 46 ++++++++++++++++++---
+ drivers/gpu/drm/virtio/virtgpu_vq.c    | 56 +++++++++++++++++++++++++-
+ include/uapi/drm/virtgpu_drm.h         | 28 +++++++++++++
+ include/uapi/linux/virtio_gpu.h        | 14 +++++++
+ 5 files changed, 145 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/gpu/drm/virtio/virtgpu_drv.h b/drivers/gpu/drm/virtio/virtgpu_drv.h
+index 64c236169db8..5dd9cfcfe118 100644
+--- a/drivers/gpu/drm/virtio/virtgpu_drv.h
++++ b/drivers/gpu/drm/virtio/virtgpu_drv.h
+@@ -90,6 +90,14 @@ struct virtio_gpu_object_params {
+ struct virtio_gpu_object {
+ 	struct drm_gem_shmem_object base;
+ 	uint32_t hw_res_handle;
++
++	bool create_callback_done;
++	/* These variables are only valid if create_callback_done is true */
++	uint32_t num_planes;
++	uint64_t format_modifier;
++	uint32_t strides[4];
++	uint32_t offsets[4];
++
+ 	bool dumb;
+ 	bool created;
+ 	bool host3d_blob, guest_blob;
+@@ -389,7 +397,7 @@ void virtio_gpu_cmd_transfer_to_host_3d(struct virtio_gpu_device *vgdev,
+ 					struct drm_virtgpu_3d_box *box,
+ 					struct virtio_gpu_object_array *objs,
+ 					struct virtio_gpu_fence *fence);
+-void
++int
+ virtio_gpu_cmd_resource_create_3d(struct virtio_gpu_device *vgdev,
+ 				  struct virtio_gpu_object *bo,
+ 				  struct virtio_gpu_object_params *params,
+diff --git a/drivers/gpu/drm/virtio/virtgpu_ioctl.c b/drivers/gpu/drm/virtio/virtgpu_ioctl.c
+index e4f76f315550..10a1733df670 100644
+--- a/drivers/gpu/drm/virtio/virtgpu_ioctl.c
++++ b/drivers/gpu/drm/virtio/virtgpu_ioctl.c
+@@ -198,12 +198,16 @@ static int virtio_gpu_resource_create_ioctl(struct drm_device *dev, void *data,
+ 	return 0;
+ }
+ 
+-static int virtio_gpu_resource_info_ioctl(struct drm_device *dev, void *data,
+-					  struct drm_file *file)
++static int virtio_gpu_resource_info_cros_ioctl(struct drm_device *dev,
++					       void *data,
++					       struct drm_file *file)
+ {
+-	struct drm_virtgpu_resource_info *ri = data;
++	struct virtio_gpu_device *vgdev = dev->dev_private;
++	struct drm_virtgpu_resource_info_cros *ri = data;
++	const u32 type = ri->type;
+ 	struct drm_gem_object *gobj = NULL;
+ 	struct virtio_gpu_object *qobj = NULL;
++	int ret = 0;
+ 
+ 	gobj = drm_gem_object_lookup(file, ri->bo_handle);
+ 	if (gobj == NULL)
+@@ -213,11 +217,40 @@ static int virtio_gpu_resource_info_ioctl(struct drm_device *dev, void *data,
+ 
+ 	ri->size = qobj->base.base.size;
+ 	ri->res_handle = qobj->hw_res_handle;
+-	if (qobj->host3d_blob || qobj->guest_blob)
++
++	if (type == VIRTGPU_RESOURCE_INFO_TYPE_DEFAULT) {
+ 		ri->blob_mem = qobj->blob_mem;
++		goto out;
++	} else {
++		if (qobj->blob_mem) {
++			ret = -EINVAL;
++			goto out;
++		}
++		ri->stride = 0;
++	}
+ 
++	if (!qobj->create_callback_done) {
++		ret = wait_event_interruptible(vgdev->resp_wq,
++					       qobj->create_callback_done);
++		if (ret)
++			goto out;
++	}
++
++	if (qobj->num_planes) {
++		int i;
++
++		ri->num_planes = qobj->num_planes;
++		for (i = 0; i < qobj->num_planes; i++) {
++			ri->strides[i] = qobj->strides[i];
++			ri->offsets[i] = qobj->offsets[i];
++		}
++	}
++
++	ri->format_modifier = qobj->format_modifier;
++
++out:
+ 	drm_gem_object_put(gobj);
+-	return 0;
++	return ret;
+ }
+ 
+ static int virtio_gpu_transfer_from_host_ioctl(struct drm_device *dev,
+@@ -707,7 +740,8 @@ struct drm_ioctl_desc virtio_gpu_ioctls[DRM_VIRTIO_NUM_IOCTLS] = {
+ 			  virtio_gpu_resource_create_ioctl,
+ 			  DRM_RENDER_ALLOW),
+ 
+-	DRM_IOCTL_DEF_DRV(VIRTGPU_RESOURCE_INFO, virtio_gpu_resource_info_ioctl,
++	DRM_IOCTL_DEF_DRV(VIRTGPU_RESOURCE_INFO_CROS,
++			  virtio_gpu_resource_info_cros_ioctl,
+ 			  DRM_RENDER_ALLOW),
+ 
+ 	/* make transfer async to the main ring? - no sure, can we
+diff --git a/drivers/gpu/drm/virtio/virtgpu_vq.c b/drivers/gpu/drm/virtio/virtgpu_vq.c
+index 0d3d0d09f39b..fd89abb6dee1 100644
+--- a/drivers/gpu/drm/virtio/virtgpu_vq.c
++++ b/drivers/gpu/drm/virtio/virtgpu_vq.c
+@@ -977,7 +977,45 @@ void virtio_gpu_cmd_context_detach_resource(struct virtio_gpu_device *vgdev,
+ 	virtio_gpu_queue_ctrl_buffer(vgdev, vbuf);
+ }
+ 
+-void
++static void virtio_gpu_cmd_resource_create_cb(struct virtio_gpu_device *vgdev,
++					      struct virtio_gpu_vbuffer *vbuf)
++{
++	struct virtio_gpu_resp_resource_plane_info *resp =
++		(struct virtio_gpu_resp_resource_plane_info *)vbuf->resp_buf;
++	struct virtio_gpu_object *obj =
++		(struct virtio_gpu_object *)vbuf->data_buf;
++	uint32_t resp_type = le32_to_cpu(resp->hdr.type);
++	int i;
++
++	/*
++	 * Keeps the data_buf, which points to this virtio_gpu_object, from
++	 * getting kfree'd after this cb returns.
++	 */
++	vbuf->data_buf = NULL;
++
++	switch (resp_type) {
++	case VIRTIO_GPU_RESP_OK_RESOURCE_PLANE_INFO:
++	case VIRTIO_GPU_RESP_OK_RESOURCE_PLANE_INFO_LEGACY:
++		break;
++	default:
++		goto finish_pending;
++	}
++
++	obj->num_planes = le32_to_cpu(resp->num_planes);
++	obj->format_modifier = le64_to_cpu(resp->format_modifier);
++
++	for (i = 0; i < obj->num_planes; i++) {
++		obj->strides[i] = le32_to_cpu(resp->strides[i]);
++		obj->offsets[i] = le32_to_cpu(resp->offsets[i]);
++	}
++
++finish_pending:
++	obj->create_callback_done = true;
++	drm_gem_object_put(&obj->base.base);
++	wake_up_all(&vgdev->resp_wq);
++}
++
++int
+ virtio_gpu_cmd_resource_create_3d(struct virtio_gpu_device *vgdev,
+ 				  struct virtio_gpu_object *bo,
+ 				  struct virtio_gpu_object_params *params,
+@@ -986,8 +1024,15 @@ virtio_gpu_cmd_resource_create_3d(struct virtio_gpu_device *vgdev,
+ {
+ 	struct virtio_gpu_resource_create_3d *cmd_p;
+ 	struct virtio_gpu_vbuffer *vbuf;
++	struct virtio_gpu_resp_resource_plane_info *resp_buf;
+ 
+-	cmd_p = virtio_gpu_alloc_cmd(vgdev, &vbuf, sizeof(*cmd_p));
++	resp_buf = kzalloc(sizeof(*resp_buf), GFP_KERNEL);
++	if (!resp_buf)
++		return -ENOMEM;
++
++	cmd_p = virtio_gpu_alloc_cmd_resp(vgdev,
++		virtio_gpu_cmd_resource_create_cb, &vbuf, sizeof(*cmd_p),
++		sizeof(struct virtio_gpu_resp_resource_plane_info), resp_buf);
+ 	memset(cmd_p, 0, sizeof(*cmd_p));
+ 	vbuf->objs = objs;
+ 
+@@ -1005,9 +1050,16 @@ virtio_gpu_cmd_resource_create_3d(struct virtio_gpu_device *vgdev,
+ 	cmd_p->nr_samples = cpu_to_le32(params->nr_samples);
+ 	cmd_p->flags = cpu_to_le32(params->flags);
+ 
++	/* Reuse the data_buf pointer for the object pointer. */
++	vbuf->data_buf = bo;
++	bo->create_callback_done = false;
++	drm_gem_object_get(&bo->base.base);
++
+ 	virtio_gpu_queue_fenced_ctrl_buffer(vgdev, vbuf, fence);
+ 
+ 	bo->created = true;
++
++	return 0;
+ }
+ 
+ void virtio_gpu_cmd_transfer_to_host_3d(struct virtio_gpu_device *vgdev,
+diff --git a/include/uapi/drm/virtgpu_drm.h b/include/uapi/drm/virtgpu_drm.h
+index c2ce71987e9b..78dfd3b499ad 100644
+--- a/include/uapi/drm/virtgpu_drm.h
++++ b/include/uapi/drm/virtgpu_drm.h
+@@ -130,6 +130,29 @@ struct drm_virtgpu_resource_info {
+ 	__u32 blob_mem;
+ };
+ 
++/* CHROMIUM */
++struct drm_virtgpu_resource_info_cros {
++	__u32 bo_handle;
++	__u32 res_handle;
++	__u32 size;
++
++/* Return res_handle and size.  Return extended info (strides, num_planes,
++ * etc.) until chromeos-5.4 and return blob_mem since chromeos-5.10.
++ */
++#define VIRTGPU_RESOURCE_INFO_TYPE_DEFAULT 0
++/* Return res_handle, size, and extended info */
++#define VIRTGPU_RESOURCE_INFO_TYPE_EXTENDED 1
++	union {
++		__u32 type; /* in, VIRTGPU_RESOURCE_INFO_TYPE_* */
++		__u32 blob_mem;
++		__u32 stride;
++		__u32 strides[4]; /* strides[0] is accessible with stride. */
++	};
++	__u32 num_planes;
++	__u32 offsets[4];
++	__u64 format_modifier;
++};
++
+ struct drm_virtgpu_3d_box {
+ 	__u32 x;
+ 	__u32 y;
+@@ -239,6 +262,11 @@ struct drm_virtgpu_context_init {
+ 	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_RESOURCE_INFO, \
+ 		 struct drm_virtgpu_resource_info)
+ 
++/* same ioctl number as DRM_IOCTL_VIRTGPU_RESOURCE_INFO */
++#define DRM_IOCTL_VIRTGPU_RESOURCE_INFO_CROS \
++	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_RESOURCE_INFO, \
++		 struct drm_virtgpu_resource_info_cros)
++
+ #define DRM_IOCTL_VIRTGPU_TRANSFER_FROM_HOST \
+ 	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_TRANSFER_FROM_HOST,	\
+ 		struct drm_virtgpu_3d_transfer_from_host)
+diff --git a/include/uapi/linux/virtio_gpu.h b/include/uapi/linux/virtio_gpu.h
+index bf2c9cabd207..aa441283b506 100644
+--- a/include/uapi/linux/virtio_gpu.h
++++ b/include/uapi/linux/virtio_gpu.h
+@@ -109,6 +109,11 @@ enum virtio_gpu_ctrl_type {
+ 	VIRTIO_GPU_RESP_OK_RESOURCE_UUID,
+ 	VIRTIO_GPU_RESP_OK_MAP_INFO,
+ 
++	/* CHROMIUM: legacy responses */
++	VIRTIO_GPU_RESP_OK_RESOURCE_PLANE_INFO_LEGACY = 0x1104,
++	/* CHROMIUM: success responses */
++	VIRTIO_GPU_RESP_OK_RESOURCE_PLANE_INFO = 0x11FF,
++
+ 	/* error responses */
+ 	VIRTIO_GPU_RESP_ERR_UNSPEC = 0x1200,
+ 	VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY,
+@@ -357,6 +362,15 @@ struct virtio_gpu_resp_edid {
+ 	__u8 edid[1024];
+ };
+ 
++/* VIRTIO_GPU_RESP_OK_RESOURCE_PLANE_INFO */
++struct virtio_gpu_resp_resource_plane_info {
++	struct virtio_gpu_ctrl_hdr hdr;
++	__le32 num_planes;
++	__le64 format_modifier;
++	__le32 strides[4];
++	__le32 offsets[4];
++};
++
+ #define VIRTIO_GPU_EVENT_DISPLAY (1 << 0)
+ 
+ struct virtio_gpu_config {
+-- 
+2.54.0
+

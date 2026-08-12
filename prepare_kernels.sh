@@ -25,9 +25,7 @@ if [ "$2" == "generic" ]; then
 	sed '/CONFIG_ATA\|CONFIG_CROS\|CONFIG_HOTPLUG\|CONFIG_MDIO\|CONFIG_PERF\|CONFIG_PINCTRL\|CONFIG.*_PMIC\|CONFIG_.*_FF=\|CONFIG_SATA\|CONFIG_SERI\|CONFIG_USB_STORAGE\|CONFIG_USB_XHCI\|CONFIG_USB_OHCI\|CONFIG_USB_EHCI/!d' ./kernels/$1/out/.config >> ./kernels/$1/arch/x86/configs/chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
 	sed -i '/_DBG\|_DEBUG\|_MOCKUP\|_NOCODEC\|_ONLY\|_WARNINGS\|TEST\|USB_OTG\|_PLTFM\|_PLATFORM\|_SELFTEST\|_TRACING/d' ./kernels/$1/arch/x86/configs/chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
 fi
-sed '/CONFIG_ATH\|CONFIG_DEBUG_INFO\|CONFIG_IWL\|CONFIG_MODULE_COMPRESS\|CONFIG_MOUSE/d' ./kernels/$1/chromeos/config/chromeos/base.config >> ./kernels/$1/arch/x86/configs/chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
-sed '/CONFIG_ATH\|CONFIG_DEBUG_INFO\|CONFIG_IWL\|CONFIG_MODULE_COMPRESS\|CONFIG_MOUSE/d' ./kernels/$1/chromeos/config/chromeos/x86_64/common.config >> ./kernels/$1/arch/x86/configs/chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
-cat ./kernels/$1/chromeos/config/chromeos/x86_64/chromeos-*.flavour.config | grep '^CONFIG_SND' >> ./kernels/$1/arch/x86/configs/chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
+cat ./kernel-patches/chromeos_configs >> ./kernels/$1/arch/x86/configs/chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
 cat ./kernel-patches/brunch_configs >> ./kernels/$1/arch/x86/configs/chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
 echo "CONFIG_LOCALVERSION=\"-$2-brunch-sebanc\"" >> ./kernels/$1/arch/x86/configs/chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
 make -C ./kernels/$1 O=out chromeos_defconfig || { echo "Kernel $1 configuration failed"; exit 1; }
@@ -36,15 +34,24 @@ cp ./kernels/$1/out/.config ./kernels/$1/arch/x86/configs/chromeos_defconfig || 
 
 download_and_patch_kernels()
 {
-kernel_remote_path="$(git ls-remote https://chromium.googlesource.com/chromiumos/third_party/kernel/ | grep "refs/heads/release-$chromeos_version" | head -1 | sed -e 's#.*\t##' -e 's#chromeos-.*##' | sort -u)chromeos-"
-[ ! "x$kernel_remote_path" == "x" ] || { echo "Remote path not found"; exit 1; }
-echo "kernel_remote_path=$kernel_remote_path"
 for kernel in $kernels; do
-	kernel_version=$(curl -Ls "https://chromium.googlesource.com/chromiumos/third_party/kernel/+/$kernel_remote_path$kernel/Makefile?format=TEXT" | base64 --decode | sed -n -e 1,4p | sed -e '/^#/d' | cut -d'=' -f 2 | sed -z 's#\n##g' | sed 's#^ *##g' | sed 's# #.#g')
-	echo "kernel_version=$kernel_version"
-	[ ! "x$kernel_version" == "x" ] || { echo "Kernel version not found"; exit 1; }
 	case "$kernel" in
+		6.18)
+			echo "Downloading latest mainline kernel source for kernel $kernel"
+			curl -L $(curl -s https://www.kernel.org/releases.json | sed 's@ @@g' | grep '^"source"' | grep linux-$kernel | cut -d '"' -f4) -o "./kernels/mainline-$kernel.tar.xz" || { echo "Kernel source download failed"; exit 1; }
+			mkdir "./kernels/$kernel"
+			tar -C "./kernels/$kernel" -xf "./kernels/mainline-$kernel.tar.xz" --strip 1 || { echo "Kernel $kernel source extraction failed"; exit 1; }
+			rm -f "./kernels/mainline-$kernel.tar.xz"
+			apply_patches "experimental-$kernel"
+			make_config "experimental-$kernel" "generic"
+		;;
 		6.12|6.6)
+			kernel_remote_path="$(git ls-remote https://chromium.googlesource.com/chromiumos/third_party/kernel/ | grep "refs/heads/release-$chromeos_version" | head -1 | sed -e 's#.*\t##' -e 's#chromeos-.*##' | sort -u)chromeos-"
+			[ ! "x$kernel_remote_path" == "x" ] || { echo "Remote path not found"; exit 1; }
+			echo "kernel_remote_path=$kernel_remote_path"
+			kernel_version=$(curl -Ls "https://chromium.googlesource.com/chromiumos/third_party/kernel/+/$kernel_remote_path$kernel/Makefile?format=TEXT" | base64 --decode | sed -n -e 1,4p | sed -e '/^#/d' | cut -d'=' -f 2 | sed -z 's#\n##g' | sed 's#^ *##g' | sed 's# #.#g')
+			echo "kernel_version=$kernel_version"
+			[ ! "x$kernel_version" == "x" ] || { echo "Kernel version not found"; exit 1; }
 			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version from https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz"
 			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
 			mkdir "./kernels/chromebook-$kernel" "./kernels/$kernel"
@@ -57,6 +64,12 @@ for kernel in $kernels; do
 			make_config "$kernel" "generic"
 		;;
 		*)
+			kernel_remote_path="$(git ls-remote https://chromium.googlesource.com/chromiumos/third_party/kernel/ | grep "refs/heads/release-$chromeos_version" | head -1 | sed -e 's#.*\t##' -e 's#chromeos-.*##' | sort -u)chromeos-"
+			[ ! "x$kernel_remote_path" == "x" ] || { echo "Remote path not found"; exit 1; }
+			echo "kernel_remote_path=$kernel_remote_path"
+			kernel_version=$(curl -Ls "https://chromium.googlesource.com/chromiumos/third_party/kernel/+/$kernel_remote_path$kernel/Makefile?format=TEXT" | base64 --decode | sed -n -e 1,4p | sed -e '/^#/d' | cut -d'=' -f 2 | sed -z 's#\n##g' | sed 's#^ *##g' | sed 's# #.#g')
+			echo "kernel_version=$kernel_version"
+			[ ! "x$kernel_version" == "x" ] || { echo "Kernel version not found"; exit 1; }
 			echo "Downloading ChromiumOS kernel source for kernel $kernel version $kernel_version from https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz"
 			curl -L "https://chromium.googlesource.com/chromiumos/third_party/kernel/+archive/$kernel_remote_path$kernel.tar.gz" -o "./kernels/chromiumos-$kernel.tar.gz" || { echo "Kernel source download failed"; exit 1; }
 			mkdir "./kernels/chromebook-$kernel"
@@ -73,6 +86,6 @@ rm -rf ./kernels
 mkdir ./kernels
 
 chromeos_version="R152"
-kernels="6.6 6.12"
+kernels="6.6 6.12 6.18"
 download_and_patch_kernels
 

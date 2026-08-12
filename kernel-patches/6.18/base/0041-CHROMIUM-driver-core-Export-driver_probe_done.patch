@@ -1,0 +1,40 @@
+From 4f7725e387a5898cce1020bbe9600696cd2a23fd Mon Sep 17 00:00:00 2001
+From: Guenter Roeck <groeck@chromium.org>
+Date: Fri, 11 Mar 2016 15:33:52 -0800
+Subject: [PATCH 041/616] CHROMIUM: driver core: Export driver_probe_done
+
+driver_probe_done() is called from dm-verity code, which can be built
+as module. Doing so results in the following build failure.
+
+ERROR: "driver_probe_done" [drivers/md/dm-verity.ko] undefined!
+
+BUG=chromium:583462
+TEST=Build x86_64:allmodconfig
+
+Change-Id: I1beae02cf83ca0da010dec8028c20c16f05853f9
+Fixes: 1326d20b57bc4 ("CHROMIUM: md: dm-verity fixes chromeos needs")
+Signed-off-by: Guenter Roeck <groeck@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/332289
+Reviewed-by: Olof Johansson <olofj@chromium.org>
+
+[rebase44(groeck): Moved patch: export prior to use to avoid build failure]
+Signed-off-by: Guenter Roeck <groeck@chromium.org>
+---
+ drivers/base/dd.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index d4f85918b330..3328101e0e10 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -789,6 +789,7 @@ bool __init driver_probe_done(void)
+ 	pr_debug("%s: probe_count = %d\n", __func__, local_probe_count);
+ 	return !local_probe_count;
+ }
++EXPORT_SYMBOL(driver_probe_done);
+ 
+ /**
+  * wait_for_device_probe
+-- 
+2.54.0
+

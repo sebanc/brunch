@@ -1,0 +1,97 @@
+From dee58eb0d13547f70d271cdf8d2bf2f812754f7e Mon Sep 17 00:00:00 2001
+From: Tomasz Figa <tfiga@chromium.org>
+Date: Tue, 28 Jun 2016 19:54:24 +0900
+Subject: [PATCH 063/616] CHROMIUM: drm: Allow DRM_IOCTL_MODE_MAP_DUMB for
+ render nodes
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+There is no particular reason to prevent userspace for using this IOCTL,
+considering that it already has access to other, platform-specific
+IOCTLs. This patch makes is possible to have the same userspace code
+work regardless on the underlying platform, which significantly
+simplifies the stack.
+
+BUG=chromium:795946
+TEST=Get a little farther
+
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/356621
+Reviewed-by: Zach Reizner <zachr@chromium.org>
+(cherry picked from commit fbc6b01ff8377e566db1ed8f61487d7ec48f5ce3)
+
+Change-Id: If0c6ef066d3828830c4db4fd42e2a6beb8948a6c
+Signed-off-by: Nicolas Norvez <norvez@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/378956
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+(cherry picked from commit 44237f0ce2a56e955e342a725793105027dbee49)
+Reviewed-on: https://chromium-review.googlesource.com/896229
+Reviewed-by: Stéphane Marchesin <marcheu@chromium.org>
+
+[rebase419(groeck): Context conflicts]
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+[rebase54(groeck):
+    The original ioctl to enable DUMB ioctls is now handled from an Android
+    import, and permissions have changed upstream. Both result in context
+    conflicts.
+    Squashed:
+	CHROMIUM: drm: Allow render node access to KMS getters
+	CHROMIUM: drm: Allow DRM_IOCTL_MODE_DESTROY_DUMB for render nodes
+]
+Signed-off-by: Guenter Roeck <groeck@chromium.org>
+
+Signed-off-by: Guenter Roeck <groeck@chromium.org>
+Change-Id: I0c2fcb288d23d80485e00126c58839904d428b15
+---
+ drivers/gpu/drm/drm_ioctl.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/gpu/drm/drm_ioctl.c b/drivers/gpu/drm/drm_ioctl.c
+index 51f39912866f..88948c1e0152 100644
+--- a/drivers/gpu/drm/drm_ioctl.c
++++ b/drivers/gpu/drm/drm_ioctl.c
+@@ -581,7 +581,7 @@ static const struct drm_ioctl_desc drm_ioctls[] = {
+ 	DRM_IOCTL_DEF(DRM_IOCTL_GET_CLIENT, drm_getclient, 0),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_GET_STATS, drm_getstats, 0),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_GET_CAP, drm_getcap, DRM_RENDER_ALLOW),
+-	DRM_IOCTL_DEF(DRM_IOCTL_SET_CLIENT_CAP, drm_setclientcap, 0),
++	DRM_IOCTL_DEF(DRM_IOCTL_SET_CLIENT_CAP, drm_setclientcap, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_SET_VERSION, drm_setversion, DRM_MASTER),
+ 
+ 	DRM_IOCTL_DEF(DRM_IOCTL_SET_UNIQUE, drm_invalid_op, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY),
+@@ -610,10 +610,10 @@ static const struct drm_ioctl_desc drm_ioctls[] = {
+ 	DRM_IOCTL_DEF(DRM_IOCTL_PRIME_HANDLE_TO_FD, drm_prime_handle_to_fd_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_PRIME_FD_TO_HANDLE, drm_prime_fd_to_handle_ioctl, DRM_RENDER_ALLOW),
+ 
+-	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETPLANERESOURCES, drm_mode_getplane_res, 0),
++	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETPLANERESOURCES, drm_mode_getplane_res, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETCRTC, drm_mode_getcrtc, 0),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_SETCRTC, drm_mode_setcrtc, DRM_MASTER),
+-	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETPLANE, drm_mode_getplane, 0),
++	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETPLANE, drm_mode_getplane, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_SETPLANE, drm_mode_setplane, DRM_MASTER),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_CURSOR, drm_mode_cursor_ioctl, DRM_MASTER),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETGAMMA, drm_mode_gamma_get_ioctl, 0),
+@@ -622,7 +622,7 @@ static const struct drm_ioctl_desc drm_ioctls[] = {
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETCONNECTOR, drm_mode_getconnector, 0),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_ATTACHMODE, drm_noop, DRM_MASTER),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_DETACHMODE, drm_noop, DRM_MASTER),
+-	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETPROPERTY, drm_mode_getproperty_ioctl, 0),
++	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETPROPERTY, drm_mode_getproperty_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_SETPROPERTY, drm_connector_property_set_ioctl, DRM_MASTER),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETPROPBLOB, drm_mode_getblob_ioctl, 0),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETFB, drm_mode_getfb, 0),
+@@ -636,7 +636,7 @@ static const struct drm_ioctl_desc drm_ioctls[] = {
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_CREATE_DUMB, drm_mode_create_dumb_ioctl, 0),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_MAP_DUMB, drm_mode_mmap_dumb_ioctl, 0),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_DESTROY_DUMB, drm_mode_destroy_dumb_ioctl, 0),
+-	DRM_IOCTL_DEF(DRM_IOCTL_MODE_OBJ_GETPROPERTIES, drm_mode_obj_get_properties_ioctl, 0),
++	DRM_IOCTL_DEF(DRM_IOCTL_MODE_OBJ_GETPROPERTIES, drm_mode_obj_get_properties_ioctl, DRM_RENDER_ALLOW),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_OBJ_SETPROPERTY, drm_mode_obj_set_property_ioctl, DRM_MASTER),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_CURSOR2, drm_mode_cursor2_ioctl, DRM_MASTER),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_ATOMIC, drm_mode_atomic_ioctl, DRM_MASTER),
+-- 
+2.54.0
+

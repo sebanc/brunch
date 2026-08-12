@@ -1,0 +1,64 @@
+From b41a2e83a03461d9177c66ea0e6a563523cc60c0 Mon Sep 17 00:00:00 2001
+From: Jae Hoon Kim <kimjae@google.com>
+Date: Thu, 8 Feb 2024 00:26:08 +0000
+Subject: [PATCH 090/616] CHROMIUM: dm verity: Add error_behavior to status
+
+Having error_behavior printed as part of optional verity arguments
+makes it easier to set up and view existing verity device mappers on
+ChromeOS.
+
+Current:
+```
+0 47896 verity 0 7:4 7:4 4096 4096 5987 5987 sha256
+9451ca6fe3ee0e6994ac58d60572435c8f1c2ce594bdbb2a2391fd258df8327c
+ffffff4b50ff595fff2f68ffff2b42ff48ffff0cffff1a6fff6f06ffff445fff
+```
+New:
+```
+0 47896 verity 0 7:4 7:4 4096 4096 5987 5987 sha256
+9451ca6fe3ee0e6994ac58d60572435c8f1c2ce594bdbb2a2391fd258df8327c
+ffffff4b50ff595fff2f68ffff2b42ff48ffff0cffff1a6fff6f06ffff445fff
+2 error_behavior 0
+```
+
+BUG=b:323989294
+TEST=emerge chromeos-kernel-[X_Y]
+TEST=update_kernel
+
+Change-Id: I92005109435589615d2314030249a7e6d7f42143
+Signed-off-by: Jae Hoon Kim <kimjae@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/5277933
+Reviewed-by: Sarthak Kukreti <sarthakkukreti@google.com>
+Commit-Queue: Sarthak Kukreti <sarthakkukreti@google.com>
+Kcr-patch: 18f0a8ad5c525679404948c7abc114ea6a53df69850e8f18656e140a.patch
+---
+ drivers/md/dm-verity-target.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/md/dm-verity-target.c b/drivers/md/dm-verity-target.c
+index c142ec5458b7..cf376c5ba724 100644
+--- a/drivers/md/dm-verity-target.c
++++ b/drivers/md/dm-verity-target.c
+@@ -834,6 +834,9 @@ static void verity_status(struct dm_target *ti, status_type_t type,
+ 			args++;
+ 		if (v->error_mode != DM_VERITY_MODE_EIO)
+ 			args++;
++		if (v->error_behavior >= DM_VERITY_ERROR_BEHAVIOR_EIO &&
++		    v->error_behavior <= DM_VERITY_ERROR_BEHAVIOR_NOTIFY)
++			args += 2;
+ 		if (verity_fec_is_enabled(v))
+ 			args += DM_VERITY_OPTS_FEC;
+ 		if (v->zero_digest)
+@@ -876,6 +879,9 @@ static void verity_status(struct dm_target *ti, status_type_t type,
+ 				BUG();
+ 			}
+ 		}
++		if (v->error_behavior >= DM_VERITY_ERROR_BEHAVIOR_EIO &&
++		    v->error_behavior <= DM_VERITY_ERROR_BEHAVIOR_NOTIFY)
++			DMEMIT(" " DM_VERITY_OPT_ERROR_BEHAVIOR " %d", v->error_behavior);
+ 		if (v->zero_digest)
+ 			DMEMIT(" " DM_VERITY_OPT_IGN_ZEROES);
+ 		if (v->validated_blocks)
+-- 
+2.54.0
+

@@ -1,0 +1,1447 @@
+From 55214e3119293a6cc910fc84618bf8a3b35fc5d9 Mon Sep 17 00:00:00 2001
+From: Stephan Uphoff <ups@chromium.org>
+Date: Mon, 24 Oct 2011 19:12:48 +0000
+Subject: [PATCH 130/616] CHROMIUM: LSM: chromiumos security module
+
+Initially the chromiumos security module only prevents symlinks
+in mount paths. Future versions will be more restrictive and
+will be configurable using a driver interface.
+
+It is still not possible to build LSMs as loadable modules, since
+security_hooks_heads (in security/security.c) is not exported. This
+could be fixed with the following upstream change:
+  EXPORT_SYMBOL(security_hook_heads);
+For now, we're happy to keep this as a built-in only.
+
+The test scenario:
+ # mount -t securityfs none /sys/kernel/security/
+ # ln -s /proc /root/link
+ # ls /root/link
+ # echo -n /root \
+   >/sys/kernel/security/chromiumos/inode_security_policies/block_symlink
+ # ls /root/link
+ ls: cannot access '/root/link': Permission denied
+ # echo -n /root \
+   >/sys/kernel/security/chromiumos/inode_security_policies/reset_symlink
+ # ls /root/link
+
+BUG=chromium-os:21954
+TEST=See description above
+
+Change-Id: I47ade3b7be684ab9e0533ce5ffd1e81009eaebfe
+Signed-off-by: Stephan Uphoff <ups@chromium.org>
+Reviewed-on: https://gerrit.chromium.org/gerrit/10581
+
+Origin-6-6: c849d1910eca3b2645f02edc284ea4916f9a0e3c
+Squashed: https://crrev.com/b9ff2ed65576eb2659fff6c8545f856ffb18cb43 FIXUP: CHROMIUM: LSM: chromiumos security module
+Squashed: https://crrev.com/5303afb77795e42b58c29ddab12b52b5ee767d78 FIXUP: CHROMIUM: LSM: chromiumos security module
+Signed-off-by: Tzung-Bi Shih <tzungbi@chromium.org>
+---
+ fs/namei.c                                    |   6 +
+ include/linux/key.h                           |   2 +-
+ include/linux/path.h                          |   5 +
+ include/uapi/linux/lsm.h                      |   1 +
+ security/Kconfig                              |   6 +
+ security/Makefile                             |   1 +
+ security/chromiumos/Kconfig                   |  29 ++
+ security/chromiumos/Makefile                  |   3 +
+ security/chromiumos/inode_mark.c              | 350 ++++++++++++++++++
+ security/chromiumos/inode_mark.h              |  47 +++
+ security/chromiumos/lsm.c                     | 317 ++++++++++++++++
+ security/chromiumos/securityfs.c              | 241 ++++++++++++
+ security/chromiumos/utils.c                   | 157 ++++++++
+ security/chromiumos/utils.h                   |  30 ++
+ security/keys/big_key.c                       |   2 +-
+ security/lsm_audit.c                          |   2 +-
+ .../selftests/lsm/lsm_list_modules_test.c     |   3 +
+ 17 files changed, 1199 insertions(+), 3 deletions(-)
+ create mode 100644 security/chromiumos/Kconfig
+ create mode 100644 security/chromiumos/Makefile
+ create mode 100644 security/chromiumos/inode_mark.c
+ create mode 100644 security/chromiumos/inode_mark.h
+ create mode 100644 security/chromiumos/lsm.c
+ create mode 100644 security/chromiumos/securityfs.c
+ create mode 100644 security/chromiumos/utils.c
+ create mode 100644 security/chromiumos/utils.h
+
+diff --git a/fs/namei.c b/fs/namei.c
+index 4a4a22a08ac2..404a4333295e 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -2615,6 +2615,9 @@ int filename_lookup(int dfd, struct filename *name, unsigned flags,
+ 	if (likely(!retval))
+ 		audit_inode(name, path->dentry,
+ 			    flags & LOOKUP_MOUNTPOINT ? AUDIT_INODE_NOEVAL : 0);
++#ifdef CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
++	path->link_count = nd.total_link_count | PATH_LINK_COUNT_VALID;
++#endif /* CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT */
+ 	restore_nameidata();
+ 	return retval;
+ }
+@@ -2658,6 +2661,9 @@ static int __filename_parentat(int dfd, struct filename *name,
+ 		*type = nd.last_type;
+ 		audit_inode(name, parent->dentry, AUDIT_INODE_PARENT);
+ 	}
++#ifdef CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
++	parent->link_count = nd.total_link_count | PATH_LINK_COUNT_VALID;
++#endif /* CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT */
+ 	restore_nameidata();
+ 	return retval;
+ }
+diff --git a/include/linux/key.h b/include/linux/key.h
+index 074dca3222b9..057aa89a634a 100644
+--- a/include/linux/key.h
++++ b/include/linux/key.h
+@@ -133,7 +133,7 @@ struct keyring_index_key {
+ 
+ union key_payload {
+ 	void __rcu		*rcu_data0;
+-	void			*data[4];
++	void			*data[5];
+ };
+ 
+ /*****************************************************************************/
+diff --git a/include/linux/path.h b/include/linux/path.h
+index 7ea389dc764b..9a6a61b95080 100644
+--- a/include/linux/path.h
++++ b/include/linux/path.h
+@@ -5,9 +5,14 @@
+ struct dentry;
+ struct vfsmount;
+ 
++#define PATH_LINK_COUNT_VALID 0x80000000
++
+ struct path {
+ 	struct vfsmount *mnt;
+ 	struct dentry *dentry;
++#ifdef CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
++	int link_count;
++#endif /* CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT */
+ } __randomize_layout;
+ 
+ extern void path_get(const struct path *);
+diff --git a/include/uapi/linux/lsm.h b/include/uapi/linux/lsm.h
+index 938593dfd5da..aaf348594cef 100644
+--- a/include/uapi/linux/lsm.h
++++ b/include/uapi/linux/lsm.h
+@@ -51,6 +51,7 @@ struct lsm_ctx {
+  * future use.
+  */
+ #define LSM_ID_UNDEF		0
++#define LSM_ID_CHROMIUMOS       99
+ #define LSM_ID_CAPABILITY	100
+ #define LSM_ID_SELINUX		101
+ #define LSM_ID_SMACK		102
+diff --git a/security/Kconfig b/security/Kconfig
+index fef74d1852b0..282bd12bbb34 100644
+--- a/security/Kconfig
++++ b/security/Kconfig
+@@ -315,11 +315,13 @@ source "security/safesetid/Kconfig"
+ source "security/lockdown/Kconfig"
+ source "security/landlock/Kconfig"
+ source "security/ipe/Kconfig"
++source "security/chromiumos/Kconfig"
+ 
+ source "security/integrity/Kconfig"
+ 
+ choice
+ 	prompt "First legacy 'major LSM' to be initialized"
++	default DEFAULT_SECURITY_CHROMIUMOS if SECURITY_CHROMIUMOS
+ 	default DEFAULT_SECURITY_SELINUX if SECURITY_SELINUX
+ 	default DEFAULT_SECURITY_SMACK if SECURITY_SMACK
+ 	default DEFAULT_SECURITY_TOMOYO if SECURITY_TOMOYO
+@@ -335,6 +337,9 @@ choice
+ 	  Selects the legacy "major security module" that will be
+ 	  initialized first. Overridden by non-default CONFIG_LSM.
+ 
++	config DEFAULT_SECURITY_CHROMIUMOS
++		bool "Chromium OS" if SECURITY_CHROMIUMOS=y
++
+ 	config DEFAULT_SECURITY_SELINUX
+ 		bool "SELinux" if SECURITY_SELINUX=y
+ 
+@@ -358,6 +363,7 @@ config LSM
+ 	default "landlock,lockdown,yama,loadpin,safesetid,apparmor,selinux,smack,tomoyo,ipe,bpf" if DEFAULT_SECURITY_APPARMOR
+ 	default "landlock,lockdown,yama,loadpin,safesetid,tomoyo,ipe,bpf" if DEFAULT_SECURITY_TOMOYO
+ 	default "landlock,lockdown,yama,loadpin,safesetid,ipe,bpf" if DEFAULT_SECURITY_DAC
++	default "landlock,lockdown,yama,loadpin,safesetid,chromiumos,selinux,bpf" if DEFAULT_SECURITY_CHROMIUMOS
+ 	default "landlock,lockdown,yama,loadpin,safesetid,selinux,smack,tomoyo,apparmor,ipe,bpf"
+ 	help
+ 	  A comma-separated list of LSMs, in initialization order.
+diff --git a/security/Makefile b/security/Makefile
+index cc0982214b84..aeafd759f0e1 100644
+--- a/security/Makefile
++++ b/security/Makefile
+@@ -13,6 +13,7 @@ obj-$(CONFIG_MMU)			+= min_addr.o
+ # Object file lists
+ obj-$(CONFIG_SECURITY)			+= security.o
+ obj-$(CONFIG_SECURITYFS)		+= inode.o
++obj-$(CONFIG_SECURITY_CHROMIUMOS)	+= chromiumos/
+ obj-$(CONFIG_SECURITY_SELINUX)		+= selinux/
+ obj-$(CONFIG_SECURITY_SMACK)		+= smack/
+ obj-$(CONFIG_SECURITY)			+= lsm_audit.o
+diff --git a/security/chromiumos/Kconfig b/security/chromiumos/Kconfig
+new file mode 100644
+index 000000000000..28ff66f7ba08
+--- /dev/null
++++ b/security/chromiumos/Kconfig
+@@ -0,0 +1,29 @@
++config SECURITY_CHROMIUMOS
++	bool "Chromium OS Security Module"
++	depends on SECURITY
++	depends on X86_64 || ARM64
++	help
++	  The purpose of the Chromium OS security module is to reduce attacking
++	  surface by preventing access to general purpose access modes not
++	  required by Chromium OS. Currently: the mount operation is
++	  restricted by requiring a mount point path without symbolic links,
++	  and loading modules is limited to only the root filesystem. This
++	  LSM is stacked ahead of any primary "full" LSM.
++
++config SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
++	bool "Chromium OS Security: prohibit mount to symlinked target"
++	depends on SECURITY_CHROMIUMOS
++	default y
++	help
++	  When enabled mount() syscall will return ELOOP whenever target path
++	  contains any symlinks.
++
++config SECURITY_CHROMIUMOS_NO_UNPRIVILEGED_UNSAFE_MOUNTS
++	bool "Chromium OS Security: prohibit unsafe mounts in unprivileged user namespaces"
++	depends on SECURITY_CHROMIUMOS
++	default y
++	help
++	  When enabled, mount() syscall will return EPERM whenever a new mount
++	  is attempted that would cause the filesystem to have the exec, suid,
++	  or dev flags if the caller does not have the CAP_SYS_ADMIN capability
++	  in the init namespace.
+diff --git a/security/chromiumos/Makefile b/security/chromiumos/Makefile
+new file mode 100644
+index 000000000000..a97d1a40ce7b
+--- /dev/null
++++ b/security/chromiumos/Makefile
+@@ -0,0 +1,3 @@
++obj-$(CONFIG_SECURITY_CHROMIUMOS) := chromiumos_lsm.o
++
++chromiumos_lsm-y := inode_mark.o lsm.o securityfs.o utils.o
+diff --git a/security/chromiumos/inode_mark.c b/security/chromiumos/inode_mark.c
+new file mode 100644
+index 000000000000..88ceef488333
+--- /dev/null
++++ b/security/chromiumos/inode_mark.c
+@@ -0,0 +1,350 @@
++/*
++ * Linux Security Module for Chromium OS
++ *
++ * Copyright 2016 Google Inc. All Rights Reserved
++ *
++ * Authors:
++ *      Mattias Nissler <mnissler@chromium.org>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/atomic.h>
++#include <linux/compiler.h>
++#include <linux/dcache.h>
++#include <linux/fs.h>
++#include <linux/fsnotify_backend.h>
++#include <linux/hash.h>
++#include <linux/mutex.h>
++#include <linux/rculist.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++
++#include "inode_mark.h"
++
++/*
++ * This file implements facilities to pin inodes in core and attach some
++ * meta data to them. We use fsnotify inode marks as a vehicle to attach the
++ * meta data.
++ */
++struct chromiumos_inode_mark {
++	struct fsnotify_mark mark;
++	struct inode *inode;
++	enum chromiumos_inode_security_policy
++		policies[CHROMIUMOS_NUMBER_OF_POLICIES];
++};
++
++static inline struct chromiumos_inode_mark *
++chromiumos_to_inode_mark(struct fsnotify_mark *mark)
++{
++	return container_of(mark, struct chromiumos_inode_mark, mark);
++}
++
++/*
++ * Hashtable entry that contains tracking information specific to the file
++ * system identified by the corresponding super_block. This contains the
++ * fsnotify group that holds all the marks for inodes belonging to the
++ * super_block.
++ */
++struct chromiumos_super_block_mark {
++	atomic_t refcnt;
++	struct hlist_node node;
++	struct super_block *sb;
++	struct fsnotify_group *fsn_group;
++};
++
++#define CHROMIUMOS_SUPER_BLOCK_HASH_BITS 8
++#define CHROMIUMOS_SUPER_BLOCK_HASH_SIZE (1 << CHROMIUMOS_SUPER_BLOCK_HASH_BITS)
++
++static struct hlist_head chromiumos_super_block_hash_table
++	[CHROMIUMOS_SUPER_BLOCK_HASH_SIZE] __read_mostly;
++static DEFINE_MUTEX(chromiumos_super_block_hash_lock);
++
++static struct hlist_head *chromiumos_super_block_hlist(struct super_block *sb)
++{
++	return &chromiumos_super_block_hash_table[hash_ptr(
++		sb, CHROMIUMOS_SUPER_BLOCK_HASH_BITS)];
++}
++
++static void chromiumos_super_block_put(struct chromiumos_super_block_mark *sbm)
++{
++	if (atomic_dec_and_test(&sbm->refcnt)) {
++		mutex_lock(&chromiumos_super_block_hash_lock);
++		hlist_del_rcu(&sbm->node);
++		mutex_unlock(&chromiumos_super_block_hash_lock);
++
++		synchronize_rcu();
++
++		fsnotify_destroy_group(sbm->fsn_group);
++		kfree(sbm);
++	}
++}
++
++static struct chromiumos_super_block_mark *
++chromiumos_super_block_lookup(struct super_block *sb)
++{
++	struct hlist_head *hlist = chromiumos_super_block_hlist(sb);
++	struct chromiumos_super_block_mark *sbm;
++	struct chromiumos_super_block_mark *matching_sbm = NULL;
++
++	rcu_read_lock();
++	hlist_for_each_entry_rcu(sbm, hlist, node) {
++		if (sbm->sb == sb && atomic_inc_not_zero(&sbm->refcnt)) {
++			matching_sbm = sbm;
++			break;
++		}
++	}
++	rcu_read_unlock();
++
++	return matching_sbm;
++}
++
++static int chromiumos_handle_fsnotify_event(struct fsnotify_group *group,
++					    u32 mask, const void *data,
++					    int data_type, struct inode *dir,
++					    const struct qstr *file_name,
++					    u32 cookie,
++					    struct fsnotify_iter_info *iter_info)
++{
++	/*
++	 * This should never get called because a zero mask is set on the inode
++	 * marks. All cases of marks going away (inode deletion, unmount,
++	 * explicit removal) are handled in chromiumos_freeing_mark.
++	 */
++	WARN_ON_ONCE(1);
++	return 0;
++}
++
++static void chromiumos_freeing_mark(struct fsnotify_mark *mark,
++				    struct fsnotify_group *group)
++{
++	struct chromiumos_inode_mark *inode_mark =
++		chromiumos_to_inode_mark(mark);
++
++	iput(inode_mark->inode);
++	inode_mark->inode = NULL;
++	chromiumos_super_block_put(group->private);
++}
++
++static void chromiumos_free_mark(struct fsnotify_mark *mark)
++{
++	iput(chromiumos_to_inode_mark(mark)->inode);
++	kfree(mark);
++}
++
++static const struct fsnotify_ops chromiumos_fsn_ops = {
++	.handle_event = chromiumos_handle_fsnotify_event,
++	.freeing_mark = chromiumos_freeing_mark,
++	.free_mark = chromiumos_free_mark,
++};
++
++static struct chromiumos_super_block_mark *
++chromiumos_super_block_create(struct super_block *sb)
++{
++	struct hlist_head *hlist = chromiumos_super_block_hlist(sb);
++	struct chromiumos_super_block_mark *sbm = NULL;
++
++	WARN_ON(!mutex_is_locked(&chromiumos_super_block_hash_lock));
++
++	/* No match found, create a new entry. */
++	sbm = kzalloc(sizeof(*sbm), GFP_KERNEL);
++	if (!sbm)
++		return ERR_PTR(-ENOMEM);
++
++	atomic_set(&sbm->refcnt, 1);
++	sbm->sb = sb;
++	sbm->fsn_group = fsnotify_alloc_group(&chromiumos_fsn_ops, 0);
++	if (IS_ERR(sbm->fsn_group)) {
++		kfree(sbm);
++		return ERR_CAST(sbm->fsn_group);
++	}
++	sbm->fsn_group->private = sbm;
++	hlist_add_head_rcu(&sbm->node, hlist);
++
++	return sbm;
++}
++
++static struct chromiumos_super_block_mark *
++chromiumos_super_block_get(struct super_block *sb)
++{
++	struct chromiumos_super_block_mark *sbm;
++
++	mutex_lock(&chromiumos_super_block_hash_lock);
++	sbm = chromiumos_super_block_lookup(sb);
++	if (!sbm)
++		sbm = chromiumos_super_block_create(sb);
++
++	mutex_unlock(&chromiumos_super_block_hash_lock);
++	return sbm;
++}
++
++/*
++ * This will only ever get called if the metadata does not already exist for
++ * an inode, so no need to worry about freeing an existing mark.
++ */
++static int
++chromiumos_inode_mark_create(
++	struct chromiumos_super_block_mark *sbm,
++	struct inode *inode,
++	enum chromiumos_inode_security_policy_type type,
++	enum chromiumos_inode_security_policy policy)
++{
++	struct chromiumos_inode_mark *inode_mark;
++	int ret;
++	size_t i;
++
++	WARN_ON(!mutex_is_locked(&sbm->fsn_group->mark_mutex));
++
++	inode_mark = kzalloc(sizeof(*inode_mark), GFP_KERNEL);
++	if (!inode_mark)
++		return -ENOMEM;
++
++	fsnotify_init_mark(&inode_mark->mark, sbm->fsn_group);
++	inode_mark->inode = igrab(inode);
++	if (!inode_mark->inode) {
++		ret = -ENOENT;
++		goto out;
++	}
++
++	/* Initialize all policies to inherit. */
++	for (i = 0; i < CHROMIUMOS_NUMBER_OF_POLICIES; i++)
++		inode_mark->policies[i] = CHROMIUMOS_INODE_POLICY_INHERIT;
++
++	inode_mark->policies[type] = policy;
++	ret = fsnotify_add_inode_mark_locked(&inode_mark->mark, inode, 0);
++	if (ret)
++		goto out;
++
++	/* Take an sbm reference so the created mark is accounted for. */
++	atomic_inc(&sbm->refcnt);
++
++out:
++	fsnotify_put_mark(&inode_mark->mark);
++	return ret;
++}
++
++int chromiumos_update_inode_security_policy(
++	struct inode *inode,
++	enum chromiumos_inode_security_policy_type type,
++	enum chromiumos_inode_security_policy policy)
++{
++	struct chromiumos_super_block_mark *sbm;
++	struct fsnotify_mark *mark;
++	bool free_mark = false;
++	int ret;
++	size_t i;
++
++	sbm = chromiumos_super_block_get(inode->i_sb);
++	if (IS_ERR(sbm))
++		return PTR_ERR(sbm);
++
++	mutex_lock(&sbm->fsn_group->mark_mutex);
++
++	mark = fsnotify_find_mark(inode, FSNOTIFY_OBJ_TYPE_INODE, sbm->fsn_group);
++	if (mark) {
++		WRITE_ONCE(chromiumos_to_inode_mark(mark)->policies[type],
++				   policy);
++		/*
++		 * Frees mark if all policies are
++		 * CHROMIUM_INODE_POLICY_INHERIT.
++		 */
++		free_mark = true;
++		for (i = 0; i < CHROMIUMOS_NUMBER_OF_POLICIES; i++) {
++			if (chromiumos_to_inode_mark(mark)->policies[i]
++				!= CHROMIUMOS_INODE_POLICY_INHERIT) {
++				free_mark = false;
++				break;
++			}
++		}
++		if (free_mark)
++			fsnotify_detach_mark(mark);
++		ret = 0;
++	} else {
++		ret = chromiumos_inode_mark_create(sbm, inode, type, policy);
++	}
++
++	mutex_unlock(&sbm->fsn_group->mark_mutex);
++	chromiumos_super_block_put(sbm);
++
++	/* This must happen after dropping the mark mutex. */
++	if (free_mark)
++		fsnotify_free_mark(mark);
++	if (mark)
++		fsnotify_put_mark(mark);
++
++	return ret;
++}
++
++/* Flushes all inode security policies. */
++int chromiumos_flush_inode_security_policies(struct super_block *sb)
++{
++	struct chromiumos_super_block_mark *sbm;
++
++	sbm = chromiumos_super_block_lookup(sb);
++	if (sbm) {
++		fsnotify_clear_marks_by_group(sbm->fsn_group,
++					      FSNOTIFY_OBJ_TYPE_ANY);
++		chromiumos_super_block_put(sbm);
++	}
++
++	return 0;
++}
++
++enum chromiumos_inode_security_policy chromiumos_get_inode_security_policy(
++	struct dentry *dentry, struct inode *inode,
++	enum chromiumos_inode_security_policy_type type)
++{
++	struct chromiumos_super_block_mark *sbm;
++	/*
++	 * Initializes policy to CHROMIUM_INODE_POLICY_INHERIT, which is
++	 * the value that will be returned if neither |dentry| nor any
++	 * directory in its path has been asigned an inode security policy
++	 * value for the given type.
++	 */
++	enum chromiumos_inode_security_policy policy =
++		CHROMIUMOS_INODE_POLICY_INHERIT;
++
++	if (!dentry || !inode || type >= CHROMIUMOS_NUMBER_OF_POLICIES)
++		return policy;
++
++	sbm = chromiumos_super_block_lookup(inode->i_sb);
++	if (!sbm)
++		return policy;
++
++	/* Walk the dentry path and look for a traversal policy. */
++	rcu_read_lock();
++	while (1) {
++		struct fsnotify_mark *mark = fsnotify_find_mark(
++			inode, FSNOTIFY_OBJ_TYPE_INODE, sbm->fsn_group);
++		if (mark) {
++			struct chromiumos_inode_mark *inode_mark =
++				chromiumos_to_inode_mark(mark);
++			policy = READ_ONCE(inode_mark->policies[type]);
++			fsnotify_put_mark(mark);
++
++			if (policy != CHROMIUMOS_INODE_POLICY_INHERIT)
++				break;
++		}
++
++		if (IS_ROOT(dentry))
++			break;
++		dentry = READ_ONCE(dentry->d_parent);
++		if (!dentry)
++			break;
++		inode = d_inode_rcu(dentry);
++		if (!inode)
++			break;
++	}
++	rcu_read_unlock();
++
++	chromiumos_super_block_put(sbm);
++
++	return policy;
++}
+diff --git a/security/chromiumos/inode_mark.h b/security/chromiumos/inode_mark.h
+new file mode 100644
+index 000000000000..ec00bb483d29
+--- /dev/null
++++ b/security/chromiumos/inode_mark.h
+@@ -0,0 +1,47 @@
++/*
++ * Linux Security Module for Chromium OS
++ *
++ * Copyright 2016 Google Inc. All Rights Reserved
++ *
++ * Authors:
++ *      Mattias Nissler <mnissler@chromium.org>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/* FS feature availability policy for inode. */
++enum chromiumos_inode_security_policy {
++	CHROMIUMOS_INODE_POLICY_INHERIT, /* Inherit policy from parent dir */
++	CHROMIUMOS_INODE_POLICY_ALLOW,
++	CHROMIUMOS_INODE_POLICY_BLOCK,
++};
++
++/*
++ * Inode security policy types available for use. To add an additional
++ * security policy, simply add a new member here, add the corresponding policy
++ * files in securityfs.c, and associate the files being added with the new enum
++ * member.
++ */
++enum chromiumos_inode_security_policy_type {
++	CHROMIUMOS_SYMLINK_TRAVERSAL = 0,
++	CHROMIUMOS_FIFO_ACCESS,
++	CHROMIUMOS_NUMBER_OF_POLICIES, /* Do not add entries after this line. */
++};
++
++extern int chromiumos_update_inode_security_policy(
++	struct inode *inode,
++	enum chromiumos_inode_security_policy_type type,
++	enum chromiumos_inode_security_policy policy);
++int chromiumos_flush_inode_security_policies(struct super_block *sb);
++
++extern enum chromiumos_inode_security_policy
++chromiumos_get_inode_security_policy(
++	struct dentry *dentry, struct inode *inode,
++	enum chromiumos_inode_security_policy_type type);
+diff --git a/security/chromiumos/lsm.c b/security/chromiumos/lsm.c
+new file mode 100644
+index 000000000000..da0b432b0e73
+--- /dev/null
++++ b/security/chromiumos/lsm.c
+@@ -0,0 +1,317 @@
++/*
++ * Linux Security Module for Chromium OS
++ *
++ * Copyright 2011 Google Inc. All Rights Reserved
++ *
++ * Authors:
++ *      Stephan Uphoff  <ups@google.com>
++ *      Kees Cook       <keescook@chromium.org>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#define pr_fmt(fmt) "Chromium OS LSM: " fmt
++
++#include <asm/syscall.h>
++#include <linux/audit.h>
++#include <linux/binfmts.h>
++#include <linux/cred.h>
++#include <linux/fs.h>
++#include <linux/fs_parser.h>
++#include <linux/fs_struct.h>
++#include <linux/lsm_hooks.h>
++#include <linux/module.h>
++#include <linux/mount.h>
++#include <linux/namei.h>	/* for nameidata_get_total_link_count */
++#include <linux/path.h>
++#include <linux/ptrace.h>
++#include <linux/sched/task_stack.h>
++#include <linux/sched.h>	/* current and other task related stuff */
++#include <linux/security.h>
++#include <linux/shmem_fs.h>
++#include <uapi/linux/mount.h>
++#include <uapi/linux/lsm.h>
++
++#include "inode_mark.h"
++#include "utils.h"
++
++#if defined(CONFIG_SECURITY_CHROMIUMOS_NO_UNPRIVILEGED_UNSAFE_MOUNTS) || \
++	defined(CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT)
++static void report(const char *origin, const struct path *path, char *operation)
++{
++	char *alloced = NULL, *cmdline;
++	char *pathname; /* Pointer to either static string or "alloced". */
++
++	if (!path)
++		pathname = "<unknown>";
++	else {
++		/* We will allow 11 spaces for ' (deleted)' to be appended */
++		alloced = pathname = kmalloc(PATH_MAX+11, GFP_KERNEL);
++		if (!pathname)
++			pathname = "<no_memory>";
++		else {
++			pathname = d_path(path, pathname, PATH_MAX+11);
++			if (IS_ERR(pathname))
++				pathname = "<too_long>";
++			else {
++				pathname = printable(pathname, PATH_MAX+11);
++				kfree(alloced);
++				alloced = pathname;
++			}
++		}
++	}
++
++	cmdline = printable_cmdline(current);
++
++	pr_notice("%s %s obj=%s pid=%d cmdline=%s\n", origin,
++		  operation, pathname, task_pid_nr(current), cmdline);
++
++	kfree(cmdline);
++	kfree(alloced);
++}
++#endif
++
++static int chromiumos_security_sb_mount(const char *dev_name,
++					const struct path *path,
++					const char *type, unsigned long flags,
++					void *data)
++{
++#ifdef CONFIG_SECURITY_CHROMIUMOS_NO_SYMLINK_MOUNT
++	if (!(path->link_count & PATH_LINK_COUNT_VALID)) {
++		WARN(1, "No link count available");
++		return -ELOOP;
++	} else if (path->link_count & ~PATH_LINK_COUNT_VALID) {
++		report("sb_mount", path, "Mount path with symlinks prohibited");
++		pr_notice("sb_mount dev=%s type=%s flags=%#lx\n",
++			  dev_name, type, flags);
++		return -ELOOP;
++	}
++#endif
++
++#ifdef CONFIG_SECURITY_CHROMIUMOS_NO_UNPRIVILEGED_UNSAFE_MOUNTS
++	if ((!(flags & (MS_BIND | MS_MOVE | MS_SHARED | MS_PRIVATE | MS_SLAVE |
++			MS_UNBINDABLE)) ||
++	     ((flags & MS_REMOUNT) && (flags & MS_BIND))) &&
++	    !capable(CAP_SYS_ADMIN)) {
++		int required_mnt_flags = MNT_NOEXEC | MNT_NOSUID | MNT_NODEV;
++
++		if (flags & MS_REMOUNT) {
++			/*
++			 * If this is a remount, we only require that the
++			 * requested flags are a superset of the original mount
++			 * flags. In addition, using nosymfollow is not
++			 * initially required, but remount is not allowed to
++			 * remove it.
++			 */
++			required_mnt_flags |= MNT_NOSYMFOLLOW;
++			required_mnt_flags &= path->mnt->mnt_flags;
++		}
++		/*
++		 * The three flags we are interested in disallowing in
++		 * unprivileged user namespaces (MS_NOEXEC, MS_NOSUID, MS_NODEV)
++		 * cannot be modified when doing a bind-mount. The kernel
++		 * attempts to dispatch calls to do_mount() within
++		 * fs/namespace.c in the following order:
++		 *
++		 * * If the MS_REMOUNT flag is present, it calls do_remount().
++		 *   When MS_BIND is also present, it only allows to modify the
++		 *   per-mount flags, which are copied into
++		 *   |required_mnt_flags|.  Otherwise it bails in the absence of
++		 *   the CAP_SYS_ADMIN in the init ns.
++		 * * If the MS_BIND flag is present, the only other flag checked
++		 *   is MS_REC.
++		 * * If any of the mount propagation flags are present
++		 *   (MS_SHARED, MS_PRIVATE, MS_SLAVE, MS_UNBINDABLE),
++		 *   flags_to_propagation_type() filters out any additional
++		 *   flags.
++		 * * If MS_MOVE flag is present, all other flags are ignored.
++		 */
++		if ((required_mnt_flags & MNT_NOEXEC) && !(flags & MS_NOEXEC)) {
++			report("sb_mount", path,
++			       "Mounting a filesystem with 'exec' flag requires CAP_SYS_ADMIN in init ns");
++			pr_notice("sb_mount dev=%s type=%s flags=%#lx\n",
++				  dev_name, type, flags);
++			return -EPERM;
++		}
++		if ((required_mnt_flags & MNT_NOSUID) && !(flags & MS_NOSUID)) {
++			report("sb_mount", path,
++			       "Mounting a filesystem with 'suid' flag requires CAP_SYS_ADMIN in init ns");
++			pr_notice("sb_mount dev=%s type=%s flags=%#lx\n",
++				  dev_name, type, flags);
++			return -EPERM;
++		}
++		if ((required_mnt_flags & MNT_NODEV) && !(flags & MS_NODEV) &&
++		    strcmp(type, "devpts")) {
++			report("sb_mount", path,
++			       "Mounting a filesystem with 'dev' flag requires CAP_SYS_ADMIN in init ns");
++			pr_notice("sb_mount dev=%s type=%s flags=%#lx\n",
++				  dev_name, type, flags);
++			return -EPERM;
++		}
++	}
++#endif
++
++	return 0;
++}
++
++/*
++ * NOTE: The WARN() calls will emit a warning in cases of blocked symlink
++ * traversal attempts. These will show up in kernel warning reports
++ * collected by the crash reporter, so we have some insight on spurious
++ * failures that need addressing.
++ */
++static int chromiumos_security_inode_follow_link(struct dentry *dentry,
++						 struct inode *inode, bool rcu)
++{
++	static char accessed_path[PATH_MAX];
++	enum chromiumos_inode_security_policy policy;
++
++	policy = chromiumos_get_inode_security_policy(
++		dentry, inode,
++		CHROMIUMOS_SYMLINK_TRAVERSAL);
++
++	WARN(policy == CHROMIUMOS_INODE_POLICY_BLOCK,
++	     "Blocked symlink traversal for path %x:%x:%s (see https://goo.gl/8xICW6 for context and rationale)\n",
++	     MAJOR(dentry->d_sb->s_dev), MINOR(dentry->d_sb->s_dev),
++	     dentry_path(dentry, accessed_path, PATH_MAX));
++
++	return policy == CHROMIUMOS_INODE_POLICY_BLOCK ? -EACCES : 0;
++}
++
++static int chromiumos_security_file_open(struct file *file)
++{
++	static char accessed_path[PATH_MAX];
++	enum chromiumos_inode_security_policy policy;
++	struct dentry *dentry = file->f_path.dentry;
++
++	/* Returns 0 if file is not a FIFO */
++	if (!S_ISFIFO(file->f_inode->i_mode))
++		return 0;
++
++	policy = chromiumos_get_inode_security_policy(
++		dentry, dentry->d_inode,
++		CHROMIUMOS_FIFO_ACCESS);
++
++	/*
++	 * Emit a warning in cases of blocked fifo access attempts. These will
++	 * show up in kernel warning reports collected by the crash reporter,
++	 * so we have some insight on spurious failures that need addressing.
++	 */
++	WARN(policy == CHROMIUMOS_INODE_POLICY_BLOCK,
++	     "Blocked fifo access for path %x:%x:%s\n (see https://goo.gl/8xICW6 for context and rationale)\n",
++	     MAJOR(dentry->d_sb->s_dev), MINOR(dentry->d_sb->s_dev),
++	     dentry_path(dentry, accessed_path, PATH_MAX));
++
++	return policy == CHROMIUMOS_INODE_POLICY_BLOCK ? -EACCES : 0;
++}
++
++static int chromiumos_sb_eat_lsm_opts(char *options, void **mnt_opts)
++{
++	char *from = options, *to = options;
++	bool found = false;
++	bool first = true;
++
++	while (1) {
++		char *next = strchr(from, ',');
++		int len;
++
++		if (next)
++			len = next - from;
++		else
++			len = strlen(from);
++
++		/*
++		 * Remove the option so that filesystems won't see it.
++		 * do_mount() has already forced the MS_NOSYMFOLLOW flag on
++		 * if it found this option, so no other action is needed.
++		 */
++		if (len == strlen("nosymfollow") && !strncmp(from, "nosymfollow", len)) {
++			found = true;
++		} else {
++			if (!first) {   /* copy with preceding comma */
++				from--;
++				len++;
++			}
++			if (to != from)
++				memmove(to, from, len);
++			to += len;
++			first = false;
++		}
++		if (!next)
++			break;
++		from += len + 1;
++	}
++	*to = '\0';
++
++	if (found)
++		pr_notice("nosymfollow option should be changed to MS_NOSYMFOLLOW flag.");
++
++	return 0;
++}
++
++static int chromiumos_bprm_creds_for_exec(struct linux_binprm *bprm)
++{
++	struct file *file = bprm->file;
++
++	if (shmem_file(file)) {
++		char *cmdline = printable_cmdline(current);
++
++		audit_log(
++			audit_context(),
++			GFP_ATOMIC,
++			AUDIT_AVC,
++			"ChromeOS LSM: memfd execution attempt, cmd=%s, pid=%d",
++			cmdline ? cmdline : "(null)",
++			task_pid_nr(current));
++		kfree(cmdline);
++
++		pr_notice_ratelimited("memfd execution blocked\n");
++		return -EACCES;
++	}
++	return 0;
++}
++
++static int chromiumos_locked_down(enum lockdown_reason what)
++{
++	if (what == LOCKDOWN_BPF_WRITE_USER) {
++		pr_notice_ratelimited("BPF_WRITE_USER blocked\n");
++		return -EACCES;
++	}
++
++	return 0;
++}
++
++static struct security_hook_list chromiumos_security_hooks[] = {
++	LSM_HOOK_INIT(sb_mount, chromiumos_security_sb_mount),
++	LSM_HOOK_INIT(inode_follow_link, chromiumos_security_inode_follow_link),
++	LSM_HOOK_INIT(file_open, chromiumos_security_file_open),
++	LSM_HOOK_INIT(sb_eat_lsm_opts, chromiumos_sb_eat_lsm_opts),
++	LSM_HOOK_INIT(bprm_creds_for_exec, chromiumos_bprm_creds_for_exec),
++	LSM_HOOK_INIT(locked_down, chromiumos_locked_down),
++};
++
++static const struct lsm_id chromiumos_lsmid = {
++       .name = "chromiumos",
++       .id = LSM_ID_CHROMIUMOS,
++};
++
++static int __init chromiumos_security_init(void)
++{
++	security_add_hooks(chromiumos_security_hooks,
++			   ARRAY_SIZE(chromiumos_security_hooks), &chromiumos_lsmid);
++
++	pr_info("enabled");
++
++	return 0;
++}
++DEFINE_LSM(chromiumos) = {
++	.name = "chromiumos",
++	.init = chromiumos_security_init
++};
+diff --git a/security/chromiumos/securityfs.c b/security/chromiumos/securityfs.c
+new file mode 100644
+index 000000000000..ae2d76a08fd9
+--- /dev/null
++++ b/security/chromiumos/securityfs.c
+@@ -0,0 +1,241 @@
++/*
++ * Linux Security Module for Chromium OS
++ *
++ * Copyright 2016 Google Inc. All Rights Reserved
++ *
++ * Authors:
++ *      Mattias Nissler <mnissler@chromium.org>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/capability.h>
++#include <linux/cred.h>
++#include <linux/dcache.h>
++#include <linux/fs.h>
++#include <linux/namei.h>
++#include <linux/sched.h>
++#include <linux/security.h>
++#include <linux/string.h>
++#include <linux/uaccess.h>
++
++#include "inode_mark.h"
++
++static struct dentry *chromiumos_dir;
++static struct dentry *chromiumos_inode_policy_dir;
++
++struct chromiumos_inode_policy_file_entry {
++	const char *name;
++	int (*handle_write)(struct chromiumos_inode_policy_file_entry *,
++			    struct dentry *);
++	enum chromiumos_inode_security_policy_type type;
++	enum chromiumos_inode_security_policy policy;
++	struct dentry *dentry;
++};
++
++static int chromiumos_inode_policy_file_write(
++	struct chromiumos_inode_policy_file_entry *file_entry,
++	struct dentry *dentry)
++{
++	return chromiumos_update_inode_security_policy(dentry->d_inode,
++		file_entry->type, file_entry->policy);
++}
++
++/*
++ * Causes all marks to be removed from inodes thus removing all inode security
++ * policies.
++ */
++static int chromiumos_inode_policy_file_flush_write(
++	struct chromiumos_inode_policy_file_entry *file_entry,
++	struct dentry *dentry)
++{
++	return chromiumos_flush_inode_security_policies(dentry->d_sb);
++}
++
++static struct chromiumos_inode_policy_file_entry
++		chromiumos_inode_policy_files[] = {
++	{.name = "block_symlink",
++	 .handle_write = chromiumos_inode_policy_file_write,
++	 .type = CHROMIUMOS_SYMLINK_TRAVERSAL,
++	 .policy = CHROMIUMOS_INODE_POLICY_BLOCK},
++	{.name = "allow_symlink",
++	 .handle_write = chromiumos_inode_policy_file_write,
++	 .type = CHROMIUMOS_SYMLINK_TRAVERSAL,
++	 .policy = CHROMIUMOS_INODE_POLICY_ALLOW},
++	{.name = "reset_symlink",
++	 .handle_write = chromiumos_inode_policy_file_write,
++	 .type = CHROMIUMOS_SYMLINK_TRAVERSAL,
++	 .policy = CHROMIUMOS_INODE_POLICY_INHERIT},
++	{.name = "block_fifo",
++	 .handle_write = chromiumos_inode_policy_file_write,
++	 .type = CHROMIUMOS_FIFO_ACCESS,
++	 .policy = CHROMIUMOS_INODE_POLICY_BLOCK},
++	{.name = "allow_fifo",
++	 .handle_write = chromiumos_inode_policy_file_write,
++	 .type = CHROMIUMOS_FIFO_ACCESS,
++	 .policy = CHROMIUMOS_INODE_POLICY_ALLOW},
++	{.name = "reset_fifo",
++	 .handle_write = chromiumos_inode_policy_file_write,
++	 .type = CHROMIUMOS_FIFO_ACCESS,
++	 .policy = CHROMIUMOS_INODE_POLICY_INHERIT},
++	{.name = "flush_policies",
++	 .handle_write = &chromiumos_inode_policy_file_flush_write},
++};
++
++static int chromiumos_resolve_path(const char __user *buf, size_t len,
++				   struct path *path)
++{
++	char *filename = NULL;
++	char *canonical_buf = NULL;
++	char *canonical;
++	int ret;
++
++	if (len + 1 > PATH_MAX)
++		return -EINVAL;
++
++	/*
++	 * Copy the path to a kernel buffer. We can't use user_path_at()
++	 * since it expects a zero-terminated path, which we generally don't
++	 * have here.
++	 */
++	filename = kzalloc(len + 1, GFP_KERNEL);
++	if (!filename)
++		return -ENOMEM;
++
++	if (copy_from_user(filename, buf, len)) {
++		ret = -EFAULT;
++		goto out;
++	}
++
++	ret = kern_path(filename, 0, path);
++	if (ret)
++		goto out;
++
++	/*
++	 * Make sure the path is canonical, i.e. it didn't contain symlinks. To
++	 * check this we convert |path| back to an absolute path (within the
++	 * global root) and compare the resulting path name with the passed-in
++	 * |filename|. This is stricter than needed (i.e. consecutive slashes
++	 * don't get ignored), but that's fine for our purposes.
++	 */
++	canonical_buf = kzalloc(len + 1, GFP_KERNEL);
++	if (!canonical_buf) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	canonical = d_absolute_path(path, canonical_buf, len + 1);
++	if (IS_ERR(canonical)) {
++		ret = PTR_ERR(canonical);
++
++		/* Buffer too short implies |filename| wasn't canonical. */
++		if (ret == -ENAMETOOLONG)
++			ret = -EMLINK;
++
++		goto out;
++	}
++
++	ret = strcmp(filename, canonical) ? -EMLINK : 0;
++
++out:
++	kfree(canonical_buf);
++	if (ret < 0)
++		path_put(path);
++	kfree(filename);
++	return ret;
++}
++
++static ssize_t chromiumos_inode_file_write(
++	struct file *file,
++	const char __user *buf,
++	size_t len,
++	loff_t *ppos)
++{
++	struct chromiumos_inode_policy_file_entry *file_entry =
++		file->f_inode->i_private;
++	struct path path = {};
++	int ret;
++
++	if (!capable(CAP_SYS_ADMIN))
++		return -EPERM;
++
++	if (*ppos != 0)
++		return -EINVAL;
++
++	ret = chromiumos_resolve_path(buf, len, &path);
++	if (ret)
++		return ret;
++
++	ret = file_entry->handle_write(file_entry, path.dentry);
++	path_put(&path);
++	return ret < 0 ? ret : len;
++}
++
++static const struct file_operations chromiumos_inode_policy_file_fops = {
++	.write = chromiumos_inode_file_write,
++};
++
++static void chromiumos_shutdown_securityfs(void)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(chromiumos_inode_policy_files); ++i) {
++		struct chromiumos_inode_policy_file_entry *entry =
++			&chromiumos_inode_policy_files[i];
++		securityfs_remove(entry->dentry);
++		entry->dentry = NULL;
++	}
++
++	securityfs_remove(chromiumos_inode_policy_dir);
++	chromiumos_inode_policy_dir = NULL;
++
++	securityfs_remove(chromiumos_dir);
++	chromiumos_dir = NULL;
++}
++
++static int chromiumos_init_securityfs(void)
++{
++	int i;
++	int ret;
++
++	chromiumos_dir = securityfs_create_dir("chromiumos", NULL);
++	if (!chromiumos_dir) {
++		ret = PTR_ERR(chromiumos_dir);
++		goto error;
++	}
++
++	chromiumos_inode_policy_dir =
++		securityfs_create_dir(
++			"inode_security_policies",
++			chromiumos_dir);
++	if (!chromiumos_inode_policy_dir) {
++		ret = PTR_ERR(chromiumos_inode_policy_dir);
++		goto error;
++	}
++
++	for (i = 0; i < ARRAY_SIZE(chromiumos_inode_policy_files); ++i) {
++		struct chromiumos_inode_policy_file_entry *entry =
++			&chromiumos_inode_policy_files[i];
++		entry->dentry = securityfs_create_file(
++			entry->name, 0200, chromiumos_inode_policy_dir,
++			entry, &chromiumos_inode_policy_file_fops);
++		if (IS_ERR(entry->dentry)) {
++			ret = PTR_ERR(entry->dentry);
++			goto error;
++		}
++	}
++
++	return 0;
++
++error:
++	chromiumos_shutdown_securityfs();
++	return ret;
++}
++fs_initcall(chromiumos_init_securityfs);
+diff --git a/security/chromiumos/utils.c b/security/chromiumos/utils.c
+new file mode 100644
+index 000000000000..d0d82d798b6d
+--- /dev/null
++++ b/security/chromiumos/utils.c
+@@ -0,0 +1,157 @@
++/*
++ * Utilities for the Linux Security Module for Chromium OS
++ * (Since CONFIG_AUDIT is disabled for Chrome OS, we must repurpose
++ * a bunch of the audit string handling logic here instead.)
++ *
++ * Copyright 2012 Google Inc. All Rights Reserved
++ *
++ * Author:
++ *      Kees Cook       <keescook@chromium.org>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/sched/mm.h>
++#include <linux/security.h>
++
++#include "utils.h"
++
++/* Disallow double-quote and control characters other than space. */
++static int contains_unprintable(const char *source, size_t len)
++{
++	const unsigned char *p;
++	for (p = source; p < (const unsigned char *)source + len; p++) {
++		if (*p == '"' || *p < 0x20 || *p > 0x7e)
++			return 1;
++	}
++	return 0;
++}
++
++static char *hex_printable(const char *source, size_t len)
++{
++	size_t i;
++	char *dest, *ptr;
++	const char *hex = "0123456789ABCDEF";
++
++	/* Need to double the length of the string, plus a NULL. */
++	if (len > (INT_MAX - 1) / 2)
++		return NULL;
++	dest = kmalloc((len * 2) + 1, GFP_KERNEL);
++	if (!dest)
++		return NULL;
++
++	for (ptr = dest, i = 0; i < len; i++) {
++		*ptr++ = hex[(source[i] & 0xF0) >> 4];
++		*ptr++ = hex[source[i] & 0x0F];
++	}
++	*ptr = '\0';
++
++	return dest;
++}
++
++static char *quoted_printable(const char *source, size_t len)
++{
++	char *dest;
++
++	/* Need to add 2 double quotes and a NULL. */
++	if (len > INT_MAX - 3)
++		return NULL;
++	dest = kmalloc(len + 3, GFP_KERNEL);
++	if (!dest)
++		return NULL;
++
++	dest[0] = '"';
++	strncpy(dest + 1, source, len);
++	dest[len + 1] = '"';
++	dest[len + 2] = '\0';
++	return dest;
++}
++
++/* Return a string that has been sanitized and is safe to log. It is either
++ * in double-quotes, or is a series of hex digits.
++ */
++char *printable(char *source, size_t max_len)
++{
++	size_t len;
++
++	if (!source)
++		return NULL;
++
++	len = strnlen(source, max_len);
++	if (contains_unprintable(source, len))
++		return hex_printable(source, len);
++	else
++		return quoted_printable(source, len);
++}
++
++/* Repurposed from fs/proc/base.c, with NULL-replacement for saner printing.
++ * Allocates the buffer itself.
++ */
++char *printable_cmdline(struct task_struct *task)
++{
++	char *buffer = NULL, *sanitized;
++	int res, i;
++	unsigned int len;
++	struct mm_struct *mm;
++
++	mm = get_task_mm(task);
++	if (!mm)
++		goto out;
++
++	if (!mm->arg_end)
++		goto out_mm;	/* Shh! No looking before we're done */
++
++	buffer = kmalloc(PAGE_SIZE, GFP_KERNEL);
++	if (!buffer)
++		goto out_mm;
++
++	len = mm->arg_end - mm->arg_start;
++
++	if (len > PAGE_SIZE)
++		len = PAGE_SIZE;
++
++	res = access_process_vm(task, mm->arg_start, buffer, len, 0);
++
++	/* Space-fill NULLs. */
++	if (res > 1)
++		for (i = 0; i < res - 2; ++i)
++			if (buffer[i] == '\0')
++				buffer[i] = ' ';
++
++	/* If the NULL at the end of args has been overwritten, then
++	 * assume application is using setproctitle(3).
++	 */
++	if (res > 0 && buffer[res-1] != '\0' && len < PAGE_SIZE) {
++		len = strnlen(buffer, res);
++		if (len < res) {
++			res = len;
++		} else {
++			len = mm->env_end - mm->env_start;
++			if (len > PAGE_SIZE - res)
++				len = PAGE_SIZE - res;
++			res += access_process_vm(task, mm->env_start,
++						 buffer+res, len, 0);
++		}
++	}
++
++	/* Make sure the buffer is always NULL-terminated. */
++	buffer[PAGE_SIZE-1] = 0;
++
++	/* Make sure result is printable. */
++	sanitized = printable(buffer, res);
++	kfree(buffer);
++	buffer = sanitized;
++
++out_mm:
++	mmput(mm);
++out:
++	return buffer;
++}
+diff --git a/security/chromiumos/utils.h b/security/chromiumos/utils.h
+new file mode 100644
+index 000000000000..7151bba6d927
+--- /dev/null
++++ b/security/chromiumos/utils.h
+@@ -0,0 +1,30 @@
++/*
++ * Utilities for the Linux Security Module for Chromium OS
++ * (Since CONFIG_AUDIT is disabled for Chrome OS, we must repurpose
++ * a bunch of the audit string handling logic here instead.)
++ *
++ * Copyright 2012 Google Inc. All Rights Reserved
++ *
++ * Author:
++ *      Kees Cook       <keescook@chromium.org>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _SECURITY_CHROMIUMOS_UTILS_H
++#define _SECURITY_CHROMIUMOS_UTILS_H
++
++#include <linux/sched.h>
++#include <linux/mm.h>
++
++char *printable(char *source, size_t max_len);
++char *printable_cmdline(struct task_struct *task);
++
++#endif /* _SECURITY_CHROMIUMOS_UTILS_H */
+diff --git a/security/keys/big_key.c b/security/keys/big_key.c
+index c3367622c683..a13ea8f34890 100644
+--- a/security/keys/big_key.c
++++ b/security/keys/big_key.c
+@@ -64,7 +64,7 @@ int big_key_preparse(struct key_preparsed_payload *prep)
+ 	size_t enclen = datalen + CHACHA20POLY1305_AUTHTAG_SIZE;
+ 	int ret;
+ 
+-	BUILD_BUG_ON(sizeof(*payload) != sizeof(prep->payload.data));
++	BUILD_BUG_ON(sizeof(*payload) > sizeof(prep->payload.data));
+ 
+ 	if (datalen <= 0 || datalen > 1024 * 1024 || !prep->data)
+ 		return -EINVAL;
+diff --git a/security/lsm_audit.c b/security/lsm_audit.c
+index 849e832719e2..830622937da4 100644
+--- a/security/lsm_audit.c
++++ b/security/lsm_audit.c
+@@ -204,7 +204,7 @@ static void dump_common_audit_data(struct audit_buffer *ab,
+ 	 * start making this union too large!  See struct lsm_network_audit
+ 	 * as an example of how to deal with large data.
+ 	 */
+-	BUILD_BUG_ON(sizeof(a->u) > sizeof(void *)*2);
++	BUILD_BUG_ON(sizeof(a->u) > sizeof(void *)*3);
+ 
+ 	audit_log_format(ab, " pid=%d comm=", task_tgid_nr(current));
+ 	audit_log_untrustedstring(ab, memcpy(comm, current->comm, sizeof(comm)));
+diff --git a/tools/testing/selftests/lsm/lsm_list_modules_test.c b/tools/testing/selftests/lsm/lsm_list_modules_test.c
+index 1cc8a977c711..9a5fdf1809b5 100644
+--- a/tools/testing/selftests/lsm/lsm_list_modules_test.c
++++ b/tools/testing/selftests/lsm/lsm_list_modules_test.c
+@@ -122,6 +122,9 @@ TEST(correct_lsm_list_modules)
+ 		case LSM_ID_LANDLOCK:
+ 			name = "landlock";
+ 			break;
++                case LSM_ID_CHROMIUMOS:
++                        name = "chroimiumos";
++                        break;
+ 		case LSM_ID_IMA:
+ 			name = "ima";
+ 			break;
+-- 
+2.54.0
+

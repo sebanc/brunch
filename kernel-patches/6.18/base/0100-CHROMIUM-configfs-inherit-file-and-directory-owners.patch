@@ -1,0 +1,90 @@
+From 3078274fa95540ebf8e7395259b2febff7f888b5 Mon Sep 17 00:00:00 2001
+From: Daniel Rosenberg <drosen@google.com>
+Date: Thu, 15 Mar 2018 20:58:32 -0700
+Subject: [PATCH 100/616] CHROMIUM: configfs: inherit file and directory owners
+
+All entries in configfs are currently owned by root,
+regardless of context. Instead, this preserves the
+current ownership, allowing userspace to choose who
+has permissions to configure the system through
+any particular configfs subsystem.
+
+This means anyone who can create a group will now
+have the ability to create any groups inside of that
+group.
+
+BUG=b:63876697
+TEST=chown 1000:1000 /sys/kernel/config/sdcardsfs/ &&
+     ls -l /sys/kernel/config/sdcardfs/ &&
+     mkdir -p /sys/kernel/config/sdcardfs/1 &&
+     ls -l /sys/kernel/config/sdcardfs/
+
+Change-Id: I11087cdd58ff1560de72c9452f1ba13881f10cf6
+Signed-off-by: Daniel Rosenberg <drosen@google.com>
+Signed-off-by: Gwendal Grignou <gwendal@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/1102012
+
+[rebase66(tzungbi):
+ Revised commit message.
+ Squashed:
+   FIXUP: CHROMIUM: configfs: inherit file and directory owners
+     (https://crrev.com/c/4764191)
+   FIXUP: CHROMIUM: configfs: inherit file and directory owners
+     (https://crrev.com/c/4764192)
+   FIXUP: CHROMIUM: configfs: inherit file and directory owners
+     (https://crrev.com/c/4764193)
+   FIXUP: CHROMIUM: configfs: inherit file and directory owners
+     (https://crrev.com/c/4852436)
+]
+Signed-off-by: Tzung-Bi Shih <tzungbi@chromium.org>
+---
+ fs/configfs/inode.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/fs/configfs/inode.c b/fs/configfs/inode.c
+index dcc22f593e43..51733a962851 100644
+--- a/fs/configfs/inode.c
++++ b/fs/configfs/inode.c
+@@ -158,6 +158,7 @@ struct inode *configfs_create(struct dentry *dentry, umode_t mode)
+ 	struct inode *inode = NULL;
+ 	struct configfs_dirent *sd;
+ 	struct inode *p_inode;
++	struct dentry *parent;
+ 
+ 	if (!dentry)
+ 		return ERR_PTR(-ENOENT);
+@@ -166,6 +167,31 @@ struct inode *configfs_create(struct dentry *dentry, umode_t mode)
+ 		return ERR_PTR(-EEXIST);
+ 
+ 	sd = dentry->d_fsdata;
++	parent = dget_parent(dentry);
++	if (parent && !sd->s_iattr) {
++		struct configfs_dirent *sd_parent = parent->d_fsdata;
++
++		sd->s_iattr = kzalloc(sizeof(struct iattr), GFP_KERNEL);
++		if (!sd->s_iattr) {
++			dput(parent);
++			return ERR_PTR(-ENOMEM);
++		}
++
++		sd->s_iattr->ia_mode = sd->s_mode;
++		if (sd_parent && sd_parent->s_iattr) {
++			sd->s_iattr->ia_uid = sd_parent->s_iattr->ia_uid;
++			sd->s_iattr->ia_gid = sd_parent->s_iattr->ia_gid;
++		} else {
++			sd->s_iattr->ia_uid = GLOBAL_ROOT_UID;
++			sd->s_iattr->ia_gid = GLOBAL_ROOT_GID;
++		}
++		if (sd_parent && sd_parent->s_dentry && d_inode(sd_parent->s_dentry))
++			sd->s_iattr->ia_ctime = current_time(d_inode(sd_parent->s_dentry));
++		else
++			ktime_get_coarse_real_ts64(&sd->s_iattr->ia_ctime);
++		sd->s_iattr->ia_atime = sd->s_iattr->ia_mtime = sd->s_iattr->ia_ctime;
++	}
++	dput(parent);
+ 	inode = configfs_new_inode(mode, sd, dentry->d_sb);
+ 	if (!inode)
+ 		return ERR_PTR(-ENOMEM);
+-- 
+2.54.0
+

@@ -1,0 +1,67 @@
+From c99230f45048a42106048f3beb9d102e4958bf04 Mon Sep 17 00:00:00 2001
+From: Koki Ryu <kokiryu@google.com>
+Date: Thu, 22 Dec 2022 17:30:17 +0900
+Subject: [PATCH 164/616] CHROMIUM: mm: multi-gen LRU: Add userspace
+ notification for generation creation
+
+Add sysfs_notify so that every time a new MGLRU
+generation is created so that user space programs can notice that by
+polling /sys/kernel/mm/lru_gen/admin.
+
+BUG=b:260967742
+TEST=Built.
+  Run /google/data/ro/users/su/suleiman/tests/poll.c on /sys/kernel/mm/lru_gen/admin
+  while generating memory pressure with /google/data/ro/users/su/suleiman/tests/memtoy,
+  ensuring it returns a POLLPRI event.
+  Also made sure kernel built with USE=lockdebug doesn't have warnings.
+Signed-off-by: Koki Ryu <kokiryu@google.com>
+Signed-off-by: Suleiman Souhlal <suleiman@google.com>
+Change-Id: I86aa889e360d219939c8e673067822cf340c0f01
+Reviewed-on: https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/4393685
+
+Origin-6-6: ec3f671f6b96befcb2ae4fab8972203e82b41231
+Squashed: https://crrev.com/c/5737377 CHROMIUM: MGLRU: fix location of new gen notification
+Signed-off-by: Tzung-Bi Shih <tzungbi@chromium.org>
+---
+ mm/vmscan.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index a4838e690879..92921b03c279 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -2580,6 +2580,8 @@ static bool can_age_anon_pages(struct pglist_data *pgdat,
+ 
+ #ifdef CONFIG_LRU_GEN
+ 
++static struct kernfs_node *lru_gen_admin_node;
++
+ #ifdef CONFIG_LRU_GEN_ENABLED
+ DEFINE_STATIC_KEY_ARRAY_TRUE(lru_gen_caps, NR_LRU_GEN_CAPS);
+ #define get_cap(cap)	static_branch_likely(&lru_gen_caps[cap])
+@@ -3910,6 +3912,7 @@ static bool try_to_inc_max_seq(struct lruvec *lruvec, unsigned long seq,
+ 	if (success) {
+ 		success = inc_max_seq(lruvec, seq, can_swap, force_scan);
+ 		WARN_ON_ONCE(!success);
++		kernfs_notify(lru_gen_admin_node);
+ 	}
+ 
+ 	return success;
+@@ -5790,11 +5793,14 @@ void lru_gen_exit_memcg(struct mem_cgroup *memcg)
+ 
+ static int __init init_lru_gen(void)
+ {
++	struct kernfs_node *tmp;
+ 	BUILD_BUG_ON(MIN_NR_GENS + 1 >= MAX_NR_GENS);
+ 	BUILD_BUG_ON(BIT(LRU_GEN_WIDTH) <= MAX_NR_GENS);
+ 
+ 	if (sysfs_create_group(mm_kobj, &lru_gen_attr_group))
+ 		pr_err("lru_gen: failed to create sysfs group\n");
++	tmp = kernfs_find_and_get(mm_kobj->sd, "lru_gen");
++	lru_gen_admin_node = kernfs_find_and_get(tmp, "admin");
+ 
+ 	debugfs_create_file("lru_gen", 0644, NULL, NULL, &lru_gen_rw_fops);
+ 	debugfs_create_file("lru_gen_full", 0444, NULL, NULL, &lru_gen_ro_fops);
+-- 
+2.54.0
+

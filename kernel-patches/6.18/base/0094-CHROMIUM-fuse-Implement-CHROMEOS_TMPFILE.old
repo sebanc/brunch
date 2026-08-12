@@ -1,0 +1,121 @@
+From 7ec1c1e468680be68d8303c90a40e2598a2f07cd Mon Sep 17 00:00:00 2001
+From: Chirantan Ekbote <chirantan@chromium.org>
+Date: Thu, 5 Nov 2020 19:15:44 +0900
+Subject: [PATCH 094/616] CHROMIUM: fuse: Implement CHROMEOS_TMPFILE
+
+This is a chrome os extension for fuse implemented in a way that will
+hopefully not conflict with rebases.  The upstream maintainer was not
+happy with this approach because it uses 2 round-trips instead of one.
+However, his proposed mechanism requires changes to the VFS layer but
+the VFS maintainer was non-committal.
+
+At this point, I think the patch is non-intrusive enough that we can
+just maintain it ourselves and if upstream ever gains support for
+O_TMPFILE we can drop it at that time.
+
+BUG=b:160932094
+TEST=Successfully open a file with  O_TMPFILE on virtio-fs
+
+Change-Id: I600abd2d7604f8e167b6be65f5194e18bbf1b554
+Signed-off-by: Chirantan Ekbote <chirantan@chromium.org>
+Reviewed-on: https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/2520740
+
+[rebase66(tzungbi):
+ Revised commit message.
+ Squashed:
+   FIXUP: CHROMIUM: fuse: Implement CHROMEOS_TMPFILE
+   CHROMIUM: uapi/fuse.h: Add message definitions for CHROMEOS_TMPFILE
+     (https://crrev.com/c/2520739)
+]
+Signed-off-by: Tzung-Bi Shih <tzungbi@chromium.org>
+
+Change-Id: I845f9a800bc02e35d78e71b25f3a7a45f18ac76e
+---
+ fs/fuse/dir.c             | 23 +++++++++++++++++++++++
+ fs/fuse/file.c            |  2 +-
+ include/uapi/linux/fuse.h |  8 ++++++++
+ 3 files changed, 32 insertions(+), 1 deletion(-)
+
+diff --git a/fs/fuse/dir.c b/fs/fuse/dir.c
+index 54104dd48af7..04b84d690c59 100644
+--- a/fs/fuse/dir.c
++++ b/fs/fuse/dir.c
+@@ -919,6 +919,28 @@ static int fuse_mkdir(struct mnt_idmap *idmap, struct inode *dir,
+ 	return create_new_entry(idmap, fm, &args, dir, entry, S_IFDIR);
+ }
+ 
++static int fuse_chromeos_tmpfile(struct mnt_idmap *idmap, struct inode *dir,
++				 struct file *file, umode_t mode)
++{
++	struct fuse_chromeos_tmpfile_in inarg;
++	struct fuse_mount *fm = get_fuse_mount(dir);
++	FUSE_ARGS(args);
++
++	if (!fm->fc->dont_mask)
++		mode &= ~current_umask();
++
++	memset(&inarg, 0, sizeof(inarg));
++	inarg.mode = mode;
++	inarg.umask = current_umask();
++	args.opcode = FUSE_CHROMEOS_TMPFILE;
++	args.in_numargs = 1;
++	args.in_args[0].size = sizeof(inarg);
++	args.in_args[0].value = &inarg;
++
++	return create_new_entry(idmap, fm, &args, dir, file->f_path.dentry,
++				S_IFREG);
++}
++
+ static int fuse_symlink(struct mnt_idmap *idmap, struct inode *dir,
+ 			struct dentry *entry, const char *link)
+ {
+@@ -2178,6 +2200,7 @@ static const struct inode_operations fuse_dir_inode_operations = {
+ 	.set_acl	= fuse_set_acl,
+ 	.fileattr_get	= fuse_fileattr_get,
+ 	.fileattr_set	= fuse_fileattr_set,
++	.tmpfile	= fuse_chromeos_tmpfile,
+ };
+ 
+ static const struct file_operations fuse_dir_operations = {
+diff --git a/fs/fuse/file.c b/fs/fuse/file.c
+index dafdf766b1d5..5031d85befc3 100644
+--- a/fs/fuse/file.c
++++ b/fs/fuse/file.c
+@@ -30,7 +30,7 @@ static int fuse_send_open(struct fuse_mount *fm, u64 nodeid,
+ 	FUSE_ARGS(args);
+ 
+ 	memset(&inarg, 0, sizeof(inarg));
+-	inarg.flags = open_flags & ~(O_CREAT | O_EXCL | O_NOCTTY);
++	inarg.flags = open_flags & ~(O_CREAT | O_EXCL | O_NOCTTY | O_TMPFILE);
+ 	if (!fm->fc->atomic_o_trunc)
+ 		inarg.flags &= ~O_TRUNC;
+ 
+diff --git a/include/uapi/linux/fuse.h b/include/uapi/linux/fuse.h
+index f1e99458e29e..d8b43ac9cffe 100644
+--- a/include/uapi/linux/fuse.h
++++ b/include/uapi/linux/fuse.h
+@@ -645,6 +645,9 @@ enum fuse_opcode {
+ 	/* Reserved opcodes: helpful to detect structure endian-ness */
+ 	CUSE_INIT_BSWAP_RESERVED	= 1048576,	/* CUSE_INIT << 8 */
+ 	FUSE_INIT_BSWAP_RESERVED	= 436207616,	/* FUSE_INIT << 24 */
++
++	/* Chrome OS extensions */
++	FUSE_CHROMEOS_TMPFILE	= 0xffffffff,	/* u32::MAX */
+ };
+ 
+ enum fuse_notify_code {
+@@ -778,6 +781,11 @@ struct fuse_create_in {
+ 	uint32_t	open_flags;	/* FUSE_OPEN_... */
+ };
+ 
++struct fuse_chromeos_tmpfile_in {
++	uint32_t mode;
++	uint32_t umask;
++};
++
+ struct fuse_open_out {
+ 	uint64_t	fh;
+ 	uint32_t	open_flags;
+-- 
+2.54.0
+

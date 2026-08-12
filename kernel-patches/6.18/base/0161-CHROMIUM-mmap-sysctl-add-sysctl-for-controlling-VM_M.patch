@@ -1,0 +1,144 @@
+From 53cc4d329b58bf5ed77483d38c2cbac8a8760720 Mon Sep 17 00:00:00 2001
+From: Will Drewry <wad@chromium.org>
+Date: Mon, 15 Aug 2011 13:31:26 -0500
+Subject: [PATCH 161/616] CHROMIUM: mmap, sysctl: add sysctl for controlling
+ VM_MAYEXEC taint
+
+This patch proposes a sysctl knob that allows a privileged user to
+disable ~VM_MAYEXEC tainting when mapping in a vma from a MNT_NOEXEC
+mountpoint.  It does not alter the normal behavior resulting from
+attempting to directly mmap(PROT_EXEC) a vma (-EPERM) nor the behavior
+of any other subsystems checking MNT_NOEXEC.
+
+It is motivated by a common /dev/shm, /tmp usecase. There are few
+facilities for creating a shared memory segment that can be remapped in
+the same process address space with different permissions.  Often, a
+file in /tmp provides this functionality.  However, on distributions
+that are more restrictive/paranoid, world-writeable directories are
+often mounted "noexec".  The only workaround to support software that
+needs this behavior is to either not use that software or remount /tmp
+exec.  (E.g., https://bugs.gentoo.org/350336?id=350336)  Given that
+the only recourse is using SysV IPC, the application programmer loses
+many of the useful ABI features that they get using a mmap'd file.
+
+With this patch, it would be possible to change the sysctl variable
+such that mprotect(PROT_EXEC) would succeed.  In cases like the example
+above, an additional userspace mmap-wrapper would be needed, but in
+other cases, like how code.google.com/p/nativeclient mmap()s then
+mprotect()s, the behavior would be unaffected.
+
+The tradeoff is a loss of defense in depth, but it seems reasonable when
+the alternative is frequently to disable the defense entirely.
+
+(There are many other ways to approach this problem, but this seemed to
+ be the most practical and feel the least like a hack or a major change.)
+
+Signed-off-by: Will Drewry <wad@chromium.org>
+
+BUG=chromium-os:19221,native-client:1883
+TEST=built x86, booted,
+     ran sysctl -w vm.mmap_noexec_taint=0
+     run mmap_tester.c from issue such that it uses mprotect.
+
+Change-Id: I1e13adc0d9e8fdb1a0027a2e715557f4aff1b283
+Reviewed-on: http://gerrit.chromium.org/gerrit/6007
+
+[rebase66(tzungbi): Revised commit message.]
+Signed-off-by: Tzung-Bi Shih <tzungbi@chromium.org>
+---
+ include/linux/mm.h |  1 +
+ kernel/sysctl.c    |  9 +++++++++
+ mm/Kconfig         | 17 +++++++++++++++++
+ mm/mmap.c          |  3 ++-
+ mm/util.c          |  1 +
+ 5 files changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 61fff5d34ed5..7a1d66f6583d 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -204,6 +204,7 @@ static inline void __mm_zero_struct_page(struct page *page)
+ #define DEFAULT_MAX_MAP_COUNT	(USHRT_MAX - MAPCOUNT_ELF_CORE_MARGIN)
+ 
+ extern int sysctl_max_map_count;
++extern int sysctl_mmap_noexec_taint;
+ 
+ extern unsigned long sysctl_user_reserve_kbytes;
+ extern unsigned long sysctl_admin_reserve_kbytes;
+diff --git a/kernel/sysctl.c b/kernel/sysctl.c
+index 39b5b61ddc88..053ddc1f5501 100644
+--- a/kernel/sysctl.c
++++ b/kernel/sysctl.c
+@@ -2195,6 +2195,15 @@ static struct ctl_table vm_table[] = {
+ 		.mode		= 0644,
+ 		.proc_handler	= mmap_min_addr_handler,
+ 	},
++	{
++		.procname	= "mmap_noexec_taint",
++		.data		= &sysctl_mmap_noexec_taint,
++		.maxlen		= sizeof(sysctl_mmap_noexec_taint),
++		.mode		= 0644,
++		.proc_handler	= proc_dointvec_minmax,
++		.extra1		= SYSCTL_ZERO,
++		.extra2		= SYSCTL_ONE,
++	},
+ #endif
+ #if (defined(CONFIG_X86_32) && !defined(CONFIG_UML))|| \
+    (defined(CONFIG_SUPERH) && defined(CONFIG_VSYSCALL))
+diff --git a/mm/Kconfig b/mm/Kconfig
+index 33fa51d608dc..3b22342b6696 100644
+--- a/mm/Kconfig
++++ b/mm/Kconfig
+@@ -759,6 +759,23 @@ config DEFAULT_MMAP_MIN_ADDR
+ 	  This value can be changed after boot using the
+ 	  /proc/sys/vm/mmap_min_addr tunable.
+ 
++config MMAP_NOEXEC_TAINT
++	int "Turns on tainting of mmap()d files from noexec mountpoints"
++	default 1 if MMU
++	default 0 if !MMU
++	help
++	  By default, the ability to change the protections of a virtual
++	  memory area to allow execution depend on if the vma has the
++	  VM_MAYEXEC flag.  When mapping regions from files, VM_MAYEXEC
++	  will be unset if the containing mountpoint is mounted MNT_NOEXEC.
++	  By setting the value to 0, any mmap()d region may be later
++	  mprotect()d with PROT_EXEC.
++
++	  If unsure, keep the value set to 1.
++
++	  This value can be changed after boot using the
++	  /proc/sys/vm/mmap_noexec_taint tunable.
++
+ config ARCH_SUPPORTS_MEMORY_FAILURE
+ 	bool
+ 
+diff --git a/mm/mmap.c b/mm/mmap.c
+index 79d541f1502b..044b5f35cdb7 100644
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -415,7 +415,8 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
+ 			if (path_noexec(&file->f_path)) {
+ 				if (vm_flags & VM_EXEC)
+ 					return -EPERM;
+-				vm_flags &= ~VM_MAYEXEC;
++				if (sysctl_mmap_noexec_taint)
++					vm_flags &= ~VM_MAYEXEC;
+ 			}
+ 
+ 			if (!file->f_op->mmap)
+diff --git a/mm/util.c b/mm/util.c
+index 4f1275023eb7..0032d900866e 100644
+--- a/mm/util.c
++++ b/mm/util.c
+@@ -905,6 +905,7 @@ int sysctl_overcommit_memory __read_mostly = OVERCOMMIT_GUESS;
+ int sysctl_overcommit_ratio __read_mostly = 50;
+ unsigned long sysctl_overcommit_kbytes __read_mostly;
+ int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
++int sysctl_mmap_noexec_taint __read_mostly = CONFIG_MMAP_NOEXEC_TAINT;
+ unsigned long sysctl_user_reserve_kbytes __read_mostly = 1UL << 17; /* 128MB */
+ unsigned long sysctl_admin_reserve_kbytes __read_mostly = 1UL << 13; /* 8MB */
+ 
+-- 
+2.54.0
+

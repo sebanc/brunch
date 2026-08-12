@@ -1,0 +1,204 @@
+From d2875ca7865eddbbc889efd78a705e581e2f9c57 Mon Sep 17 00:00:00 2001
+From: Bryan Yu <yuholong@google.com>
+Date: Wed, 19 Oct 2022 13:31:24 +0900
+Subject: [PATCH 163/616] CHROMIUM: mm: multi-gen LRU: Add sysfs
+
+This is a reland of CL:3839069 fixing the memcg bug and snprintf buffer
+overflow.
+Tested on ARM device with both memcg on and off.
+This cherry-pick also contains the changes in CL:4004384.
+
+BUG=b:254153610
+TEST=Manual testing on DUT
+
+Signed-off-by: Bryan Yu <yuholong@google.com>
+Change-Id: I7dcd354fadda7b4a28c787f6b28dfbce3d1c2f87
+Reviewed-on: https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/3998276
+
+[rebase66(tzungbi):
+ Revised commit message.
+ Squashed:
+   FIXUP: CHROMIUM: Reland of add implementation of MGLRU in sysfs
+     (https://crrev.com/c/4680852)
+   FIXUP: CHROMIUM: Reland of add implementation of MGLRU in sysfs
+   CHROMIUM: MGLRU: Fix crash when writing to sysfs MGLRU lru_gen/admin file.
+     (https://crrev.com/c/4393683)
+]
+Signed-off-by: Tzung-Bi Shih <tzungbi@chromium.org>
+---
+ mm/vmscan.c | 156 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 156 insertions(+)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 28ba2b06fc7d..a4838e690879 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -5182,9 +5182,165 @@ static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
+ 
+ static struct kobj_attribute lru_gen_enabled_attr = __ATTR_RW(enabled);
+ 
++static int print_node_mglru(struct lruvec *lruvec, char *buf, int orig_pos)
++{
++	unsigned long seq;
++	struct lru_gen_folio *lrugen = &lruvec->lrugen;
++
++	DEFINE_MAX_SEQ(lruvec);
++	DEFINE_MIN_SEQ(lruvec);
++
++	int print_pos = orig_pos;
++
++	seq = min(min_seq[0], min_seq[1]);
++
++	for (; seq <= max_seq; seq++) {
++		int gen, type, zone;
++		unsigned int msecs;
++
++		gen = lru_gen_from_seq(seq);
++		msecs = jiffies_to_msecs(jiffies - READ_ONCE(lrugen->timestamps[gen]));
++
++		print_pos += snprintf(buf + print_pos, PAGE_SIZE - print_pos,
++			" %10lu %10u", seq, msecs);
++
++		for (type = 0; type < ANON_AND_FILE; type++) {
++			long size = 0;
++
++			if (seq < min_seq[type]) {
++				print_pos += snprintf(buf + print_pos,
++					PAGE_SIZE - print_pos, "         -0 ");
++				continue;
++			}
++
++			for (zone = 0; zone < MAX_NR_ZONES; zone++)
++				size += READ_ONCE(lrugen->nr_pages[gen][type][zone]);
++
++			print_pos += snprintf(buf + print_pos,
++				PAGE_SIZE - print_pos, " %10lu ", max(size, 0L));
++		}
++
++		print_pos += snprintf(buf + print_pos, PAGE_SIZE - print_pos, "\n");
++
++	}
++
++	return print_pos - orig_pos;
++}
++
++static ssize_t show_lru_gen_admin(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
++{
++	struct lruvec *lruvec;
++	struct mem_cgroup *memcg;
++
++	char *path = kvmalloc(PATH_MAX, GFP_KERNEL);
++	int buf_len = 0;
++
++	if (!path)
++		return -EINVAL;
++	path[0] = 0;
++	buf[0] = 0;
++	memcg = mem_cgroup_iter(NULL, NULL, NULL);
++	do {
++		int nid;
++
++		for_each_node_state(nid, N_MEMORY) {
++			lruvec = mem_cgroup_lruvec(memcg, NODE_DATA(nid));
++			if (lruvec) {
++				if (nid == first_memory_node) {
++#ifdef CONFIG_MEMCG
++					if (memcg)
++						cgroup_path(memcg->css.cgroup, path, PATH_MAX);
++					else
++						path[0] = 0;
++#endif
++					buf_len += snprintf(buf + buf_len, PAGE_SIZE - buf_len,
++						"memcg %5hu %s\n", mem_cgroup_id(memcg), path);
++				}
++
++				buf_len += snprintf(buf + buf_len, PAGE_SIZE - buf_len,
++					" node %5d\n", nid);
++				buf_len += print_node_mglru(lruvec, buf, buf_len);
++			}
++		}
++	} while ((memcg = mem_cgroup_iter(NULL, memcg, NULL)));
++
++	if (buf_len >= PAGE_SIZE)
++		buf_len = PAGE_SIZE - 1;
++	buf[buf_len] = 0;
++
++	kvfree(path);
++
++	return buf_len;
++}
++
++static int run_cmd(char cmd, int memcg_id, int nid, unsigned long seq,
++		   struct scan_control *sc, int swappiness, unsigned long opt);
++
++static ssize_t store_lru_gen_admin(struct kobject *kobj, struct kobj_attribute *attr,
++				const char *src, size_t len)
++{
++	void *buf;
++	char *cur, *next;
++	int err = 0;
++	struct scan_control sc = {
++		.may_writepage = true,
++		.may_unmap = true,
++		.may_swap = true,
++		.reclaim_idx = MAX_NR_ZONES - 1,
++		.gfp_mask = GFP_KERNEL,
++	};
++
++	buf = kvmalloc(len + 1, GFP_USER);
++	if (!buf)
++		return -ENOMEM;
++
++	memcpy(buf, src, len);
++
++	next = buf;
++	next[len] = '\0';
++
++	set_task_reclaim_state(current, &sc.reclaim_state);
++
++	while ((cur = strsep(&next, ",;\n"))) {
++		int n;
++		int end;
++		char cmd;
++		unsigned int memcg_id;
++		unsigned int nid;
++		unsigned long seq;
++		unsigned int swappiness = -1;
++		unsigned long nr_to_reclaim = -1;
++
++		cur = skip_spaces(cur);
++		if (!*cur)
++			continue;
++
++		n = sscanf(cur, "%c %u %u %lu %n %u %n %lu %n", &cmd, &memcg_id, &nid,
++			   &seq, &end, &swappiness, &end, &nr_to_reclaim, &end);
++		if (n < 4 || cur[end]) {
++			err = -EINVAL;
++			break;
++		}
++
++		err = run_cmd(cmd, memcg_id, nid, seq, &sc, swappiness, nr_to_reclaim);
++		if (err)
++			break;
++	}
++
++	set_task_reclaim_state(current, NULL);
++	kvfree(buf);
++
++	return err ? : len;
++}
++
++static struct kobj_attribute lru_gen_admin_attr = __ATTR(
++	admin, 0644, show_lru_gen_admin, store_lru_gen_admin
++);
++
+ static struct attribute *lru_gen_attrs[] = {
+ 	&lru_gen_min_ttl_attr.attr,
+ 	&lru_gen_enabled_attr.attr,
++	&lru_gen_admin_attr.attr,
+ 	NULL
+ };
+ 
+-- 
+2.54.0
+

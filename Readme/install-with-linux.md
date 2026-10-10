@@ -32,7 +32,8 @@ This guide is for installing Brunch to a USB (or other disk) using Linux. This g
   
 #### Intel
 * 10th gen: "[jinlon][recovery-jinlon]".
-* 11th gen & above: "[voxel][recovery-voxel]".
+* 11th gen to 13th gen: "[voxel][recovery-voxel]".
+* 14th gen and Core Ultra: "[kanix][recovery-kanix]".
 #### AMD
 * Ryzen: "[gumboz][recovery-gumboz]".
 
@@ -196,7 +197,8 @@ This guide is for installing Brunch to a partition using Linux. This guide is *n
   
 #### Intel
 * 10th gen: "[jinlon][recovery-jinlon]".
-* 11th gen & above: "[voxel][recovery-voxel]".
+* 11th gen to 13th gen: "[voxel][recovery-voxel]".
+* 14th gen and Core Ultra: "[kanix][recovery-kanix]".
 #### AMD
 * Ryzen: "[gumboz][recovery-gumboz]".
 
@@ -363,15 +365,10 @@ In case you run into issues while installing or using Brunch, you can find suppo
 [swtpm]: https://github.com/stefanberger/swtpm
 [linux-surface]: https://github.com/linux-surface/linux-surface
 [chromebrew]: https://github.com/skycocker/chromebrew
-[intel-cpus]: https://en.wikipedia.org/wiki/Intel_Core
-[intel-list]: https://en.wikipedia.org/wiki/List_of_Intel_CPU_microarchitectures
-[atom-cpus]: https://en.wikipedia.org/wiki/Intel_Atom
-[atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
-[amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
-[amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
 [recovery-jinlon]: https://cros.tech/device/jinlon
 [recovery-voxel]: https://cros.tech/device/voxel
 [recovery-gumboz]: https://cros.tech/device/gumboz
+[recovery-kanix]: https://cros.tech/device/kanix
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils

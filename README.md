@@ -62,7 +62,8 @@ Linuxloops is a tool that allows the installation of Brunch with a GUI.
 First, identify the recovery image suitable for your CPU:  
 #### Intel
 * 10th gen: "[jinlon][recovery-jinlon]".
-* 11th gen & above: "[voxel][recovery-voxel]".
+* 11th gen to 13th gen: "[voxel][recovery-voxel]".
+* 14th gen and Core Ultra: "[kanix][recovery-kanix]".
 #### AMD
 * Ryzen: "[gumboz][recovery-gumboz]".
   
@@ -108,14 +109,11 @@ Additional troubleshooting and support tips can be found at the following page:
 [chromebrew]: https://github.com/skycocker/chromebrew
 [celeron-cpus]: https://en.wikipedia.org/wiki/List_of_Intel_Celeron_processors
 [intel-cpus]: https://en.wikipedia.org/wiki/Intel_Core
-[intel-list]: https://en.wikipedia.org/wiki/List_of_Intel_CPU_microarchitectures
-[atom-cpus]: https://en.wikipedia.org/wiki/Intel_Atom
-[atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
-[amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
 [amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
 [recovery-jinlon]: https://cros.tech/device/jinlon
 [recovery-voxel]: https://cros.tech/device/voxel
 [recovery-gumboz]: https://cros.tech/device/gumboz
+[recovery-kanix]: https://cros.tech/device/kanix
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils

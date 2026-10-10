@@ -382,15 +382,6 @@ It is currently recommended to only update ChromeOS when the matching version of
 [swtpm]: https://github.com/stefanberger/swtpm
 [linux-surface]: https://github.com/linux-surface/linux-surface
 [chromebrew]: https://github.com/skycocker/chromebrew
-[intel-cpus]: https://en.wikipedia.org/wiki/Intel_Core
-[intel-list]: https://en.wikipedia.org/wiki/List_of_Intel_CPU_microarchitectures
-[atom-cpus]: https://en.wikipedia.org/wiki/Intel_Atom
-[atom-list]: https://en.wikipedia.org/wiki/List_of_Intel_Atom_microprocessors
-[amd-sr-list]: https://en.wikipedia.org/wiki/List_of_AMD_accelerated_processing_units#%22Stoney_Ridge%22_(2016)
-[amd-ry-list]: https://en.wikipedia.org/wiki/List_of_AMD_Ryzen_processors
-[recovery-jinlon]: https://cros.tech/device/jinlon
-[recovery-voxel]: https://cros.tech/device/voxel
-[recovery-gumboz]: https://cros.tech/device/gumboz
 [cros-tech]: https://cros.tech/
 [cros-official]: https://cros-updates-serving.appspot.com/
 [vboot-utils]: https://aur.archlinux.org/packages/vboot-utils
